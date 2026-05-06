@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: Production-Ready
 status: in_progress
-stopped_at: Phase 6 complete — documentation shipped and verified
-last_updated: "2026-05-06T23:40:00Z"
-last_activity: 2026-05-06 -- Phase 6 complete (DOCS2-01..13 verified; docs/examples self-lint clean)
+stopped_at: Phase 6.5 complete — self-improvement research spec written
+last_updated: "2026-05-06T23:55:00Z"
+last_activity: 2026-05-06 -- Phase 6.5 complete (RES-01..02 verified; research-only boundary preserved)
 progress:
   total_phases: 8
   completed_phases: 1
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-06)
 
 **Core value:** Every response with structure gets an ASCII diagram without the developer asking. v0.2.0 closes the loop with a Stop-hook linter that validates output.
-**Current focus:** Phase 6.5 — Self-Improvement Research, planning
+**Current focus:** Phase 7 — Release v0.2.0
 
 ## Current Position
 
-Phase: 6 — COMPLETE
-Plan: documentation
-Status: Phase 6 complete
-Last activity: 2026-05-06 -- Phase 6 complete (README, docs/, examples/, CONTRIBUTING.md, GitHub templates, 06-SUMMARY.md)
+Phase: 6.5 — COMPLETE
+Plan: self-improvement-research
+Status: Phase 6.5 complete
+Last activity: 2026-05-06 -- Phase 6.5 complete (docs/self-improvement.md, 06-5-SUMMARY.md)
 
 ## Performance Metrics
 
@@ -71,6 +71,7 @@ Recent decisions affecting current work:
 - [v0.2.0]: NPX as primary install path, bash install.sh refactored to call same Node logic (Phase 5)
 - [v0.2.0]: Documentation is release-ready: README under 500 words, six examples, docs references, contribution templates (Phase 6)
 - [v0.2.0]: Self-improvement loop is research-only in this milestone — full implementation deferred to v0.3.0 (Phase 6.5)
+- [v0.2.0]: Future self-improvement loop must be local-first, off by default, and human-reviewed before rule changes (Phase 6.5)
 
 ### Pending Todos
 
@@ -100,5 +101,5 @@ None yet — Phase 2 plans not yet generated.
 ## Session Continuity
 
 Last session: 2026-05-06
-Stopped at: Phase 6 complete — documentation shipped and verified (178 tests pass, 97.17% coverage)
-Resume file: None — next step is Phase 6.5 (Self-Improvement Research)
+Stopped at: Phase 6.5 complete — self-improvement research spec written
+Resume file: None — next step is Phase 7 (Release v0.2.0)
