@@ -16,7 +16,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/apolenkov/feynman.git"
+    "url": "git+https://github.com/apolenkov/feynman.git"
   },
   "homepage": "https://github.com/apolenkov/feynman#readme",
   "bugs": {
@@ -27,8 +27,8 @@
   },
   "main": "lib/lint/index.js",
   "bin": {
-    "feynman": "./bin/feynman.js",
-    "feynman-lint": "./bin/feynman-lint.js"
+    "feynman": "bin/feynman.js",
+    "feynman-lint": "bin/feynman-lint.js"
   },
   "files": [
     "hooks/",
