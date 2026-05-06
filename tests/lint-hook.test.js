@@ -93,9 +93,6 @@ describe('feynman-lint Stop-hook', () => {
     ].join('\n');
 
     let result;
-    before_each_run: {
-      // Evaluate once for shared assertions in sub-tests
-    }
 
     it('exits 0 (never blocks Claude)', () => {
       result = runLintHook(invalidResponse);

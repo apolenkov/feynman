@@ -11,7 +11,6 @@ const os = require('node:os');
 const path = require('node:path');
 
 const HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-activate.js');
-const RULES_PATH = path.resolve(__dirname, '..', 'rules', 'feynman-activate.md');
 
 /**
  * Create an isolated temp dir and return its path.

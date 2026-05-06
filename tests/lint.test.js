@@ -8,17 +8,8 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const { lint } = require(path.resolve(__dirname, '..', 'lib', 'lint'));
-const rules = require(path.resolve(__dirname, '..', 'lib', 'lint', 'rules'));
 const { parse } = require(path.resolve(__dirname, '..', 'lib', 'lint', 'parser'));
 const cases = require(path.resolve(__dirname, 'lint-cases.json'));
-
-// ---------------------------------------------------------------------------
-// Helper: find first AST node in markdown
-// ---------------------------------------------------------------------------
-function firstNode(markdown) {
-  const ast = parse(markdown);
-  return ast[0] || null;
-}
 
 // ---------------------------------------------------------------------------
 // Golden cases from lint-cases.json
@@ -397,12 +388,7 @@ describe('Parser: standalone diagram detection', () => {
   });
 
   it('prose with [brackets] containing English words not treated as diagram', () => {
-    // "[a word] and [another word] are not boxes" — prose words between boxes
     const md = '[see docs] then [run tests]';
-    // "then" has 4 chars — prose between boxes, should NOT be detected
-    const ast = parse(md);
-    // If detected, it's a flow. If not, it's prose. Either is valid behavior.
-    // We just check lint doesn't crash.
     const result = lint(md);
     assert.ok(Array.isArray(result.issues));
   });
@@ -452,7 +438,6 @@ describe('lint() API contract', () => {
   it('rules filter works', () => {
     // Diagram that would fail L01 and L05
     const md = '```\n[A] [B]\n┌─ box ─┐\n│ item  │\n```';
-    const full = lint(md);
     const l05only = lint(md, { rules: ['L05'] });
     // L05-only should not contain L01 issues
     const hasL01 = l05only.issues.some(i => i.rule === 'L01');
