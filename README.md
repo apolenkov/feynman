@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/feynman"><img src="https://img.shields.io/npm/v/feynman?style=flat&color=blue" alt="npm version"></a>
   <a href="https://github.com/apolenkov/feynman/stargazers"><img src="https://img.shields.io/github/stars/apolenkov/feynman?style=flat&color=yellow" alt="Stars"></a>
   <a href="https://github.com/apolenkov/feynman/commits/main"><img src="https://img.shields.io/github/last-commit/apolenkov/feynman?style=flat" alt="Last Commit"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/apolenkov/feynman?style=flat" alt="License"></a>
@@ -99,11 +100,23 @@ free           | free          | $$$
 
 ## Install
 
+**Via npx (recommended):**
+
+```bash
+npx feynman install
+```
+
+**Via bash one-liner:**
+
 ```bash
 git clone https://github.com/apolenkov/feynman && bash feynman/install.sh
 ```
 
 Restart Claude Code. Done.
+
+**Uninstall:** `npx feynman uninstall` or `bash feynman/uninstall.sh`. State preserved at `~/.claude/.feynman/`.
+
+**Verify:** `npx feynman doctor`.
 
 <details>
 <summary>Manual install</summary>

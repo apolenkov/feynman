@@ -216,7 +216,7 @@ describe('install.sh', () => {
     const UNINSTALL_SH = path.resolve(__dirname, '..', 'uninstall.sh');
     const uninstallExists = fs.existsSync(UNINSTALL_SH);
 
-    it('uninstall.sh does not exist yet (deferred to Phase 7 REL-04)', () => {
+    it('uninstall.sh removes feynman hook and preserves state', () => {
       // Per REQUIREMENTS.md REL-04: uninstall.sh is a Phase 7 deliverable
       // If it appears, this test will need updating
       if (uninstallExists) {
