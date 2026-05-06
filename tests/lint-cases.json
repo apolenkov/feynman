@@ -1,0 +1,178 @@
+[
+  {
+    "name": "L01 pass — complete box with matching corners",
+    "rule": "L01",
+    "expected": "pass",
+    "input": "```\n┌─ Status ─┐\n│  done    │\n└──────────┘\n```"
+  },
+  {
+    "name": "L01 fail — ┌ with no matching └",
+    "rule": "L01",
+    "expected": "fail",
+    "input": "```\n┌─ Status ─┐\n│  done    │\n```",
+    "expected_issues": [{"rule": "L01", "line": 2}]
+  },
+  {
+    "name": "L01 fail — ┐ with no matching ┘",
+    "rule": "L01",
+    "expected": "fail",
+    "input": "```\n┌─ Title ──┐\n│  item    │\n└──────────┘\n```\n\nAnother box:\n\n```\n  ──┐\n  ──│\n```",
+    "expected_issues": [{"rule": "L01"}]
+  },
+  {
+    "name": "L01 pass — multiple complete frames",
+    "rule": "L01",
+    "expected": "pass",
+    "input": "```\n┌─ A ─┐\n│ a   │\n└─────┘\n```\n\n```\n┌─ B ─┐\n│ b   │\n└─────┘\n```"
+  },
+  {
+    "name": "L02 pass — correct tree with └── as last child",
+    "rule": "L02",
+    "expected": "pass",
+    "input": "```\nroot\n├── child-a\n│   ├── grandchild-1\n│   └── grandchild-2\n└── child-b\n```"
+  },
+  {
+    "name": "L02 fail — last child uses ├── instead of └──",
+    "rule": "L02",
+    "expected": "fail",
+    "input": "```\nroot\n├── child-a\n├── child-b\n├── child-c\n```",
+    "expected_issues": [{"rule": "L02"}]
+  },
+  {
+    "name": "L02 pass — single child (only ├──, no siblings after)",
+    "rule": "L02",
+    "expected": "fail",
+    "input": "```\nroot\n├── only-child\n```",
+    "expected_issues": [{"rule": "L02"}]
+  },
+  {
+    "name": "L02 pass — correctly structured multi-level tree",
+    "rule": "L02",
+    "expected": "pass",
+    "input": "```\nproject\n├── src\n│   ├── index.js\n│   └── utils.js\n└── package.json\n```"
+  },
+  {
+    "name": "L03 pass — single arrow style (-->)",
+    "rule": "L03",
+    "expected": "pass",
+    "input": "```\n[A] --> [B] --> [C]\n```"
+  },
+  {
+    "name": "L03 pass — single arrow style (→)",
+    "rule": "L03",
+    "expected": "pass",
+    "input": "```\n[A] → [B] → [C]\n```"
+  },
+  {
+    "name": "L03 fail — mixed --> and →",
+    "rule": "L03",
+    "expected": "fail",
+    "input": "```\n[A] --> [B] → [C]\n```",
+    "expected_issues": [{"rule": "L03"}]
+  },
+  {
+    "name": "L03 fail — mixed --> and ──>",
+    "rule": "L03",
+    "expected": "fail",
+    "input": "```\n[A] --> [B]\n[C] ──> [D]\n```",
+    "expected_issues": [{"rule": "L03"}]
+  },
+  {
+    "name": "L04 pass — consistent table column count",
+    "rule": "L04",
+    "expected": "pass",
+    "input": "```\n| Name  | Value | Status |\n|-------|-------|--------|\n| alpha | 1     | ok     |\n| beta  | 2     | ok     |\n```"
+  },
+  {
+    "name": "L04 fail — row with wrong column count",
+    "rule": "L04",
+    "expected": "fail",
+    "input": "```\n| Name  | Value | Status |\n|-------|-------|\n| alpha | 1     | ok     |\n```",
+    "expected_issues": [{"rule": "L04"}]
+  },
+  {
+    "name": "L05 pass — boxes connected with arrows",
+    "rule": "L05",
+    "expected": "pass",
+    "input": "```\n[Auth] --> [Handler] --> [Response]\n```"
+  },
+  {
+    "name": "L05 fail — two boxes on same line no arrow",
+    "rule": "L05",
+    "expected": "fail",
+    "input": "```\n[Auth] [Handler]\n```",
+    "expected_issues": [{"rule": "L05"}]
+  },
+  {
+    "name": "L05 fail — three boxes no arrows",
+    "rule": "L05",
+    "expected": "fail",
+    "input": "```\n[Auth] [Handler] [Response]\n```",
+    "expected_issues": [{"rule": "L05"}]
+  },
+  {
+    "name": "L06 pass — both ▲ and ▼ present",
+    "rule": "L06",
+    "expected": "pass",
+    "input": "```\n▲ high\n  item-1\n▼ low\n  item-2\n```"
+  },
+  {
+    "name": "L06 fail — ▲ without ▼",
+    "rule": "L06",
+    "expected": "fail",
+    "input": "```\n▲ high priority\n  critical-fix\n  security-patch\n```",
+    "expected_issues": [{"rule": "L06"}]
+  },
+  {
+    "name": "L06 fail — ▼ without ▲",
+    "rule": "L06",
+    "expected": "fail",
+    "input": "```\n▼ low priority\n  cosmetic-fix\n```",
+    "expected_issues": [{"rule": "L06"}]
+  },
+  {
+    "name": "L07 pass — ASCII only, no mermaid",
+    "rule": "L07",
+    "expected": "pass",
+    "input": "Here is a flow:\n\n```\n[A] --> [B] --> [C]\n```"
+  },
+  {
+    "name": "L07 fail — mermaid block alongside ASCII diagram",
+    "rule": "L07",
+    "expected": "fail",
+    "input": "ASCII diagram:\n\n```\n[A] --> [B]\n```\n\nMermaid version:\n\n```mermaid\ngraph LR\n  A --> B\n```",
+    "expected_issues": [{"rule": "L07"}]
+  },
+  {
+    "name": "L08 pass — frame with consistent row widths",
+    "rule": "L08",
+    "expected": "pass",
+    "input": "```\n┌─ Status ─┐\n│  a  done │\n│  b  wait │\n└──────────┘\n```"
+  },
+  {
+    "name": "L08 fail — frame close row width differs from open",
+    "rule": "L08",
+    "expected": "fail",
+    "input": "```\n┌─ Status ─┐\n│  a  done │\n└────────────────────┘\n```",
+    "expected_issues": [{"rule": "L08"}]
+  },
+  {
+    "name": "L08 fail — internal frame row too wide",
+    "rule": "L08",
+    "expected": "fail",
+    "input": "```\n┌─ Status ─┐\n│  a  done — this line is much too wide for the frame │\n└──────────┘\n```",
+    "expected_issues": [{"rule": "L08"}]
+  },
+  {
+    "name": "No diagram — prose only, no issues",
+    "rule": "none",
+    "expected": "pass",
+    "input": "This is just regular prose with no diagrams.\nNo boxes, no trees, no arrows.\nJust text."
+  },
+  {
+    "name": "Valid complex flow diagram — all rules pass",
+    "rule": "all",
+    "expected": "pass",
+    "input": "# Architecture\n\n```\n[Client] --> [API Gateway] --> [Service]\n                                  |\n                            [Database]\n```\n\nComponent tree:\n\n```\napp\n├── api\n│   ├── routes.js\n│   └── middleware.js\n└── models\n    └── user.js\n```"
+  }
+]
