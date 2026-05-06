@@ -1,0 +1,9 @@
+{
+  "name": "feynman",
+  "version": "1.0.0",
+  "description": "Injects ASCII diagram rules into every Claude request. Why explain in words when diagram do trick.",
+  "author": {
+    "name": "apolenkov",
+    "url": "https://github.com/apolenkov/feynman"
+  }
+}
