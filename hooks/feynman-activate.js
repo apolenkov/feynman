@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // feynman — UserPromptSubmit hook — injects ASCII diagram rules on every prompt
-// Zero dependencies. CJS only (no ESM — matches caveman pattern).
+// Zero dependencies. CJS only (no ESM — CommonJS for zero-dep portability).
 // Bug workarounds: #13912 (JSON stdout), #35713 (flag file), #8810 (os.homedir), #10225 (no hooks in plugin.json)
 'use strict';
 
@@ -15,9 +15,9 @@ const STATE_PATH  = path.join(FEYNMAN_DIR, 'state.json');
 const FLAG_PATH   = path.join(HOME, '.claude', '.feynman-active');
 const RULES_PATH  = path.join(__dirname, '..', 'rules', 'feynman-activate.md');
 
-const DEFAULT_STATE = { enabled: true, intensity: 'full', count: 0 };
+const DEFAULT_STATE = { enabled: true, intensity: 'full', injections: 0 };
 
-// --- stdin accumulator — exact caveman-mode-tracker.js pattern ---
+// --- stdin accumulator: buffer all input before processing ---
 let input = '';
 process.stdin.on('data', chunk => { input += chunk; });
 process.stdin.on('end', () => {
@@ -75,8 +75,10 @@ process.stdin.on('end', () => {
 
     if (!rulesText) process.exit(0);
 
-    // Step 6: increment session counter and write state back (HOOK-05)
-    state.count = (state.count || 0) + 1;
+    // Step 6: increment injection counter and write state back (HOOK-05)
+    // Backward-compat: read legacy count field on first migration cycle
+    state.injections = (state.injections ?? state.count ?? 0) + 1;
+    delete state.count;
     try {
       fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
     } catch (e) {

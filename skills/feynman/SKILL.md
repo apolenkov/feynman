@@ -1,5 +1,6 @@
 ---
 name: feynman
+disable-model-invocation: true
 description: >
   Toggle ASCII diagram injection on/off or set intensity level (lite/full/ultra).
   Use when user says /feynman, /feynman on, /feynman off, /feynman lite/full/ultra, /feynman status.
@@ -26,9 +27,9 @@ node -e "
 const fs = require('fs'), os = require('os'), path = require('path');
 const stateFile = path.join(os.homedir(), '.claude', '.feynman', 'state.json');
 const flagFile  = path.join(os.homedir(), '.claude', '.feynman-active');
-let st = {enabled: false, intensity: 'full', count: 0};
+let st = {enabled: false, intensity: 'full', injections: 0};
 try { st = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch(e) {}
-console.log('enabled:', st.enabled, '| intensity:', st.intensity, '| diagrams:', st.count, '| flag:', fs.existsSync(flagFile));
+console.log('enabled:', st.enabled, '| intensity:', st.intensity, '| injections:', (st.injections ?? st.count ?? 0), '| flag:', fs.existsSync(flagFile));
 "
 ```
 
@@ -40,7 +41,7 @@ const fs = require('fs'), os = require('os'), path = require('path');
 const stateFile = path.join(os.homedir(), '.claude', '.feynman', 'state.json');
 const flagFile  = path.join(os.homedir(), '.claude', '.feynman-active');
 const arg = process.argv[1] || '';
-let st = {enabled: true, intensity: 'full', count: 0};
+let st = {enabled: true, intensity: 'full', injections: 0};
 try { st = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch(e) {}
 if (arg === 'on')  { st.enabled = true;  fs.writeFileSync(flagFile, st.intensity); }
 if (arg === 'off') { st.enabled = false; try { fs.unlinkSync(flagFile); } catch(e) {} }
@@ -57,6 +58,6 @@ console.log(JSON.stringify(st));
 ┌─ feynman ───────────────────────────┐
   status     on / off
   intensity  lite / full / ultra
-  diagrams   N injected total
+  injections N total
 └────────────────────────────────────┘
 ```
