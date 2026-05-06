@@ -13,9 +13,16 @@ Works alongside caveman — caveman compresses words, feynman adds visual struct
 
 ## Install
 
-<!-- INSTALL PLACEHOLDER -->
+```bash
+git clone https://github.com/apolenkov/feynman && bash feynman/install.sh
+```
 
-Until the install script ships, register the hook manually in `~/.claude/settings.json`:
+Restart Claude Code. Done.
+
+<details>
+<summary>Manual install (if you prefer)</summary>
+
+Add to `~/.claude/settings.json` — use the absolute path, not `~/` ([bug #8810](https://github.com/anthropics/claude-code/issues/8810)):
 
 ```json
 {
@@ -35,6 +42,4 @@ Until the install script ships, register the hook manually in `~/.claude/setting
   }
 }
 ```
-
-> **Important:** Replace `/absolute/path/to/feynman` with the actual path where you cloned this repo.
-> Do not use `~/` — Claude Code requires an absolute path (see [bug #8810](https://github.com/anthropics/claude-code/issues/8810)).
+</details>
