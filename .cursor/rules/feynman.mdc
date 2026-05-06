@@ -1,0 +1,79 @@
+---
+description: Feynman ASCII diagram rules — injected into every Cursor conversation
+alwaysApply: true
+---
+
+## Feynman Diagram Rules
+
+### When diagrams appear
+
+**Sequential flows** — A response describing a sequence of steps, stages, or events includes an ASCII flow diagram.
+
+Syntax: `[Step A] --> [Step B] --> [Step C]`
+
+For branching flows:
+```
+[Start] --> [Decision?]
+               |
+        yes -- + -- no
+        |             |
+    [Path A]      [Path B]
+        |             |
+        +---- [End] --+
+```
+
+**Hierarchical structures** — A response describing a hierarchy, tree, or containment relationship with three or more levels includes an ASCII tree diagram.
+
+Syntax:
+```
+root
+├── child-a
+│   ├── grandchild-1
+│   └── grandchild-2
+└── child-b
+    └── grandchild-3
+```
+
+**Comparisons** — A response comparing two or more options across multiple criteria includes side-by-side ASCII columns (maximum three columns, ten words per cell).
+
+Syntax:
+```
+Option A          | Option B          | Option C
+------------------|-------------------|------------------
+fast startup      | slow startup      | medium startup
+low memory        | high memory       | medium memory
+no persistence    | full persistence  | optional
+```
+
+**Status summaries** — A response summarizing the status of multiple items, tasks, or states where the total content exceeds five lines uses a frame block.
+
+Syntax:
+```
+┌─ Status ─┐
+  item-a    done
+  item-b    in progress
+  item-c    blocked
+└─────────┘
+```
+
+**Priority orderings** — A response that orders three or more items by priority, importance, severity, or rank includes an ▲▼ priority scale.
+
+Syntax:
+```
+▲ high
+  item-1
+  item-2
+▼ low
+  item-3
+```
+
+### When no diagram appears
+
+Responses that are any of the following contain no diagram:
+- A single fact or direct answer (one or two sentences)
+- An answer under four lines that contains no explicit structure
+- A response consisting entirely of a code block
+- A case where a plain list or table already captures the structure clearly
+- A response where the user explicitly asked for prose or narrative
+
+The purpose of diagrams is clarity. A diagram that adds no clarity is absent.
