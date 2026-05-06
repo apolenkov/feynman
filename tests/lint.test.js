@@ -282,6 +282,12 @@ describe('L06 priority scale — unit tests', () => {
     const result = lint(md);
     assert.equal(result.issues.filter(i => i.rule === 'L06').length, 0);
   });
+
+  it('vertical flow arrows do not trigger priority-scale warning', () => {
+    const md = '```\n[A]\n |\n ▼\n[B]\n |\n ▼\n[C]\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L06').length, 0);
+  });
 });
 
 // ---------------------------------------------------------------------------
