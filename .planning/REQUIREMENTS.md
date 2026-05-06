@@ -42,63 +42,63 @@
 
 ### Cleanup
 
-- [ ] **CLN-01**: Remove all caveman mentions from public files (README.md, hooks/feynman-activate.js comments, .planning/PROJECT.md surfaces) — standalone positioning
-- [ ] **CLN-02**: Delete `commands/feynman.toml` — dead file, Claude Code uses `.md` not `.toml`
-- [ ] **CLN-03**: Delete `skills/feynman-stats/` — duplicates `/feynman status`; consolidate into single `/feynman` command
-- [ ] **CLN-04**: Rename `state.count` → `state.injections` everywhere (hook, SKILL.md scripts, docs) — current name lies, counts hook fires not diagrams drawn
-- [ ] **CLN-05**: Clean project CLAUDE.md from auto-generated empty stubs (`### Hook Runtime` etc with no content; `## Open Questions` empty section)
-- [ ] **CLN-06**: Update install.sh to reflect cleaned structure (drop /feynman-stats command install)
-- [ ] **CLN-07**: Resolve SKIL-03 — add `disable-model-invocation: true` to `/feynman` skill frontmatter
-- [ ] **CLN-08**: Update PROJECT.md and `Out of Scope` to reflect v0.1 actual scope vs v0.2.0 scope
+- [x] **CLN-01**: Remove all caveman mentions from public files (README.md, hooks/feynman-activate.js comments, .planning/PROJECT.md surfaces) — standalone positioning
+- [x] **CLN-02**: Delete `commands/feynman.toml` — dead file, Claude Code uses `.md` not `.toml`
+- [x] **CLN-03**: Delete `skills/feynman-stats/` — duplicates `/feynman status`; consolidate into single `/feynman` command
+- [x] **CLN-04**: Rename `state.count` → `state.injections` everywhere (hook, SKILL.md scripts, docs) — current name lies, counts hook fires not diagrams drawn
+- [x] **CLN-05**: Clean project CLAUDE.md from auto-generated empty stubs (`### Hook Runtime` etc with no content; `## Open Questions` empty section)
+- [x] **CLN-06**: Update install.sh to reflect cleaned structure (drop /feynman-stats command install)
+- [x] **CLN-07**: Resolve SKIL-03 — add `disable-model-invocation: true` to `/feynman` skill frontmatter
+- [x] **CLN-08**: Update PROJECT.md and `Out of Scope` to reflect v0.1 actual scope vs v0.2.0 scope
 
 ### Diagram Linter (main new feature)
 
-- [ ] **LINT-01**: `lib/lint/parser.js` — ASCII diagram block parser; detects diagrams in markdown (between ``` or as freestanding ASCII art); returns structured AST
-- [ ] **LINT-02**: `lib/lint/rules.js` rule **L01 box closure** — every `┌─...─┐` opening pair has matching `└─...─┘` with vertical alignment; vertical bars `│` align
-- [ ] **LINT-03**: `lib/lint/rules.js` rule **L02 tree chars** — `├──` for non-last children, `└──` for last; flag inversions
-- [ ] **LINT-04**: `lib/lint/rules.js` rule **L03 arrow style** — single arrow style per diagram (`→` or `-->` or `─→`); flag mixing
-- [ ] **LINT-05**: `lib/lint/rules.js` rule **L04 column widths** — table column widths consistent across rows; `|---|---|` separator matches column count
-- [ ] **LINT-06**: `lib/lint/rules.js` rule **L05 flow integrity** — between any two `[Box]` tokens an arrow must exist; orphan boxes flagged
-- [ ] **LINT-07**: `lib/lint/rules.js` rule **L06 priority scale** — when `▲` present, `▼` also present (and vice versa)
-- [ ] **LINT-08**: `lib/lint/rules.js` rule **L07 no mermaid+ASCII mix** — if ASCII present in response, no `\`\`\`mermaid` blocks (and vice versa)
-- [ ] **LINT-09**: `lib/lint/rules.js` rule **L08 frame width discipline** — all rows inside a frame block have consistent width
-- [ ] **LINT-10**: `bin/feynman-lint.js` — standalone CLI; `feynman-lint <file.md>` returns 0/non-zero, prints rule failures with line numbers
-- [ ] **LINT-11**: `hooks/feynman-lint.js` — Stop-hook variant; reads Claude's last response; if lint fails, outputs `additionalContext` with corrections for next turn
-- [ ] **LINT-12**: `tests/lint-cases.json` — 20+ golden test cases (10+ valid, 10+ invalid, one per rule)
+- [x] **LINT-01**: `lib/lint/parser.js` — ASCII diagram block parser; detects diagrams in markdown (between ``` or as freestanding ASCII art); returns structured AST
+- [x] **LINT-02**: `lib/lint/rules.js` rule **L01 box closure** — every `┌─...─┐` opening pair has matching `└─...─┘` with vertical alignment; vertical bars `│` align
+- [x] **LINT-03**: `lib/lint/rules.js` rule **L02 tree chars** — `├──` for non-last children, `└──` for last; flag inversions
+- [x] **LINT-04**: `lib/lint/rules.js` rule **L03 arrow style** — single arrow style per diagram (`→` or `-->` or `─→`); flag mixing
+- [x] **LINT-05**: `lib/lint/rules.js` rule **L04 column widths** — table column widths consistent across rows; `|---|---|` separator matches column count
+- [x] **LINT-06**: `lib/lint/rules.js` rule **L05 flow integrity** — between any two `[Box]` tokens an arrow must exist; orphan boxes flagged
+- [x] **LINT-07**: `lib/lint/rules.js` rule **L06 priority scale** — when `▲` present, `▼` also present (and vice versa)
+- [x] **LINT-08**: `lib/lint/rules.js` rule **L07 no mermaid+ASCII mix** — if ASCII present in response, no `\`\`\`mermaid` blocks (and vice versa)
+- [x] **LINT-09**: `lib/lint/rules.js` rule **L08 frame width discipline** — all rows inside a frame block have consistent width
+- [x] **LINT-10**: `bin/feynman-lint.js` — standalone CLI; `feynman-lint <file.md>` returns 0/non-zero, prints rule failures with line numbers
+- [x] **LINT-11**: `hooks/feynman-lint.js` — Stop-hook variant; reads Claude's last response; if lint fails, outputs `additionalContext` with corrections for next turn
+- [x] **LINT-12**: `tests/lint-cases.json` — 20+ golden test cases (10+ valid, 10+ invalid, one per rule)
 
 ### Quality (Tests + CI)
 
-- [ ] **TEST-01**: `tests/hook.test.js` — e2e via stdin: first-run bootstrap, normal flow, disabled, intensity switch, corrupt state recovery, all 5 paths covered
-- [ ] **TEST-02**: `tests/lint.test.js` — every rule L01-L08 has positive + negative case; golden cases from LINT-12 all pass
-- [ ] **TEST-03**: `tests/install.test.js` — install/uninstall idempotency; settings.json merge with existing hooks; missing-Node error path
-- [ ] **TEST-04**: GitHub Actions CI workflow — runs on PR + push to main; matrix Linux + macOS; node:test runner; fails CI on lint or test failure
-- [ ] **TEST-05**: Coverage badge in README.md (codecov or shield from c8 output); target ≥95% line coverage on `hooks/`, `lib/lint/`, `bin/`
-- [ ] **TEST-06**: 100% coverage of all 8 lint rules verified explicitly in test report
+- [x] **TEST-01**: `tests/hook.test.js` — e2e via stdin: first-run bootstrap, normal flow, disabled, intensity switch, corrupt state recovery, all 5 paths covered
+- [x] **TEST-02**: `tests/lint.test.js` — every rule L01-L08 has positive + negative case; golden cases from LINT-12 all pass
+- [x] **TEST-03**: `tests/install.test.js` — install/uninstall idempotency; settings.json merge with existing hooks; missing-Node error path
+- [x] **TEST-04**: GitHub Actions CI workflow — runs on PR + push to main; matrix Linux + macOS; node:test runner; fails CI on lint or test failure
+- [x] **TEST-05**: Coverage badge in README.md (codecov or shield from c8 output); target ≥95% line coverage on `hooks/`, `lib/lint/`, `bin/`
+- [x] **TEST-06**: 100% coverage of all 8 lint rules verified explicitly in test report
 
 ### Distribution (NPX + bash)
 
-- [ ] **NPX-01**: `package.json` with name "feynman", version "0.2.0", `bin` entries, `files` whitelist, `engines.node >= 18`
-- [ ] **NPX-02**: `bin/feynman.js` — unified CLI; subcommands: `install`, `uninstall`, `doctor`, `lint`, `version`; `--help` for each
+- [x] **NPX-01**: `package.json` with name "feynman", version "0.2.0", `bin` entries, `files` whitelist, `engines.node >= 18`
+- [x] **NPX-02**: `bin/feynman.js` — unified CLI; subcommands: `install`, `uninstall`, `doctor`, `lint`, `version`; `--help` for each
 - [ ] **NPX-03**: `npm publish` — feynman package live on npm registry; verified by running `npx feynman@0.2.0 install` in clean env
-- [ ] **NPX-04**: `bash install.sh` refactored to call `node bin/feynman.js install` internally — DRY single source of install logic
-- [ ] **NPX-05**: README install section updated: primary `npx feynman install`, fallback bash one-liner, manual settings.json instructions
-- [ ] **NPX-06**: `feynman doctor` — checks hook registered? state.json valid? rules file readable? lint hook registered? prints status frame
+- [x] **NPX-04**: `bash install.sh` refactored to call `node bin/feynman.js install` internally — DRY single source of install logic
+- [x] **NPX-05**: README install section updated: primary `npx feynman install`, fallback bash one-liner, manual settings.json instructions
+- [x] **NPX-06**: `feynman doctor` — checks hook registered? state.json valid? rules file readable? lint hook registered? prints status frame
 
 ### Documentation (visitkarte)
 
-- [ ] **DOCS2-01**: `examples/architecture-review.md` — example session showing feynman drawing architecture diagrams from architecture questions
-- [ ] **DOCS2-02**: `examples/api-flow.md` — request/response flow examples
-- [ ] **DOCS2-03**: `examples/db-schema.md` — entity relationships, table structure examples
-- [ ] **DOCS2-04**: `examples/algorithm-explain.md` — algorithm walkthrough with state machine + flow diagrams
-- [ ] **DOCS2-05**: `examples/deploy-pipeline.md` — CI/CD pipeline visualization examples
-- [ ] **DOCS2-06**: `examples/code-review.md` — code review session with priority + comparison diagrams
-- [ ] **DOCS2-07**: `docs/visual-patterns.md` — visualization research (Tufte, Few, Bertin) adapted to ASCII; principles distilled into ≤2000 words
-- [ ] **DOCS2-08**: `docs/lint-rules.md` — full L01-L08 documentation with valid/invalid examples per rule
-- [ ] **DOCS2-09**: `docs/architecture.md` — internal architecture: hook lifecycle, lint pipeline, state schema, with ASCII diagrams
-- [ ] **DOCS2-10**: `CONTRIBUTING.md` improved — PR checklist, issue triage, governance, "what's a good first PR"
-- [ ] **DOCS2-11**: `.github/ISSUE_TEMPLATE/bug_report.md` + `.github/ISSUE_TEMPLATE/feature_request.md`
-- [ ] **DOCS2-12**: `.github/PULL_REQUEST_TEMPLATE.md`
-- [ ] **DOCS2-13**: README full rewrite — badges (CI, coverage, npm version, license), screenshots/GIF placeholders, NPX-first install, intensity examples with linter results, "Why feynman" section explaining standalone value
+- [x] **DOCS2-01**: `examples/architecture-review.md` — example session showing feynman drawing architecture diagrams from architecture questions
+- [x] **DOCS2-02**: `examples/api-flow.md` — request/response flow examples
+- [x] **DOCS2-03**: `examples/db-schema.md` — entity relationships, table structure examples
+- [x] **DOCS2-04**: `examples/algorithm-explain.md` — algorithm walkthrough with state machine + flow diagrams
+- [x] **DOCS2-05**: `examples/deploy-pipeline.md` — CI/CD pipeline visualization examples
+- [x] **DOCS2-06**: `examples/code-review.md` — code review session with priority + comparison diagrams
+- [x] **DOCS2-07**: `docs/visual-patterns.md` — visualization research (Tufte, Few, Bertin) adapted to ASCII; principles distilled into ≤2000 words
+- [x] **DOCS2-08**: `docs/lint-rules.md` — full L01-L08 documentation with valid/invalid examples per rule
+- [x] **DOCS2-09**: `docs/architecture.md` — internal architecture: hook lifecycle, lint pipeline, state schema, with ASCII diagrams
+- [x] **DOCS2-10**: `CONTRIBUTING.md` improved — PR checklist, issue triage, governance, "what's a good first PR"
+- [x] **DOCS2-11**: `.github/ISSUE_TEMPLATE/bug_report.md` + `.github/ISSUE_TEMPLATE/feature_request.md`
+- [x] **DOCS2-12**: `.github/PULL_REQUEST_TEMPLATE.md`
+- [x] **DOCS2-13**: README full rewrite — badges (CI, coverage, npm version, license), screenshots/GIF placeholders, NPX-first install, intensity examples with linter results, "Why feynman" section explaining standalone value
 
 ### Research
 
@@ -157,58 +157,58 @@
 | RULE-03 | Phase 1 (v0.1) | Validated |
 | RULE-04 | Phase 1 (v0.1) | Validated |
 | SKIL-01 | (outside-GSD v0.1) | Validated |
-| SKIL-02 | (outside-GSD v0.1) | To be deleted in CLN-03 |
-| SKIL-03 | Phase 2 | Pending |
+| SKIL-02 | (outside-GSD v0.1) | Deleted in CLN-03 |
+| SKIL-03 | Phase 2 | Validated |
 | DIST-01 | Phase 1 + outside-GSD | Validated |
 | DIST-04 | Phase 1 | Validated |
 | DOCS-01 | Phase 1 | Validated |
 | DOCS-02 | Phase 1 | Validated |
 | DOCS-03 | Phase 1 + outside-GSD | Validated |
-| CLN-01 | Phase 2 | Pending |
-| CLN-02 | Phase 2 | Pending |
-| CLN-03 | Phase 2 | Pending |
-| CLN-04 | Phase 2 | Pending |
-| CLN-05 | Phase 2 | Pending |
-| CLN-06 | Phase 2 | Pending |
-| CLN-07 | Phase 2 | Pending |
-| CLN-08 | Phase 2 | Pending |
-| LINT-01 | Phase 3 | Pending |
-| LINT-02 | Phase 3 | Pending |
-| LINT-03 | Phase 3 | Pending |
-| LINT-04 | Phase 3 | Pending |
-| LINT-05 | Phase 3 | Pending |
-| LINT-06 | Phase 3 | Pending |
-| LINT-07 | Phase 3 | Pending |
-| LINT-08 | Phase 3 | Pending |
-| LINT-09 | Phase 3 | Pending |
-| LINT-10 | Phase 3 | Pending |
-| LINT-11 | Phase 3 | Pending |
-| LINT-12 | Phase 3 | Pending |
-| TEST-01 | Phase 4 | Pending |
-| TEST-02 | Phase 4 | Pending |
-| TEST-03 | Phase 4 | Pending |
-| TEST-04 | Phase 4 | Pending |
-| TEST-05 | Phase 4 | Pending |
-| TEST-06 | Phase 4 | Pending |
-| NPX-01 | Phase 5 | Pending |
-| NPX-02 | Phase 5 | Pending |
+| CLN-01 | Phase 2 | Validated |
+| CLN-02 | Phase 2 | Validated |
+| CLN-03 | Phase 2 | Validated |
+| CLN-04 | Phase 2 | Validated |
+| CLN-05 | Phase 2 | Validated |
+| CLN-06 | Phase 2 | Validated |
+| CLN-07 | Phase 2 | Validated |
+| CLN-08 | Phase 2 | Validated |
+| LINT-01 | Phase 3 | Validated |
+| LINT-02 | Phase 3 | Validated |
+| LINT-03 | Phase 3 | Validated |
+| LINT-04 | Phase 3 | Validated |
+| LINT-05 | Phase 3 | Validated |
+| LINT-06 | Phase 3 | Validated |
+| LINT-07 | Phase 3 | Validated |
+| LINT-08 | Phase 3 | Validated |
+| LINT-09 | Phase 3 | Validated |
+| LINT-10 | Phase 3 | Validated |
+| LINT-11 | Phase 3 | Validated |
+| LINT-12 | Phase 3 | Validated |
+| TEST-01 | Phase 4 | Validated |
+| TEST-02 | Phase 4 | Validated |
+| TEST-03 | Phase 4 | Validated |
+| TEST-04 | Phase 4 | Validated |
+| TEST-05 | Phase 4 | Validated |
+| TEST-06 | Phase 4 | Validated |
+| NPX-01 | Phase 5 | Validated |
+| NPX-02 | Phase 5 | Validated |
 | NPX-03 | Phase 5 | Pending |
-| NPX-04 | Phase 5 | Pending |
-| NPX-05 | Phase 5 | Pending |
-| NPX-06 | Phase 5 | Pending |
-| DOCS2-01 | Phase 6 | Pending |
-| DOCS2-02 | Phase 6 | Pending |
-| DOCS2-03 | Phase 6 | Pending |
-| DOCS2-04 | Phase 6 | Pending |
-| DOCS2-05 | Phase 6 | Pending |
-| DOCS2-06 | Phase 6 | Pending |
-| DOCS2-07 | Phase 6 | Pending |
-| DOCS2-08 | Phase 6 | Pending |
-| DOCS2-09 | Phase 6 | Pending |
-| DOCS2-10 | Phase 6 | Pending |
-| DOCS2-11 | Phase 6 | Pending |
-| DOCS2-12 | Phase 6 | Pending |
-| DOCS2-13 | Phase 6 | Pending |
+| NPX-04 | Phase 5 | Validated |
+| NPX-05 | Phase 5 | Validated |
+| NPX-06 | Phase 5 | Validated |
+| DOCS2-01 | Phase 6 | Validated |
+| DOCS2-02 | Phase 6 | Validated |
+| DOCS2-03 | Phase 6 | Validated |
+| DOCS2-04 | Phase 6 | Validated |
+| DOCS2-05 | Phase 6 | Validated |
+| DOCS2-06 | Phase 6 | Validated |
+| DOCS2-07 | Phase 6 | Validated |
+| DOCS2-08 | Phase 6 | Validated |
+| DOCS2-09 | Phase 6 | Validated |
+| DOCS2-10 | Phase 6 | Validated |
+| DOCS2-11 | Phase 6 | Validated |
+| DOCS2-12 | Phase 6 | Validated |
+| DOCS2-13 | Phase 6 | Validated |
 | RES-01 | Phase 6.5 | Validated |
 | RES-02 | Phase 6.5 | Validated |
 | REL-01 | Phase 7 | Pending |
