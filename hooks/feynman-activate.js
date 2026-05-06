@@ -28,25 +28,29 @@ process.stdin.on('end', () => {
     const sessionId = data.session_id || '';
     if (sessionId && /[/\\]|\.\./.test(sessionId)) process.exit(0);
 
-    // Step 2: flag file check — must be present for hook to run (bug #35713)
-    // If flag file absent, feynman is disabled — exit 0 with no output
-    if (!fs.existsSync(FLAG_PATH)) process.exit(0);
+    // Step 2: flag file + first-run bootstrap (D-05, D-07, bug #35713)
+    // True first run: neither flag nor state exists → bootstrap both, then fall through
+    // Intentionally disabled: flag absent but state exists → exit 0 (user ran /feynman off)
+    const flagExists  = fs.existsSync(FLAG_PATH);
+    const stateExists = fs.existsSync(STATE_PATH);
+    if (!flagExists) {
+      if (!stateExists) {
+        // First install — bootstrap everything and activate
+        fs.mkdirSync(FEYNMAN_DIR, { recursive: true });
+        fs.writeFileSync(STATE_PATH, JSON.stringify(DEFAULT_STATE, null, 2));
+        fs.writeFileSync(FLAG_PATH, DEFAULT_STATE.intensity);
+      } else {
+        process.exit(0); // disabled intentionally by user
+      }
+    }
 
-    // Step 3: read state.json; bootstrap on first run (D-05)
+    // Step 3: read state.json
     let state;
     try {
       state = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
     } catch (e) {
-      if (e.code !== 'ENOENT') {
-        // Corrupt state — fail safe per D-07; never crash into UI
-        process.exit(0);
-      }
-      // First run: bootstrap — create dir, write default state, create flag file
-      // so hook is active immediately after install without needing install.sh
-      fs.mkdirSync(FEYNMAN_DIR, { recursive: true });
-      state = Object.assign({}, DEFAULT_STATE);
-      fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
-      fs.writeFileSync(FLAG_PATH, state.intensity); // activate feynman from first run
+      // Corrupt state — fail safe per D-07
+      process.exit(0);
     }
 
     // Step 4: enabled check
