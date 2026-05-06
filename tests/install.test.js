@@ -224,7 +224,7 @@ describe('install.sh', () => {
         const tmpHome = makeTempHome();
         try {
           runInstall(tmpHome);
-          const resultUninstall = execFileSync('bash', [UNINSTALL_SH], {
+          execFileSync('bash', [UNINSTALL_SH], {
             encoding: 'utf8',
             env: { PATH: process.env.PATH, HOME: tmpHome },
             cwd: REPO_DIR,
