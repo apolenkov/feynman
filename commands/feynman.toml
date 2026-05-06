@@ -1,0 +1,2 @@
+description = "Toggle feynman diagram injection on/off or set intensity (lite/full/ultra)"
+prompt = "Run the feynman skill with argument '{{args}}'. Read ~/.claude/.feynman/state.json, apply the change if an argument was given, then report current status in a ┌─ frame ─┐ block."
