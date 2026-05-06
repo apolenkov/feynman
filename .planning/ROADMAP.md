@@ -28,7 +28,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Responses that are single facts, short answers, or pure code blocks do NOT include an unsolicited diagram
   4. User can set intensity to lite, full, or ultra and the hook injects the matching rule variant
   5. README.md skeleton exists with before/after example and install one-liner placeholder
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Author rules/feynman-activate.md with three intensity variants (lite/full/ultra)
+- [ ] 01-02-PLAN.md — Implement hooks/feynman-activate.js (UserPromptSubmit hook)
+- [ ] 01-03-PLAN.md — Create .claude-plugin/plugin.json manifest and README.md skeleton
+
 **UI hint**: no
 
 ### Phase 2: Skills
@@ -60,6 +66,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core | 0/TBD | Not started | - |
+| 1. Core | 0/3 | Not started | - |
 | 2. Skills | 0/TBD | Not started | - |
 | 3. Distribution | 0/TBD | Not started | - |
