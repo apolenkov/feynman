@@ -72,13 +72,62 @@ Tagline: "why explain in words when diagram do trick"
 <!-- GSD:conventions-start source:CONVENTIONS.md -->
 ## Conventions
 
-Conventions not yet established. Will populate as patterns emerge during development.
+### Модульная система
+- Только `require()` — никакого `import`/`export`, никакого `"type": "module"`
+- Ноль npm-зависимостей — хук должен работать без `npm install`
+
+### Пути к файлам
+- Всегда `os.homedir()` — никогда тильда (`~/`) или жёсткий путь `/Users/...`
+- Файлы рядом с хуком — через `__dirname`
+
+### Вывод хука
+- Только `process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:'UserPromptSubmit',additionalContext:text}}))`
+- Без переноса строки в конце. Никогда `console.log` — добавляет `\n`, ломает JSON.
+
+### Формат файла правил
+- Варианты интенсивности ограничены маркерами: `<!-- lite -->` … `<!-- /lite -->`
+- Допустимые значения: `lite` | `full` | `ultra`. По умолчанию: `full`
+- Правила — только декларативные факты, не команды (баг #17804)
+
+### Файл состояния + флаг-файл
+- Состояние: `~/.claude/.feynman/state.json` — схема `{enabled: boolean, intensity: string, count: number}`
+- Флаг: `~/.claude/.feynman-active` — есть = активен; нет + state есть = отключён пользователем
+- Первый запуск: оба отсутствуют → создать оба → продолжить нормально
+- Схема заморожена — не менять имена полей (используется в Phase 2 скиллах)
+
+### Известные баги Claude Code (влияют на этот проект)
+
+| Баг | Эффект | Решение |
+|-----|--------|---------|
+| #8810 | Тильда-пути не работают из поддиректорий | `os.homedir()` |
+| #13912 | Чистый stdout = красная ошибка в UI | Только JSON-обёртка |
+| #17804 | Императивные правила = защита от инъекций | Только декларативные фразы |
+| #35713 | Отключённый плагин всё равно инжектит | Проверка флаг-файла до чтения state |
+| #10225 | Хуки из пути плагина не срабатывают | Регистрировать только через `settings.json` |
 <!-- GSD:conventions-end -->
 
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->
 ## Architecture
 
-Architecture not yet mapped. Follow existing patterns found in the codebase.
+```
+settings.json
+     │  срабатывает на каждый промт
+     ▼
+feynman-activate.js
+     │
+     ├─ [1] защита session_id (path traversal)
+     ├─ [2] флаг-файл ~/.claude/.feynman-active
+     │       нет флага + нет state  → bootstrap (первый запуск)
+     │       нет флага + state есть → exit 0 (отключён пользователем)
+     ├─ [3] читать state.json → enabled? intensity?
+     ├─ [4] читать rules/feynman-activate.md → извлечь секцию по intensity
+     ├─ [5] state.count++
+     └─ [6] stdout: JSON additionalContext → инжектируется в каждый промт
+                                                      │
+                                               Claude Code / модель
+```
+
+Phase 2 скиллы (`/feynman`, `/feynman-stats`) читают и пишут тот же `state.json`.
 <!-- GSD:architecture-end -->
 
 <!-- GSD:skills-start source:skills/ -->
