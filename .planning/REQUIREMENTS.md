@@ -102,8 +102,8 @@
 
 ### Research
 
-- [ ] **RES-01**: `docs/self-improvement.md` — design spec for self-improvement loop: how feynman-lint failure logs feed back to rules updates; human-in-loop review gate; data collection schema; full implementation deferred to v0.3.0
-- [ ] **RES-02**: `docs/visual-patterns.md` (links to DOCS2-07) — research foundation for L01-L08 rules; cite sources
+- [x] **RES-01**: `docs/self-improvement.md` — design spec for self-improvement loop: how feynman-lint failure logs feed back to rules updates; human-in-loop review gate; data collection schema; full implementation deferred to v0.3.0
+- [x] **RES-02**: `docs/visual-patterns.md` (links to DOCS2-07) — research foundation for L01-L08 rules; cite sources
 
 ### Release
 
@@ -209,8 +209,8 @@
 | DOCS2-11 | Phase 6 | Pending |
 | DOCS2-12 | Phase 6 | Pending |
 | DOCS2-13 | Phase 6 | Pending |
-| RES-01 | Phase 6.5 | Pending |
-| RES-02 | Phase 6.5 | Pending |
+| RES-01 | Phase 6.5 | Validated |
+| RES-02 | Phase 6.5 | Validated |
 | REL-01 | Phase 7 | Pending |
 | REL-02 | Phase 7 | Pending |
 | REL-03 | Phase 7 | Pending |
