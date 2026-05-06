@@ -2,33 +2,65 @@
 
 ## What This Is
 
-feynman is an open-source Claude Code plugin that automatically injects ASCII diagram rules into every AI request via the `UserPromptSubmit` hook. It works alongside caveman — caveman compresses words, feynman adds visual structure. Together they produce responses that are short and visual.
+feynman is an open-source Claude Code plugin that automatically injects ASCII diagram rules into every AI request via the `UserPromptSubmit` hook. Standalone tool — when a response has structure (flow, hierarchy, comparison, status, priority), feynman makes Claude draw it as an ASCII diagram without the developer having to ask.
 
 Tagline: "why explain in words when diagram do trick"
 
 ## Core Value
 
-Every response that has structure — flow, hierarchy, comparison, status — gets an ASCII diagram without the developer having to ask.
+Every response that has structure — flow, hierarchy, comparison, status — gets an ASCII diagram without the developer having to ask. v0.2.0 adds a diagram linter that validates Claude's ASCII output and feeds corrections back via Stop-hook.
+
+## Current Milestone: v0.2.0 Production-Ready
+
+**Goal:** Polish v0.1 (Phase 1) into a stable, well-tested, well-documented open-source release. Quality bar high before any v1.0 talk. Add diagram linter as the main new feature. NPX install path. 100% test coverage. Full docs with domain-organized examples.
+
+**Target features:**
+- Cleanup of v0.1 dead files and caveman framing — standalone positioning
+- Diagram linter (parser + 8 lint rules + Stop hook + CLI)
+- 100% test coverage with GitHub Actions CI
+- NPX install path (`npx feynman install`) + bash fallback
+- Full documentation: examples per domain, visual-patterns research, lint rules docs
+- Self-improvement loop design (research-only in this milestone)
+- v0.2.0 release tag + GitHub release
 
 ## Requirements
 
-### Validated
+### Validated (v0.1)
 
-(None yet — ship to validate)
+- [x] UserPromptSubmit hook injects diagram rules into every request (HOOK-01..05)
+- [x] Rules define WHEN to draw and WHEN NOT to draw (RULE-01, RULE-02)
+- [x] Intensity levels: lite / full / ultra (RULE-03)
+- [x] Five diagram types: boxes+arrows, trees, columns, frame blocks, priority scales (RULE-01)
+- [x] /feynman skill — toggle on/off and switch levels (SKIL-01)
+- [x] install.sh one-liner with idempotent settings.json upsert (DIST-01)
+- [x] README skeleton with before/after table and install (DOCS-01, DOCS-02)
+- [x] MIT license + .claude-plugin/plugin.json manifest (DIST-04)
+- [x] Public on GitHub at apolenkov/feynman
 
-### Active
+### Active (v0.2.0)
 
-- [ ] UserPromptSubmit hook injects diagram rules into every request
-- [ ] Rules define WHEN to draw: flow, hierarchy, comparison, status >5 lines, priority chain
-- [ ] Rules define WHEN NOT to draw: single facts, code blocks, short answers
-- [ ] Intensity levels: lite (flow+trees only), full (all types, default), ultra (force even short answers)
-- [ ] Diagram types: ASCII boxes+arrows, trees, side-by-side columns, ┌─frame─┐ blocks, ▲▼ scales
-- [ ] /feynman skill — toggle on/off and switch levels
-- [ ] /feynman-stats skill — session diagram count
-- [ ] .clinerules/feynman.md for Cursor/Windsurf compatibility
-- [ ] install.sh one-liner for Unix/macOS
-- [ ] install.ps1 for Windows
-- [ ] README with before/after examples, install instructions, caveman compatibility section
+- [ ] Cleanup: remove caveman mentions, dead toml file, duplicate /feynman-stats, rename state.count
+- [ ] Diagram linter: ASCII parser + 8 rules (L01-L08) + bin/feynman-lint CLI + Stop-hook integration
+- [ ] 100% test coverage: hook + lint + install/uninstall via node:test
+- [ ] GitHub Actions CI on Linux+macOS matrix, coverage badge
+- [ ] NPX install path: npx feynman install / uninstall / doctor / lint
+- [ ] bash install.sh refactored to call same Node logic (DRY)
+- [ ] examples/ folder per domain (architecture, api-flow, db-schema, algorithm, deploy, code-review)
+- [ ] docs/visual-patterns.md — visualization research adapted to ASCII
+- [ ] docs/lint-rules.md — full L01-L08 documentation
+- [ ] CONTRIBUTING.md improved + .github/ISSUE_TEMPLATE + PR template
+- [ ] Self-improvement loop design spec (docs/self-improvement.md, no implementation)
+- [ ] v0.2.0 git tag + GitHub release notes
+- [ ] uninstall.sh for clean removal
+
+### Future (v0.3.0+)
+
+- [ ] Empirical benchmark "diagram coverage with vs without feynman" (research-grade measurement)
+- [ ] Domain packs (arch / db / devops as separate rule sets)
+- [ ] feynman.config.yaml for team customization
+- [ ] Claude Code Marketplace submission
+- [ ] Self-improvement loop full implementation
+- [ ] IDE compatibility (.clinerules / .cursor / .windsurf) — deferred from v0.1
 
 ### Out of Scope
 
@@ -39,28 +71,34 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 
 ## Context
 
-- Target ecosystem: Claude Code (Anthropic CLI) + compatible AI editors (Cursor, Windsurf)
-- Inspiration/sibling: JuliusBrussee/caveman — same hook pattern, same install UX
+- Target ecosystem: Claude Code (Anthropic CLI) — IDE compat (Cursor/Windsurf) deferred to v0.3+
 - Hook mechanism: `UserPromptSubmit` in Claude Code settings.json (hooks.js pattern)
-- Claude Code plugin manifest: `.claude-plugin`
-- Rules file double-duty: injected by hook at runtime AND copyable into CLAUDE.md manually
-- Caveman compatibility is a feature, not an afterthought — both plugins coexist, complementary
+- Stop hook (v0.2.0): post-response linter that validates ASCII output and feeds corrections back
+- Claude Code plugin manifest: `.claude-plugin/plugin.json`
+- Rules file double-duty: injected by hook at runtime AND readable as docs in repo
+- Repo published at https://github.com/apolenkov/feynman with MIT license
 
 ## Constraints
 
-- **Tech Stack**: Pure JavaScript (Node.js) hook — no build step, no deps, matches caveman pattern
-- **Compatibility**: Must work with Claude Code hooks API; .clinerules for Cursor/Windsurf
-- **Scope**: Open-source repo, public README, install one-liner pattern (like caveman)
-- **Design**: Greenfield — repo is empty, start from scratch
+- **Tech Stack**: Pure JavaScript (Node.js >=18) hook — no build step, no npm deps for the hook itself
+- **NPX wrapper layer**: bin/feynman.js can use minimal deps for nicer UX (TBD in Phase 5)
+- **Compatibility**: Claude Code hooks API only for v0.2.0
+- **Quality bar**: 100% test coverage, CI green, no dead files, no internal stubs
+- **Positioning**: standalone tool — no caveman-derivative framing in public surface
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Mirror caveman repo structure | Familiarity for caveman users, proven install pattern | — Pending |
-| UserPromptSubmit hook (not system prompt) | Injects rules per-request, survives context compaction | — Pending |
-| ASCII-only diagrams | No dependencies, works in any terminal, token-efficient | — Pending |
-| Start with 3 files, ask before more | User explicitly requested staged delivery | — Pending |
+| UserPromptSubmit hook (not system prompt) | Injects rules per-request, survives context compaction | Validated v0.1 |
+| ASCII-only diagrams | No dependencies, works in any terminal, token-efficient | Validated v0.1 |
+| Start with 3 files, ask before more | User explicitly requested staged delivery | Validated v0.1 |
+| v0.2.0 not v1.0 | Tool still calibrating; quality bar not yet met for 1.0 announcement | v0.2.0 |
+| Standalone positioning, drop caveman framing | User wants this as own analog work, not derivative | v0.2.0 |
+| Diagram linter as Stop hook | Post-response validation closes the quality loop | v0.2.0 |
+| 100% test coverage target | Production-ready bar; can't ship "business card" without tests | v0.2.0 |
+| NPX as primary install path | Modern UX; bash fallback for npm-less users | v0.2.0 |
+| node:test (not jest/vitest) | Zero deps for testing, ships with Node >=18 | v0.2.0 |
 
 ## Evolution
 
@@ -80,4 +118,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-06 after initialization*
+*Last updated: 2026-05-06 — milestone v0.2.0 started*
