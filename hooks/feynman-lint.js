@@ -1,0 +1,96 @@
+#!/usr/bin/env node
+// hooks/feynman-lint.js — feynman Stop-hook variant
+// Reads Claude's response from stdin JSON {response, session_id, ...}
+// If lint fails: emit additionalContext with corrections
+// If lint passes: exit 0 silently
+// ALWAYS exits 0 — never block Claude (best practice)
+// Zero deps. CJS only.
+'use strict';
+
+const { lint } = require('../lib/lint');
+
+// Rule descriptions for actionable feedback
+const RULE_DESCRIPTIONS = {
+  L01: 'Box closure: every ┌─...─┐ opening must have a matching └─...─┘ at the same column',
+  L02: 'Tree chars: last child must use └── not ├──',
+  L03: 'Arrow style: use only one arrow style per diagram (-->, →, ─→, or ──>)',
+  L04: 'Column widths: all table rows must have the same number of columns',
+  L05: 'Flow integrity: two [Box] tokens on the same line must have an arrow between them',
+  L06: 'Priority scale: if ▲ appears, ▼ must also appear (and vice versa)',
+  L07: 'Mermaid+ASCII mix: use either Mermaid or ASCII diagrams, not both in the same response',
+  L08: 'Frame width: all rows inside a ┌─ frame must have the same display width',
+};
+
+/**
+ * Build a concise additionalContext message from lint issues
+ * @param {object[]} issues
+ * @returns {string}
+ */
+function buildCorrectionMessage(issues) {
+  if (!issues || issues.length === 0) return '';
+
+  // Group by rule
+  const byRule = new Map();
+  for (const iss of issues) {
+    if (!byRule.has(iss.rule)) byRule.set(iss.rule, []);
+    byRule.get(iss.rule).push(iss);
+  }
+
+  const lines = [
+    'DIAGRAM LINT CORRECTIONS NEEDED:',
+    '',
+  ];
+
+  for (const [rule, ruleIssues] of byRule) {
+    const desc = RULE_DESCRIPTIONS[rule] || rule;
+    lines.push(`[${rule}] ${desc}`);
+    for (const iss of ruleIssues) {
+      lines.push(`  - Line ${iss.line}: ${iss.message}`);
+      if (iss.suggestion) lines.push(`    Fix: ${iss.suggestion}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('Please correct the ASCII diagram(s) above before responding further.');
+
+  return lines.join('\n');
+}
+
+// Accumulate stdin
+let input = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', chunk => { input += chunk; });
+process.stdin.on('end', () => {
+  try {
+    const data = JSON.parse(input);
+    const response = data.response || data.message || '';
+
+    if (!response || typeof response !== 'string') {
+      process.exit(0);
+    }
+
+    const result = lint(response);
+
+    if (result.passed) {
+      // No errors — exit 0 silently
+      process.exit(0);
+    }
+
+    // Build correction message
+    const correctionText = buildCorrectionMessage(result.issues);
+
+    // Emit Stop-hook output
+    process.stdout.write(JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'Stop',
+        additionalContext: correctionText
+      }
+    }));
+
+    // Always exit 0 — never block Claude
+    process.exit(0);
+  } catch (e) {
+    // Silent fail — never surface hook errors
+    process.exit(0);
+  }
+});
