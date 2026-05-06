@@ -17,8 +17,7 @@
 <p align="center">
   <a href="#before--after">Before/After</a> •
   <a href="#install">Install</a> •
-  <a href="#intensity-levels">Levels</a> •
-  <a href="#works-great-with-caveman">+ caveman</a>
+  <a href="#intensity-levels">Levels</a>
 </p>
 
 ---
@@ -147,25 +146,6 @@ Toggle via `/feynman`:
 /feynman on      — re-enable
 /feynman status  — show current state
 ```
-
-## Works great with caveman
-
-Both hooks run simultaneously. Zero config needed.
-
-```
-without both   long words,  no structure
-with caveman   short words, no structure
-with feynman   long words,  structure
-with both  →   short words, structure     ← optimal
-```
-
-```bash
-# Install both
-git clone https://github.com/JuliusBrussee/caveman && bash caveman/install.sh
-git clone https://github.com/apolenkov/feynman && bash feynman/install.sh
-```
-
-caveman cuts token count. feynman adds structure. Together = short + visual.
 
 ## How it works
 
