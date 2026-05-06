@@ -6,25 +6,30 @@ Three independent layers: hook lifecycle, lint pipeline, and state schema.
 
 ## Layer 1: Hook Lifecycle
 
-The `UserPromptSubmit` hook fires before every Claude prompt. feynman
-intercepts the event, reads the active rules, and injects them as
+The `UserPromptSubmit` hook fires before every Claude Code or Codex prompt.
+feynman intercepts the event, reads the active rules, and injects them as
 `additionalContext`.
 
 ```
-~/.claude/settings.json
+~/.claude/settings.json       ~/.codex/hooks.json
          │
          │  hooks.UserPromptSubmit fires on every prompt
          ▼
 hooks/feynman-activate.js
          │
+         ├─ [0] FEYNMAN_HOME selects client state root
+         │        unset              → ~/.claude (backward compatible)
+         │        ~/.claude          → Claude Code install
+         │        ~/.codex           → Codex install
+         │
          ├─ [1] validate session_id (path-traversal guard)
          │
-         ├─ [2] ~/.claude/.feynman-active  ← flag file
+         ├─ [2] $FEYNMAN_HOME/.feynman-active  ← flag file
          │        absent + no state.json   → bootstrap first run
          │        absent + state.json      → exit 0 (user disabled)
          │        present                  → continue
          │
-         ├─ [3] ~/.claude/.feynman/state.json
+         ├─ [3] $FEYNMAN_HOME/.feynman/state.json
          │        enabled: false           → exit 0
          │        corrupt JSON             → exit 0 (fail safe)
          │
@@ -44,8 +49,10 @@ hooks/feynman-activate.js
 - Output must be JSON with no trailing newline — plain stdout triggers
   Claude Code's red error banner (bug #13912).
 - Paths use `os.homedir()`, never tilde literals (bug #8810).
-- Hook registered in `settings.json` directly, not via `plugin.json`
-  (bug #10225).
+- Production install writes user hook config directly:
+  `~/.claude/settings.json` for Claude Code and `~/.codex/hooks.json` for
+  Codex. Plugin manifests are shipped for discoverability, but direct hook
+  registration remains the reliable fallback.
 - Flag file checked before state file to detect intentional disabling
   vs. first run (bug #35713).
 
@@ -107,10 +114,11 @@ reporter (inline in CLI + Stop hook)
 
 ## Layer 3: State Schema
 
-All runtime state lives in two files under `~/.claude/`.
+All runtime state lives in two files under the selected client root:
+`~/.claude/` for Claude Code, `~/.codex/` for Codex.
 
 ```
-~/.claude/
+~/.claude/ or ~/.codex/
 ├── .feynman-active          ← presence flag
 │     present  = feynman active
 │     absent   = user disabled (state.json preserved)
@@ -145,8 +153,8 @@ All runtime state lives in two files under `~/.claude/`.
   state.intensity = <value>
   .feynman-active content updated
 
-[npx feynman uninstall]
-  hook removed from settings.json
+[npx feynman uninstall --target claude|codex|both]
+  hook removed from target hook config
   .feynman-active deleted
   state.json preserved (user data)
 ```
@@ -164,11 +172,19 @@ managed by skill commands in `skills/feynman/SKILL.md`.
 
 ```
 bin/feynman.js
-├── install    → writes settings.json + state.json + flag
-├── uninstall  → removes hook entries + flag (keeps state)
-├── doctor     → checks all 6 health criteria, prints frame
+├── install    → writes target hook config + state.json + flag
+├── uninstall  → removes target hook entries + flag (keeps state)
+├── doctor     → checks target health criteria, prints frame
 ├── lint       → delegates to bin/feynman-lint.js
 └── version    → prints package.json version
+```
+
+Targets:
+
+```
+claude → ~/.claude/settings.json + ~/.claude/.feynman/
+codex  → ~/.codex/hooks.json     + ~/.codex/.feynman/
+both   → runs claude and codex installers idempotently
 ```
 
 **File:** `bin/feynman.js`

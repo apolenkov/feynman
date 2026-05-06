@@ -83,6 +83,8 @@
 - [x] **NPX-04**: `bash install.sh` refactored to call `node bin/feynman.js install` internally — DRY single source of install logic
 - [x] **NPX-05**: README install section updated: primary `npx feynman install`, fallback bash one-liner, manual settings.json instructions
 - [x] **NPX-06**: `feynman doctor` — checks hook registered? state.json valid? rules file readable? lint hook registered? prints status frame
+- [x] **NPX-07**: Codex target support — `npx feynman install --target codex` writes `~/.codex/hooks.json`, `~/.codex/.feynman/state.json`, and `~/.codex/.feynman-active`; install is idempotent
+- [x] **NPX-08**: Plugin metadata for both clients — `.claude-plugin/plugin.json` + `hooks/hooks.json`, `.codex-plugin/plugin.json` + repo-root `hooks.json`, all included in npm package files
 
 ### Documentation (visitkarte)
 
@@ -196,6 +198,8 @@
 | NPX-04 | Phase 5 | Validated |
 | NPX-05 | Phase 5 | Validated |
 | NPX-06 | Phase 5 | Validated |
+| NPX-07 | Phase 5 | Validated |
+| NPX-08 | Phase 5 | Validated |
 | DOCS2-01 | Phase 6 | Validated |
 | DOCS2-02 | Phase 6 | Validated |
 | DOCS2-03 | Phase 6 | Validated |
@@ -218,11 +222,11 @@
 | REL-05 | Phase 7 | Pending |
 
 **Coverage:**
-- v0.1 requirements: 17 (HOOK-01..05, RULE-01..04, SKIL-01..03, DIST-01, DIST-04, DOCS-01..03) — 16 validated, 1 (SKIL-03) deferred to Phase 2
-- v0.2.0 requirements: 51 total (8 CLN + 12 LINT + 6 TEST + 6 NPX + 13 DOCS2 + 2 RES + 5 REL)
-- Plus 1 outstanding from v0.1: SKIL-03 (mapped to Phase 2)
-- Total active for v0.2.0: 52
-- Mapped to phases: 52 ✓
+- v0.1 requirements: 17 (HOOK-01..05, RULE-01..04, SKIL-01..03, DIST-01, DIST-04, DOCS-01..03) — all validated; SKIL-03 was carried into Phase 2 and closed there
+- v0.2.0 requirements: 54 total (8 CLN + 12 LINT + 6 TEST + 8 NPX + 13 DOCS2 + 2 RES + 5 REL)
+- Plus 1 carried-over v0.1 requirement: SKIL-03 (mapped to Phase 2)
+- Total milestone-tracked requirements: 55
+- Mapped to phases: 55 ✓
 - Unmapped: 0
 
 ---

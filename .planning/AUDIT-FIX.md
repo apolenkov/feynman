@@ -16,6 +16,7 @@ auto-fixed before writing this report.
 |---------|----------|-----|--------------|
 | `.planning/ROADMAP.md` had `Plans: 1 summary completed` on the wrong phase after a patch collision | medium | Restored Phase 4/5 to `TBD` and assigned `1 summary completed` to Phase 6 and Phase 6.5 | `rg "**Plans**" .planning/ROADMAP.md` and direct ROADMAP inspection |
 | `.planning/REQUIREMENTS.md` still marked completed Phase 2-6 requirements as pending | medium | Marked verified CLN/LINT/TEST/NPX/DOCS2 requirements as validated; kept NPX-03 pending for Phase 7 publish | Cross-checked `*-VERIFICATION.md`, Phase 6 summary, and Phase 6.5 summary |
+| Release scope was Claude Code only after user clarified Codex is required | high | Added Codex install target, Codex plugin metadata, Claude plugin hooks manifest, docs, tests, and planning updates | `npm test`, `npm run coverage`, `npm pack --dry-run` |
 
 ## Non-Fixable / Deferred
 
@@ -27,7 +28,8 @@ auto-fixed before writing this report.
 
 ## Verification
 
-- `npm test`: PASS, 178 tests
-- `npm run coverage`: PASS, 97.17% lines
+- `npm test`: PASS, 190 tests
+- `npm run coverage`: PASS, 96.98% lines
 - Markdown diagram lint over README/docs/examples/CONTRIBUTING: PASS
 - `node bin/feynman.js doctor`: Status OK
+- `npm pack --dry-run`: PASS; tarball includes dual plugin metadata

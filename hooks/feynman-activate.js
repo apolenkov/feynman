@@ -8,11 +8,13 @@ const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
 
-// Path constants — use os.homedir(), never tilde strings (bug #8810)
+// Path constants — use os.homedir(), never tilde strings (bug #8810).
+// FEYNMAN_HOME lets the same hook serve Claude Code (~/.claude) and Codex (~/.codex).
 const HOME        = os.homedir();
-const FEYNMAN_DIR = path.join(HOME, '.claude', '.feynman');
+const CLIENT_HOME = process.env.FEYNMAN_HOME || path.join(HOME, '.claude');
+const FEYNMAN_DIR = path.join(CLIENT_HOME, '.feynman');
 const STATE_PATH  = path.join(FEYNMAN_DIR, 'state.json');
-const FLAG_PATH   = path.join(HOME, '.claude', '.feynman-active');
+const FLAG_PATH   = path.join(CLIENT_HOME, '.feynman-active');
 const RULES_PATH  = path.join(__dirname, '..', 'rules', 'feynman-activate.md');
 
 const DEFAULT_STATE = { enabled: true, intensity: 'full', injections: 0 };

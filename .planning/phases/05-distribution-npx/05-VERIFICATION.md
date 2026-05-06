@@ -17,6 +17,8 @@ verified: 2026-05-06
 | NPX-04 | `bash install.sh` refactored to call `node bin/feynman.js install` internally — DRY | PASS | `install.sh` is 17 lines, delegates via `exec node "$SCRIPT_DIR/bin/feynman.js" install "$@"`. All 151 original + 26 new tests pass |
 | NPX-05 | README install section updated: primary `npx feynman install`, fallback bash, manual instructions | PASS | `README.md` — npx-first install block, bash one-liner, uninstall/doctor lines, manual `<details>` block preserved |
 | NPX-06 | `feynman doctor` — checks hook registered? state.json valid? rules file readable? lint hook? prints status frame | PASS | `bin/feynman.js:260-340` — 7 checks, ASCII frame output verified |
+| NPX-07 | Codex target support — install/uninstall/doctor work against `~/.codex/hooks.json` and `~/.codex/.feynman` | PASS | `tests/cli.test.js` covers `--target codex`, `--target both`, Codex uninstall, and Codex doctor |
+| NPX-08 | Plugin metadata for both clients shipped in npm package | PASS | `tests/package.test.js`; `npm pack --dry-run` includes `.codex-plugin/plugin.json`, `hooks.json`, and `hooks/hooks.json` |
 
 ## NPX-03 Note
 
@@ -90,6 +92,31 @@ All files             |   97.16 |    85.74 |  97.16
 ```
 
 Note: `bin/feynman-lint.js` at 77% — stdin/json/strict paths not exercised by CLI tests (covered by `lint.test.js` calling the lint library directly). All critical paths in hooks/ and lib/lint/ exceed 95%.
+
+## Codex Addendum (2026-05-06)
+
+The original Phase 5 verification was Claude Code only. After user review,
+Codex became a release requirement.
+
+Current verification:
+
+```
+npm test
+  tests: 190
+  pass: 190
+
+npm run coverage
+  All files: 96.98% lines
+
+npm pack --dry-run
+  includes .codex-plugin/plugin.json
+  includes hooks.json
+  includes hooks/hooks.json
+```
+
+The production Codex path is direct user hook registration via
+`~/.codex/hooks.json`. The Codex plugin manifest is included for discoverability
+and future marketplace install flows.
 
 ## npm pack Tarball Verification
 
