@@ -1,5 +1,5 @@
 {
-  "model_profile": "balanced",
+  "model_profile": "budget",
   "commit_docs": true,
   "parallelization": true,
   "search_gitignored": false,
@@ -13,7 +13,7 @@
     "quick_branch_template": null
   },
   "workflow": {
-    "research": true,
+    "research": false,
     "plan_check": true,
     "verifier": true,
     "nyquist_validation": false,
@@ -27,7 +27,7 @@
     "text_mode": false,
     "research_before_questions": false,
     "discuss_mode": "discuss",
-    "skip_discuss": false,
+    "skip_discuss": true,
     "code_review": true,
     "code_review_depth": "standard",
     "code_review_command": null,
@@ -46,7 +46,16 @@
   },
   "project_code": null,
   "phase_naming": "sequential",
-  "agent_skills": {},
+  "agent_skills": {
+    "gsd-phase-researcher": "haiku",
+    "gsd-planner": "haiku",
+    "gsd-plan-checker": "haiku",
+    "gsd-pattern-mapper": "haiku",
+    "gsd-executor": "sonnet",
+    "gsd-verifier": "haiku",
+    "gsd-code-reviewer": "haiku",
+    "gsd-code-fixer": "sonnet"
+  },
   "claude_md_path": "./CLAUDE.md",
   "resolve_model_ids": "omit",
   "mode": "yolo",
