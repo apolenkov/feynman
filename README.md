@@ -29,8 +29,8 @@
 
 ---
 
-A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) plugin that
-automatically injects ASCII diagram rules into every prompt via the
+A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex
+plugin that automatically injects ASCII diagram rules into every prompt via the
 `UserPromptSubmit` hook.
 
 <!-- TODO: GIF after v0.3.0 visual capture -->
@@ -39,9 +39,9 @@ automatically injects ASCII diagram rules into every prompt via the
 
 Structured information explained in prose forces you to rebuild the structure
 in your head before you can reason about it. feynman intercepts every Claude
-prompt and injects rules that turn flows into arrows, hierarchies into trees,
-comparisons into columns, and status into frames. The structure is visible
-before you have to think about it.
+Code or Codex prompt and injects rules that turn flows into arrows,
+hierarchies into trees, comparisons into columns, and status into frames. The
+structure is visible before you have to think about it.
 
 ## Before / After
 
@@ -132,23 +132,43 @@ free           | free          | $$$
 
 ## Install
 
-**Via npx (recommended):**
+**Claude Code via npx:**
 
 ```bash
-npx feynman install
+npx feynman install --target claude
 ```
 
-**Via bash one-liner:**
+**Codex via npx:**
+
+```bash
+npx feynman install --target codex
+```
+
+**Both clients:**
+
+```bash
+npx feynman install --target both
+```
+
+The install command is idempotent: running it again updates the existing
+feynman hook instead of adding duplicates.
+
+**Claude Code via bash one-liner:**
 
 ```bash
 git clone https://github.com/apolenkov/feynman && bash feynman/install.sh
 ```
 
-Restart Claude Code. Done.
+Restart Claude Code or Codex. Done.
 
-**Verify:** `npx feynman doctor`
+**Verify:** `npx feynman doctor --target claude` or `npx feynman doctor --target codex`
 
-**Uninstall:** `npx feynman uninstall`
+**Uninstall:** `npx feynman uninstall --target claude|codex|both`
+
+**Plugin manifests:** this repo also ships `.claude-plugin/plugin.json`,
+`hooks/hooks.json`, `.codex-plugin/plugin.json`, and `hooks.json` so plugin
+marketplaces can discover feynman. The npx installer remains the production
+fallback because both clients still support direct user hook registration.
 
 <details>
 <summary>Manual install</summary>
@@ -165,6 +185,28 @@ Add to `~/.claude/settings.json` — use the absolute path, not `~/`
           {
             "type": "command",
             "command": "node \"/absolute/path/to/feynman/hooks/feynman-activate.js\"",
+            "timeout": 5,
+            "statusMessage": "Injecting diagram rules..."
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+For Codex, add the same shape to `~/.codex/hooks.json` and set
+`FEYNMAN_HOME` so state lives under `~/.codex`:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FEYNMAN_HOME=\"$HOME/.codex\" node \"/absolute/path/to/feynman/hooks/feynman-activate.js\"",
             "timeout": 5,
             "statusMessage": "Injecting diagram rules..."
           }

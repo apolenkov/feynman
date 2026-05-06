@@ -46,6 +46,24 @@ function runHook(tmpHome, stdinData) {
   };
 }
 
+function runHookWithFeynmanHome(tmpHome, feynmanHome, stdinData) {
+  const result = spawnSync('node', [HOOK_PATH], {
+    input: JSON.stringify(stdinData),
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      HOME: tmpHome,
+      FEYNMAN_HOME: feynmanHome,
+    },
+    timeout: 10000,
+  });
+  return {
+    status: result.status,
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
+  };
+}
+
 /**
  * Parse additionalContext from hook stdout JSON.
  * Returns the additionalContext string or throws.
@@ -108,6 +126,36 @@ describe('feynman-activate hook', () => {
       // Strict: entire stdout must be exactly one JSON object
       const parsed = JSON.parse(result.stdout);
       assert.equal(typeof parsed, 'object');
+    });
+  });
+
+  describe('Codex target via FEYNMAN_HOME', () => {
+    let tmpHome;
+    let codexHome;
+    let result;
+
+    before(() => {
+      tmpHome = makeTempHome();
+      codexHome = path.join(tmpHome, '.codex');
+      result = runHookWithFeynmanHome(tmpHome, codexHome, { prompt: 'draw the flow' });
+    });
+
+    after(() => rmrf(tmpHome));
+
+    it('creates ~/.codex/.feynman/state.json', () => {
+      const statePath = path.join(codexHome, '.feynman', 'state.json');
+      assert.ok(fs.existsSync(statePath), 'Codex state.json should be created');
+    });
+
+    it('creates ~/.codex/.feynman-active flag', () => {
+      const flagPath = path.join(codexHome, '.feynman-active');
+      assert.ok(fs.existsSync(flagPath), 'Codex flag should be created');
+    });
+
+    it('emits valid additionalContext JSON', () => {
+      assert.equal(result.status, 0);
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.ok(ctx.length > 0, 'additionalContext should not be empty');
     });
   });
 

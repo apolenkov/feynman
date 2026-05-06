@@ -2,13 +2,13 @@
 
 ## What This Is
 
-feynman is an open-source Claude Code plugin that automatically injects ASCII diagram rules into every AI request via the `UserPromptSubmit` hook. Standalone tool — when a response has structure (flow, hierarchy, comparison, status, priority), feynman makes Claude draw it as an ASCII diagram without the developer having to ask.
+feynman is an open-source Claude Code and Codex plugin that automatically injects ASCII diagram rules into every AI request via the `UserPromptSubmit` hook. Standalone tool — when a response has structure (flow, hierarchy, comparison, status, priority), feynman makes the assistant draw it as an ASCII diagram without the developer having to ask.
 
 Tagline: "why explain in words when diagram do trick"
 
 ## Core Value
 
-Every response that has structure — flow, hierarchy, comparison, status — gets an ASCII diagram without the developer having to ask. v0.2.0 adds a diagram linter that validates Claude's ASCII output and feeds corrections back via Stop-hook.
+Every response that has structure — flow, hierarchy, comparison, status — gets an ASCII diagram without the developer having to ask. v0.2.0 adds a diagram linter that validates ASCII output and feeds corrections back via Stop-hook.
 
 ## Current Milestone: v0.2.0 Production-Ready
 
@@ -18,7 +18,7 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 - Cleanup of v0.1 dead files and caveman framing — standalone positioning
 - Diagram linter (parser + 8 lint rules + Stop hook + CLI)
 - 100% test coverage with GitHub Actions CI
-- NPX install path (`npx feynman install`) + bash fallback
+- NPX install path (`npx feynman install --target claude|codex|both`) + bash fallback
 - Full documentation: examples per domain, visual-patterns research, lint rules docs
 - Self-improvement loop design (research-only in this milestone)
 - v0.2.0 release tag + GitHub release
@@ -44,6 +44,7 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 - [ ] 100% test coverage: hook + lint + install/uninstall via node:test
 - [ ] GitHub Actions CI on Linux+macOS matrix, coverage badge
 - [ ] NPX install path: npx feynman install / uninstall / doctor / lint
+- [ ] Codex install path: npx feynman install --target codex writes ~/.codex/hooks.json and uses ~/.codex state
 - [ ] bash install.sh refactored to call same Node logic (DRY)
 - [ ] examples/ folder per domain (architecture, api-flow, db-schema, algorithm, deploy, code-review)
 - [ ] docs/visual-patterns.md — visualization research adapted to ASCII
@@ -59,6 +60,7 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 - [ ] Domain packs (arch / db / devops as separate rule sets)
 - [ ] feynman.config.yaml for team customization
 - [ ] Claude Code Marketplace submission
+- [ ] Codex marketplace submission once plugin-local hook behavior is fully documented
 - [ ] Self-improvement loop full implementation
 - [ ] IDE compatibility (.clinerules / .cursor / .windsurf) — deferred from v0.1
 
@@ -71,10 +73,11 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 
 ## Context
 
-- Target ecosystem: Claude Code (Anthropic CLI) — IDE compat (Cursor/Windsurf) deferred to v0.3+
-- Hook mechanism: `UserPromptSubmit` in Claude Code settings.json (hooks.js pattern)
+- Target ecosystem: Claude Code and Codex — IDE compat (Cursor/Windsurf) deferred to v0.3+
+- Hook mechanism: `UserPromptSubmit` in Claude Code `~/.claude/settings.json` and Codex `~/.codex/hooks.json`
 - Stop hook (v0.2.0): post-response linter that validates ASCII output and feeds corrections back
 - Claude Code plugin manifest: `.claude-plugin/plugin.json`
+- Codex plugin manifest: `.codex-plugin/plugin.json` plus repo-root `hooks.json`
 - Rules file double-duty: injected by hook at runtime AND readable as docs in repo
 - Repo published at https://github.com/apolenkov/feynman with MIT license
 
@@ -82,7 +85,7 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 
 - **Tech Stack**: Pure JavaScript (Node.js >=18) hook — no build step, no npm deps for the hook itself
 - **NPX wrapper layer**: bin/feynman.js can use minimal deps for nicer UX (TBD in Phase 5)
-- **Compatibility**: Claude Code hooks API only for v0.2.0
+- **Compatibility**: Claude Code and Codex hook APIs for v0.2.0
 - **Quality bar**: 100% test coverage, CI green, no dead files, no internal stubs
 - **Positioning**: standalone tool — no caveman-derivative framing in public surface
 
@@ -99,6 +102,7 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 | 100% test coverage target | Production-ready bar; can't ship "business card" without tests | v0.2.0 |
 | NPX as primary install path | Modern UX; bash fallback for npm-less users | v0.2.0 |
 | node:test (not jest/vitest) | Zero deps for testing, ships with Node >=18 | v0.2.0 |
+| Codex as first-class target | User asked for production-ready support in both Claude Code and Codex | v0.2.0 |
 
 ## Evolution
 

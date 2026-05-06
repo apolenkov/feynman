@@ -2,7 +2,7 @@
 
 ## Overview
 
-feynman ships across two milestones. **v0.1** delivered the core IP — rules + hook + plugin manifest + README skeleton — plus skills, install.sh, MIT license, and GitHub publication (some via outside-GSD work). **v0.2.0 "Production-Ready"** turns that into a polished, well-tested, well-documented open-source release: cleanup, diagram linter (the main new feature), 100% test coverage, NPX install path, full domain-organized documentation, and a tagged release. Each phase leaves the project in a fully testable, shippable state.
+feynman ships across two milestones. **v0.1** delivered the core IP — rules + hook + plugin manifest + README skeleton — plus skills, install.sh, MIT license, and GitHub publication (some via outside-GSD work). **v0.2.0 "Production-Ready"** turns that into a polished, well-tested, well-documented open-source release for both Claude Code and Codex: cleanup, diagram linter (the main new feature), 95%+ test coverage, NPX install path, full domain-organized documentation, dual plugin metadata, and a tagged release. Each phase leaves the project in a fully testable, shippable state.
 
 ## Phase Numbering
 
@@ -95,15 +95,16 @@ Plans:
 **UI hint**: no
 
 ### Phase 5: Distribution (NPX + bash)
-**Goal**: A user on a clean machine can install feynman with `npx feynman install`, uninstall it with `npx feynman uninstall`, diagnose issues with `npx feynman doctor`, and run the linter with `npx feynman lint <file>`; the bash one-liner remains as a fallback and shares the same install logic (DRY)
+**Goal**: A user on a clean machine can install feynman for Claude Code, Codex, or both with `npx feynman install --target claude|codex|both`, uninstall it with `npx feynman uninstall`, diagnose issues with `npx feynman doctor`, and run the linter with `npx feynman lint <file>`; the bash one-liner remains as a Claude Code fallback and shares the same install logic (DRY)
 **Depends on**: Phase 4 (don't ship untested distribution artefacts)
-**Requirements**: NPX-01, NPX-02, NPX-03, NPX-04, NPX-05, NPX-06
+**Requirements**: NPX-01, NPX-02, NPX-03, NPX-04, NPX-05, NPX-06, NPX-07, NPX-08
 **Success Criteria** (what must be TRUE):
   1. `npx feynman@0.2.0 install` in a clean docker container (node:18-alpine) registers the hook in `~/.claude/settings.json` with an absolute path; running it twice is idempotent
-  2. `npx feynman doctor` prints a status frame showing hook registered, state.json valid, rules file readable, lint hook registered (or clear failure for each)
-  3. `bash install.sh` (the legacy path) internally invokes `node bin/feynman.js install` — `grep -c 'feynman.js install' install.sh ≥ 1`; install logic exists in exactly one place
-  4. `feynman` package is publicly resolvable on the npm registry at version 0.2.0 with the correct `bin`, `files`, and `engines.node >= 18` fields
-  5. README install section leads with `npx feynman install`; the bash one-liner is documented as a fallback; manual settings.json instructions are still present for power users
+  2. `npx feynman@0.2.0 install --target codex` registers the hook in `~/.codex/hooks.json` with `FEYNMAN_HOME=~/.codex`; running it twice is idempotent
+  3. `npx feynman doctor --target claude|codex` prints a status frame showing hook registered, state.json valid, rules file readable, lint hook registered (or clear failure for each)
+  4. `bash install.sh` (the legacy path) internally invokes `node bin/feynman.js install` — `grep -c 'feynman.js install' install.sh ≥ 1`; install logic exists in exactly one place
+  5. `feynman` package is publicly resolvable on the npm registry at version 0.2.0 with the correct `bin`, `files`, plugin manifests, and `engines.node >= 18` fields
+  6. README install section leads with `npx feynman install --target claude|codex|both`; the bash one-liner is documented as a fallback; manual settings.json/hooks.json instructions are still present for power users
 **Plans**: TBD
 
 **UI hint**: no
@@ -136,7 +137,7 @@ Plans:
 **UI hint**: no
 
 ### Phase 7: Release v0.2.0
-**Goal**: Cut v0.2.0 — git tag, GitHub release with notes, npm package live, uninstall.sh shipped, all README badges green; downstream users can install and uninstall feynman cleanly and read what changed since v0.1
+**Goal**: Cut v0.2.0 — git tag, GitHub release with notes, npm package live, uninstall.sh shipped, all README badges green; downstream users can install and uninstall feynman cleanly for Claude Code and Codex and read what changed since v0.1
 **Depends on**: Phase 2, Phase 3, Phase 4, Phase 5, Phase 6, Phase 6.5
 **Requirements**: REL-01, REL-02, REL-03, REL-04, REL-05
 **Success Criteria** (what must be TRUE):
@@ -180,10 +181,10 @@ Phase 5 (NPX+bash)              │
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core (v0.1) | 3/3 | Completed | 2026-05-06 |
-| 2. Cleanup + State Schema | 0/TBD | Not started | - |
-| 3. Diagram Linter | 0/TBD | Not started | - |
-| 4. Quality (Tests + CI) | 0/TBD | Not started | - |
-| 5. Distribution (NPX + bash) | 0/TBD | Not started | - |
+| 2. Cleanup + State Schema | verification | Completed | 2026-05-06 |
+| 3. Diagram Linter | verification | Completed | 2026-05-06 |
+| 4. Quality (Tests + CI) | verification | Completed | 2026-05-06 |
+| 5. Distribution (NPX + bash) | 1/1 + Codex addendum | Completed | 2026-05-06 |
 | 6. Documentation | 1/1 | Completed | 2026-05-06 |
 | 6.5. Self-Improvement Research | 1/1 | Completed | 2026-05-06 |
-| 7. Release v0.2.0 | 0/TBD | Not started | - |
+| 7. Release v0.2.0 | in progress | Blocked on npm auth / remote release steps | - |

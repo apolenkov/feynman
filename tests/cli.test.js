@@ -53,6 +53,11 @@ function readSettings(tmpHome) {
   return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 }
 
+function readCodexHooks(tmpHome) {
+  const hooksPath = path.join(tmpHome, '.codex', 'hooks.json');
+  return JSON.parse(fs.readFileSync(hooksPath, 'utf8'));
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('bin/feynman.js', () => {
@@ -246,6 +251,62 @@ describe('bin/feynman.js', () => {
         rmrf(tmp);
       }
     });
+
+    it('--target codex creates ~/.codex/hooks.json with feynman hook', () => {
+      const tmp = makeTempHome();
+      try {
+        const result = runFeynman(['install', '--target', 'codex'], tmp);
+        assert.equal(result.status, 0, `install failed: ${result.stderr}`);
+
+        const hooksPath = path.join(tmp, '.codex', 'hooks.json');
+        assert.ok(fs.existsSync(hooksPath), 'Codex hooks.json must exist');
+
+        const cfg = readCodexHooks(tmp);
+        const entry = cfg.hooks.UserPromptSubmit.find(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        );
+        assert.ok(entry, 'feynman hook missing from Codex hooks.json');
+        const hook = entry.hooks[0];
+        assert.ok(hook.command.includes('FEYNMAN_HOME='));
+        assert.ok(hook.command.includes('.codex'));
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('--target codex creates Codex state and flag', () => {
+      const tmp = makeTempHome();
+      try {
+        runFeynman(['install', '--target=codex'], tmp);
+        const statePath = path.join(tmp, '.codex', '.feynman', 'state.json');
+        const flagPath = path.join(tmp, '.codex', '.feynman-active');
+        assert.ok(fs.existsSync(statePath), 'Codex state.json must exist');
+        assert.ok(fs.existsSync(flagPath), 'Codex .feynman-active flag must exist');
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('--target both installs into Claude Code and Codex without duplicate hooks', () => {
+      const tmp = makeTempHome();
+      try {
+        runFeynman(['install', '--target', 'both'], tmp);
+        runFeynman(['install', '--target', 'both'], tmp);
+
+        const claudeCfg = readSettings(tmp);
+        const codexCfg = readCodexHooks(tmp);
+        const claudeCount = claudeCfg.hooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        ).length;
+        const codexCount = codexCfg.hooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        ).length;
+        assert.equal(claudeCount, 1);
+        assert.equal(codexCount, 1);
+      } finally {
+        rmrf(tmp);
+      }
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -334,6 +395,28 @@ describe('bin/feynman.js', () => {
         rmrf(tmp);
       }
     });
+
+    it('--target codex removes hook and preserves state', () => {
+      const tmp = makeTempHome();
+      try {
+        runFeynman(['install', '--target', 'codex'], tmp);
+        const result = runFeynman(['uninstall', '--target', 'codex'], tmp);
+        assert.equal(result.status, 0, `uninstall failed: ${result.stderr}`);
+
+        const cfg = readCodexHooks(tmp);
+        const feynman = (cfg.hooks?.UserPromptSubmit || []).find(e =>
+          e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        );
+        assert.equal(feynman, undefined, 'Codex feynman hook should be removed');
+        assert.ok(
+          fs.existsSync(path.join(tmp, '.codex', '.feynman', 'state.json')),
+          'Codex state.json must be preserved'
+        );
+        assert.ok(!fs.existsSync(path.join(tmp, '.codex', '.feynman-active')));
+      } finally {
+        rmrf(tmp);
+      }
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -345,6 +428,18 @@ describe('bin/feynman.js', () => {
       try {
         runFeynman(['install'], tmp);
         const result = runFeynman(['doctor'], tmp);
+        assert.equal(result.status, 0, `doctor must exit 0: ${result.stderr}`);
+        assert.ok(result.stdout.includes('Status: OK'), `expected "Status: OK": ${result.stdout}`);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('--target codex all checks OK, exits 0', () => {
+      const tmp = makeTempHome();
+      try {
+        runFeynman(['install', '--target', 'codex'], tmp);
+        const result = runFeynman(['doctor', '--target', 'codex'], tmp);
         assert.equal(result.status, 0, `doctor must exit 0: ${result.stderr}`);
         assert.ok(result.stdout.includes('Status: OK'), `expected "Status: OK": ${result.stdout}`);
       } finally {
