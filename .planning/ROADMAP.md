@@ -26,7 +26,7 @@ The skills layer (`/feynman`, `/feynman-stats`), `install.sh`, MIT license, and 
 - [ ] **Phase 3: Diagram Linter** - ASCII parser + 8 lint rules (L01-L08) + bin/feynman-lint CLI + Stop-hook variant + 20+ golden test cases
 - [ ] **Phase 4: Quality (Tests + CI)** - node:test suites for hook, lint, install; GitHub Actions matrix Linux+macOS; coverage badge ≥95%
 - [ ] **Phase 5: Distribution (NPX + bash)** - package.json + bin/feynman.js unified CLI; npm publish; install.sh refactored to call Node logic
-- [ ] **Phase 6: Documentation** - examples/ per domain + docs/visual-patterns + docs/lint-rules + docs/architecture + CONTRIBUTING + .github templates + README rewrite
+- [x] **Phase 6: Documentation** - examples/ per domain + docs/visual-patterns + docs/lint-rules + docs/architecture + CONTRIBUTING + .github templates + README rewrite
 - [ ] **Phase 6.5: Self-Improvement Research** - design spec for self-improvement loop (lint failure → rule update); research-only, no implementation
 - [ ] **Phase 7: Release v0.2.0** - git tag, GitHub release notes, npm publish, uninstall.sh, badges green
 
@@ -62,7 +62,7 @@ Plans:
   4. `skills/feynman/SKILL.md` frontmatter contains `disable-model-invocation: true`; running "draw a diagram" in a non-command context does NOT auto-invoke the skill
   5. `install.sh` no longer references `/feynman-stats`; running it on a clean machine produces a working install with the new structure
   6. `CLAUDE.md` and `.planning/PROJECT.md` contain no empty auto-generated stub sections; "Out of Scope" reflects v0.1-vs-v0.2.0 reality
-**Plans**: TBD
+**Plans**: 1 summary completed
 
 **UI hint**: no
 
@@ -184,6 +184,6 @@ Phase 5 (NPX+bash)              │
 | 3. Diagram Linter | 0/TBD | Not started | - |
 | 4. Quality (Tests + CI) | 0/TBD | Not started | - |
 | 5. Distribution (NPX + bash) | 0/TBD | Not started | - |
-| 6. Documentation | 0/TBD | Not started | - |
+| 6. Documentation | 1/1 | Completed | 2026-05-06 |
 | 6.5. Self-Improvement Research | 0/TBD | Not started | - |
 | 7. Release v0.2.0 | 0/TBD | Not started | - |
