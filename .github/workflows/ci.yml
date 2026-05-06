@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (Node ${{ matrix.node }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [18, 20]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run coverage
+        run: npm run coverage
+
+      - name: Upload coverage artifact
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          retention-days: 7
+
+      - name: Check coverage threshold (≥95% lines)
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20
+        run: |
+          # Extract line coverage percentage from c8 text output
+          COVERAGE=$(npm run coverage 2>&1 | grep "All files" | grep -oP '\d+\.\d+(?=\s*\|.*\|.*\|.*\|.*Lines)' | head -1)
+          if [ -z "$COVERAGE" ]; then
+            # Try alternate format: parse the Lines column
+            COVERAGE=$(npm run coverage 2>&1 | grep "All files" | awk -F'|' '{gsub(/ /,"",$5); print $5}')
+          fi
+          echo "Line coverage: ${COVERAGE}%"
+          # Use awk for float comparison (bash can't do floats)
+          awk -v cov="${COVERAGE}" 'BEGIN {
+            if (cov+0 < 95) {
+              print "FAIL: Coverage " cov "% is below 95% threshold"
+              exit 1
+            } else {
+              print "PASS: Coverage " cov "% meets >=95% threshold"
+              exit 0
+            }
+          }'
+
+      - name: Update coverage badge JSON
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20 && github.ref == 'refs/heads/main'
+        run: |
+          COVERAGE=$(npm run coverage 2>&1 | grep "All files" | awk -F'|' '{gsub(/ /,"",$5); print $5}')
+          echo "Coverage: ${COVERAGE}%"
+          # Determine badge color based on coverage level
+          COLOR="red"
+          if awk -v c="$COVERAGE" 'BEGIN{exit !(c+0 >= 95)}'; then COLOR="brightgreen"; fi
+          if awk -v c="$COVERAGE" 'BEGIN{exit !(c+0 >= 90 && c+0 < 95)}'; then COLOR="yellow"; fi
+          # Write shields.io endpoint JSON
+          mkdir -p .github
+          cat > .github/coverage-badge.json <<EOF
+          {
+            "schemaVersion": 1,
+            "label": "coverage",
+            "message": "${COVERAGE}%",
+            "color": "${COLOR}"
+          }
+          EOF
+          cat .github/coverage-badge.json
+
+      - name: Commit coverage badge JSON
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20 && github.ref == 'refs/heads/main'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update coverage badge [skip ci]"
+          file_pattern: .github/coverage-badge.json
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
