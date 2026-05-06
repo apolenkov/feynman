@@ -90,7 +90,7 @@ Plans:
   3. GitHub Actions CI workflow is green on `main` for both `ubuntu-latest` and `macos-latest`; the same workflow fails CI on lint or test failure
   4. `c8` (or equivalent) reports ≥95% line coverage on `hooks/`, `lib/lint/`, `bin/`; coverage badge in README.md reflects the live number
   5. The test report explicitly names all 8 lint rules and shows positive+negative coverage for each
-**Plans**: 1 summary completed
+**Plans**: TBD
 
 **UI hint**: no
 
@@ -119,7 +119,7 @@ Plans:
   4. `docs/architecture.md` shows hook lifecycle, lint pipeline, and state schema as ASCII diagrams (drawn by feynman itself)
   5. `.github/ISSUE_TEMPLATE/bug_report.md`, `.github/ISSUE_TEMPLATE/feature_request.md`, and `.github/PULL_REQUEST_TEMPLATE.md` exist; opening a new issue on GitHub presents the templates
   6. README rewrite shows badges (CI, coverage, npm, license) all green; "Why feynman" section explains standalone value with no caveman framing
-**Plans**: TBD
+**Plans**: 1 summary completed
 
 **UI hint**: no
 
@@ -131,7 +131,7 @@ Plans:
   1. `docs/self-improvement.md` exists and describes: failure log schema, aggregation step, rule-update proposal format, human-review gate, rollout cadence, kill-switch — without committing to an implementation
   2. The spec explicitly marks the implementation as deferred to v0.3.0 (BENCH-V3-02) and lists open questions
   3. `docs/visual-patterns.md` (shared with DOCS2-07) cites the research foundation behind L01-L08 with at least one source per rule family
-**Plans**: TBD
+**Plans**: 1 summary completed
 
 **UI hint**: no
 
