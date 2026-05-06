@@ -12,6 +12,8 @@
   <a href="https://github.com/apolenkov/feynman/stargazers"><img src="https://img.shields.io/github/stars/apolenkov/feynman?style=flat&color=yellow" alt="Stars"></a>
   <a href="https://github.com/apolenkov/feynman/commits/main"><img src="https://img.shields.io/github/last-commit/apolenkov/feynman?style=flat" alt="Last Commit"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/apolenkov/feynman?style=flat" alt="License"></a>
+  <a href="https://github.com/apolenkov/feynman/actions/workflows/ci.yml"><img src="https://github.com/apolenkov/feynman/workflows/CI/badge.svg" alt="CI"></a>
+  <a href="https://github.com/apolenkov/feynman/blob/main/.github/coverage-badge.json"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/apolenkov/feynman/main/.github/coverage-badge.json" alt="Coverage"></a>
 </p>
 
 <p align="center">
