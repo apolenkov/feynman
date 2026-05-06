@@ -665,7 +665,7 @@ if (/[/\\]|\.\./.test(sessionId)) {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Idempotency guard for bug #14281**
    - What we know: bug #14281 reports `additionalContext` duplication; confirmed open
