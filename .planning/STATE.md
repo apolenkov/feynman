@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: Production-Ready
-status: planning
-last_updated: "2026-05-06T18:00:00.000Z"
-last_activity: 2026-05-06
+status: completed
+stopped_at: Phase 5 complete — NPX distribution + unified CLI shipped
+last_updated: "2026-05-06T22:50:00Z"
+last_activity: 2026-05-06 -- Phase 5 complete (NPX-01..02,04..06 verified; NPX-03 deferred to Phase 7)
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 1
   total_plans: 3
   completed_plans: 3
-  percent: 14
+  percent: 100
 ---
 
 # Project State
@@ -24,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-06)
 
 ## Current Position
 
-Phase: 2 — Cleanup, planning
-Plan: —
-Status: Roadmap written for v0.2.0; awaiting `/gsd-plan-phase 2`
-Last activity: 2026-05-06 — v0.2.0 roadmap created (Phases 2–7 + 6.5)
+Phase: 5 — COMPLETE
+Plan: distribution-npx
+Status: Phase 5 complete
+Last activity: 2026-05-06 -- Phase 5 complete (bin/feynman.js, install.sh refactor, uninstall.sh, cli.test.js, VERIFICATION.md)
 
 ## Performance Metrics
 
@@ -98,5 +99,5 @@ None yet — Phase 2 plans not yet generated.
 ## Session Continuity
 
 Last session: 2026-05-06
-Stopped at: v0.2.0 roadmap written; STATE.md updated; REQUIREMENTS.md traceability mapped 52/52
-Resume file: None — next step is `/gsd-plan-phase 2`
+Stopped at: Phase 5 complete — NPX distribution + unified CLI shipped (177 tests pass, 97.16% coverage)
+Resume file: None — next step is Phase 6 (Docs)
