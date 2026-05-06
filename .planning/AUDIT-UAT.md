@@ -17,6 +17,7 @@ were verified by current command runs.
 | Item | Status | Notes |
 |------|--------|-------|
 | NPX-03 / REL-03 npm publish | Deferred | Correctly deferred to Phase 7 release; requires npm account and 2FA |
+| Codex install support | Complete | `--target codex` writes `~/.codex/hooks.json` and uses `~/.codex/.feynman`; covered by tests |
 | Human UAT items | None found | No UAT files and no unresolved human-needed markers |
 | Skipped unresolved items | None found | No unresolved skip markers found |
 
@@ -28,13 +29,15 @@ Commands run:
 for f in README.md docs/*.md examples/*.md CONTRIBUTING.md; do node bin/feynman-lint.js "$f"; done
 npm run coverage
 node bin/feynman.js doctor
+npm pack --dry-run
 ```
 
 Results:
 
 - Docs/examples/contributing lint: PASS
-- Coverage: 97.17% lines
-- Doctor: Status OK
+- Coverage: 96.98% lines after Codex support
+- Doctor: Status OK for Claude Code and Codex targets in automated tests
+- Package dry run: PASS; tarball includes Claude and Codex plugin metadata
 
 ## Recommended Actions
 

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PLUGIN_ROOT=\"${PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}\"; FEYNMAN_HOME=\"$HOME/.codex\" node \"$PLUGIN_ROOT/hooks/feynman-activate.js\"",
+            "timeout": 5,
+            "statusMessage": "Injecting diagram rules..."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -24,29 +24,69 @@ const PKG       = require('../package.json');
 const VERSION   = PKG.version;
 
 // Resolve paths using os.homedir() — never tilde literal (bug #8810)
-const HOME          = os.homedir();
-const CLAUDE_DIR    = path.join(HOME, '.claude');
-const SETTINGS_PATH = path.join(CLAUDE_DIR, 'settings.json');
-const FEYNMAN_DIR   = path.join(CLAUDE_DIR, '.feynman');
-const STATE_PATH    = path.join(FEYNMAN_DIR, 'state.json');
-const FLAG_PATH     = path.join(CLAUDE_DIR, '.feynman-active');
+const HOME = os.homedir();
 
 // Hook script lives relative to this file
 const HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-activate.js');
 const RULES_PATH = path.resolve(__dirname, '..', 'rules', 'feynman-activate.md');
 
 const DEFAULT_STATE = { enabled: true, intensity: 'full', injections: 0 };
+const VALID_TARGETS = ['claude', 'codex', 'both'];
+
+function targetConfig(name) {
+  const dirName = name === 'codex' ? '.codex' : '.claude';
+  const rootDir = path.join(HOME, dirName);
+  return {
+    name,
+    label: name === 'codex' ? 'Codex' : 'Claude Code',
+    rootDir,
+    settingsPath: path.join(rootDir, name === 'codex' ? 'hooks.json' : 'settings.json'),
+    feynmanDir: path.join(rootDir, '.feynman'),
+    statePath: path.join(rootDir, '.feynman', 'state.json'),
+    flagPath: path.join(rootDir, '.feynman-active'),
+    commandsDir: name === 'claude' ? path.join(rootDir, 'commands') : null,
+  };
+}
+
+function targetNames(target) {
+  return target === 'both' ? ['claude', 'codex'] : [target];
+}
+
+function parseTarget(args, fallback = 'claude') {
+  let target = fallback;
+  const keep = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--target') {
+      target = args[++i];
+    } else if (arg.startsWith('--target=')) {
+      target = arg.slice('--target='.length);
+    } else {
+      keep.push(arg);
+    }
+  }
+  if (!VALID_TARGETS.includes(target)) {
+    console.error(`feynman: invalid --target '${target}' (expected claude, codex, or both)`);
+    process.exit(2);
+  }
+  return { target, args: keep };
+}
+
+function hookCommandFor(target) {
+  const cfg = targetConfig(target);
+  return `FEYNMAN_HOME="${cfg.rootDir}" node "${HOOK_PATH}"`;
+}
 
 // ─── Help text ────────────────────────────────────────────────────────────────
 
-const HELP = `${c.bold('feynman')} v${VERSION} — auto-inject ASCII diagram rules into Claude Code
+const HELP = `${c.bold('feynman')} v${VERSION} — auto-inject ASCII diagram rules into Claude Code and Codex
 
 ${c.bold('Usage:')}
   feynman <command> [options]
 
 ${c.bold('Commands:')}
-  install      Register feynman hook in ~/.claude/settings.json
-  uninstall    Remove feynman hook from settings.json (state preserved)
+  install      Register feynman hook
+  uninstall    Remove feynman hook (state preserved)
   doctor       Check installation health
   lint <file>  Lint a markdown file for diagram rule violations
   version      Print version number
@@ -54,38 +94,47 @@ ${c.bold('Commands:')}
 
 ${c.bold('Options:')}
   --help, -h   Show help for a command
+  --target     claude | codex | both (default: claude)
   --force      (install) Re-register even if already installed
 
 ${c.bold('Examples:')}
   npx feynman install
+  npx feynman install --target codex
+  npx feynman install --target both
   npx feynman doctor
   feynman lint response.md
   feynman uninstall
 `;
 
-const INSTALL_HELP = `${c.bold('feynman install')} — register feynman hook in ~/.claude/settings.json
+const INSTALL_HELP = `${c.bold('feynman install')} — register feynman hook
 
 ${c.bold('Usage:')}
-  feynman install [--force]
+  feynman install [--target claude|codex|both] [--force]
 
 ${c.bold('Options:')}
+  --target  Install into Claude Code, Codex, or both (default: claude)
   --force   Re-register hook even if already installed
 
-Creates:
+Claude creates:
   ~/.claude/.feynman/state.json   — feynman state (enabled, intensity, injections)
   ~/.claude/.feynman-active        — presence flag
+
+Codex creates:
+  ~/.codex/hooks.json              — UserPromptSubmit hook registration
+  ~/.codex/.feynman/state.json     — feynman state (enabled, intensity, injections)
+  ~/.codex/.feynman-active         — presence flag
 
 Idempotent by default: skips if feynman-activate.js entry already exists.
 `;
 
-const UNINSTALL_HELP = `${c.bold('feynman uninstall')} — remove feynman hook from settings.json
+const UNINSTALL_HELP = `${c.bold('feynman uninstall')} — remove feynman hook
 
 ${c.bold('Usage:')}
-  feynman uninstall
+  feynman uninstall [--target claude|codex|both]
 
-Removes feynman hook entries from ~/.claude/settings.json.
-Preserves ~/.claude/.feynman/state.json (user data).
-Removes ~/.claude/.feynman-active flag.
+Removes feynman hook entries from target config.
+Preserves .feynman/state.json (user data).
+Removes .feynman-active flag.
 
 Idempotent: safe to run multiple times.
 `;
@@ -93,10 +142,10 @@ Idempotent: safe to run multiple times.
 const DOCTOR_HELP = `${c.bold('feynman doctor')} — check feynman installation health
 
 ${c.bold('Usage:')}
-  feynman doctor
+  feynman doctor [--target claude|codex]
 
 Checks:
-  1. settings.json present
+  1. target hook config present
   2. UserPromptSubmit hook references feynman-activate.js
   3. Hook script file exists and is readable
   4. Rules file exists and is non-empty
@@ -137,141 +186,185 @@ Prints: ${VERSION}
 
 // ─── Settings helpers ─────────────────────────────────────────────────────────
 
-function readSettings() {
+function readSettings(target) {
+  const cfg = targetConfig(target);
   try {
-    return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8'));
+    return JSON.parse(fs.readFileSync(cfg.settingsPath, 'utf8'));
   } catch (_) {
     return {};
   }
 }
 
-function writeSettings(cfg) {
-  fs.mkdirSync(CLAUDE_DIR, { recursive: true });
-  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(cfg, null, 2) + '\n');
+function writeSettings(target, settings) {
+  const cfg = targetConfig(target);
+  fs.mkdirSync(cfg.rootDir, { recursive: true });
+  fs.writeFileSync(cfg.settingsPath, JSON.stringify(settings, null, 2) + '\n');
+}
+
+function hasFeynmanHook(settings) {
+  return ((settings.hooks && settings.hooks.UserPromptSubmit) || []).some(g =>
+    g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+  );
+}
+
+function removeFeynmanHooks(settings) {
+  if (!settings.hooks || !Array.isArray(settings.hooks.UserPromptSubmit)) return settings;
+  settings.hooks.UserPromptSubmit = settings.hooks.UserPromptSubmit.filter(g =>
+    !(g.hooks && g.hooks.some(h =>
+      h.command && (
+        h.command.includes('feynman-activate.js') ||
+        h.command.includes('feynman-lint.js')
+      )
+    ))
+  );
+  if (settings.hooks.UserPromptSubmit.length === 0) {
+    delete settings.hooks.UserPromptSubmit;
+  }
+  if (Object.keys(settings.hooks).length === 0) {
+    delete settings.hooks;
+  }
+  return settings;
+}
+
+function bootstrapState(target) {
+  const cfg = targetConfig(target);
+  fs.mkdirSync(cfg.feynmanDir, { recursive: true });
+  if (!fs.existsSync(cfg.statePath)) {
+    fs.writeFileSync(cfg.statePath, JSON.stringify(DEFAULT_STATE, null, 2) + '\n');
+  }
+  fs.writeFileSync(cfg.flagPath, DEFAULT_STATE.intensity);
+}
+
+function installClaudeCommand() {
+  const cfg = targetConfig('claude');
+  const skillSrc = path.resolve(__dirname, '..', 'skills', 'feynman', 'SKILL.md');
+  const commandDest = path.join(cfg.commandsDir, 'feynman.md');
+  if (fs.existsSync(skillSrc)) {
+    fs.mkdirSync(cfg.commandsDir, { recursive: true });
+    if (!fs.existsSync(commandDest)) {
+      fs.copyFileSync(skillSrc, commandDest);
+    }
+  }
 }
 
 // ─── Install ──────────────────────────────────────────────────────────────────
 
-function cmdInstall(opts) {
+function installOne(target, opts) {
   const force = opts.force || false;
+  const tc = targetConfig(target);
 
   // Read or create settings
-  const cfg = readSettings();
+  const cfg = readSettings(target);
   cfg.hooks = cfg.hooks || {};
   cfg.hooks.UserPromptSubmit = cfg.hooks.UserPromptSubmit || [];
 
   // Idempotency check
-  const already = cfg.hooks.UserPromptSubmit.some(g =>
-    g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
-  );
+  const already = hasFeynmanHook(cfg);
 
   if (already && !force) {
-    console.log('hook: already installed');
-    process.exit(0);
+    bootstrapState(target);
+    if (target === 'claude') installClaudeCommand();
+    return { target, already: true };
   }
 
   // If force + already, remove old entry first
   if (already && force) {
-    cfg.hooks.UserPromptSubmit = cfg.hooks.UserPromptSubmit.filter(g =>
-      !(g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js')))
-    );
+    removeFeynmanHooks(cfg);
+    cfg.hooks = cfg.hooks || {};
+    cfg.hooks.UserPromptSubmit = cfg.hooks.UserPromptSubmit || [];
   }
 
   // Append hook entry
   cfg.hooks.UserPromptSubmit.push({
     hooks: [{
       type: 'command',
-      command: `node "${HOOK_PATH}"`,
+      command: hookCommandFor(target),
       timeout: 5,
       statusMessage: 'Injecting diagram rules...',
     }]
   });
 
   // Write settings
-  writeSettings(cfg);
+  writeSettings(target, cfg);
 
   // Bootstrap state dir + state.json
-  fs.mkdirSync(FEYNMAN_DIR, { recursive: true });
-  if (!fs.existsSync(STATE_PATH)) {
-    fs.writeFileSync(STATE_PATH, JSON.stringify(DEFAULT_STATE, null, 2) + '\n');
-  }
-
-  // Touch flag file
-  fs.writeFileSync(FLAG_PATH, DEFAULT_STATE.intensity);
+  bootstrapState(target);
 
   // Install /feynman command to ~/.claude/commands/ (preserves user's existing skill)
-  const COMMANDS_DIR = path.join(CLAUDE_DIR, 'commands');
-  const SKILL_SRC    = path.resolve(__dirname, '..', 'skills', 'feynman', 'SKILL.md');
-  const COMMAND_DEST = path.join(COMMANDS_DIR, 'feynman.md');
-  if (fs.existsSync(SKILL_SRC)) {
-    fs.mkdirSync(COMMANDS_DIR, { recursive: true });
-    if (!fs.existsSync(COMMAND_DEST)) {
-      fs.copyFileSync(SKILL_SRC, COMMAND_DEST);
-    }
+  if (target === 'claude') installClaudeCommand();
+
+  return { target, already: false, tc };
+}
+
+function cmdInstall(opts) {
+  const results = targetNames(opts.target).map(t => installOne(t, opts));
+
+  if (results.every(r => r.already)) {
+    const labels = results.map(r => targetConfig(r.target).label).join(' + ');
+    console.log(`hook: already installed (${labels})`);
+    process.exit(0);
   }
 
   // Print status frame
-  const homeSym = SETTINGS_PATH.replace(HOME, '~');
-  const stateSymSym = STATE_PATH.replace(HOME, '~');
-  const flagSym = FLAG_PATH.replace(HOME, '~');
-
   console.log('');
   console.log('┌─ feynman installed ──────────────────────────────────────────┐');
   console.log(`│ hook:     ${HOOK_PATH}`);
-  console.log(`│ settings: ${homeSym}`);
-  console.log(`│ state:    ${stateSymSym}`);
-  console.log(`│ flag:     ${flagSym}`);
+  for (const result of results) {
+    const tc = targetConfig(result.target);
+    console.log(`│ target:   ${tc.label}${result.already ? ' (already installed)' : ''}`);
+    console.log(`│ config:   ${tc.settingsPath.replace(HOME, '~')}`);
+    console.log(`│ state:    ${tc.statePath.replace(HOME, '~')}`);
+    console.log(`│ flag:     ${tc.flagPath.replace(HOME, '~')}`);
+  }
   console.log('└──────────────────────────────────────────────────────────────┘');
   console.log('');
-  console.log('Restart Claude Code to activate feynman.');
+  console.log('Restart Claude Code or Codex to activate feynman.');
 
   process.exit(0);
 }
 
 // ─── Uninstall ────────────────────────────────────────────────────────────────
 
-function cmdUninstall() {
-  if (!fs.existsSync(SETTINGS_PATH)) {
-    console.log('feynman: settings.json not found — nothing to uninstall.');
-    process.exit(0);
+function uninstallOne(target) {
+  const tc = targetConfig(target);
+  if (!fs.existsSync(tc.settingsPath)) {
+    if (fs.existsSync(tc.flagPath)) fs.unlinkSync(tc.flagPath);
+    return { target, missing: true };
   }
 
-  const cfg = readSettings();
-
-  if (cfg.hooks && Array.isArray(cfg.hooks.UserPromptSubmit)) {
-    // Remove entries whose hooks contain feynman-activate.js or feynman-lint.js
-    cfg.hooks.UserPromptSubmit = cfg.hooks.UserPromptSubmit.filter(g =>
-      !(g.hooks && g.hooks.some(h =>
-        h.command && (
-          h.command.includes('feynman-activate.js') ||
-          h.command.includes('feynman-lint.js')
-        )
-      ))
-    );
-
-    // Clean up empty arrays/objects
-    if (cfg.hooks.UserPromptSubmit.length === 0) {
-      delete cfg.hooks.UserPromptSubmit;
-    }
-    if (Object.keys(cfg.hooks).length === 0) {
-      delete cfg.hooks;
-    }
-  }
-
-  writeSettings(cfg);
+  const cfg = readSettings(target);
+  const hadHook = hasFeynmanHook(cfg);
+  removeFeynmanHooks(cfg);
+  writeSettings(target, cfg);
 
   // Remove flag file (NOT state.json — user data per D-11)
-  if (fs.existsSync(FLAG_PATH)) {
-    fs.unlinkSync(FLAG_PATH);
+  if (fs.existsSync(tc.flagPath)) {
+    fs.unlinkSync(tc.flagPath);
   }
 
-  console.log('feynman disabled. State preserved at ~/.claude/.feynman/. Re-enable: npx feynman install');
+  return { target, missing: false, hadHook };
+}
+
+function cmdUninstall(opts) {
+  const results = targetNames(opts.target).map(uninstallOne);
+  const labels = results.map(r => targetConfig(r.target).label).join(' + ');
+  if (results.every(r => r.missing || !r.hadHook)) {
+    console.log(`feynman: no hook found for ${labels} — nothing to uninstall.`);
+  } else {
+    console.log(`feynman disabled for ${labels}. State preserved. Re-enable: npx feynman install --target ${opts.target}`);
+  }
   process.exit(0);
 }
 
 // ─── Doctor ───────────────────────────────────────────────────────────────────
 
-function cmdDoctor() {
+function cmdDoctor(opts = {}) {
+  const target = opts.target || 'claude';
+  if (target === 'both') {
+    targetNames(target).forEach(t => cmdDoctor({ target: t, noExit: true }));
+    process.exit(0);
+  }
+  const tc = targetConfig(target);
   const checks = [];
   let failCount = 0;
 
@@ -282,15 +375,15 @@ function cmdDoctor() {
     if (!info && !pass) failCount++;
   }
 
-  // 1. settings.json exists
-  const settingsExists = fs.existsSync(SETTINGS_PATH);
-  check('settings.json present', settingsExists);
+  // 1. settings/hooks config exists
+  const settingsExists = fs.existsSync(tc.settingsPath);
+  check(`${tc.settingsPath.replace(HOME, '~')} present`, settingsExists);
 
   // 2. UserPromptSubmit hook references feynman-activate.js
   let hookRegistered = false;
   let hookAbsPath = null;
   if (settingsExists) {
-    const cfg = readSettings();
+    const cfg = readSettings(target);
     const entries = (cfg.hooks && cfg.hooks.UserPromptSubmit) || [];
     const feynmanEntry = entries.find(g =>
       g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
@@ -332,19 +425,19 @@ function cmdDoctor() {
   // 5. state.json valid JSON + has enabled field
   let stateOk = false;
   try {
-    const state = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
+    const state = JSON.parse(fs.readFileSync(tc.statePath, 'utf8'));
     stateOk = 'enabled' in state;
   } catch (_) {}
   check('state.json valid (has enabled field)', stateOk);
 
   // 6. .feynman-active flag present
-  const flagPresent = fs.existsSync(FLAG_PATH);
+  const flagPresent = fs.existsSync(tc.flagPath);
   check('.feynman-active flag present', flagPresent);
 
   // 7. (INFO) lint hook registered
   let lintHookRegistered = false;
   if (settingsExists) {
-    const cfg = readSettings();
+    const cfg = readSettings(target);
     // Check Stop hooks too
     const allHookGroups = [
       ...((cfg.hooks && cfg.hooks.UserPromptSubmit) || []),
@@ -361,7 +454,7 @@ function cmdDoctor() {
   const strippedLines = checks.map(l => l.replace(/\x1b\[[0-9;]*m/g, ''));
   const maxLen = Math.max(...strippedLines.map(l => l.length));
   const innerW = Math.max(maxLen + 2, 48); // +2 for one space on each side; min 48
-  const titlePart = 'feynman doctor ';
+  const titlePart = `feynman doctor ${target} `;
   const border = '─'.repeat(innerW);
   const topDashes = '─'.repeat(innerW - titlePart.length - 1);
   console.log(`┌─ ${titlePart}${topDashes}┐`);
@@ -377,7 +470,7 @@ function cmdDoctor() {
     : c.red(`Status: ISSUES (${failCount})`);
   console.log(status);
 
-  process.exit(0);
+  if (!opts.noExit) process.exit(0);
 }
 
 // ─── Lint (delegate to feynman-lint.js) ──────────────────────────────────────
@@ -433,18 +526,21 @@ if (!sub || sub === 'help' || sub === '--help' || sub === '-h') {
 switch (sub) {
   case 'install': {
     if (rest.includes('--help')) { console.log(INSTALL_HELP); process.exit(0); }
-    const force = rest.includes('--force');
-    cmdInstall({ force });
+    const parsed = parseTarget(rest);
+    const force = parsed.args.includes('--force');
+    cmdInstall({ force, target: parsed.target });
     break;
   }
   case 'uninstall': {
     if (rest.includes('--help')) { console.log(UNINSTALL_HELP); process.exit(0); }
-    cmdUninstall();
+    const parsed = parseTarget(rest);
+    cmdUninstall({ target: parsed.target });
     break;
   }
   case 'doctor': {
     if (rest.includes('--help')) { console.log(DOCTOR_HELP); process.exit(0); }
-    cmdDoctor();
+    const parsed = parseTarget(rest);
+    cmdDoctor({ target: parsed.target });
     break;
   }
   case 'lint': {

@@ -127,3 +127,30 @@ None — no new network endpoints or auth paths. install/uninstall write to loca
 - Commit a2f474d exists: FOUND
 - 177 tests pass: VERIFIED
 - npm pack 21.4 kB: VERIFIED
+
+## Addendum: Codex Support (2026-05-06)
+
+User requested production-ready support for both Claude Code and Codex before
+release. Phase 5 distribution scope was extended accordingly.
+
+```
+npx feynman install --target claude  → ~/.claude/settings.json
+npx feynman install --target codex   → ~/.codex/hooks.json
+npx feynman install --target both    → both configs, no duplicate hooks
+```
+
+Added:
+
+- `--target claude|codex|both` for install/uninstall/doctor
+- `FEYNMAN_HOME` support in `hooks/feynman-activate.js`
+- `.codex-plugin/plugin.json` and repo-root `hooks.json`
+- `hooks/hooks.json` for Claude Code plugin packaging
+- README and architecture docs for dual-client install
+- Package metadata tests for plugin manifests
+
+Verification:
+
+- `npm test`: PASS, 190 tests
+- `npm run coverage`: PASS, 96.98% lines
+- `npm pack --dry-run`: PASS, tarball includes `.codex-plugin/plugin.json`,
+  `hooks.json`, and `hooks/hooks.json`

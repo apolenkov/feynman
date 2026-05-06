@@ -1,14 +1,16 @@
 {
   "name": "feynman",
   "version": "0.2.0",
-  "description": "Claude Code plugin that auto-injects ASCII diagram rules into every AI request via UserPromptSubmit hook",
+  "description": "Claude Code and Codex plugin that auto-injects ASCII diagram rules into every AI request via UserPromptSubmit hook",
   "license": "MIT",
   "author": "apolenkov",
   "keywords": [
     "claude-code",
+    "codex",
     "ascii",
     "diagrams",
     "claude",
+    "openai",
     "plugin",
     "hook"
   ],
@@ -34,6 +36,8 @@
     "bin/",
     "rules/",
     "skills/",
+    "hooks.json",
+    ".codex-plugin/",
     "install.sh",
     "uninstall.sh",
     "README.md",
