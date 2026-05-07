@@ -146,10 +146,10 @@ free           | free          | $$$
 
 ## Install
 
-**Claude Code via npx:**
+**Install to Codex by default (when --target is omitted):**
 
 ```bash
-npx @albinocrabs/feynman install --target claude
+npx @albinocrabs/feynman install
 ```
 
 **Codex via npx:**

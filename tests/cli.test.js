@@ -216,10 +216,10 @@ describe('bin/feynman.js', () => {
         const result = runFeynman(['install'], tmp);
         assert.equal(result.status, 0, `install failed: ${result.stderr}`);
 
-        const settingsPath = path.join(tmp, '.claude', 'settings.json');
+        const settingsPath = path.join(tmp, '.codex', 'hooks.json');
         assert.ok(fs.existsSync(settingsPath), 'settings.json must exist');
 
-        const cfg = readSettings(tmp);
+        const cfg = readCodexHooks(tmp);
         assert.ok(cfg.hooks && Array.isArray(cfg.hooks.UserPromptSubmit), 'UserPromptSubmit must be array');
 
         const entry = cfg.hooks.UserPromptSubmit.find(g =>
@@ -239,7 +239,7 @@ describe('bin/feynman.js', () => {
       const tmp = makeTempHome();
       try {
         runFeynman(['install'], tmp);
-        const statePath = path.join(tmp, '.claude', '.feynman', 'state.json');
+        const statePath = path.join(tmp, '.codex', '.feynman', 'state.json');
         assert.ok(fs.existsSync(statePath), 'state.json must be created');
         const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
         assert.equal(state.enabled, true);
@@ -254,17 +254,17 @@ describe('bin/feynman.js', () => {
       const tmp = makeTempHome();
       try {
         runFeynman(['install'], tmp);
-        const flagPath = path.join(tmp, '.claude', '.feynman-active');
+        const flagPath = path.join(tmp, '.codex', '.feynman-active');
         assert.ok(fs.existsSync(flagPath), '.feynman-active flag must exist after install');
       } finally {
         rmrf(tmp);
       }
     });
 
-    it('installs /feynman command to ~/.claude/commands/', () => {
+    it('installs /feynman command to ~/.claude/commands/ when Claude target is selected', () => {
       const tmp = makeTempHome();
       try {
-        runFeynman(['install'], tmp);
+        runFeynman(['install', '--target', 'claude'], tmp);
         const commandPath = path.join(tmp, '.claude', 'commands', 'feynman.md');
         assert.ok(fs.existsSync(commandPath), 'feynman.md command should be installed');
       } finally {
@@ -296,7 +296,7 @@ describe('bin/feynman.js', () => {
         runFeynman(['install'], tmp);
         runFeynman(['install'], tmp); // second time
 
-        const cfg = readSettings(tmp);
+        const cfg = readCodexHooks(tmp);
         const feynmanHooks = cfg.hooks.UserPromptSubmit.filter(g =>
           g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
         );
@@ -326,7 +326,7 @@ describe('bin/feynman.js', () => {
         runFeynman(['install'], tmp);
         runFeynman(['install', '--force'], tmp);
 
-        const cfg = readSettings(tmp);
+        const cfg = readCodexHooks(tmp);
         const count = cfg.hooks.UserPromptSubmit.filter(g =>
           g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
         ).length;
@@ -439,14 +439,14 @@ describe('bin/feynman.js', () => {
   // uninstall
   // -------------------------------------------------------------------------
   describe('feynman uninstall', () => {
-    it('removes feynman hook from settings.json', () => {
+    it('removes feynman hook from Codex hooks.json', () => {
       const tmp = makeTempHome();
       try {
         runFeynman(['install'], tmp);
         const result = runFeynman(['uninstall'], tmp);
         assert.equal(result.status, 0, `uninstall failed: ${result.stderr}`);
 
-        const cfg = readSettings(tmp);
+        const cfg = readCodexHooks(tmp);
         const feynman = (cfg.hooks?.UserPromptSubmit || []).find(e =>
           e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
         );
@@ -462,7 +462,7 @@ describe('bin/feynman.js', () => {
         runFeynman(['install'], tmp);
         runFeynman(['uninstall'], tmp);
 
-        const statePath = path.join(tmp, '.claude', '.feynman', 'state.json');
+        const statePath = path.join(tmp, '.codex', '.feynman', 'state.json');
         assert.ok(fs.existsSync(statePath), 'state.json must be preserved after uninstall');
       } finally {
         rmrf(tmp);
@@ -475,7 +475,7 @@ describe('bin/feynman.js', () => {
         runFeynman(['install'], tmp);
         runFeynman(['uninstall'], tmp);
 
-        const flagPath = path.join(tmp, '.claude', '.feynman-active');
+        const flagPath = path.join(tmp, '.codex', '.feynman-active');
         assert.ok(!fs.existsSync(flagPath), '.feynman-active should be removed by uninstall');
       } finally {
         rmrf(tmp);
@@ -498,7 +498,7 @@ describe('bin/feynman.js', () => {
       const tmp = makeTempHome();
       try {
         // Pre-create settings.json with another hook
-        const claudeDir = path.join(tmp, '.claude');
+        const claudeDir = path.join(tmp, '.codex');
         fs.mkdirSync(claudeDir, { recursive: true });
         const existingCfg = {
           hooks: {
@@ -507,12 +507,12 @@ describe('bin/feynman.js', () => {
             ]
           }
         };
-        fs.writeFileSync(path.join(claudeDir, 'settings.json'), JSON.stringify(existingCfg, null, 2));
+        fs.writeFileSync(path.join(claudeDir, 'hooks.json'), JSON.stringify(existingCfg, null, 2));
 
         runFeynman(['install'], tmp);
         runFeynman(['uninstall'], tmp);
 
-        const cfg = readSettings(tmp);
+        const cfg = readCodexHooks(tmp);
         const myHook = (cfg.hooks?.UserPromptSubmit || []).find(e =>
           e.hooks && e.hooks.some(h => h.command && h.command.includes('my-hook.js'))
         );
@@ -745,7 +745,7 @@ describe('bin/feynman.js', () => {
     it('preserves other hooks and config after install', () => {
       const tmp = makeTempHome();
       try {
-        const claudeDir = path.join(tmp, '.claude');
+        const claudeDir = path.join(tmp, '.codex');
         fs.mkdirSync(claudeDir, { recursive: true });
         const existingCfg = {
           hooks: {
@@ -755,11 +755,11 @@ describe('bin/feynman.js', () => {
           },
           someOtherKey: { value: 99 }
         };
-        fs.writeFileSync(path.join(claudeDir, 'settings.json'), JSON.stringify(existingCfg, null, 2));
+        fs.writeFileSync(path.join(claudeDir, 'hooks.json'), JSON.stringify(existingCfg, null, 2));
 
         runFeynman(['install'], tmp);
 
-        const cfg = readSettings(tmp);
+        const cfg = readCodexHooks(tmp);
         // Other hook preserved
         const otherHook = cfg.hooks.UserPromptSubmit.find(e =>
           e.hooks && e.hooks.some(h => h.command && h.command.includes('other/hook.js'))
