@@ -28,9 +28,9 @@ function rmrf(dir) {
  * Run install.sh with HOME stubbed to tmpDir.
  * Returns { stdout, stderr, status }.
  */
-function runInstall(tmpHome, env = {}) {
+function runInstall(tmpHome, env = {}, args = []) {
   try {
-    const stdout = execFileSync('bash', [INSTALL_SH], {
+    const stdout = execFileSync('bash', [INSTALL_SH, ...args], {
       encoding: 'utf8',
       env: {
         PATH: process.env.PATH,
@@ -53,7 +53,7 @@ function runInstall(tmpHome, env = {}) {
  * Read and parse settings.json from the temp HOME.
  */
 function readSettings(tmpHome) {
-  const settingsPath = path.join(tmpHome, '.claude', 'settings.json');
+  const settingsPath = path.join(tmpHome, '.codex', 'hooks.json');
   return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 }
 
@@ -77,9 +77,9 @@ describe('install.sh', () => {
       assert.equal(result.status, 0, `install.sh failed: ${result.stderr}`);
     });
 
-    it('creates settings.json', () => {
-      const settingsPath = path.join(tmpHome, '.claude', 'settings.json');
-      assert.ok(fs.existsSync(settingsPath), 'settings.json should be created');
+    it('creates codex hooks.json', () => {
+      const settingsPath = path.join(tmpHome, '.codex', 'hooks.json');
+      assert.ok(fs.existsSync(settingsPath), 'codex hooks.json should be created');
     });
 
     it('settings.json contains UserPromptSubmit hook', () => {
@@ -102,7 +102,9 @@ describe('install.sh', () => {
       assert.ok(!hook.command.includes('~/'), 'hook command must not use tilde');
     });
 
-    it('installs /feynman command to ~/.claude/commands/', () => {
+    it('installs /feynman command to ~/.claude/commands/ with explicit claude target', () => {
+      const result = runInstall(tmpHome, {}, ['--target', 'claude']);
+      assert.equal(result.status, 0, `install --target claude failed: ${result.stderr}`);
       const commandPath = path.join(tmpHome, '.claude', 'commands', 'feynman.md');
       assert.ok(fs.existsSync(commandPath), 'feynman.md command should be installed');
     });
@@ -156,8 +158,8 @@ describe('install.sh', () => {
 
     before(() => {
       tmpHome = makeTempHome();
-      // Create pre-existing settings.json with another hook
-      const claudeDir = path.join(tmpHome, '.claude');
+      // Create pre-existing codex hooks.json with another hook
+      const claudeDir = path.join(tmpHome, '.codex');
       fs.mkdirSync(claudeDir, { recursive: true });
       const existingCfg = {
         hooks: {
@@ -169,8 +171,8 @@ describe('install.sh', () => {
         },
         someOtherConfig: { value: 42 }
       };
-      fs.writeFileSync(
-        path.join(claudeDir, 'settings.json'),
+        fs.writeFileSync(
+        path.join(claudeDir, 'hooks.json'),
         JSON.stringify(existingCfg, null, 2)
       );
 
