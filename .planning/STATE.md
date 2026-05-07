@@ -76,7 +76,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Publish `feynman@0.2.0` to npm after `npm adduser` / npm auth is available.
+- Publish `@albinocrabs/feynman@0.2.0` to npm after team-scoped package metadata is committed.
 - Create/push annotated `v0.2.0` tag and GitHub release after final release commit lands.
 
 ### Blockers/Concerns
@@ -84,7 +84,7 @@ Recent decisions affecting current work:
 - [Phase 2]: SKIL-03 (`disable-model-invocation: true`) deferred from v0.1 — must verify Claude Code skill frontmatter still supports this flag
 - [Phase 3]: ASCII parser needs to handle both fenced code blocks and freestanding diagrams; rule precedence when multiple rules trigger on same line
 - [Phase 4]: c8 vs node --experimental-test-coverage trade-off — pick before writing CI workflow
-- [Phase 7]: npm publish requires npm account + 2FA; current `npm whoami` reports `ENEEDAUTH`
+- [Phase 7]: unscoped `feynman` is already owned by another npm team; publish under `@albinocrabs/feynman`
 - [Phase 7]: GitHub release/tag should wait until final code/docs commit is pushed
 - [Phase 6.5]: research must avoid scope creep into implementation — design spec only
 

@@ -22,7 +22,7 @@ Docs were checked against the current repository state after Phase 6.5.
 
 | Area | Status | Evidence |
 |------|--------|----------|
-| Install docs | PASS | `README.md` documents `npx feynman install`, bash fallback, manual settings, doctor, uninstall |
+| Install docs | PASS | `README.md` documents `npx @albinocrabs/feynman install`, bash fallback, manual settings, doctor, uninstall |
 | CLI docs | PASS | `package.json` exposes `feynman` and `feynman-lint`; README and docs reference matching commands |
 | Lint rules | PASS | `docs/lint-rules.md` documents L01-L08 and references `lib/lint/rules.js` |
 | Architecture | PASS | `docs/architecture.md` matches current files: `hooks/`, `lib/lint/`, `bin/`, `rules/`, `skills/` |

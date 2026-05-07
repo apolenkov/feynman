@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/feynman"><img src="https://img.shields.io/npm/v/feynman?style=flat&color=blue" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/@albinocrabs/feynman"><img src="https://img.shields.io/npm/v/@albinocrabs/feynman?style=flat&color=blue" alt="npm version"></a>
   <a href="https://github.com/apolenkov/feynman/actions/workflows/ci.yml"><img src="https://github.com/apolenkov/feynman/workflows/CI/badge.svg" alt="CI"></a>
   <a href="https://github.com/apolenkov/feynman/blob/main/.github/coverage-badge.json"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/apolenkov/feynman/main/.github/coverage-badge.json" alt="Coverage"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/apolenkov/feynman?style=flat" alt="License"></a>
@@ -135,19 +135,19 @@ free           | free          | $$$
 **Claude Code via npx:**
 
 ```bash
-npx feynman install --target claude
+npx @albinocrabs/feynman install --target claude
 ```
 
 **Codex via npx:**
 
 ```bash
-npx feynman install --target codex
+npx @albinocrabs/feynman install --target codex
 ```
 
 **Both clients:**
 
 ```bash
-npx feynman install --target both
+npx @albinocrabs/feynman install --target both
 ```
 
 The install command is idempotent: running it again updates the existing
@@ -161,9 +161,9 @@ git clone https://github.com/apolenkov/feynman && bash feynman/install.sh
 
 Restart Claude Code or Codex. Done.
 
-**Verify:** `npx feynman doctor --target claude` or `npx feynman doctor --target codex`
+**Verify:** `npx @albinocrabs/feynman doctor --target claude` or `npx @albinocrabs/feynman doctor --target codex`
 
-**Uninstall:** `npx feynman uninstall --target claude|codex|both`
+**Uninstall:** `npx @albinocrabs/feynman uninstall --target claude|codex|both`
 
 **Plugin manifests:** this repo also ships `.claude-plugin/plugin.json`,
 `hooks/hooks.json`, `.codex-plugin/plugin.json`, and `hooks.json` so plugin
@@ -244,7 +244,7 @@ before they reach readers: unclosed boxes, wrong tree characters, mixed arrow
 styles, inconsistent column counts, and more.
 
 ```bash
-npx feynman lint response.md
+npx @albinocrabs/feynman lint response.md
 ```
 
 See [docs/lint-rules.md](docs/lint-rules.md) for the full L01-L08 reference.

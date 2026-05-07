@@ -41,7 +41,7 @@ metrics:
 ## What Was Built
 
 ```
-[npx feynman install] → [bin/feynman.js] → [settings.json mutation]
+[npx @albinocrabs/feynman install] → [bin/feynman.js] → [settings.json mutation]
                                           → [state.json bootstrap]
                                           → [.feynman-active flag]
                                           → [~/.claude/commands/feynman.md]
@@ -134,9 +134,9 @@ User requested production-ready support for both Claude Code and Codex before
 release. Phase 5 distribution scope was extended accordingly.
 
 ```
-npx feynman install --target claude  → ~/.claude/settings.json
-npx feynman install --target codex   → ~/.codex/hooks.json
-npx feynman install --target both    → both configs, no duplicate hooks
+npx @albinocrabs/feynman install --target claude  → ~/.claude/settings.json
+npx @albinocrabs/feynman install --target codex   → ~/.codex/hooks.json
+npx @albinocrabs/feynman install --target both    → both configs, no duplicate hooks
 ```
 
 Added:

@@ -153,7 +153,7 @@ All runtime state lives in two files under the selected client root:
   state.intensity = <value>
   .feynman-active content updated
 
-[npx feynman uninstall --target claude|codex|both]
+[npx @albinocrabs/feynman uninstall --target claude|codex|both]
   hook removed from target hook config
   .feynman-active deleted
   state.json preserved (user data)

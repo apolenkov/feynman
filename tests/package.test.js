@@ -14,6 +14,13 @@ function readJson(relPath) {
 }
 
 describe('package metadata', () => {
+  it('uses the albinocrabs npm scope while keeping CLI bin names', () => {
+    const pkg = readJson('package.json');
+    assert.equal(pkg.name, '@albinocrabs/feynman');
+    assert.equal(pkg.bin.feynman, 'bin/feynman.js');
+    assert.equal(pkg.bin['feynman-lint'], 'bin/feynman-lint.js');
+  });
+
   it('ships Codex plugin files in npm package file list', () => {
     const pkg = readJson('package.json');
     assert.ok(pkg.files.includes('.codex-plugin/'));

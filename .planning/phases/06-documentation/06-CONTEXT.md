@@ -34,7 +34,7 @@ Documentation that turns feynman into a credible "visitkarte" repo: 6 example se
 ### Tone & language
 - **D-01:** All docs in **English** (technical surface for OSS contributors). Russian remains for chat replies per global CLAUDE.md.
 - **D-02:** Plain, direct prose. No marketing fluff. Sentences ≤25 words. Code blocks for every example.
-- **D-03:** Every diagram in docs is itself a feynman-compliant diagram (passes our linter). Run `npx feynman lint docs/*.md examples/*.md` after writing — fix any L01-L08 issues.
+- **D-03:** Every diagram in docs is itself a feynman-compliant diagram (passes our linter). Run `npx @albinocrabs/feynman lint docs/*.md examples/*.md` after writing — fix any L01-L08 issues.
 
 ### Example structure
 - **D-04:** Each `examples/*.md` follows the schema:
@@ -133,7 +133,7 @@ Documentation that turns feynman into a credible "visitkarte" repo: 6 example se
   3. Nav: `Why • Examples • Install • Levels • Lint • Contributing`
   4. **Why feynman** — 3 sentences, standalone value (NO caveman ref)
   5. **Before / After** table (existing 3 rows preserved + maybe expand to 4)
-  6. **Install** — `npx feynman install` primary, bash fallback, manual <details>
+  6. **Install** — `npx @albinocrabs/feynman install` primary, bash fallback, manual <details>
   7. **Intensity Levels** — existing table + `/feynman` toggle commands
   8. **Lint** — one line: "feynman includes a linter for ASCII diagrams; see [docs/lint-rules.md](docs/lint-rules.md)"
   9. **Examples** — link list to all 6 examples/*.md files
@@ -145,7 +145,7 @@ Documentation that turns feynman into a credible "visitkarte" repo: 6 example se
 - **D-22:** Screenshot/GIF placeholders DEFERRED — note in TODO comment, not blocking.
 
 ### Lint compliance for own docs
-- **D-23:** All ASCII diagrams in examples/ + docs/ pass `npx feynman lint`. If a diagram intentionally violates a rule (for invalid example), wrap it in HTML comment marker `<!-- lint-skip -->` OR document inside a code fence with language `text` to avoid scanning. Decision: use language `text` on intentionally-broken examples — parser detects fences but only ASCII-art content; document this in lint-rules.md.
+- **D-23:** All ASCII diagrams in examples/ + docs/ pass `npx @albinocrabs/feynman lint`. If a diagram intentionally violates a rule (for invalid example), wrap it in HTML comment marker `<!-- lint-skip -->` OR document inside a code fence with language `text` to avoid scanning. Decision: use language `text` on intentionally-broken examples — parser detects fences but only ASCII-art content; document this in lint-rules.md.
 
 ### Claude's Discretion
 - Exact wording of the "Why feynman" paragraph — keep concise, value-focused
@@ -173,7 +173,7 @@ Documentation that turns feynman into a credible "visitkarte" repo: 6 example se
 </code_context>
 
 <specifics>
-- All diagrams pass `npx feynman lint` (run as final verification before commit)
+- All diagrams pass `npx @albinocrabs/feynman lint` (run as final verification before commit)
 - README total length 90-second read — count words excluding code blocks
 - docs/visual-patterns.md ≤2000 words (hard cap, use diagrams)
 - Each example file ≤300 lines (concise sessions, not novels)

@@ -29,7 +29,7 @@ What actually happens. If there is an error message, paste it verbatim:
 
 ## Environment
 
-- **feynman version:** `npx feynman version` or `node bin/feynman.js version`
+- **feynman version:** `npx @albinocrabs/feynman version` or `node bin/feynman.js version`
 - **Node.js version:** `node --version`
 - **OS:** (macOS 14 / Ubuntu 22.04 / etc.)
 - **Claude Code version:** (from Help > About, or `claude --version`)

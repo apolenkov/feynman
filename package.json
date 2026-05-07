@@ -1,5 +1,5 @@
 {
-  "name": "feynman",
+  "name": "@albinocrabs/feynman",
   "version": "0.2.0",
   "description": "Claude Code and Codex plugin that auto-injects ASCII diagram rules into every AI request via UserPromptSubmit hook",
   "license": "MIT",

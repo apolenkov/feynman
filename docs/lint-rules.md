@@ -3,7 +3,7 @@
 feynman includes a linter for ASCII diagrams in markdown files.
 Eight rules (L01-L08) enforce structural correctness.
 
-Run: `npx feynman lint <file.md>` or `feynman lint <file.md>`
+Run: `npx @albinocrabs/feynman lint <file.md>` or `feynman lint <file.md>`
 
 ---
 

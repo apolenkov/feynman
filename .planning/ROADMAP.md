@@ -95,16 +95,16 @@ Plans:
 **UI hint**: no
 
 ### Phase 5: Distribution (NPX + bash)
-**Goal**: A user on a clean machine can install feynman for Claude Code, Codex, or both with `npx feynman install --target claude|codex|both`, uninstall it with `npx feynman uninstall`, diagnose issues with `npx feynman doctor`, and run the linter with `npx feynman lint <file>`; the bash one-liner remains as a Claude Code fallback and shares the same install logic (DRY)
+**Goal**: A user on a clean machine can install feynman for Claude Code, Codex, or both with `npx @albinocrabs/feynman install --target claude|codex|both`, uninstall it with `npx @albinocrabs/feynman uninstall`, diagnose issues with `npx @albinocrabs/feynman doctor`, and run the linter with `npx @albinocrabs/feynman lint <file>`; the bash one-liner remains as a Claude Code fallback and shares the same install logic (DRY)
 **Depends on**: Phase 4 (don't ship untested distribution artefacts)
 **Requirements**: NPX-01, NPX-02, NPX-03, NPX-04, NPX-05, NPX-06, NPX-07, NPX-08
 **Success Criteria** (what must be TRUE):
-  1. `npx feynman@0.2.0 install` in a clean docker container (node:18-alpine) registers the hook in `~/.claude/settings.json` with an absolute path; running it twice is idempotent
-  2. `npx feynman@0.2.0 install --target codex` registers the hook in `~/.codex/hooks.json` with `FEYNMAN_HOME=~/.codex`; running it twice is idempotent
-  3. `npx feynman doctor --target claude|codex` prints a status frame showing hook registered, state.json valid, rules file readable, lint hook registered (or clear failure for each)
+  1. `npx @albinocrabs/feynman@0.2.0 install` in a clean docker container (node:18-alpine) registers the hook in `~/.claude/settings.json` with an absolute path; running it twice is idempotent
+  2. `npx @albinocrabs/feynman@0.2.0 install --target codex` registers the hook in `~/.codex/hooks.json` with `FEYNMAN_HOME=~/.codex`; running it twice is idempotent
+  3. `npx @albinocrabs/feynman doctor --target claude|codex` prints a status frame showing hook registered, state.json valid, rules file readable, lint hook registered (or clear failure for each)
   4. `bash install.sh` (the legacy path) internally invokes `node bin/feynman.js install` — `grep -c 'feynman.js install' install.sh ≥ 1`; install logic exists in exactly one place
-  5. `feynman` package is publicly resolvable on the npm registry at version 0.2.0 with the correct `bin`, `files`, plugin manifests, and `engines.node >= 18` fields
-  6. README install section leads with `npx feynman install --target claude|codex|both`; the bash one-liner is documented as a fallback; manual settings.json/hooks.json instructions are still present for power users
+  5. `@albinocrabs/feynman` package is publicly resolvable on the npm registry at version 0.2.0 with the correct `bin`, `files`, plugin manifests, and `engines.node >= 18` fields
+  6. README install section leads with `npx @albinocrabs/feynman install --target claude|codex|both`; the bash one-liner is documented as a fallback; manual settings.json/hooks.json instructions are still present for power users
 **Plans**: TBD
 
 **UI hint**: no
@@ -143,7 +143,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. `git tag --list` contains `v0.2.0` with an annotated message; `git show v0.2.0` shows the release notes
   2. The GitHub release page for `v0.2.0` lists what's new, what's fixed, breaking changes, and migration notes from v0.1
-  3. `npm view feynman version` returns `0.2.0`; `npx feynman@0.2.0 install` works in a fresh container
+  3. `npm view @albinocrabs/feynman version` returns `0.2.0`; `npx @albinocrabs/feynman@0.2.0 install` works in a fresh container
   4. `bash uninstall.sh` removes the hook entry from `~/.claude/settings.json` and deletes `~/.claude/.feynman-active`; prompts the user before deleting `state.json`
   5. README badges (CI passing, coverage ≥95%, npm version 0.2.0, MIT license) all render green on the public repo page
 **Plans**: TBD
