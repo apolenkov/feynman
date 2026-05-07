@@ -18,7 +18,7 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 - Cleanup of v0.1 dead files and caveman framing — standalone positioning
 - Diagram linter (parser + 8 lint rules + Stop hook + CLI)
 - 100% test coverage with GitHub Actions CI
-- NPX install path (`npx feynman install --target claude|codex|both`) + bash fallback
+- NPX install path (`npx @albinocrabs/feynman install --target claude|codex|both`) + bash fallback
 - Full documentation: examples per domain, visual-patterns research, lint rules docs
 - Self-improvement loop design (research-only in this milestone)
 - v0.2.0 release tag + GitHub release
@@ -43,8 +43,8 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 - [ ] Diagram linter: ASCII parser + 8 rules (L01-L08) + bin/feynman-lint CLI + Stop-hook integration
 - [ ] 100% test coverage: hook + lint + install/uninstall via node:test
 - [ ] GitHub Actions CI on Linux+macOS matrix, coverage badge
-- [ ] NPX install path: npx feynman install / uninstall / doctor / lint
-- [ ] Codex install path: npx feynman install --target codex writes ~/.codex/hooks.json and uses ~/.codex state
+- [ ] NPX install path: npx @albinocrabs/feynman install / uninstall / doctor / lint
+- [ ] Codex install path: npx @albinocrabs/feynman install --target codex writes ~/.codex/hooks.json and uses ~/.codex state
 - [ ] bash install.sh refactored to call same Node logic (DRY)
 - [ ] examples/ folder per domain (architecture, api-flow, db-schema, algorithm, deploy, code-review)
 - [ ] docs/visual-patterns.md — visualization research adapted to ASCII

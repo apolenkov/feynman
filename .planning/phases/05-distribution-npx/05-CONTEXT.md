@@ -7,13 +7,13 @@
 <domain>
 ## Phase Boundary
 
-feynman ships as an NPM package installable via `npx feynman install`. Bash one-liner remains as fallback and delegates to the same Node logic (DRY). A `feynman doctor` subcommand validates installation health.
+feynman ships as an NPM package installable via `npx @albinocrabs/feynman install`. Bash one-liner remains as fallback and delegates to the same Node logic (DRY). A `feynman doctor` subcommand validates installation health.
 
 **Delivers:**
 - bin/feynman.js — unified CLI (install / uninstall / doctor / lint / version / help)
 - install.sh — refactored to call `node bin/feynman.js install` (no logic duplication)
 - uninstall.sh — calls `node bin/feynman.js uninstall`
-- README install section — `npx feynman install` primary, bash one-liner secondary
+- README install section — `npx @albinocrabs/feynman install` primary, bash one-liner secondary
 - package.json — `bin` field maps `feynman` and `feynman-lint` commands
 - LICENSE — MIT (if missing)
 - npm publish: NOT executed in this phase — Phase 7 ships it. We make the artifact publish-ready and verify locally via `npm pack && npm install -g ./feynman-0.2.0.tgz`.
@@ -39,7 +39,7 @@ feynman ships as an NPM package installable via `npx feynman install`. Bash one-
 
 ### Uninstall logic
 - **D-10:** `uninstall` removes feynman hook entries from settings.json (filters out entries with `feynman-activate.js` in command). Preserves other hooks.
-- **D-11:** `uninstall` does NOT delete state.json or rules — user data preserved. Removes `.feynman-active` flag only. Print: "feynman disabled. State preserved at ~/.claude/.feynman/. Re-enable: npx feynman install".
+- **D-11:** `uninstall` does NOT delete state.json or rules — user data preserved. Removes `.feynman-active` flag only. Print: "feynman disabled. State preserved at ~/.claude/.feynman/. Re-enable: npx @albinocrabs/feynman install".
 - **D-12:** Idempotent: running uninstall twice is safe.
 
 ### Doctor (NPX-06)
@@ -64,8 +64,8 @@ feynman ships as an NPM package installable via `npx feynman install`. Bash one-
 - **D-20:** Add `keywords: ["claude-code", "ascii", "diagrams", "claude", "plugin", "hook"]`, `author: "apolenkov"`.
 
 ### README updates
-- **D-21:** Replace install section. Primary: `npx feynman install`. Secondary (Manual / no Node global): bash `curl ... | bash` or git-clone + bash. Existing manual settings.json block preserved as last fallback.
-- **D-22:** Add npm version badge (shields.io: `https://img.shields.io/npm/v/feynman`).
+- **D-21:** Replace install section. Primary: `npx @albinocrabs/feynman install`. Secondary (Manual / no Node global): bash `curl ... | bash` or git-clone + bash. Existing manual settings.json block preserved as last fallback.
+- **D-22:** Add npm version badge (shields.io: `https://img.shields.io/npm/v/@albinocrabs/feynman`).
 
 ### Claude's Discretion
 - Exact wording of doctor output frame
@@ -94,7 +94,7 @@ feynman ships as an NPM package installable via `npx feynman install`. Bash one-
 - All install/uninstall paths must work with `HOME` env override (tests rely on this — D-08 of Phase 4)
 - `npm pack` should produce a tarball ≤50KB (no node_modules, no .planning/, no tests/, no .github/)
 - Verify `.npmignore` OR `files` whitelist excludes: tests/, .planning/, .github/, .gitignore, *.log
-- After Phase 5: `npx feynman --help` runs, `npx feynman doctor` runs, `npx feynman install` writes correct settings.json
+- After Phase 5: `npx @albinocrabs/feynman --help` runs, `npx @albinocrabs/feynman doctor` runs, `npx @albinocrabs/feynman install` writes correct settings.json
 - All Phase 4 tests still pass (install.test.js covers install.sh which now delegates to Node)
 </specifics>
 

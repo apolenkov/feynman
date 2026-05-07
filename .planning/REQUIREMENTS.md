@@ -79,11 +79,11 @@
 
 - [x] **NPX-01**: `package.json` with name "feynman", version "0.2.0", `bin` entries, `files` whitelist, `engines.node >= 18`
 - [x] **NPX-02**: `bin/feynman.js` — unified CLI; subcommands: `install`, `uninstall`, `doctor`, `lint`, `version`; `--help` for each
-- [ ] **NPX-03**: `npm publish` — feynman package live on npm registry; verified by running `npx feynman@0.2.0 install` in clean env
+- [ ] **NPX-03**: `npm publish` — @albinocrabs/feynman package live on npm registry; verified by running `npx @albinocrabs/feynman@0.2.0 install` in clean env
 - [x] **NPX-04**: `bash install.sh` refactored to call `node bin/feynman.js install` internally — DRY single source of install logic
-- [x] **NPX-05**: README install section updated: primary `npx feynman install`, fallback bash one-liner, manual settings.json instructions
+- [x] **NPX-05**: README install section updated: primary `npx @albinocrabs/feynman install`, fallback bash one-liner, manual settings.json instructions
 - [x] **NPX-06**: `feynman doctor` — checks hook registered? state.json valid? rules file readable? lint hook registered? prints status frame
-- [x] **NPX-07**: Codex target support — `npx feynman install --target codex` writes `~/.codex/hooks.json`, `~/.codex/.feynman/state.json`, and `~/.codex/.feynman-active`; install is idempotent
+- [x] **NPX-07**: Codex target support — `npx @albinocrabs/feynman install --target codex` writes `~/.codex/hooks.json`, `~/.codex/.feynman/state.json`, and `~/.codex/.feynman-active`; install is idempotent
 - [x] **NPX-08**: Plugin metadata for both clients — `.claude-plugin/plugin.json` + `hooks/hooks.json`, `.codex-plugin/plugin.json` + repo-root `hooks.json`, all included in npm package files
 
 ### Documentation (visitkarte)

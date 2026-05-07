@@ -13,9 +13,9 @@ verified: 2026-05-06
 |----|-------------|--------|----------|
 | NPX-01 | `package.json` with name "feynman", version "0.2.0", `bin` entries, `files` whitelist, `engines.node >= 18` | PASS | `package.json:1-52` — name/version/bin/files/engines all present |
 | NPX-02 | `bin/feynman.js` — unified CLI; subcommands: install, uninstall, doctor, lint, version; `--help` for each | PASS | `bin/feynman.js` created; all subcommands verified via `tests/cli.test.js` (177 tests pass) |
-| NPX-03 | `npm publish` — package live on npm (npx feynman@0.2.0 install) | DEFERRED | Phase 7 (REL-03). Verified locally via `npm pack` → 21.4 KB tarball; isolated install test with `npm install <tgz>` confirms all subcommands work |
+| NPX-03 | `npm publish` — package live on npm (npx @albinocrabs/feynman@0.2.0 install) | DEFERRED | Phase 7 (REL-03). Verified locally via `npm pack` → 21.4 KB tarball; isolated install test with `npm install <tgz>` confirms all subcommands work |
 | NPX-04 | `bash install.sh` refactored to call `node bin/feynman.js install` internally — DRY | PASS | `install.sh` is 17 lines, delegates via `exec node "$SCRIPT_DIR/bin/feynman.js" install "$@"`. All 151 original + 26 new tests pass |
-| NPX-05 | README install section updated: primary `npx feynman install`, fallback bash, manual instructions | PASS | `README.md` — npx-first install block, bash one-liner, uninstall/doctor lines, manual `<details>` block preserved |
+| NPX-05 | README install section updated: primary `npx @albinocrabs/feynman install`, fallback bash, manual instructions | PASS | `README.md` — npx-first install block, bash one-liner, uninstall/doctor lines, manual `<details>` block preserved |
 | NPX-06 | `feynman doctor` — checks hook registered? state.json valid? rules file readable? lint hook? prints status frame | PASS | `bin/feynman.js:260-340` — 7 checks, ASCII frame output verified |
 | NPX-07 | Codex target support — install/uninstall/doctor work against `~/.codex/hooks.json` and `~/.codex/.feynman` | PASS | `tests/cli.test.js` covers `--target codex`, `--target both`, Codex uninstall, and Codex doctor |
 | NPX-08 | Plugin metadata for both clients shipped in npm package | PASS | `tests/package.test.js`; `npm pack --dry-run` includes `.codex-plugin/plugin.json`, `hooks.json`, and `hooks/hooks.json` |
