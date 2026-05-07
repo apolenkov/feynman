@@ -27,9 +27,31 @@ jobs:
               return;
             }
 
+            const requiredLabels = new Set(['auto-merge', 'status:ready']);
+            const blockedLabels = new Set(['wip', 'do not merge', 'hold', 'blocked']);
+
+            function normalizeLabel(label) {
+              return typeof label?.name === 'string' ? label.name.toLowerCase() : '';
+            }
+
+            function hasRequiredLabels(prLabels) {
+              const names = prLabels.map(normalizeLabel);
+              for (const label of requiredLabels) {
+                if (!names.includes(label)) {
+                  return { ok: false, missing: label };
+                }
+              }
+              for (const blocked of blockedLabels) {
+                if (names.includes(blocked)) {
+                  return { ok: false, blocked };
+                }
+              }
+              return { ok: true };
+            }
+
             for (const pr of prs) {
-              if (!pr.base || pr.base.ref !== 'main') {
-                core.info(`Skipping PR #${pr.number || pr.id}: not targeting main`);
+              if (!pr.number) {
+                core.info('Skipping PR entry with no pull request number');
                 continue;
               }
 
@@ -39,18 +61,25 @@ jobs:
                 pull_number: pr.number,
               });
 
-              const hasAutoMergeLabel = (fullPr.labels || []).some((label) => {
-                const name = typeof label?.name === 'string' ? label.name.toLowerCase() : '';
-                return name === 'auto-merge';
-              });
+              const labels = fullPr.labels || [];
+              const labelsCheck = hasRequiredLabels(labels);
 
-              if (!hasAutoMergeLabel) {
-                core.info(`Skipping PR #${fullPr.number}: missing auto-merge label`);
+              if (fullPr.base?.ref !== 'main') {
+                core.info(`Skipping PR #${fullPr.number}: not targeting main`);
                 continue;
               }
 
               if (fullPr.state !== 'open' || fullPr.draft) {
                 core.info(`Skipping PR #${fullPr.number}: not open or draft`);
+                continue;
+              }
+
+              if (!labelsCheck.ok) {
+                if (labelsCheck.missing) {
+                  core.info(`Skipping PR #${fullPr.number}: missing required label '${labelsCheck.missing}'`);
+                } else {
+                  core.info(`Skipping PR #${fullPr.number}: blocked by label '${labelsCheck.blocked}'`);
+                }
                 continue;
               }
 
@@ -61,6 +90,34 @@ jobs:
 
               if (fullPr.mergeable_state && fullPr.mergeable_state !== 'clean') {
                 core.info(`Skipping PR #${fullPr.number}: mergeable_state=${fullPr.mergeable_state}`);
+                continue;
+              }
+
+              const latestReviews = await github.paginate(github.rest.pulls.listReviews, {
+                owner,
+                repo,
+                pull_number: fullPr.number,
+                per_page: 100,
+              });
+
+              const latestByUser = new Map();
+              for (const review of latestReviews) {
+                const userLogin = review.user?.login;
+                if (!userLogin || review.state === 'COMMENTED') continue;
+                const prev = latestByUser.get(userLogin);
+                if (!prev || new Date(review.submitted_at) > new Date(prev.submitted_at)) {
+                  latestByUser.set(userLogin, review);
+                }
+              }
+
+              const latestStates = Array.from(latestByUser.values()).map((r) => r.state);
+              if (latestStates.includes('CHANGES_REQUESTED')) {
+                core.info(`Skipping PR #${fullPr.number}: changes requested by reviewer`);
+                continue;
+              }
+
+              if (!latestStates.includes('APPROVED')) {
+                core.info(`Skipping PR #${fullPr.number}: no approving review yet`);
                 continue;
               }
 

@@ -29,3 +29,14 @@ feynman is a local hook package. The main security-sensitive surfaces are:
 - state files under `~/.claude/.feynman/` and `~/.codex/.feynman/`
 
 The package has zero runtime npm dependencies.
+
+## Release Security Checklist
+
+Before publishing a new npm version:
+
+- CI required checks must pass on Node 18 and 20 across Ubuntu and macOS.
+- `npm run audit` must pass at `moderate` severity or higher.
+- GitHub release tag must match `package.json` version with a `v` prefix.
+- GitHub Actions secret `NPM_TOKEN` must be present for first publish of a new version.
+- npm provenance is enabled in the release workflow.
+- Registry smoke verification must pass after publish (`npm view`, install from npm, `feynman doctor --target both`).
