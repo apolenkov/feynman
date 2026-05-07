@@ -113,6 +113,37 @@ jobs:
             echo "$PACKAGE_NAME@$PACKAGE_VERSION is not published yet"
           fi
 
+      - name: Validate release tag matches package version
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          PACKAGE_TAG="v${PACKAGE_VERSION}"
+          if [ "$RELEASE_TAG" != "$PACKAGE_TAG" ]; then
+            echo "❌ Release tag mismatch: github=${RELEASE_TAG}, package=${PACKAGE_TAG}"
+            exit 1
+          fi
+          echo "✅ Release tag matches package version: ${PACKAGE_TAG}"
+
+      - name: Check npm publish token
+        id: npm_token
+        run: |
+          if [ -n "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require token for new release publish
+        if: (github.event_name == 'release' || inputs.dry_run == false) && steps.npm_version.outputs.published != 'true'
+        run: |
+          if [ "${{ steps.npm_token.outputs.present }}" != "true" ]; then
+            echo "❌ NPM_TOKEN is required for publishing a new release."
+            echo "Set NPM_TOKEN in repository secrets and rerun release."
+            exit 1
+          fi
+
       - name: Update GitHub release notes
         if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
         env:
@@ -129,13 +160,13 @@ jobs:
           fi
 
       - name: Publish to npm
-        if: (github.event_name == 'release' || inputs.dry_run == false) && steps.npm_version.outputs.published != 'true'
+        if: (github.event_name == 'release' || inputs.dry_run == false) && steps.npm_version.outputs.published != 'true' && steps.npm_token.outputs.present == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance --ignore-scripts
 
       - name: Verify npm publish result
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
+        if: (github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)) && steps.npm_token.outputs.present == 'true'
         env:
           PACKAGE_NAME: ${{ steps.release_metadata.outputs.package_name }}
           PACKAGE_VERSION: ${{ steps.release_metadata.outputs.package_version }}
@@ -151,6 +182,11 @@ jobs:
 
           echo "❌ npm publish verification failed for ${PACKAGE_NAME}@${PACKAGE_VERSION}."
           exit 1
+
+      - name: Skip npm publish
+        if: steps.npm_version.outputs.published == 'true' && steps.npm_token.outputs.present != 'true' && (github.event_name == 'release' || inputs.dry_run == false)
+        run: |
+          echo "⚠️ NPM_TOKEN is not configured; npm publish and verification were skipped."
 
       - name: Dry-run publish
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true

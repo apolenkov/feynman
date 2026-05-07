@@ -504,12 +504,31 @@ the model on every message.
 Every push runs tests on Node 18 and 20 across Ubuntu and macOS. The release
 lane also lints public docs, smoke-tests the packed npm tarball, builds a
 `dist/*.tgz` artifact, and can publish to npm from a GitHub Release when
-`NPM_TOKEN` is configured.
+`NPM_TOKEN` is configured. If the token is absent and the package version is
+already published, the workflow updates release notes and exits successfully;
+for a new publish, it fails with a clear message so token-less publication
+cannot silently pass.
 
 ```bash
 npm run ci
 npm run changelog
 npm run build
+```
+
+### GitHub release path
+
+1. Tag and release from GitHub (or run workflow_dispatch with `dry_run=false`).
+2. Ensure repository secret `NPM_TOKEN` is set (only needed for first publish
+   of a new version).
+3. Keep version/tag aligned: release tag must equal `package.json` with `v`
+   prefix (enforced by workflow).
+4. Create release notes generated from `CHANGELOG.md` and verify package
+   availability after publish.
+
+Set or rotate `NPM_TOKEN` with:
+
+```bash
+gh secret set NPM_TOKEN -r apolenkov/feynman
 ```
 
 State is stored at `~/.claude/.feynman/state.json`. First run bootstraps
