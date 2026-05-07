@@ -65,3 +65,10 @@ limited writes   | production-ready | persistence opt
 ```bash
 npx -y @albinocrabs/feynman@latest version
 ```
+
+For the full release playbook, see: [docs/release.md](release.md)
+
+## Detailed Release Docs
+
+- [docs/release.md](release.md): full end-to-end release procedure, release notes
+  contract, workflow behavior, and post-release verification.
