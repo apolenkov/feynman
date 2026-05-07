@@ -187,4 +187,4 @@ Phase 5 (NPX+bash)              │
 | 5. Distribution (NPX + bash) | 1/1 + Codex addendum | Completed | 2026-05-06 |
 | 6. Documentation | 1/1 | Completed | 2026-05-06 |
 | 6.5. Self-Improvement Research | 1/1 | Completed | 2026-05-06 |
-| 7. Release v0.2.0 | complete | Published to npm, tagged, GitHub release created; v0.2.4 launch automation polish in progress | 2026-05-07 |
+| 7. Release v0.2.0 | complete | Published to npm, tagged, GitHub release created; follow-up v0.2.4 release automation and version-alignment pending | 2026-05-07 |
