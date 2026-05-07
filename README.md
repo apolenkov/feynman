@@ -263,6 +263,8 @@ Domain-specific examples showing feynman in practice:
 - [Algorithm walkthrough](examples/algorithm-explain.md) — token-bucket rate limiter
 - [Deploy pipeline](examples/deploy-pipeline.md) — monorepo CI/CD
 - [Code review](examples/code-review.md) — priority + comparison diagrams
+- [Incident response](examples/incident-response.md) — triage and restoration flow
+- [Feature planning](examples/feature-planning.md) — decision matrix + rollout path
 
 ## How it works
 
