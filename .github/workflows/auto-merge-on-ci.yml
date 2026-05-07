@@ -1,0 +1,80 @@
+name: Auto Merge PRs
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge ready PRs automatically
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const run = context.payload.workflow_run;
+            const prs = run.pull_requests || [];
+            if (!prs.length) {
+              core.info('workflow_run has no pull requests');
+              return;
+            }
+
+            for (const pr of prs) {
+              if (!pr.base || pr.base.ref !== 'main') {
+                core.info(`Skipping PR #${pr.number || pr.id}: not targeting main`);
+                continue;
+              }
+
+              const { data: fullPr } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: pr.number,
+              });
+
+              const hasAutoMergeLabel = (fullPr.labels || []).some((label) => {
+                const name = typeof label?.name === 'string' ? label.name.toLowerCase() : '';
+                return name === 'auto-merge';
+              });
+
+              if (!hasAutoMergeLabel) {
+                core.info(`Skipping PR #${fullPr.number}: missing auto-merge label`);
+                continue;
+              }
+
+              if (fullPr.state !== 'open' || fullPr.draft) {
+                core.info(`Skipping PR #${fullPr.number}: not open or draft`);
+                continue;
+              }
+
+              if (fullPr.mergeable === false || fullPr.merged) {
+                core.info(`Skipping PR #${fullPr.number}: mergeable=${fullPr.mergeable}, merged=${fullPr.merged}`);
+                continue;
+              }
+
+              if (fullPr.mergeable_state && fullPr.mergeable_state !== 'clean') {
+                core.info(`Skipping PR #${fullPr.number}: mergeable_state=${fullPr.mergeable_state}`);
+                continue;
+              }
+
+              try {
+                await github.rest.pulls.merge({
+                  owner,
+                  repo,
+                  pull_number: fullPr.number,
+                  merge_method: 'squash',
+                  commit_title: `chore: auto-merge #${fullPr.number}`,
+                  commit_message: 'Auto-merge by CI workflow',
+                });
+                core.info(`Merged PR #${fullPr.number}`);
+              } catch (error) {
+                core.warning(`Auto-merge failed for PR #${fullPr.number}: ${error.message}`);
+              }
+            }

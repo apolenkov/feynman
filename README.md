@@ -19,6 +19,7 @@
 
 <p align="center">
   <a href="#why-feynman">Why</a> •
+  <a href="docs/object-passport.md">Passport</a> •
   <a href="#before--after">Before/After</a> •
   <a href="#install">Install</a> •
   <a href="#intensity-levels">Levels</a> •
@@ -35,7 +36,7 @@ plugin that automatically injects ASCII diagram rules into every prompt via the
 `UserPromptSubmit` hook.
 
 ```bash
-npx -y @albinocrabs/feynman@latest install --target both
+npx -y @albinocrabs/feynman@latest install --target all
 npx -y @albinocrabs/feynman@latest doctor --target codex
 ```
 
@@ -46,6 +47,15 @@ in your head before you can reason about it. feynman intercepts every Claude
 Code or Codex prompt and injects rules that turn flows into arrows,
 hierarchies into trees, comparisons into columns, and status into frames. The
 structure is visible before you have to think about it.
+
+Conceptually, feynman is inspired by prompt-compression ideas from the Caveman
+agent style: smaller prompts, clearer intent, and explicit diagram-first thinking.
+
+## Governance docs
+
+- `AGENTS.md` — project execution contract for Codex-aware tooling.
+- `CLAUDE.md` — canonical project memory, stack, and architecture constraints.
+- Global instructions are loaded from user-level runtime configuration before repo-specific overrides.
 
 ## Before / After
 
@@ -151,7 +161,7 @@ npx @albinocrabs/feynman install --target codex
 **Both clients:**
 
 ```bash
-npx @albinocrabs/feynman install --target both
+npx @albinocrabs/feynman install --target all
 ```
 
 The install command is idempotent: running it again updates the existing
@@ -167,7 +177,7 @@ Restart Claude Code or Codex. Done.
 
 **Verify:** `npx @albinocrabs/feynman doctor --target claude` or `npx @albinocrabs/feynman doctor --target codex`
 
-**Uninstall:** `npx @albinocrabs/feynman uninstall --target claude|codex|both`
+**Uninstall:** `npx @albinocrabs/feynman uninstall --target claude|codex|both|all|*`
 
 **Plugin manifests:** this repo also ships `.claude-plugin/plugin.json`,
 `hooks/hooks.json`, `.codex-plugin/plugin.json`, and `hooks.json` so plugin
@@ -253,6 +263,37 @@ npx @albinocrabs/feynman lint response.md
 
 See [docs/lint-rules.md](docs/lint-rules.md) for the full L01-L08 reference.
 
+## CLI examples
+
+Quickly discover and view repository prompt templates:
+
+```bash
+feynman examples
+feynman examples --name feature-planning
+feynman examples --name incident-response
+feynman examples --random
+```
+
+Export a ready-to-distribute local package (examples, rules, plugins, and skill):
+
+```bash
+feynman bootstrap
+feynman bootstrap --out ./feynman-package
+feynman bootstrap --out ./feynman-package --force
+```
+
+This is useful for disconnected/air-gapped installs where you want to copy one
+folder with all `Feynman` assets instead of depending on `npm`.
+
+Slash command aliases (inside Claude/Codex):
+
+```text
+/feynman on | off
+/feynman start | stop
+/feynman lite | full | ultra
+/feynman status
+```
+
 ## Examples
 
 Domain-specific examples showing feynman in practice:
@@ -265,6 +306,50 @@ Domain-specific examples showing feynman in practice:
 - [Code review](examples/code-review.md) — priority + comparison diagrams
 - [Incident response](examples/incident-response.md) — triage and restoration flow
 - [Feature planning](examples/feature-planning.md) — decision matrix + rollout path
+- [C4 platform design](examples/c4-platform-diagramming.md) — context + container + component decomposition
+- [Context splitting](examples/context-splitting.md) — structured decomposition of big initiatives
+- [Release readiness](examples/release-readiness.md) — gates, status frame, and rollback matrix
+- [Bug isolation](examples/bug-isolation.md) — tree + flow + priority for diagnostics
+- [Service migration](examples/service-migration.md) — phased cutover and risk controls
+
+## Visual gallery (before → after)
+
+If you want to quickly see how diagram-first responses evolve, this is the core pattern:
+
+Without feynman:
+
+`We need to choose between shipping fast with a managed API, keeping control in-house, or a hybrid path while managing risk and cost.`
+
+With feynman:
+
+```
+[Is SLA strict?] --> [Yes] --> [Prefer managed service]
+                 |             |               |
+                 |             v               v
+                 |      [Contract + vendor risk] --> [Is rollback cheap?]
+                 |                                   |
+                 v                                   +--> [Yes] --> [Adopt + guardrails]
+        [Can we build fast?]                            +--> [No]  --> [Hybrid path]
+                 |
+      no ------ +------- yes
+       |                |
+       v                v
+ [Build in house]   [Run controlled managed pilot]
+```
+
+Same brief question, different clarity level.
+
+```
+criterion      | build in-house | managed API | hybrid
+---------------|----------------|-------------|----------------
+launch speed   | slow           | fast        | medium
+vendor lock-in | low            | high        | medium
+compliance     | high control   | partner SLA | custom controls
+cost           | low initial    | medium      | medium-high
+```
+
+Use this gallery style if you want `feynman` examples to look “production-clean”
+from day one.
 
 ## How it works
 

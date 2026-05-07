@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: Production-Ready
-status: release-polish
-stopped_at: v0.2.1 launch polish — CI/CD, changelog, build automation, GSD health, graphify, and AGENTS.md/CLAUDE.md alignment in progress
-last_updated: "2026-05-07T06:35:00Z"
-last_activity: 2026-05-07 -- Published v0.2.0, installed feynman locally for Claude Code and Codex, then started v0.2.1 open-source automation polish
+status: Awaiting next milestone
+stopped_at: v0.2.1 launch automation polish in progress
+last_updated: "2026-05-07T08:18:13.414Z"
+last_activity: 2026-05-07 — Milestone v0.2.0 completed and archived
 progress:
   total_phases: 8
-  completed_phases: 7
-  total_plans: 7
-  completed_plans: 7
-  percent: 87
+  completed_phases: 1
+  total_plans: 3
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-06)
 
 ## Current Position
 
-Phase: 7 — RELEASED + POLISH
-Plan: release-readiness / launch-automation
-Status: v0.2.0 is published; v0.2.1 automation hardening is in progress
-Last activity: 2026-05-07 -- GSD health run, UAT audit clean, graphify enabled/built, AGENTS.md aligned to CLAUDE.md
+Phase: Milestone v0.2.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-07 — Milestone v0.2.0 completed and archived
 
 ## Performance Metrics
 
@@ -108,3 +108,7 @@ Recent decisions affecting current work:
 Last session: 2026-05-07
 Stopped at: v0.2.1 launch automation polish in progress
 Resume file: None — continue with tests, commit, push, CI, changelog regeneration, tag/release/publish v0.2.1
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

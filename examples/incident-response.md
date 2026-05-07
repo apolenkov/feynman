@@ -30,18 +30,22 @@ Triage and restore sequence:
                                   |
                                   +--> [2) Isolate root layer]
                                            |
-                                            yes --------------------------+
-                                           /                               |
-                                  [Cache regression?]                  [No]
-                                     | no                                |
-                                     v                                   v
-                                   [DB latency?]                      [Deployment rollback?]
-                                      | no                               | yes
-                                      v                                  v
-                                  [Scale API / limit RPS]            [Rollback last deploy]
-                                      |                                  |
-                                      v                                  v
-                                  [Service partially stable]        [Restore response rate]
+                                   [Cache regression?]
+                                      |
+                                yes -->|                   |--> no
+                                       v                   v
+                               [Scale API / limit RPS]   [Deployment rollback?]
+                                      |                   |
+                                      pass                    fail
+                                      |                      |
+                                      v                      v
+                             [Service partially stable]
+                                      |                   |
+                                      v                   v
+                               [Resolve]       [Rollback last deploy]
+                                                       |
+                                                       v
+                                         [Restore response rate]
 ```
 
 Live status summary:

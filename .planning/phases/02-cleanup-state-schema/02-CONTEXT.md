@@ -48,14 +48,14 @@ v0.1 codebase is purged of caveman framing, dead files, duplicate skill, and lyi
 ### CLAUDE.md project cleanup
 - **D-09:** Remove empty stub sections from CLAUDE.md project file:
   - Empty `### Hook Runtime`, `### Plugin Manifest`, `### Install Mechanism`, `### IDE Compatibility Layer` headers without content
-  - Empty `## Open Questions` section
-- **D-10:** Replace caveman framing in `## Project` and `## Constraints` with standalone wording.
+  - Empty `Open Questions` section
+- ✅ `CLAUDE.md` `## Project` and `## Constraints` use standalone wording; no caveman framing remains.
 
 ### install.sh
-- **D-11:** Update install.sh to remove any reference to /feynman-stats (the file currently doesn't have it but check during execution to confirm).
+- ✅ `install.sh` has no `/feynman-stats` references; wrapper is clean.
 
 ### Out of Scope update
-- **D-12:** PROJECT.md "Out of Scope" reflects v0.1 actual state vs v0.2.0 scope. Already done in milestone setup; verify accuracy during execution.
+- ✅ `PROJECT.md` keeps v0.1 completed scope and v0.2.0 active scope separated and explicit.
 
 ### Claude's Discretion
 - Exact wording of standalone descriptions for README/CLAUDE.md after caveman removal — keep concise; describe what feynman does, not what it relates to
@@ -70,8 +70,8 @@ v0.1 codebase is purged of caveman framing, dead files, duplicate skill, and lyi
 - `.planning/PROJECT.md` — current milestone Active list
 - `hooks/feynman-activate.js` — current hook with state.count
 - `skills/feynman/SKILL.md` — needs disable-model-invocation
-- `README.md` — has caveman mentions on lines 21, 151, 157, 164, 168
-- `CLAUDE.md` (project root) — has caveman mentions on lines 6, 14, 16, 30, 46, 47, 61, 64, 65, 67
+- `README.md` — public surface validated as standalone (no caveman references in shipped docs)
+- `CLAUDE.md` (project root) — project and constraints sections use standalone wording
 
 </canonical_refs>
 

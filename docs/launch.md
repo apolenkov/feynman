@@ -9,7 +9,7 @@ become columns, priorities become scales, and status summaries become frames.
 ## One-liner
 
 ```bash
-npx -y @albinocrabs/feynman@latest install --target both
+npx -y @albinocrabs/feynman@latest install --target all
 ```
 
 ## Short Description
@@ -30,9 +30,10 @@ without asking every time.
 ## Demo Script
 
 ```bash
-npx -y @albinocrabs/feynman@latest install --target both
+npx -y @albinocrabs/feynman@latest install --target '*'
 npx -y @albinocrabs/feynman@latest doctor --target claude
 npx -y @albinocrabs/feynman@latest doctor --target codex
+feynman bootstrap --out ./feynman-package
 ```
 
 Prompt:
