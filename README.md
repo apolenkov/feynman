@@ -309,21 +309,136 @@ Slash command aliases (inside Claude/Codex):
 
 ## Examples
 
-Domain-specific examples showing feynman in practice:
+Run a concrete example in the needed style:
 
-- [Architecture review](examples/architecture-review.md) — auth service topology
-- [API flow](examples/api-flow.md) — POST /api/login request lifecycle
-- [Database schema](examples/db-schema.md) — e-commerce entity model
-- [Algorithm walkthrough](examples/algorithm-explain.md) — token-bucket rate limiter
-- [Deploy pipeline](examples/deploy-pipeline.md) — monorepo CI/CD
-- [Code review](examples/code-review.md) — priority + comparison diagrams
-- [Incident response](examples/incident-response.md) — triage and restoration flow
-- [Feature planning](examples/feature-planning.md) — decision matrix + rollout path
-- [C4 platform design](examples/c4-platform-diagramming.md) — context + container + component decomposition
-- [Context splitting](examples/context-splitting.md) — structured decomposition of big initiatives
-- [Release readiness](examples/release-readiness.md) — gates, status frame, and rollback matrix
-- [Bug isolation](examples/bug-isolation.md) — tree + flow + priority for diagnostics
-- [Service migration](examples/service-migration.md) — phased cutover and risk controls
+```bash
+feynman examples --name <example-name>
+```
+
+> Tip: all examples are ready-to-run templates in `examples/*.md`, can be copied into prompts or docs, and rendered as a compact ASCII layout with `feynman examples --name ...`.
+
+```text
+[Flow]  [Architecture]   [API]        [Decisions]
+  |          |            |              |
+  v          v            v              v
+ [Action]  [System]    [Lifecycle]   [Reasoning]
+    ↓          ↓            ↓              ↓
+ [Outcome] [Design]     [Change]      [Choice]
+```
+
+## Visual example gallery
+
+### Flow and actioning
+
+#### Incident-ready action playbooks
+
+- [Activity sequence](examples/activity-sequence.md) — incident action plans with rollback gates  
+  ```
+  [Incident] --> [Triage] --> [Contain] --> [Mitigate] --> [Review]
+                                   | no         |
+                                   v            |
+                                [Rollback] <----+ 
+  ```
+- [Incident response](examples/incident-response.md) — triage and containment sequence  
+  ```
+  [Detect] --> [Classify] --> [Isolate] --> [Communicate]
+                                  |
+                                  +--> [Recover]
+  ```
+- [Bug isolation](examples/bug-isolation.md) — stateful diagnostic flow with priorities  
+  ```
+  ▲ high
+    high-likelihood
+  ▼ low
+    narrow scope
+    documentation
+  ```
+- [Release readiness](examples/release-readiness.md) — staged launch gates and recovery triggers  
+  ```
+  [Build] --> [QA] --> [Dark launch] --> [General] 
+                       | no             | yes
+                       v                v
+                 [Rollback]        [Monitor]
+  ```
+
+### Architecture and design
+
+- [Architecture review](examples/architecture-review.md) — auth system decomposition  
+  ```
+  Auth
+  ├── Service
+  │   ├── Redis rate limits
+  │   └── Postgres users
+  └── Observability
+      └── Events
+  ```
+- [C4 platform design](examples/c4-platform-diagramming.md) — context → container → component  
+  ```
+  [User] --> [Web] --> [API] --> [DB]
+  ```
+- [Context splitting](examples/context-splitting.md) — decomposing complex initiatives  
+  ```
+  Initiative
+  ├── Domain A
+  ├── Domain B
+  └── Domain C
+  ```
+- [Database schema](examples/db-schema.md) — entity model as structured tree  
+  ```
+  Report
+  ├── Metadata
+  ├── Sections
+  └── History
+  ```
+
+### API and migration
+
+- [API flow](examples/api-flow.md) — request lifecycle with branch diagnostics  
+  ```
+  [Client] --> [Auth] --> [Service] --> [DB]
+                        | yes          |
+                        +-->[Cache] ---+
+  ```
+- [Deploy pipeline](examples/deploy-pipeline.md) — CI/CD action chain  
+  ```
+  [Source] --> [Build] --> [Test] --> [Canary] --> [Scale]
+              |             |
+              v             +--> [Rollback]
+  ```
+- [Service migration](examples/service-migration.md) — cutover with risk controls  
+  ```
+  [Old service] --> [Dual write] --> [Read compare] --> [Cut over]
+                                        | mismatch
+                                        v
+                                  [Stop migration]
+  ```
+
+### Decisions and methods
+
+- [Feature planning](examples/feature-planning.md) — decision matrix + phased rollout  
+  ```
+  [Need] --> [Plan] --> [Run experiment] --> [Scale]
+             |        |
+             +--> [Kill-switch]
+  ```
+- [Algorithm walkthrough](examples/algorithm-explain.md) — rate-limiter logic as explainable sequence  
+  ```
+  [Need decision?] --> [Compute score] --> [Allow / Deny]
+  ```
+- [Code review](examples/code-review.md) — issue prioritization and evidence matrix  
+  ```
+  ▲ must-fix       [security]
+    ▲ medium       [performance]
+      ▼ low        [docs]
+  ```
+
+### One-command pack test
+
+```bash
+feynman examples --name activity-sequence && \
+feynman examples --name incident-response && \
+feynman examples --name c4-platform-diagramming
+```
 
 ## Visual gallery (before → after)
 
