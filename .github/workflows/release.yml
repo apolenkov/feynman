@@ -46,6 +46,15 @@ jobs:
           ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
           cat "$RUNNER_TEMP/release-notes.md"
 
+      - name: Resolve package release metadata
+        id: release_metadata
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Build package artifact
         run: npm run build
 
@@ -70,16 +79,43 @@ jobs:
           fi
 
       - name: Update GitHub release notes
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
+        run: |
+          TAG="${{ steps.release_metadata.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create "$TAG" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" \
+              --title "${TAG#v}" \
+              --target "$GITHUB_SHA"
+          fi
 
       - name: Publish to npm
         if: (github.event_name == 'release' || inputs.dry_run == false) && steps.npm_version.outputs.published != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance --ignore-scripts
+
+      - name: Verify npm publish result
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
+        env:
+          PACKAGE_NAME: ${{ steps.release_metadata.outputs.package_name }}
+          PACKAGE_VERSION: ${{ steps.release_metadata.outputs.package_version }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+              echo "✅ npm publish verified: ${PACKAGE_NAME}@${PACKAGE_VERSION} is available."
+              exit 0
+            fi
+            echo "⏳ waiting for npm metadata propagation (attempt ${attempt}/5)"
+            sleep 5
+          done
+
+          echo "❌ npm publish verification failed for ${PACKAGE_NAME}@${PACKAGE_VERSION}."
+          exit 1
 
       - name: Dry-run publish
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true
