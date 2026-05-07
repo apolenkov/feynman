@@ -60,6 +60,6 @@
     "prepublishOnly": "npm run ci"
   },
   "devDependencies": {
-    "c8": "^10"
+    "c8": "^11"
   }
 }
