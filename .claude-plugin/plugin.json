@@ -1,6 +1,6 @@
 {
   "name": "feynman",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Injects ASCII diagram rules into every Claude Code request. Why explain in words when diagram do trick.",
   "author": {
     "name": "apolenkov",
