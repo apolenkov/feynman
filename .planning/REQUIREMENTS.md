@@ -79,7 +79,7 @@
 
 - [x] **NPX-01**: `package.json` with name "feynman", version "0.2.0", `bin` entries, `files` whitelist, `engines.node >= 18`
 - [x] **NPX-02**: `bin/feynman.js` — unified CLI; subcommands: `install`, `uninstall`, `doctor`, `lint`, `version`; `--help` for each
-- [ ] **NPX-03**: `npm publish` — @albinocrabs/feynman package live on npm registry; verified by running `npx @albinocrabs/feynman@0.2.0 install` in clean env
+- [x] **NPX-03**: `npm publish` — @albinocrabs/feynman package live on npm registry; verified by running `npx @albinocrabs/feynman@0.2.0 install` in clean env
 - [x] **NPX-04**: `bash install.sh` refactored to call `node bin/feynman.js install` internally — DRY single source of install logic
 - [x] **NPX-05**: README install section updated: primary `npx @albinocrabs/feynman install`, fallback bash one-liner, manual settings.json instructions
 - [x] **NPX-06**: `feynman doctor` — checks hook registered? state.json valid? rules file readable? lint hook registered? prints status frame
@@ -109,11 +109,11 @@
 
 ### Release
 
-- [ ] **REL-01**: `git tag v0.2.0` with annotated tag message
-- [ ] **REL-02**: GitHub release with notes — what's new, what's fixed, breaking changes, migration from v0.1
-- [ ] **REL-03**: `npm publish` (depends on NPX-03) at version 0.2.0
-- [ ] **REL-04**: `uninstall.sh` for clean removal — removes hook entry from settings.json + deletes ~/.claude/.feynman-active flag (preserves state.json with prompt)
-- [ ] **REL-05**: README badges all green (CI passing, coverage ≥95%, npm version 0.2.0)
+- [x] **REL-01**: `git tag v0.2.0` with annotated tag message
+- [x] **REL-02**: GitHub release with notes — what's new, what's fixed, breaking changes, migration from v0.1
+- [x] **REL-03**: `npm publish` (depends on NPX-03) at version 0.2.0
+- [x] **REL-04**: `uninstall.sh` for clean removal — removes hook entry from settings.json/hooks.json + deletes .feynman-active flag (preserves state.json)
+- [x] **REL-05**: README badges all green (CI passing, coverage ≥95%, npm version 0.2.0)
 
 ## Future (v0.3.0+)
 
@@ -215,11 +215,11 @@
 | DOCS2-13 | Phase 6 | Validated |
 | RES-01 | Phase 6.5 | Validated |
 | RES-02 | Phase 6.5 | Validated |
-| REL-01 | Phase 7 | Pending |
-| REL-02 | Phase 7 | Pending |
-| REL-03 | Phase 7 | Pending |
-| REL-04 | Phase 7 | Pending |
-| REL-05 | Phase 7 | Pending |
+| REL-01 | Phase 7 | Complete |
+| REL-02 | Phase 7 | Complete |
+| REL-03 | Phase 7 | Complete |
+| REL-04 | Phase 7 | Complete |
+| REL-05 | Phase 7 | Complete |
 
 **Coverage:**
 - v0.1 requirements: 17 (HOOK-01..05, RULE-01..04, SKIL-01..03, DIST-01, DIST-04, DOCS-01..03) — all validated; SKIL-03 was carried into Phase 2 and closed there

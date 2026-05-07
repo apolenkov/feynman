@@ -12,6 +12,7 @@ const path = require('node:path');
 
 const FEYNMAN_JS = path.resolve(__dirname, '..', 'bin', 'feynman.js');
 const REPO_DIR   = path.resolve(__dirname, '..');
+const PKG = require(path.join(REPO_DIR, 'package.json'));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -66,12 +67,12 @@ describe('bin/feynman.js', () => {
   // version
   // -------------------------------------------------------------------------
   describe('feynman version', () => {
-    it('prints "0.2.0"', () => {
+    it('prints the package version', () => {
       const tmp = makeTempHome();
       try {
         const result = runFeynman(['version'], tmp);
         assert.equal(result.status, 0, `exit status: ${result.stderr}`);
-        assert.ok(result.stdout.includes('0.2.0'), `expected "0.2.0" in stdout: ${result.stdout}`);
+        assert.ok(result.stdout.includes(PKG.version), `expected "${PKG.version}" in stdout: ${result.stdout}`);
       } finally {
         rmrf(tmp);
       }
