@@ -37,3 +37,4 @@ Closes #
 ## Auto-merge
 
 - [ ] Add label `auto-merge` (required for workflow-driven merge after CI)
+- [ ] Add label `status:ready` (required for workflow-driven merge)

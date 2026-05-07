@@ -47,6 +47,7 @@ Before opening a pull request:
 - [ ] `README.md` updated if a user-facing feature changed
 - [ ] Commit message follows the format: `type(scope): description`
       (types: `feat`, `fix`, `test`, `docs`, `refactor`, `chore`)
+- [ ] Add labels `auto-merge` and `status:ready` when the PR is fully reviewed and safe to merge automatically
 
 ---
 

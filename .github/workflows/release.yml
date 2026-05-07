@@ -188,6 +188,14 @@ jobs:
         run: |
           echo "⚠️ NPM_TOKEN is not configured; npm publish and verification were skipped."
 
+      - name: Verify release package from npm registry
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
+        env:
+          PACKAGE_NAME: ${{ steps.release_metadata.outputs.package_name }}
+          PACKAGE_VERSION: ${{ steps.release_metadata.outputs.package_version }}
+        run: |
+          node scripts/verify-published-package.js
+
       - name: Dry-run publish
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true
         run: npm publish --access public --dry-run --ignore-scripts

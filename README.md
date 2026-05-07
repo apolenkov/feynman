@@ -524,6 +524,8 @@ npm run build
    prefix (enforced by workflow).
 4. Create release notes generated from `CHANGELOG.md` and verify package
    availability after publish.
+5. Mark PRs for auto-merge with labels `auto-merge` and `status:ready` and
+   keep required review approvals in place.
 
 Set or rotate `NPM_TOKEN` with:
 

@@ -35,7 +35,7 @@ jobs:
 
       - name: Supply-chain audit
         if: matrix.os == 'ubuntu-latest' && matrix.node == 20
-        run: npm audit --audit-level=moderate
+        run: npm run audit
 
       - name: Run tests
         run: npm test
