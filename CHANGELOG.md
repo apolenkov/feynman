@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here.
 
+## 0.2.2 - 2026-05-07
+
+Changes since v0.2.1.
+
+### Maintenance
+
+- fix changelog diff base tag
+
 ## 0.2.1 - 2026-05-07
 
 Changes since v0.2.0.
@@ -13,4 +21,3 @@ Changes since v0.2.0.
 ### Maintenance
 
 - add open-source automation
-
