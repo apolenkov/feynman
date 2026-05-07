@@ -89,9 +89,92 @@ describe('bin/feynman.js', () => {
         const result = runFeynman(['--help'], tmp);
         assert.equal(result.status, 0, `exit status: ${result.stderr}`);
         const out = result.stdout;
-        for (const cmd of ['install', 'uninstall', 'doctor', 'lint', 'version', 'help']) {
+        for (const cmd of ['install', 'uninstall', 'doctor', 'lint', 'examples', 'bootstrap', 'version', 'help']) {
           assert.ok(out.includes(cmd), `--help missing subcommand '${cmd}': ${out}`);
         }
+      } finally {
+        rmrf(tmp);
+      }
+    });
+  });
+
+  describe('feynman bootstrap', () => {
+    it('prints bootstrap help', () => {
+      const tmp = makeTempHome();
+      try {
+        const result = runFeynman(['bootstrap', '--help'], tmp);
+        assert.equal(result.status, 0, `bootstrap --help failed: ${result.stderr}`);
+        assert.ok(result.stdout.includes('feynman bootstrap'), `missing bootstrap help text: ${result.stdout}`);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('exports Feynman assets to target directory', () => {
+      const tmp = makeTempHome();
+      const out = path.join(tmp, 'feynman-package');
+      try {
+        const result = runFeynman(['bootstrap', '--out', out], tmp);
+        assert.equal(result.status, 0, `bootstrap failed: ${result.stderr}`);
+
+        assert.ok(fs.existsSync(path.join(out, 'examples', 'feature-planning.md')));
+        assert.ok(fs.existsSync(path.join(out, 'rules', 'feynman-activate.md')));
+        assert.ok(fs.existsSync(path.join(out, 'hooks', 'hooks.json')));
+        assert.ok(fs.existsSync(path.join(out, 'hooks', 'feynman-activate.js')));
+        assert.ok(fs.existsSync(path.join(out, 'bin', 'feynman.js')));
+        assert.ok(fs.existsSync(path.join(out, '.claude-plugin', 'plugin.json')));
+        assert.ok(fs.existsSync(path.join(out, '.codex-plugin', 'plugin.json')));
+        assert.ok(fs.existsSync(path.join(out, 'skills', 'feynman', 'SKILL.md')));
+        assert.ok(fs.existsSync(path.join(out, 'package.json')));
+        assert.ok(fs.existsSync(path.join(out, 'feynman-bootstrap.json')));
+
+        const manifest = JSON.parse(fs.readFileSync(path.join(out, 'feynman-bootstrap.json'), 'utf8'));
+        assert.equal(manifest.version, PKG.version);
+        assert.equal(manifest.counts.examples > 0, true);
+        assert.equal(manifest.counts.rules, 1);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('is idempotent by default (no --force)', () => {
+      const tmp = makeTempHome();
+      const out = path.join(tmp, 'feynman-package');
+      try {
+        runFeynman(['bootstrap', '--out', out], tmp);
+        fs.writeFileSync(path.join(out, 'keep-me.txt'), 'keep');
+
+        const result = runFeynman(['bootstrap', '--out', out], tmp);
+        assert.equal(result.status, 0, `second bootstrap should be safe: ${result.stderr}`);
+        assert.ok(result.stdout.includes('output already exists'), `expected idempotent notice: ${result.stdout}`);
+        assert.ok(fs.existsSync(path.join(out, 'keep-me.txt')));
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('--force recreates output directory', () => {
+      const tmp = makeTempHome();
+      const out = path.join(tmp, 'feynman-package');
+      try {
+        runFeynman(['bootstrap', '--out', out], tmp);
+        fs.writeFileSync(path.join(out, 'delete-me.txt'), 'delete me');
+        assert.ok(fs.existsSync(path.join(out, 'delete-me.txt')));
+
+        const result = runFeynman(['bootstrap', '--out', out, '--force'], tmp);
+        assert.equal(result.status, 0, `bootstrap --force failed: ${result.stderr}`);
+        assert.ok(!fs.existsSync(path.join(out, 'delete-me.txt')));
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('exits with error for missing value after --out', () => {
+      const tmp = makeTempHome();
+      try {
+        const result = runFeynman(['bootstrap', '--out'], tmp);
+        assert.equal(result.status, 2, `expected exit 2: ${result.status}`);
+        assert.ok(result.stderr.includes('--out requires a value'));
       } finally {
         rmrf(tmp);
       }
@@ -293,6 +376,48 @@ describe('bin/feynman.js', () => {
       try {
         runFeynman(['install', '--target', 'both'], tmp);
         runFeynman(['install', '--target', 'both'], tmp);
+
+        const claudeCfg = readSettings(tmp);
+        const codexCfg = readCodexHooks(tmp);
+        const claudeCount = claudeCfg.hooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        ).length;
+        const codexCount = codexCfg.hooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        ).length;
+        assert.equal(claudeCount, 1);
+        assert.equal(codexCount, 1);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('--target all installs into Claude Code and Codex without duplicate hooks', () => {
+      const tmp = makeTempHome();
+      try {
+        runFeynman(['install', '--target', 'all'], tmp);
+        runFeynman(['install', '--target', 'all'], tmp);
+
+        const claudeCfg = readSettings(tmp);
+        const codexCfg = readCodexHooks(tmp);
+        const claudeCount = claudeCfg.hooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        ).length;
+        const codexCount = codexCfg.hooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        ).length;
+        assert.equal(claudeCount, 1);
+        assert.equal(codexCount, 1);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it("--target '*' installs into Claude Code and Codex without duplicate hooks", () => {
+      const tmp = makeTempHome();
+      try {
+        runFeynman(['install', '--target', '*'], tmp);
+        runFeynman(['install', '--target', '*'], tmp);
 
         const claudeCfg = readSettings(tmp);
         const codexCfg = readCodexHooks(tmp);
@@ -521,6 +646,76 @@ describe('bin/feynman.js', () => {
         // lint with no args prints help and exits 0 (shows lint help)
         // OR exits 2 (no file to lint). Either is acceptable.
         assert.ok([0, 2].includes(result.status), `expected exit 0 or 2, got ${result.status}`);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+  });
+
+  describe('feynman examples', () => {
+    it('lists examples and exits 0', () => {
+      const tmp = makeTempHome();
+      try {
+        const result = runFeynman(['examples'], tmp);
+        assert.equal(result.status, 0, `examples list should exit 0: ${result.stderr}`);
+        assert.ok(result.stdout.includes('Available examples:'), `expected examples header: ${result.stdout}`);
+        assert.ok(result.stdout.includes('feature-planning'), 'expected feature-planning in examples list');
+        assert.ok(result.stdout.includes('incident-response'), 'expected incident-response in examples list');
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('prints named example', () => {
+      const tmp = makeTempHome();
+      try {
+        const result = runFeynman(['examples', '--name', 'feature-planning'], tmp);
+        assert.equal(result.status, 0, `expected exit 0: ${result.stderr}`);
+        assert.ok(result.stdout.includes('Feature Planning'), `expected example title: ${result.stdout}`);
+        assert.ok(result.stdout.includes('> We need fast text search'), `expected question in output: ${result.stdout}`);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('--random prints a sample and exits 0', () => {
+      const tmp = makeTempHome();
+      try {
+        const result = runFeynman(['examples', '--random'], tmp);
+        assert.equal(result.status, 0, `expected exit 0: ${result.stderr}`);
+        assert.ok(result.stdout.includes('Preview:'), `expected preview block: ${result.stdout}`);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('--name requires value', () => {
+      const tmp = makeTempHome();
+      try {
+        const result = runFeynman(['examples', '--name'], tmp);
+        assert.equal(result.status, 2, `expected exit 2: ${result.status}`);
+        assert.ok(result.stderr.includes('--name requires a value'), `expected validation message: ${result.stderr}`);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('--name and --random are mutually exclusive', () => {
+      const tmp = makeTempHome();
+      try {
+        const result = runFeynman(['examples', '--name', 'feature-planning', '--random'], tmp);
+        assert.equal(result.status, 2, `expected exit 2: ${result.status}`);
+        assert.ok(result.stderr.includes('use either --random or --name'), `expected conflict message: ${result.stderr}`);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('unknown example returns exit 2', () => {
+      const tmp = makeTempHome();
+      try {
+        const result = runFeynman(['examples', '--name', 'does-not-exist'], tmp);
+        assert.equal(result.status, 2, `expected exit 2 for missing example: ${result.status}`);
       } finally {
         rmrf(tmp);
       }

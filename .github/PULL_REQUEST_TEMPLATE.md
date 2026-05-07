@@ -33,3 +33,7 @@ Closes #
 
 - [ ] No new lint warnings (`node bin/feynman-lint.js <changed markdown files>`)
 - [ ] All ASCII diagrams in changed files pass `feynman lint`
+
+## Auto-merge
+
+- [ ] Add label `auto-merge` (required for workflow-driven merge after CI)
