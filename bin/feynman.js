@@ -98,10 +98,10 @@ ${c.bold('Options:')}
   --force      (install) Re-register even if already installed
 
 ${c.bold('Examples:')}
-  npx feynman install
-  npx feynman install --target codex
-  npx feynman install --target both
-  npx feynman doctor
+  npx @albinocrabs/feynman install
+  npx @albinocrabs/feynman install --target codex
+  npx @albinocrabs/feynman install --target both
+  npx @albinocrabs/feynman doctor
   feynman lint response.md
   feynman uninstall
 `;
@@ -351,7 +351,7 @@ function cmdUninstall(opts) {
   if (results.every(r => r.missing || !r.hadHook)) {
     console.log(`feynman: no hook found for ${labels} — nothing to uninstall.`);
   } else {
-    console.log(`feynman disabled for ${labels}. State preserved. Re-enable: npx feynman install --target ${opts.target}`);
+    console.log(`feynman disabled for ${labels}. State preserved. Re-enable: npx @albinocrabs/feynman install --target ${opts.target}`);
   }
   process.exit(0);
 }

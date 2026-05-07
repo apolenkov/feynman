@@ -22,16 +22,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js ${{ matrix.node }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run tests
         run: npm test
@@ -39,9 +39,29 @@ jobs:
       - name: Run coverage
         run: npm run coverage
 
+      - name: Lint public docs
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20
+        run: npm run test:docs
+
+      - name: Release smoke test
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20
+        run: npm run test:release
+
+      - name: Build npm package
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20
+        run: npm run build
+
+      - name: Upload package artifact
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-package
+          path: dist/*.tgz
+          retention-days: 14
+
       - name: Upload coverage artifact
         if: matrix.os == 'ubuntu-latest' && matrix.node == 20
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-lcov
           path: coverage/lcov.info
@@ -91,7 +111,7 @@ jobs:
 
       - name: Commit coverage badge JSON
         if: matrix.os == 'ubuntu-latest' && matrix.node == 20 && github.ref == 'refs/heads/main'
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore: update coverage badge [skip ci]"
           file_pattern: .github/coverage-badge.json

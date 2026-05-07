@@ -27,9 +27,18 @@ describe('package metadata', () => {
     assert.ok(pkg.files.includes('hooks.json'));
   });
 
+  it('ships public open-source docs in npm package file list', () => {
+    const pkg = readJson('package.json');
+    for (const file of ['docs/', 'examples/', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md']) {
+      assert.ok(pkg.files.includes(file), `${file} should be included in package files`);
+    }
+  });
+
   it('Codex plugin manifest is valid and points at hooks + skills', () => {
+    const pkg = readJson('package.json');
     const manifest = readJson('.codex-plugin/plugin.json');
     assert.equal(manifest.name, 'feynman');
+    assert.equal(manifest.version, pkg.version);
     assert.equal(manifest.hooks, './hooks.json');
     assert.equal(manifest.skills, './skills/');
     assert.ok(manifest.interface.defaultPrompt.length <= 3);

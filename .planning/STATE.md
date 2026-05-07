@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: Production-Ready
-status: in_progress
-stopped_at: Phase 7 release prep — Codex support implemented, publish blocked on npm auth
-last_updated: "2026-05-06T21:45:00Z"
-last_activity: 2026-05-06 -- Added first-class Codex install target, Codex plugin manifest, Claude plugin hooks manifest, docs, tests, coverage and npm pack verification
+status: release-polish
+stopped_at: v0.2.1 launch polish — CI/CD, changelog, build automation, GSD health, graphify, and AGENTS.md/CLAUDE.md alignment in progress
+last_updated: "2026-05-07T06:35:00Z"
+last_activity: 2026-05-07 -- Published v0.2.0, installed feynman locally for Claude Code and Codex, then started v0.2.1 open-source automation polish
 progress:
   total_phases: 8
   completed_phases: 7
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-06)
 
 **Core value:** Every response with structure gets an ASCII diagram without the developer asking. v0.2.0 closes the loop with a Stop-hook linter that validates output.
-**Current focus:** Phase 7 — Release v0.2.0 for Claude Code + Codex
+**Current focus:** Phase 7 follow-up — v0.2.1 launch polish for open-source automation
 
 ## Current Position
 
-Phase: 7 — IN PROGRESS
-Plan: release-readiness
-Status: Code/docs/tests/package ready; npm publish and GitHub release remain blocked on credentials/remote release step
-Last activity: 2026-05-06 -- Codex compatibility added and verified (190 tests, 96.98% coverage, npm pack includes dual plugin metadata)
+Phase: 7 — RELEASED + POLISH
+Plan: release-readiness / launch-automation
+Status: v0.2.0 is published; v0.2.1 automation hardening is in progress
+Last activity: 2026-05-07 -- GSD health run, UAT audit clean, graphify enabled/built, AGENTS.md aligned to CLAUDE.md
 
 ## Performance Metrics
 
@@ -73,11 +73,13 @@ Recent decisions affecting current work:
 - [v0.2.0]: Self-improvement loop is research-only in this milestone — full implementation deferred to v0.3.0 (Phase 6.5)
 - [v0.2.0]: Future self-improvement loop must be local-first, off by default, and human-reviewed before rule changes (Phase 6.5)
 - [v0.2.0]: Codex is a first-class install target; `FEYNMAN_HOME` selects `~/.claude` or `~/.codex` state root and avoids duplicated hook code (Phase 7 prep)
+- [v0.2.1]: Keep `CLAUDE.md` as canonical project memory and make `AGENTS.md` a small compatibility shim importing it; avoid divergent generated copies
+- [v0.2.1]: CI/CD must build the npm tarball, smoke-test packed installs, lint public docs, generate changelog notes, and publish from GitHub Release using `NPM_TOKEN`
 
 ### Pending Todos
 
-- Publish `@albinocrabs/feynman@0.2.0` to npm after team-scoped package metadata is committed.
-- Create/push annotated `v0.2.0` tag and GitHub release after final release commit lands.
+- Finish v0.2.1 release-polish verification and publish `@albinocrabs/feynman@0.2.1`.
+- Add repository secret `NPM_TOKEN` before relying on automated npm publish from GitHub Actions.
 
 ### Blockers/Concerns
 
@@ -85,7 +87,7 @@ Recent decisions affecting current work:
 - [Phase 3]: ASCII parser needs to handle both fenced code blocks and freestanding diagrams; rule precedence when multiple rules trigger on same line
 - [Phase 4]: c8 vs node --experimental-test-coverage trade-off — pick before writing CI workflow
 - [Phase 7]: unscoped `feynman` is already owned by another npm team; publish under `@albinocrabs/feynman`
-- [Phase 7]: GitHub release/tag should wait until final code/docs commit is pushed
+- [Phase 7]: npm token posted in chat must be revoked/rotated; configure future publish through GitHub Actions secret `NPM_TOKEN`
 - [Phase 6.5]: research must avoid scope creep into implementation — design spec only
 
 ## Deferred Items
@@ -103,6 +105,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-06
-Stopped at: Phase 7 release prep with Codex support complete
-Resume file: None — next step is commit/push, then release tag/GitHub release/npm publish once credentials allow
+Last session: 2026-05-07
+Stopped at: v0.2.1 launch automation polish in progress
+Resume file: None — continue with tests, commit, push, CI, changelog regeneration, tag/release/publish v0.2.1
