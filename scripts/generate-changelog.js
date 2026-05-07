@@ -16,8 +16,16 @@ function git(args, fallback = '') {
   return (result.stdout || '').trim();
 }
 
-function latestTag() {
-  return git(['describe', '--tags', '--abbrev=0'], '');
+function previousTag() {
+  const currentTag = git(['describe', '--tags', '--abbrev=0', '--exact-match'], '');
+  const tags = git(['tag', '--sort=-creatordate', '--merged', 'HEAD'], '')
+    .split('\n')
+    .map(tag => tag.trim())
+    .filter(Boolean);
+
+  if (!currentTag) return tags[0] || '';
+
+  return tags.find(tag => tag !== currentTag) || '';
 }
 
 function commitRange(tag) {
@@ -106,7 +114,7 @@ function render(version, tag, commits) {
   return lines.join('\n');
 }
 
-const tag = latestTag();
+const tag = previousTag();
 const commits = commitsSince(tag);
 const generated = render(pkg.version, tag, commits);
 const existing = fs.existsSync(CHANGELOG) ? fs.readFileSync(CHANGELOG, 'utf8') : '';
