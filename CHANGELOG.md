@@ -6,6 +6,10 @@ All notable changes to this project are documented here.
 
 Changes since v0.2.0.
 
+### CI/CD
+
+- skip npm publish when version exists
+
 ### Maintenance
 
 - add open-source automation
