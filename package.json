@@ -1,6 +1,6 @@
 {
   "name": "@albinocrabs/feynman",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Claude Code and Codex plugin that auto-injects ASCII diagram rules into every AI request via UserPromptSubmit hook",
   "license": "MIT",
   "author": "apolenkov",
@@ -60,6 +60,6 @@
     "prepublishOnly": "npm run ci"
   },
   "devDependencies": {
-    "c8": "^10"
+    "c8": "^11.0.0"
   }
 }

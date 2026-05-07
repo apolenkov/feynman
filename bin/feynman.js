@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // bin/feynman.js — feynman unified CLI
-// Subcommands: install, uninstall, doctor, lint, version, help
+// Subcommands: install, uninstall, doctor, lint, examples, bootstrap, version, help
 // Zero runtime deps. CJS only. Node >= 18.
 'use strict';
 
@@ -22,6 +22,7 @@ const c = {
 
 const PKG       = require('../package.json');
 const VERSION   = PKG.version;
+const ROOT_DIR = path.resolve(__dirname, '..');
 
 // Resolve paths using os.homedir() — never tilde literal (bug #8810)
 const HOME = os.homedir();
@@ -31,7 +32,11 @@ const HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-activate.js');
 const RULES_PATH = path.resolve(__dirname, '..', 'rules', 'feynman-activate.md');
 
 const DEFAULT_STATE = { enabled: true, intensity: 'full', injections: 0 };
-const VALID_TARGETS = ['claude', 'codex', 'both'];
+const TARGET_ALIASES = {
+  all: 'both',
+  '*': 'both',
+};
+const VALID_TARGETS = ['claude', 'codex', 'both', 'all', '*'];
 
 function targetConfig(name) {
   const dirName = name === 'codex' ? '.codex' : '.claude';
@@ -66,9 +71,10 @@ function parseTarget(args, fallback = 'claude') {
     }
   }
   if (!VALID_TARGETS.includes(target)) {
-    console.error(`feynman: invalid --target '${target}' (expected claude, codex, or both)`);
+    console.error(`feynman: invalid --target '${target}' (expected claude, codex, both, all, or *)`);
     process.exit(2);
   }
+  target = TARGET_ALIASES[target] || target;
   return { target, args: keep };
 }
 
@@ -89,30 +95,329 @@ ${c.bold('Commands:')}
   uninstall    Remove feynman hook (state preserved)
   doctor       Check installation health
   lint <file>  Lint a markdown file for diagram rule violations
+  examples     List and display example prompts from the repository
+  bootstrap    Export shared Feynman assets to a local folder
   version      Print version number
   help         Show this help
 
 ${c.bold('Options:')}
   --help, -h   Show help for a command
-  --target     claude | codex | both (default: claude)
+  --target     claude | codex | both | all | *
   --force      (install) Re-register even if already installed
 
 ${c.bold('Examples:')}
   npx @albinocrabs/feynman install
   npx @albinocrabs/feynman install --target codex
   npx @albinocrabs/feynman install --target both
+  npx @albinocrabs/feynman install --target all
   npx @albinocrabs/feynman doctor
   feynman lint response.md
+  feynman bootstrap --out ./feynman-package
+  feynman examples
   feynman uninstall
 `;
+
+const EXAMPLES_HELP = `${c.bold('feynman examples')} — print built-in demonstration prompts
+
+${c.bold('Usage:')}
+  feynman examples                     # list available examples
+  feynman examples --name <fileBase>   # print a specific example
+  feynman examples --random            # print a random example
+
+${c.bold('Options:')}
+  --name    Example filename without .md extension (examples/feature-planning)
+  --random  Show one random example in full
+  --help    Show this help
+
+Example filenames:
+  - architecture-review
+  - api-flow
+  - c4-platform-diagramming
+  - db-schema
+  - algorithm-explain
+  - deploy-pipeline
+  - code-review
+  - incident-response
+  - feature-planning
+`;
+
+const EXAMPLES_DIR = path.resolve(__dirname, '..', 'examples');
+const SKILL_SRC = path.resolve(ROOT_DIR, 'skills', 'feynman', 'SKILL.md');
+const CLAUDE_PLUGIN = path.resolve(ROOT_DIR, '.claude-plugin', 'plugin.json');
+const CODEX_PLUGIN = path.resolve(ROOT_DIR, '.codex-plugin', 'plugin.json');
+const PACKAGE_HOOKS = path.resolve(ROOT_DIR, 'hooks', 'hooks.json');
+const DEFAULT_BOOTSTRAP_DIR = 'feynman-package';
+const ACTIVATOR_JS = path.resolve(ROOT_DIR, 'hooks', 'feynman-activate.js');
+const CLI_JS = path.resolve(ROOT_DIR, 'bin', 'feynman.js');
+const PACKAGE_JSON = path.resolve(ROOT_DIR, 'package.json');
+
+const BOOTSTRAP_HELP = `${c.bold('feynman bootstrap')} — export Feynman assets into local folder
+
+${c.bold('Usage:')}
+  feynman bootstrap
+  feynman bootstrap --out <directory>
+
+${c.bold('Options:')}
+  --out    Output folder (default: ./feynman-package)
+  --force  Recreate output folder if it exists
+  --help   Show this help
+`;
+
+function ensureDir(dir) {
+  fs.mkdirSync(dir, { recursive: true });
+}
+
+function copyFileIfExists(src, dest) {
+  if (!fs.existsSync(src)) return false;
+  ensureDir(path.dirname(dest));
+  fs.copyFileSync(src, dest);
+  return true;
+}
+
+function copyMarkdownDir(src, dest) {
+  if (!fs.existsSync(src)) return 0;
+  let copied = 0;
+  for (const entry of fs.readdirSync(src, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    const sourcePath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      copied += copyMarkdownDir(sourcePath, destPath);
+      continue;
+    }
+
+    if (!entry.isFile() || !entry.name.endsWith('.md')) {
+      continue;
+    }
+
+    ensureDir(path.dirname(destPath));
+    fs.copyFileSync(sourcePath, destPath);
+    copied += 1;
+  }
+  return copied;
+}
+
+function examplesIndex() {
+  if (!fs.existsSync(EXAMPLES_DIR)) return [];
+
+  return fs.readdirSync(EXAMPLES_DIR)
+    .filter((name) => name.endsWith('.md'))
+    .sort()
+    .map((name) => {
+      const file = path.join(EXAMPLES_DIR, name);
+      const content = fs.readFileSync(file, 'utf8');
+      const title = (content.match(/^#\s*(.+)$/m) || [null, name])[1].trim();
+      const question = (content.match(/^> (.*)$/m) || [null, ''])[1].trim();
+      return {
+        name: name.replace(/\.md$/, ''),
+        title,
+        question,
+        path: file,
+      };
+    });
+}
+
+function cmdExamples(args) {
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(EXAMPLES_HELP);
+    process.exit(0);
+  }
+
+  const entries = examplesIndex();
+  if (!entries.length) {
+    console.log('No examples found under examples/.');
+    process.exit(0);
+  }
+
+  let random = false;
+  let wantsName = null;
+  const unknown = [];
+
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === '--name' || arg === '-n') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('-')) {
+        console.error('feynman examples: --name requires a value');
+        process.exit(2);
+      }
+      if (wantsName !== null) {
+        console.error('feynman examples: duplicate --name');
+        process.exit(2);
+      }
+      wantsName = value;
+      i += 1;
+      continue;
+    }
+
+    if (arg === '--random' || arg === '-r') {
+      random = true;
+      continue;
+    }
+
+    if (arg.startsWith('-')) {
+      unknown.push(arg);
+      continue;
+    }
+
+    unknown.push(arg);
+  }
+
+  if (random && wantsName) {
+    console.error('feynman examples: use either --random or --name');
+    process.exit(2);
+  }
+
+  if (unknown.length > 0) {
+    console.error(`feynman examples: unexpected arguments "${unknown.join(' ')}"`);
+    console.error('Run `feynman examples --help` for usage.');
+    process.exit(2);
+  }
+
+  if (random) {
+    const entry = entries[Math.floor(Math.random() * entries.length)];
+    const content = fs.readFileSync(entry.path, 'utf8');
+    console.log(`\n[${entry.name}] ${entry.title}\n`);
+    console.log('Question:');
+    console.log(entry.question ? `> ${entry.question}` : '(no question marker found)');
+    console.log('\nPreview:\n');
+    const lines = content.split('\n').slice(0, 26);
+    console.log(lines.join('\n'));
+    process.exit(0);
+  }
+
+  if (wantsName) {
+    const entry = entries.find((item) => item.name === wantsName);
+    if (!entry) {
+      console.error(`feynman examples: unknown example '${wantsName}'`);
+      process.exit(2);
+    }
+    const content = fs.readFileSync(entry.path, 'utf8');
+    console.log(`\n[${entry.name}] ${entry.title}\n`);
+    console.log(content);
+    process.exit(0);
+  }
+
+  if (args.length === 0) {
+    console.log('Available examples:\n');
+    for (const entry of entries) {
+      const q = entry.question ? ` — ${entry.question}` : '';
+      console.log(`- ${entry.name}`);
+      console.log(`  ${entry.title}${q ? ` — ${q}` : ''}`);
+    }
+    process.exit(0);
+  }
+}
+
+function cmdBootstrap(args) {
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(BOOTSTRAP_HELP);
+    process.exit(0);
+  }
+
+  let out = path.resolve(process.cwd(), DEFAULT_BOOTSTRAP_DIR);
+  let force = false;
+  const unknown = [];
+
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+
+    if (arg === '--force') {
+      force = true;
+      continue;
+    }
+
+    if (arg === '--out') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('-')) {
+        console.error('feynman bootstrap: --out requires a value');
+        process.exit(2);
+      }
+      out = path.resolve(process.cwd(), value);
+      i += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--out=')) {
+      const value = arg.slice('--out='.length);
+      if (!value) {
+        console.error('feynman bootstrap: invalid --out argument');
+        process.exit(2);
+      }
+      out = path.resolve(process.cwd(), value);
+      continue;
+    }
+
+    if (arg.startsWith('-')) {
+      unknown.push(arg);
+      continue;
+    }
+
+    unknown.push(arg);
+  }
+
+  if (unknown.length > 0) {
+    console.error(`feynman bootstrap: unexpected arguments "${unknown.join(' ')}"`);
+    console.error('Run `feynman bootstrap --help` for usage.');
+    process.exit(2);
+  }
+
+  if (fs.existsSync(out) && !force) {
+    console.log(`feynman bootstrap: output already exists at ${out}`);
+    console.log('Use `--force` to recreate it.');
+    process.exit(0);
+  }
+
+  if (fs.existsSync(out)) {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+
+  const counts = {
+    examples: copyMarkdownDir(EXAMPLES_DIR, path.join(out, 'examples')),
+    rules: copyFileIfExists(RULES_PATH, path.join(out, 'rules', 'feynman-activate.md')) ? 1 : 0,
+    hooks: copyFileIfExists(PACKAGE_HOOKS, path.join(out, 'hooks', 'hooks.json')) ? 1 : 0,
+    hookRuntime: copyFileIfExists(ACTIVATOR_JS, path.join(out, 'hooks', 'feynman-activate.js')) ? 1 : 0,
+    cliRuntime: copyFileIfExists(CLI_JS, path.join(out, 'bin', 'feynman.js')) ? 1 : 0,
+    packageManifest: copyFileIfExists(PACKAGE_JSON, path.join(out, 'package.json')) ? 1 : 0,
+    plugins:
+      (copyFileIfExists(CLAUDE_PLUGIN, path.join(out, '.claude-plugin', 'plugin.json')) ? 1 : 0) +
+      (copyFileIfExists(CODEX_PLUGIN, path.join(out, '.codex-plugin', 'plugin.json')) ? 1 : 0),
+    skill: copyFileIfExists(SKILL_SRC, path.join(out, 'skills', 'feynman', 'SKILL.md')) ? 1 : 0,
+  };
+
+  ensureDir(out);
+  fs.writeFileSync(
+    path.join(out, 'feynman-bootstrap.json'),
+    JSON.stringify({
+      version: VERSION,
+      createdAt: new Date().toISOString(),
+      outputDir: out,
+      counts,
+    }, null, 2) + '\n'
+  );
+
+  const total = Object.values(counts).reduce((sum, count) => sum + (count || 0), 1);
+  console.log('');
+  console.log('┌─ feynman bootstrap ────────────────────────────────────────┐');
+  console.log(`│ output:   ${out}`);
+  console.log(`│ examples: ${counts.examples}`);
+  console.log(`│ rules:    ${counts.rules}`);
+  console.log(`│ hooks:    ${counts.hooks}`);
+  console.log(`│ runtime:  ${counts.hookRuntime + counts.cliRuntime + counts.packageManifest}`);
+  console.log(`│ plugins:  ${counts.plugins}`);
+  console.log(`│ skill:    ${counts.skill}`);
+  console.log(`│ files:    ${total}`);
+  console.log('└───────────────────────────────────────────────────────────┘');
+  process.exit(0);
+}
 
 const INSTALL_HELP = `${c.bold('feynman install')} — register feynman hook
 
 ${c.bold('Usage:')}
-  feynman install [--target claude|codex|both] [--force]
+  feynman install [--target claude|codex|both|all|*] [--force]
 
 ${c.bold('Options:')}
-  --target  Install into Claude Code, Codex, or both (default: claude)
+  --target  Install into Claude Code, Codex, both, all, or * (default: claude)
   --force   Re-register hook even if already installed
 
 Claude creates:
@@ -130,7 +435,7 @@ Idempotent by default: skips if feynman-activate.js entry already exists.
 const UNINSTALL_HELP = `${c.bold('feynman uninstall')} — remove feynman hook
 
 ${c.bold('Usage:')}
-  feynman uninstall [--target claude|codex|both]
+  feynman uninstall [--target claude|codex|both|all|*]
 
 Removes feynman hook entries from target config.
 Preserves .feynman/state.json (user data).
@@ -142,7 +447,7 @@ Idempotent: safe to run multiple times.
 const DOCTOR_HELP = `${c.bold('feynman doctor')} — check feynman installation health
 
 ${c.bold('Usage:')}
-  feynman doctor [--target claude|codex]
+  feynman doctor [--target claude|codex|both|all|*]
 
 Checks:
   1. target hook config present
@@ -545,6 +850,14 @@ switch (sub) {
   }
   case 'lint': {
     cmdLint(rest);
+    break;
+  }
+  case 'examples': {
+    cmdExamples(rest);
+    break;
+  }
+  case 'bootstrap': {
+    cmdBootstrap(rest);
     break;
   }
   case 'version': {

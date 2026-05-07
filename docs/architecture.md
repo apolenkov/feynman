@@ -153,7 +153,7 @@ All runtime state lives in two files under the selected client root:
   state.intensity = <value>
   .feynman-active content updated
 
-[npx @albinocrabs/feynman uninstall --target claude|codex|both]
+[npx @albinocrabs/feynman uninstall --target claude|codex|both|all|*]
   hook removed from target hook config
   .feynman-active deleted
   state.json preserved (user data)
@@ -171,20 +171,27 @@ managed by skill commands in `skills/feynman/SKILL.md`.
 ## CLI Subcommand Map
 
 ```
-bin/feynman.js
-├── install    → writes target hook config + state.json + flag
-├── uninstall  → removes target hook entries + flag (keeps state)
-├── doctor     → checks target health criteria, prints frame
-├── lint       → delegates to bin/feynman-lint.js
-└── version    → prints package.json version
+   bin/feynman.js
+   ├── install    → writes target hook config + state.json + flag
+   ├── uninstall  → removes target hook entries + flag (keeps state)
+   ├── doctor     → checks target health criteria, prints frame
+   ├── lint       → delegates to bin/feynman-lint.js
+   ├── examples   → list and render built-in ASCII examples
+   ├── help       → this help/usage block
+   ├── bootstrap  → exports examples + manifests + skill into local package folder
+   └── version    → prints package.json version
 ```
+
+`/feynman on|off|start|stop|lite|full|ultra` are handled by the skill contract
+in `skills/feynman/SKILL.md` and share aliases:
+`start` == `on`, `stop` == `off`.
 
 Targets:
 
 ```
 claude → ~/.claude/settings.json + ~/.claude/.feynman/
 codex  → ~/.codex/hooks.json     + ~/.codex/.feynman/
-both   → runs claude and codex installers idempotently
+both, all, * → runs claude and codex installers/uninstallers idempotently
 ```
 
 **File:** `bin/feynman.js`

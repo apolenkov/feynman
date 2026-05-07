@@ -44,12 +44,41 @@ error response is sent.
                           [200 OK + token]
 ```
 
-Seven stages, two branch points. Every failure path exits early — success
-continues to the next stage.
+### Timing lens: what can degrade and where
+
+```
+[Client]
+   |
+   v
+[CORS] --> [Parser] --> [Validation] --> [Controller] --> [AuthService]
+                                   |                   |
+                                   |                   +--> [401]
+                                   |
+                                   +--> [429/503]
+                                   +--> [400]
+
+[AuthService] --> [UserRepository] --> [bcrypt.compare]
+                                   |
+                                   +-- mismatch --> [401]
+                                   |
+                                   +-- hit --> [JWT sign] --> [200]
+```
+
+Error-path table:
+
+```
+stage              | symptom      | response | recovery
+-------------------|--------------|----------|-------------------
+validation failed   | 400          | reject   | fix request payload
+user not found      | 401          | reject   | prompt signup/help
+credentials mismatch| 401          | reject   | suggest retry/reset
+dependency timeout  | 503/504      | fail     | retry/backoff
+success            | 200          | token    | cache token metadata
+```
 
 ## Why this works
 
 The request lifecycle is a sequential flow with conditional branches, which
-activates feynman's flow diagram rules. Boxes (`[…]`) mark processing stages;
+activates feynman's flow-diagram rules. Boxes (`[…]`) mark processing stages;
 arrows (`-->`) mark data flow; branch splits show the conditional paths at
 validation and credential-check points.

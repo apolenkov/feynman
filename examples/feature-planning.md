@@ -33,18 +33,19 @@ Decision flow:
 [Need search by title/body now?] --> [Yes]
                                    |
                                    v
-                        [Evaluate managed by default]
-                                   |
-                                   +--> [POC in 2 weeks]
-                                   |        |
-                                   v        v
-                      [Latency/cost ok]   [No]
-                            |               |
-                            v               v
-                         [Adopt]      [Re-open internal build path]
-                            |
-                            v
-                     [Plan v1 migration in 1 sprint]
+                     [Need search now?] --> [Evaluate managed by default]
+                                                  |
+                                                  v
+                                       [POC in 2 weeks]
+                                                 |
+                           +-------------------- +--------------------+
+                           |                                         |
+                           v                                         v
+                   [Latency/cost ok]                              [No]
+                         |                                         |
+                         +--> [Adopt]                              +--> [Re-open internal build path]
+                               |
+                               +--> [Plan v1 migration in 1 sprint]
 ```
 
 Governance priority:
@@ -56,6 +57,47 @@ Governance priority:
 ▼ low
   UI polish in search result cards
   Advanced synonym tuning
+```
+
+Phased rollout map:
+
+```
+[Decision]
+  |
+  v
+[POC + telemetry]
+  |
+  +-- latency/cost tests fail? --+--> [Re-scope]
+  |
+  +-- latency/cost tests pass? --> [Fallback path] --> [Adoption path]
+                                  |
+                                  +--> [Cost optimization] --> [Quarterly review]
+```
+
+Rollback frame:
+
+```
+Managed API chosen:
+- fail trigger: P95 > 2x baseline + cost ↑
+- response: cut volume 50%, enable fallback
+- rollback time: 45 min
+- owner: on-call + search guild
+```
+
+Context split before execution:
+
+```
+[Business goal]
+  ├── [Performance]
+  │     ├── latency
+  │     └── availability
+  ├── [Economics]
+  │     ├── direct cost
+  │     └── hidden support cost
+  └── [Risk]
+        ├── lock-in
+        ├── security
+        └── reversibility
 ```
 
 ## Why this works
