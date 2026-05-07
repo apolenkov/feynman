@@ -1,8 +1,6 @@
 <!-- feynman diagram rules — feynman-activate.md -->
 <!-- Hook reads only the section matching the active intensity. -->
 <!-- Variants: lite (flow+trees), full (all types, default), ultra (force diagrams). -->
-<!-- Each section must stay under 8,000 chars. Measure with: -->
-<!--   node -e "const f=require('fs').readFileSync('rules/feynman-activate.md','utf8');['lite','full','ultra'].forEach(v=>{const s=f.indexOf('<!-- '+v+' -->');const e=f.indexOf('<!-- /'+v+' -->',s);console.log(v,f.slice(s,e+('<!-- /'+v+' -->').length).length,'chars');})" -->
 
 <!-- lite -->
 ## Feynman Diagram Rules — Lite
@@ -95,11 +93,11 @@ no persistence    | full persistence  | optional
 
 Syntax:
 ```
-┌─ Status ─┐
-  item-a    done
-  item-b    in progress
-  item-c    blocked
-└─────────┘
++---- Status ----+
+|item-a: done    |
+|item-b: in prog |
+|item-c: blocked |
++----------------+
 ```
 
 **Priority orderings** — A response that orders three or more items by priority, importance, severity, or rank includes an ▲▼ priority scale.

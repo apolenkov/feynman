@@ -263,6 +263,19 @@ npx @albinocrabs/feynman lint response.md
 
 See [docs/lint-rules.md](docs/lint-rules.md) for the full L01-L08 reference.
 
+### Quick hard-disable / re-enable (testing and emergency)
+
+For temporary global disable in Codex (for smoke tests or troubleshooting), use:
+
+```bash
+touch ~/.codex/.feynman-disable-global    # hard OFF
+rm ~/.codex/.feynman-disable-global       # hard ON
+```
+
+This bypasses `~/.codex/hooks.json` hook execution entirely.
+Regular `/feynman off` and `/feynman on` continue to use normal profile state
+files (`~/.codex/.feynman-active`, `~/.codex/.feynman/state.json`).
+
 ## CLI examples
 
 Quickly discover and view repository prompt templates:
