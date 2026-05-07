@@ -8,9 +8,9 @@ open-source plugin for Claude Code and Codex.
 ## What's New
 
 - First-class Codex support:
-  - `npx feynman install --target codex`
-  - `npx feynman uninstall --target codex`
-  - `npx feynman doctor --target codex`
+  - `npx @albinocrabs/feynman install --target codex`
+  - `npx @albinocrabs/feynman uninstall --target codex`
+  - `npx @albinocrabs/feynman doctor --target codex`
 - Dual-client install:
   - `--target claude`
   - `--target codex`
@@ -65,19 +65,19 @@ The hook still reads legacy `count` once and migrates it to `injections`.
 Run the installer again:
 
 ```bash
-npx feynman install --target claude
+npx @albinocrabs/feynman install --target claude
 ```
 
 For Codex:
 
 ```bash
-npx feynman install --target codex
+npx @albinocrabs/feynman install --target codex
 ```
 
 For both:
 
 ```bash
-npx feynman install --target both
+npx @albinocrabs/feynman install --target both
 ```
 
 Then restart Claude Code or Codex.
@@ -90,7 +90,8 @@ Then restart Claude Code or Codex.
 - `npm pack --dry-run`: package includes Claude Code and Codex plugin metadata
 - Isolated tarball install: `install --target both` plus both doctor targets pass
 
-## Release Blockers
+## Release Notes
 
-- `npm publish` requires npm authentication on the release machine.
+- npm package name: `@albinocrabs/feynman`
+- CLI binaries remain `feynman` and `feynman-lint`
 - Git tag and GitHub release should be cut after npm publish succeeds.

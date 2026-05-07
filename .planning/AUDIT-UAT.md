@@ -43,4 +43,4 @@ Results:
 
 1. Proceed to Phase 7 release.
 2. Complete npm publish during Phase 7.
-3. If manual release testing is desired, run `npx feynman@0.2.0 install` after publish in a clean environment.
+3. If manual release testing is desired, run `npx @albinocrabs/feynman@0.2.0 install` after publish in a clean environment.
