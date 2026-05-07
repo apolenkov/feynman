@@ -22,13 +22,13 @@ The skills layer (`/feynman`, `/feynman-stats`), `install.sh`, MIT license, and 
 
 ### Phases
 
-- [ ] **Phase 2: Cleanup + State Schema** - Remove caveman framing, dead files, duplicate skill; rename state.count → state.injections; resolve SKIL-03
-- [ ] **Phase 3: Diagram Linter** - ASCII parser + 8 lint rules (L01-L08) + bin/feynman-lint CLI + Stop-hook variant + 20+ golden test cases
-- [ ] **Phase 4: Quality (Tests + CI)** - node:test suites for hook, lint, install; GitHub Actions matrix Linux+macOS; coverage badge ≥95%
-- [ ] **Phase 5: Distribution (NPX + bash)** - package.json + bin/feynman.js unified CLI; npm publish; install.sh refactored to call Node logic
+- [x] **Phase 2: Cleanup + State Schema** - Remove caveman framing, dead files, duplicate skill; rename state.count → state.injections; resolve SKIL-03
+- [x] **Phase 3: Diagram Linter** - ASCII parser + 8 lint rules (L01-L08) + bin/feynman-lint CLI + Stop-hook variant + 20+ golden test cases
+- [x] **Phase 4: Quality (Tests + CI)** - node:test suites for hook, lint, install; GitHub Actions matrix Linux+macOS; coverage badge ≥95%
+- [x] **Phase 5: Distribution (NPX + bash)** - package.json + bin/feynman.js unified CLI; npm publish; install.sh refactored to call Node logic
 - [x] **Phase 6: Documentation** - examples/ per domain + docs/visual-patterns + docs/lint-rules + docs/architecture + CONTRIBUTING + .github templates + README rewrite
 - [x] **Phase 6.5: Self-Improvement Research** - design spec for self-improvement loop (lint failure → rule update); research-only, no implementation
-- [ ] **Phase 7: Release v0.2.0** - git tag, GitHub release notes, npm publish, uninstall.sh, badges green
+- [x] **Phase 7: Release v0.2.0** - git tag, GitHub release notes, npm publish, uninstall.sh, badges green
 
 ## Phase Details
 
@@ -187,4 +187,4 @@ Phase 5 (NPX+bash)              │
 | 5. Distribution (NPX + bash) | 1/1 + Codex addendum | Completed | 2026-05-06 |
 | 6. Documentation | 1/1 | Completed | 2026-05-06 |
 | 6.5. Self-Improvement Research | 1/1 | Completed | 2026-05-06 |
-| 7. Release v0.2.0 | complete | Published to npm, tagged, GitHub release created; v0.2.1 launch automation polish in progress | 2026-05-07 |
+| 7. Release v0.2.0 | complete | Published to npm, tagged, GitHub release created; v0.2.4 launch automation polish in progress | 2026-05-07 |
