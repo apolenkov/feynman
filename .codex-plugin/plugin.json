@@ -1,6 +1,6 @@
 {
   "name": "feynman",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Auto-inject ASCII diagram rules into Codex and Claude Code prompts.",
   "author": {
     "name": "apolenkov",
