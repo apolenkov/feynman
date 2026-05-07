@@ -24,6 +24,7 @@
   <a href="#intensity-levels">Levels</a> •
   <a href="#lint">Lint</a> •
   <a href="#examples">Examples</a> •
+  <a href="docs/launch.md">Launch</a> •
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
@@ -33,7 +34,10 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex
 plugin that automatically injects ASCII diagram rules into every prompt via the
 `UserPromptSubmit` hook.
 
-<!-- TODO: GIF after v0.3.0 visual capture -->
+```bash
+npx -y @albinocrabs/feynman@latest install --target both
+npx -y @albinocrabs/feynman@latest doctor --target codex
+```
 
 ## Why feynman
 
@@ -262,10 +266,11 @@ Domain-specific examples showing feynman in practice:
 
 ## How it works
 
-The `UserPromptSubmit` hook fires on every Claude prompt. The hook reads
-`~/.claude/.feynman/state.json`, extracts the rules for the active intensity
+The `UserPromptSubmit` hook fires on every Claude Code or Codex prompt. The
+hook reads the target-local state file (`~/.claude/.feynman/state.json` or
+`~/.codex/.feynman/state.json`), extracts the rules for the active intensity
 level, and injects them as `additionalContext` — invisible to you, visible to
-Claude on every message.
+the model on every message.
 
 ```
 [your prompt]
@@ -277,6 +282,19 @@ Claude on every message.
       │
       ▼
 [structured response with ASCII diagrams]
+```
+
+## Release process
+
+Every push runs tests on Node 18 and 20 across Ubuntu and macOS. The release
+lane also lints public docs, smoke-tests the packed npm tarball, builds a
+`dist/*.tgz` artifact, and can publish to npm from a GitHub Release when
+`NPM_TOKEN` is configured.
+
+```bash
+npm run ci
+npm run changelog
+npm run build
 ```
 
 State is stored at `~/.claude/.feynman/state.json`. First run bootstraps

@@ -59,5 +59,8 @@
   "claude_md_path": "./CLAUDE.md",
   "resolve_model_ids": "omit",
   "mode": "yolo",
-  "granularity": "coarse"
+  "granularity": "coarse",
+  "graphify": {
+    "enabled": true
+  }
 }

@@ -3,7 +3,7 @@
 
 **feynman**
 
-feynman is an open-source Claude Code plugin that automatically injects ASCII diagram rules into every AI request via the `UserPromptSubmit` hook. When a response has structure — flow, hierarchy, comparison, status — feynman makes Claude draw it as an ASCII diagram without the developer having to ask.
+feynman is an open-source Claude Code and Codex plugin that automatically injects ASCII diagram rules into every AI request via the `UserPromptSubmit` hook. When a response has structure — flow, hierarchy, comparison, status — feynman makes the assistant draw it as an ASCII diagram without the developer having to ask.
 
 Tagline: "why explain in words when diagram do trick"
 
@@ -12,7 +12,7 @@ Tagline: "why explain in words when diagram do trick"
 ### Constraints
 
 - **Tech Stack**: Pure JavaScript (Node.js) hook — no build step, no deps, CommonJS for zero-dep portability
-- **Compatibility**: Must work with Claude Code hooks API
+- **Compatibility**: Must work with Claude Code and Codex hooks APIs
 - **Scope**: Open-source repo, public README, install one-liner
 - **Design**: Greenfield — repo is empty, start from scratch
 <!-- GSD:project-end -->
@@ -22,8 +22,8 @@ Tagline: "why explain in words when diagram do trick"
 
 ## Recommended Stack
 - **Hook Runtime**: Node.js >= 18, CommonJS (`require()`), zero npm deps
-- **Plugin Manifest**: `.claude-plugin/plugin.json` — `name` kebab-case, `version` semver `MAJOR.MINOR.PATCH`
-- **Install**: `bash install.sh` upserts hook into `~/.claude/settings.json` via `node -e` (no `jq`)
+- **Plugin Manifests**: `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` — `name` kebab-case, `version` semver `MAJOR.MINOR.PATCH`
+- **Install**: `npx @albinocrabs/feynman install --target claude|codex|both`; `bash install.sh` remains a Claude Code fallback
 - **IDE compat** (v0.3.0+): `.clinerules/` for Cline/Windsurf, `.cursor/rules/*.mdc` for Cursor
 
 ## What NOT to Use
@@ -46,6 +46,7 @@ Tagline: "why explain in words when diagram do trick"
 | `additionalContext` 10,000 char cap | MEDIUM | Official docs page (single source, no corroboration) |
 | CommonJS requirement for hook scripts | HIGH | Zero-dep constraint + hooks API docs confirm CJS works reliably |
 | `.claude-plugin/plugin.json` manifest format | HIGH | Context7 `/anthropics/claude-code` official plugin docs |
+| `.codex-plugin/plugin.json` manifest format | HIGH | Implemented and package-tested for Codex plugin discovery |
 | hooks.json plugin format with `${CLAUDE_PLUGIN_ROOT}` | HIGH | Context7 official docs |
 | `node -e` inline Node.js for settings.json merge | HIGH | Verified in feynman install.sh — no jq dependency |
 | `.clinerules/` directory format (Cline) | HIGH | Multiple sources: everydev.ai analysis + Cline docs |
@@ -76,12 +77,12 @@ Tagline: "why explain in words when diagram do trick"
 - Правила — только декларативные факты, не команды (баг #17804)
 
 ### Файл состояния + флаг-файл
-- Состояние: `~/.claude/.feynman/state.json` — схема `{enabled: boolean, intensity: string, injections: number}`
-- Флаг: `~/.claude/.feynman-active` — есть = активен; нет + state есть = отключён пользователем
+- Состояние: `~/.claude/.feynman/state.json` или `~/.codex/.feynman/state.json` — схема `{enabled: boolean, intensity: string, injections: number}`
+- Флаг: `~/.claude/.feynman-active` или `~/.codex/.feynman-active` — есть = активен; нет + state есть = отключён пользователем
 - Первый запуск: оба отсутствуют → создать оба → продолжить нормально
 - Схема заморожена — не менять имена полей (используется в Phase 2 скиллах)
 
-### Известные баги Claude Code (влияют на этот проект)
+### Известные баги хуков (влияют на этот проект)
 
 | Баг | Эффект | Решение |
 |-----|--------|---------|
@@ -96,13 +97,13 @@ Tagline: "why explain in words when diagram do trick"
 ## Architecture
 
 ```
-settings.json
+settings.json / hooks.json
      │  срабатывает на каждый промт
      ▼
 feynman-activate.js
      │
      ├─ [1] защита session_id (path traversal)
-     ├─ [2] флаг-файл ~/.claude/.feynman-active
+     ├─ [2] флаг-файл ~/.claude/.feynman-active или ~/.codex/.feynman-active
      │       нет флага + нет state  → bootstrap (первый запуск)
      │       нет флага + state есть → exit 0 (отключён пользователем)
      ├─ [3] читать state.json → enabled? intensity?
@@ -110,10 +111,10 @@ feynman-activate.js
      ├─ [5] state.injections++
      └─ [6] stdout: JSON additionalContext → инжектируется в каждый промт
                                                       │
-                                               Claude Code / модель
+                                               Claude Code / Codex / модель
 ```
 
-Скилл `/feynman` читает и пишет тот же `state.json`.
+Скилл `/feynman` и CLI `feynman install|doctor|uninstall` читают и пишут тот же `state.json`.
 <!-- GSD:architecture-end -->
 
 <!-- GSD:skills-start source:skills/ -->
