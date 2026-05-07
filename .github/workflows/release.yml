@@ -23,6 +23,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -37,15 +40,6 @@ jobs:
       - name: Run release checks
         run: npm run ci
 
-      - name: Generate changelog notes
-        run: |
-          npm run changelog
-          awk '
-            /^## / { seen++; if (seen > 1) exit }
-            seen == 1 { print }
-          ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
-          cat "$RUNNER_TEMP/release-notes.md"
-
       - name: Resolve package release metadata
         id: release_metadata
         run: |
@@ -54,6 +48,47 @@ jobs:
           echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
           echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          CURRENT_TAG="v$PACKAGE_VERSION"
+          PREVIOUS_TAG=$(git tag --sort=-creatordate --merged "$CURRENT_TAG" 2>/dev/null | awk 'NR==2')
+          if [ -z "$PREVIOUS_TAG" ]; then
+            PREVIOUS_TAG=$(git tag --sort=-creatordate --merged HEAD 2>/dev/null | awk 'NR==1')
+          fi
+          echo "current_tag=$CURRENT_TAG" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog notes
+        run: |
+          VERSION='${{ steps.release_metadata.outputs.package_version }}'
+          CURRENT_TAG='${{ steps.release_metadata.outputs.current_tag }}'
+          PREVIOUS_TAG='${{ steps.release_metadata.outputs.previous_tag }}'
+          CHANGELOG_SOURCE="$RUNNER_TEMP/changelog-source.md"
+
+          if git cat-file -e "$CURRENT_TAG:CHANGELOG.md" 2>/dev/null; then
+            git show "$CURRENT_TAG:CHANGELOG.md" > "$CHANGELOG_SOURCE"
+          else
+            cp CHANGELOG.md "$CHANGELOG_SOURCE"
+          fi
+
+          awk -v version="$VERSION" '
+            $0 ~ "^## " version " " { found=1; next }
+            found && /^## / { exit }
+            found { print }
+          ' "$CHANGELOG_SOURCE" > "$RUNNER_TEMP/release-notes.md"
+
+          if [ ! -s "$RUNNER_TEMP/release-notes.md" ]; then
+            {
+              echo "## $VERSION"
+              if [ -n "$PREVIOUS_TAG" ]; then
+                echo "Changes since ${PREVIOUS_TAG}."
+              else
+                echo "Changes in $VERSION."
+              fi
+              echo
+              echo "- Release published from package.json version $VERSION."
+            } > "$RUNNER_TEMP/release-notes.md"
+          fi
+
+          cat "$RUNNER_TEMP/release-notes.md"
 
       - name: Build package artifact
         run: npm run build
