@@ -39,20 +39,20 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 
 ### Active (v0.2.0)
 
-- [ ] Cleanup: remove caveman mentions, dead toml file, duplicate /feynman-stats, rename state.count
-- [ ] Diagram linter: ASCII parser + 8 rules (L01-L08) + bin/feynman-lint CLI + Stop-hook integration
-- [ ] 100% test coverage: hook + lint + install/uninstall via node:test
+- [x] Cleanup: remove caveman mentions, dead toml file, duplicate /feynman-stats, rename state.count
+- [x] Diagram linter: ASCII parser + 8 rules (L01-L08) + bin/feynman-lint CLI + Stop-hook integration
+- [x] 100% test coverage: hook + lint + install/uninstall via node:test
 - [x] GitHub Actions CI on Linux+macOS matrix, coverage badge
 - [x] NPX install path: npx @albinocrabs/feynman install / uninstall / doctor / lint
 - [x] Codex install path: npx @albinocrabs/feynman install --target codex writes ~/.codex/hooks.json and uses ~/.codex state
-- [ ] bash install.sh refactored to call same Node logic (DRY)
-- [ ] examples/ folder per domain (architecture, api-flow, db-schema, algorithm, deploy, code-review)
-- [ ] docs/visual-patterns.md — visualization research adapted to ASCII
-- [ ] docs/lint-rules.md — full L01-L08 documentation
-- [ ] CONTRIBUTING.md improved + .github/ISSUE_TEMPLATE + PR template
-- [ ] Self-improvement loop design spec (docs/self-improvement.md, no implementation)
+- [x] bash install.sh refactored to call same Node logic (DRY)
+- [x] examples/ folder per domain (architecture, api-flow, db-schema, algorithm, deploy, code-review)
+- [x] docs/visual-patterns.md — visualization research adapted to ASCII
+- [x] docs/lint-rules.md — full L01-L08 documentation
+- [x] CONTRIBUTING.md improved + .github/ISSUE_TEMPLATE + PR template
+- [x] Self-improvement loop design spec (docs/self-improvement.md, no implementation)
 - [x] v0.2.0 git tag + GitHub release notes
-- [ ] uninstall.sh for clean removal
+- [x] uninstall.sh for clean removal
 
 ### Future (v0.3.0+)
 
