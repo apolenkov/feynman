@@ -57,7 +57,7 @@ function targetNames(target) {
   return target === 'both' ? ['claude', 'codex'] : [target];
 }
 
-function parseTarget(args, fallback = 'claude') {
+function parseTarget(args, fallback = 'codex') {
   let target = fallback;
   const keep = [];
   for (let i = 0; i < args.length; i++) {
@@ -417,7 +417,7 @@ ${c.bold('Usage:')}
   feynman install [--target claude|codex|both|all|*] [--force]
 
 ${c.bold('Options:')}
-  --target  Install into Claude Code, Codex, both, all, or * (default: claude)
+  --target  Install into Claude Code, Codex, both, all, or * (default: codex)
   --force   Re-register hook even if already installed
 
 Claude creates:
