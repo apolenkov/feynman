@@ -56,6 +56,19 @@ jobs:
           path: dist/*.tgz
           retention-days: 30
 
+      - name: Check npm version
+        id: npm_version
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION is already published"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION is not published yet"
+          fi
+
       - name: Update GitHub release notes
         if: github.event_name == 'release'
         env:
@@ -63,7 +76,7 @@ jobs:
         run: gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
 
       - name: Publish to npm
-        if: github.event_name == 'release' || inputs.dry_run == false
+        if: (github.event_name == 'release' || inputs.dry_run == false) && steps.npm_version.outputs.published != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance --ignore-scripts
