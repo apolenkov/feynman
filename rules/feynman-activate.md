@@ -360,3 +360,30 @@ The only response that contains no diagram is a single sentence of pure prose wi
 
 All other responses — including those with two or more items, any named concept with sub-parts, any sequence of actions, any set of options — include an ASCII diagram.
 <!-- /ultra -->
+
+### Russian terminal chat visual guardrail
+
+For Russian terminal chat, avoid using ASCII frames as two-column tables when
+values contain long Cyrillic or mixed Cyrillic/Latin text. Visual alignment can
+look broken even when character counts are correct.
+
+Prefer bullets for long Russian status facts:
+
+Итог:
+- Что сделали: dtp-retro стал русским по умолчанию.
+- История: текущая session ищется автоматически.
+- Форма: сначала смысл, потом proof/details.
+- Статус: правки есть, commit ещё не сделан.
+
+Avoid frame rows like this for long Russian text:
+
+| что сделали | длинная русская строка ... |
+| история     | длинная смешанная строка ... |
+
+Rule:
+
+- frame with short values -> OK
+- long Russian value -> bullets
+- sequence -> arrows
+- comparison -> max 3 short columns
+- status with long text -> label bullets, not frame rows

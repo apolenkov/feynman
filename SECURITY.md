@@ -39,4 +39,4 @@ Before publishing a new npm version:
 - GitHub release tag must match `package.json` version with a `v` prefix.
 - GitHub Actions secret `NPM_TOKEN` must be present for first publish of a new version.
 - npm provenance is enabled in the release workflow.
-- Registry smoke verification must pass after publish (`npm view`, install from npm, `feynman doctor --target both`).
+- Registry smoke verification must pass after publish (`npm view`, install from npm, `feynman doctor --target all`).
