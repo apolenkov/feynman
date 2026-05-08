@@ -29,6 +29,7 @@ const HOME = os.homedir();
 
 // Hook script lives relative to this file
 const HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-activate.js');
+const SESSION_HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-session-start.js');
 const RULES_PATH = path.resolve(__dirname, '..', 'rules', 'feynman-activate.md');
 
 const DEFAULT_STATE = { enabled: true, intensity: 'full', injections: 0 };
@@ -425,11 +426,11 @@ Claude creates:
   ~/.claude/.feynman-active        — presence flag
 
 Codex creates:
-  ~/.codex/hooks.json              — UserPromptSubmit hook registration
+  ~/.codex/hooks.json              — SessionStart + UserPromptSubmit hook registration
   ~/.codex/.feynman/state.json     — feynman state (enabled, intensity, injections)
   ~/.codex/.feynman-active         — presence flag
 
-Idempotent by default: skips if feynman-activate.js entry already exists.
+Idempotent by default: skips if feynman hook entries already exist.
 `;
 
 const UNINSTALL_HELP = `${c.bold('feynman uninstall')} — remove feynman hook
@@ -451,11 +452,11 @@ ${c.bold('Usage:')}
 
 Checks:
   1. target hook config present
-  2. UserPromptSubmit hook references feynman-activate.js
-  3. Hook script file exists and is readable
+  2. SessionStart and UserPromptSubmit hooks reference feynman scripts
+  3. Hook script files exist and are readable
   4. Rules file exists and is non-empty
   5. state.json valid JSON with enabled field
-  6. .feynman-active flag present
+  6. .feynman-active flag matches enabled state
   7. (INFO) lint hook registered (optional)
 
 Exit code: always 0 (advisory only).
@@ -507,23 +508,31 @@ function writeSettings(target, settings) {
 }
 
 function hasFeynmanHook(settings) {
-  return ((settings.hooks && settings.hooks.UserPromptSubmit) || []).some(g =>
+  const promptHook = ((settings.hooks && settings.hooks.UserPromptSubmit) || []).some(g =>
     g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
   );
+  const sessionHook = ((settings.hooks && settings.hooks.SessionStart) || []).some(g =>
+    g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
+  );
+  return promptHook && sessionHook;
 }
 
 function removeFeynmanHooks(settings) {
-  if (!settings.hooks || !Array.isArray(settings.hooks.UserPromptSubmit)) return settings;
-  settings.hooks.UserPromptSubmit = settings.hooks.UserPromptSubmit.filter(g =>
-    !(g.hooks && g.hooks.some(h =>
-      h.command && (
-        h.command.includes('feynman-activate.js') ||
-        h.command.includes('feynman-lint.js')
-      )
-    ))
-  );
-  if (settings.hooks.UserPromptSubmit.length === 0) {
-    delete settings.hooks.UserPromptSubmit;
+  if (!settings.hooks) return settings;
+  for (const eventName of ['SessionStart', 'UserPromptSubmit', 'Stop']) {
+    if (!Array.isArray(settings.hooks[eventName])) continue;
+    settings.hooks[eventName] = settings.hooks[eventName].filter(g =>
+      !(g.hooks && g.hooks.some(h =>
+        h.command && (
+          h.command.includes('feynman-session-start.js') ||
+          h.command.includes('feynman-activate.js') ||
+          h.command.includes('feynman-lint.js')
+        )
+      ))
+    );
+    if (settings.hooks[eventName].length === 0) {
+      delete settings.hooks[eventName];
+    }
   }
   if (Object.keys(settings.hooks).length === 0) {
     delete settings.hooks;
@@ -534,10 +543,21 @@ function removeFeynmanHooks(settings) {
 function bootstrapState(target) {
   const cfg = targetConfig(target);
   fs.mkdirSync(cfg.feynmanDir, { recursive: true });
+  let state = DEFAULT_STATE;
   if (!fs.existsSync(cfg.statePath)) {
     fs.writeFileSync(cfg.statePath, JSON.stringify(DEFAULT_STATE, null, 2) + '\n');
+  } else {
+    try {
+      state = { ...DEFAULT_STATE, ...JSON.parse(fs.readFileSync(cfg.statePath, 'utf8')) };
+    } catch (_) {
+      fs.writeFileSync(cfg.statePath, JSON.stringify(DEFAULT_STATE, null, 2) + '\n');
+    }
   }
-  fs.writeFileSync(cfg.flagPath, DEFAULT_STATE.intensity);
+  if (state.enabled) {
+    fs.writeFileSync(cfg.flagPath, state.intensity || DEFAULT_STATE.intensity);
+  } else if (fs.existsSync(cfg.flagPath)) {
+    fs.unlinkSync(cfg.flagPath);
+  }
 }
 
 function installClaudeCommand() {
@@ -561,6 +581,7 @@ function installOne(target, opts) {
   // Read or create settings
   const cfg = readSettings(target);
   cfg.hooks = cfg.hooks || {};
+  cfg.hooks.SessionStart = cfg.hooks.SessionStart || [];
   cfg.hooks.UserPromptSubmit = cfg.hooks.UserPromptSubmit || [];
 
   // Idempotency check
@@ -572,20 +593,36 @@ function installOne(target, opts) {
     return { target, already: true };
   }
 
-  // If force + already, remove old entry first
+  // If force or partial legacy install, remove old feynman entries first.
   if (already && force) {
     removeFeynmanHooks(cfg);
     cfg.hooks = cfg.hooks || {};
+    cfg.hooks.SessionStart = cfg.hooks.SessionStart || [];
+    cfg.hooks.UserPromptSubmit = cfg.hooks.UserPromptSubmit || [];
+  } else if (!already) {
+    removeFeynmanHooks(cfg);
+    cfg.hooks = cfg.hooks || {};
+    cfg.hooks.SessionStart = cfg.hooks.SessionStart || [];
     cfg.hooks.UserPromptSubmit = cfg.hooks.UserPromptSubmit || [];
   }
 
-  // Append hook entry
+  // Append hook entries
+  const sessionEntry = {
+    hooks: [{
+      type: 'command',
+      command: hookCommandFor(target).replace(HOOK_PATH, SESSION_HOOK_PATH),
+      timeout: 5,
+    }]
+  };
+  if (target === 'codex') {
+    sessionEntry.matcher = 'startup|resume';
+  }
+  cfg.hooks.SessionStart.push(sessionEntry);
   cfg.hooks.UserPromptSubmit.push({
     hooks: [{
       type: 'command',
       command: hookCommandFor(target),
       timeout: 5,
-      statusMessage: 'Injecting diagram rules...',
     }]
   });
 
@@ -623,7 +660,7 @@ function cmdInstall(opts) {
   }
   console.log('└──────────────────────────────────────────────────────────────┘');
   console.log('');
-  console.log('Restart Claude Code or Codex to activate feynman.');
+  console.log('Restart Claude Code or Codex to activate feynman full mode.');
 
   process.exit(0);
 }
@@ -684,11 +721,24 @@ function cmdDoctor(opts = {}) {
   const settingsExists = fs.existsSync(tc.settingsPath);
   check(`${tc.settingsPath.replace(HOME, '~')} present`, settingsExists);
 
-  // 2. UserPromptSubmit hook references feynman-activate.js
+  // 2. SessionStart and UserPromptSubmit hooks reference feynman scripts
+  let sessionHookRegistered = false;
   let hookRegistered = false;
+  let sessionHookAbsPath = null;
   let hookAbsPath = null;
   if (settingsExists) {
     const cfg = readSettings(target);
+    const sessionEntries = (cfg.hooks && cfg.hooks.SessionStart) || [];
+    const feynmanSessionEntry = sessionEntries.find(g =>
+      g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
+    );
+    sessionHookRegistered = !!feynmanSessionEntry;
+    if (feynmanSessionEntry) {
+      const hookCmd = feynmanSessionEntry.hooks.find(h => h.command && h.command.includes('feynman-session-start.js')).command;
+      const match = hookCmd.match(/"([^"]+feynman-session-start\.js)"/);
+      if (match) sessionHookAbsPath = match[1];
+    }
+
     const entries = (cfg.hooks && cfg.hooks.UserPromptSubmit) || [];
     const feynmanEntry = entries.find(g =>
       g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
@@ -701,9 +751,24 @@ function cmdDoctor(opts = {}) {
       if (match) hookAbsPath = match[1];
     }
   }
+  check('hook registered (feynman-session-start.js in SessionStart)', sessionHookRegistered);
   check('hook registered (feynman-activate.js in UserPromptSubmit)', hookRegistered);
 
-  // 3. Hook script file exists + readable
+  // 3. Hook script files exist + readable
+  let sessionHookFileOk = false;
+  if (sessionHookAbsPath) {
+    try {
+      fs.accessSync(sessionHookAbsPath, fs.constants.R_OK);
+      sessionHookFileOk = true;
+    } catch (_) {}
+  } else if (sessionHookRegistered) {
+    try {
+      fs.accessSync(SESSION_HOOK_PATH, fs.constants.R_OK);
+      sessionHookFileOk = true;
+    } catch (_) {}
+  }
+  check('session hook script file exists and is readable', sessionHookFileOk);
+
   let hookFileOk = false;
   if (hookAbsPath) {
     try {
@@ -717,7 +782,7 @@ function cmdDoctor(opts = {}) {
       hookFileOk = true;
     } catch (_) {}
   }
-  check('hook script file exists and is readable', hookFileOk);
+  check('prompt hook script file exists and is readable', hookFileOk);
 
   // 4. Rules file exists + non-empty
   let rulesOk = false;
@@ -729,15 +794,20 @@ function cmdDoctor(opts = {}) {
 
   // 5. state.json valid JSON + has enabled field
   let stateOk = false;
+  let stateEnabled = false;
   try {
     const state = JSON.parse(fs.readFileSync(tc.statePath, 'utf8'));
     stateOk = 'enabled' in state;
+    stateEnabled = state.enabled === true;
   } catch (_) {}
   check('state.json valid (has enabled field)', stateOk);
 
-  // 6. .feynman-active flag present
+  // 6. .feynman-active flag matches state
   const flagPresent = fs.existsSync(tc.flagPath);
-  check('.feynman-active flag present', flagPresent);
+  check(
+    stateEnabled ? '.feynman-active flag present when enabled' : '.feynman-active flag absent when disabled',
+    stateEnabled ? flagPresent : !flagPresent
+  );
 
   // 7. (INFO) lint hook registered
   let lintHookRegistered = false;

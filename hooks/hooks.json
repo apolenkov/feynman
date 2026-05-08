@@ -1,14 +1,24 @@
 {
   "description": "Inject feynman ASCII diagram rules before each Claude Code prompt.",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FEYNMAN_HOME=\"$HOME/.claude\" node \"${CLAUDE_PLUGIN_ROOT}/hooks/feynman-session-start.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "FEYNMAN_HOME=\"$HOME/.claude\" node \"${CLAUDE_PLUGIN_ROOT}/hooks/feynman-activate.js\"",
-            "timeout": 5,
-            "statusMessage": "Injecting diagram rules..."
+            "timeout": 5
           }
         ]
       }

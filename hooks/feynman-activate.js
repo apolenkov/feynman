@@ -31,18 +31,25 @@ process.stdin.on('end', () => {
     if (sessionId && /[/\\]|\.\./.test(sessionId)) process.exit(0);
 
     // Step 2: flag file + first-run bootstrap (D-05, D-07, bug #35713)
-    // True first run: neither flag nor state exists → bootstrap both, then fall through
-    // Intentionally disabled: flag absent but state exists → exit 0 (user ran /feynman off)
+    // True first run: neither flag nor state exists -> bootstrap default full mode.
+    // Intentionally disabled: flag absent + state.enabled=false -> exit 0.
     const flagExists  = fs.existsSync(FLAG_PATH);
     const stateExists = fs.existsSync(STATE_PATH);
     if (!flagExists) {
       if (!stateExists) {
-        // First install — bootstrap everything and activate
+        // First install: bootstrap and activate full mode.
         fs.mkdirSync(FEYNMAN_DIR, { recursive: true });
         fs.writeFileSync(STATE_PATH, JSON.stringify(DEFAULT_STATE, null, 2));
         fs.writeFileSync(FLAG_PATH, DEFAULT_STATE.intensity);
       } else {
-        process.exit(0); // disabled intentionally by user
+        let existingState;
+        try {
+          existingState = { ...DEFAULT_STATE, ...JSON.parse(fs.readFileSync(STATE_PATH, 'utf8')) };
+        } catch (_) {
+          process.exit(0);
+        }
+        if (!existingState.enabled) process.exit(0);
+        fs.writeFileSync(FLAG_PATH, existingState.intensity || DEFAULT_STATE.intensity);
       }
     }
 

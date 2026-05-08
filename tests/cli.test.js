@@ -250,7 +250,7 @@ describe('bin/feynman.js', () => {
       }
     });
 
-    it('creates .feynman-active flag', () => {
+    it('creates .feynman-active flag by default', () => {
       const tmp = makeTempHome();
       try {
         runFeynman(['install'], tmp);
@@ -300,7 +300,11 @@ describe('bin/feynman.js', () => {
         const feynmanHooks = cfg.hooks.UserPromptSubmit.filter(g =>
           g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
         );
+        const sessionHooks = cfg.hooks.SessionStart.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
+        );
         assert.equal(feynmanHooks.length, 1, `hook should appear exactly once, found ${feynmanHooks.length}`);
+        assert.equal(sessionHooks.length, 1, `session hook should appear exactly once, found ${sessionHooks.length}`);
       } finally {
         rmrf(tmp);
       }
@@ -330,7 +334,11 @@ describe('bin/feynman.js', () => {
         const count = cfg.hooks.UserPromptSubmit.filter(g =>
           g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
         ).length;
+        const sessionCount = cfg.hooks.SessionStart.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
+        ).length;
         assert.equal(count, 1, `force install must not create duplicate, found ${count}`);
+        assert.equal(sessionCount, 1, `force install must not create duplicate session hook, found ${sessionCount}`);
       } finally {
         rmrf(tmp);
       }
@@ -346,9 +354,13 @@ describe('bin/feynman.js', () => {
         assert.ok(fs.existsSync(hooksPath), 'Codex hooks.json must exist');
 
         const cfg = readCodexHooks(tmp);
+        const sessionEntry = cfg.hooks.SessionStart.find(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
+        );
         const entry = cfg.hooks.UserPromptSubmit.find(g =>
           g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
         );
+        assert.ok(sessionEntry, 'feynman session hook missing from Codex hooks.json');
         assert.ok(entry, 'feynman hook missing from Codex hooks.json');
         const hook = entry.hooks[0];
         assert.ok(hook.command.includes('FEYNMAN_HOME='));
@@ -365,7 +377,7 @@ describe('bin/feynman.js', () => {
         const statePath = path.join(tmp, '.codex', '.feynman', 'state.json');
         const flagPath = path.join(tmp, '.codex', '.feynman-active');
         assert.ok(fs.existsSync(statePath), 'Codex state.json must exist');
-        assert.ok(fs.existsSync(flagPath), 'Codex .feynman-active flag must exist');
+        assert.ok(fs.existsSync(flagPath), 'Codex .feynman-active flag must exist by default');
       } finally {
         rmrf(tmp);
       }

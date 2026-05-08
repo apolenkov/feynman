@@ -44,21 +44,31 @@ describe('package metadata', () => {
     assert.ok(manifest.interface.defaultPrompt.length <= 3);
   });
 
-  it('Codex hooks.json registers UserPromptSubmit feynman hook', () => {
+  it('Codex hooks.json registers SessionStart and UserPromptSubmit feynman hooks', () => {
     const hooks = readJson('hooks.json');
-    const entries = hooks.hooks.UserPromptSubmit;
-    assert.ok(Array.isArray(entries));
-    const command = entries[0].hooks[0].command;
-    assert.ok(command.includes('FEYNMAN_HOME="$HOME/.codex"'));
-    assert.ok(command.includes('feynman-activate.js'));
+    const sessionEntries = hooks.hooks.SessionStart;
+    const promptEntries = hooks.hooks.UserPromptSubmit;
+    assert.ok(Array.isArray(sessionEntries));
+    assert.ok(Array.isArray(promptEntries));
+    const sessionCommand = sessionEntries[0].hooks[0].command;
+    const promptCommand = promptEntries[0].hooks[0].command;
+    assert.ok(sessionCommand.includes('FEYNMAN_HOME="$HOME/.codex"'));
+    assert.ok(sessionCommand.includes('feynman-session-start.js'));
+    assert.ok(promptCommand.includes('FEYNMAN_HOME="$HOME/.codex"'));
+    assert.ok(promptCommand.includes('feynman-activate.js'));
   });
 
-  it('Claude plugin hooks.json registers UserPromptSubmit feynman hook', () => {
+  it('Claude plugin hooks.json registers SessionStart and UserPromptSubmit feynman hooks', () => {
     const hooks = readJson('hooks/hooks.json');
-    const entries = hooks.hooks.UserPromptSubmit;
-    assert.ok(Array.isArray(entries));
-    const command = entries[0].hooks[0].command;
-    assert.ok(command.includes('FEYNMAN_HOME="$HOME/.claude"'));
-    assert.ok(command.includes('${CLAUDE_PLUGIN_ROOT}/hooks/feynman-activate.js'));
+    const sessionEntries = hooks.hooks.SessionStart;
+    const promptEntries = hooks.hooks.UserPromptSubmit;
+    assert.ok(Array.isArray(sessionEntries));
+    assert.ok(Array.isArray(promptEntries));
+    const sessionCommand = sessionEntries[0].hooks[0].command;
+    const promptCommand = promptEntries[0].hooks[0].command;
+    assert.ok(sessionCommand.includes('FEYNMAN_HOME="$HOME/.claude"'));
+    assert.ok(sessionCommand.includes('${CLAUDE_PLUGIN_ROOT}/hooks/feynman-session-start.js'));
+    assert.ok(promptCommand.includes('FEYNMAN_HOME="$HOME/.claude"'));
+    assert.ok(promptCommand.includes('${CLAUDE_PLUGIN_ROOT}/hooks/feynman-activate.js'));
   });
 });

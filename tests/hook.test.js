@@ -1,4 +1,4 @@
-// tests/hook.test.js — e2e tests for hooks/feynman-activate.js
+// tests/hook.test.js — e2e tests for feynman hook scripts
 // Uses node:test + node:assert/strict. Spawns hook as child process.
 // Each test gets an isolated temp dir (HOME override) — no ~/.claude/ pollution.
 'use strict';
@@ -11,6 +11,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-activate.js');
+const SESSION_HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-session-start.js');
 
 /**
  * Create an isolated temp dir and return its path.
@@ -54,6 +55,23 @@ function runHookWithFeynmanHome(tmpHome, feynmanHome, stdinData) {
       ...process.env,
       HOME: tmpHome,
       FEYNMAN_HOME: feynmanHome,
+    },
+    timeout: 10000,
+  });
+  return {
+    status: result.status,
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
+  };
+}
+
+function runSessionHook(tmpHome, stdinData = { session_id: 'test-session' }) {
+  const result = spawnSync('node', [SESSION_HOOK_PATH], {
+    input: JSON.stringify(stdinData),
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      HOME: tmpHome,
     },
     timeout: 10000,
   });
@@ -114,7 +132,7 @@ describe('feynman-activate hook', () => {
 
     it('creates ~/.claude/.feynman-active flag', () => {
       const flagPath = path.join(tmpHome, '.claude', '.feynman-active');
-      assert.ok(fs.existsSync(flagPath), '.feynman-active flag should be created');
+      assert.ok(fs.existsSync(flagPath), '.feynman-active flag should be created by default');
     });
 
     it('emits valid additionalContext JSON', () => {
@@ -123,7 +141,6 @@ describe('feynman-activate hook', () => {
     });
 
     it('stdout is valid JSON (no trailing newline issues)', () => {
-      // Strict: entire stdout must be exactly one JSON object
       const parsed = JSON.parse(result.stdout);
       assert.equal(typeof parsed, 'object');
     });
@@ -149,13 +166,50 @@ describe('feynman-activate hook', () => {
 
     it('creates ~/.codex/.feynman-active flag', () => {
       const flagPath = path.join(codexHome, '.feynman-active');
-      assert.ok(fs.existsSync(flagPath), 'Codex flag should be created');
+      assert.ok(fs.existsSync(flagPath), 'Codex flag should be created by default');
     });
 
-    it('emits valid additionalContext JSON', () => {
+    it('emits valid additionalContext by default', () => {
       assert.equal(result.status, 0);
       const ctx = parseAdditionalContext(result.stdout);
       assert.ok(ctx.length > 0, 'additionalContext should not be empty');
+    });
+  });
+
+  describe('SessionStart hook', () => {
+    it('bootstraps full mode and emits rules text', () => {
+      const tmpHome = makeTempHome();
+      try {
+        const result = runSessionHook(tmpHome);
+        const statePath = path.join(tmpHome, '.claude', '.feynman', 'state.json');
+        const flagPath = path.join(tmpHome, '.claude', '.feynman-active');
+        const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+        assert.equal(result.status, 0);
+        assert.equal(state.enabled, true);
+        assert.equal(state.intensity, 'full');
+        assert.ok(fs.existsSync(flagPath), '.feynman-active flag should be created');
+        assert.ok(result.stdout.includes('Feynman Diagram Rules'), 'SessionStart should emit rules text');
+      } finally {
+        rmrf(tmpHome);
+      }
+    });
+
+    it('stays silent when state is disabled', () => {
+      const tmpHome = makeTempHome();
+      try {
+        const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+        fs.mkdirSync(feynmanDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(feynmanDir, 'state.json'),
+          JSON.stringify({ enabled: false, intensity: 'full', injections: 0 })
+        );
+        const result = runSessionHook(tmpHome);
+        assert.equal(result.status, 0);
+        assert.equal(result.stdout, '');
+        assert.equal(result.stderr, '');
+      } finally {
+        rmrf(tmpHome);
+      }
     });
   });
 
@@ -206,9 +260,9 @@ describe('feynman-activate hook', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Path 3: Disabled — .feynman-active absent, state.json exists
+  // Path 3: Disabled — .feynman-active absent, state.enabled=false
   // -------------------------------------------------------------------------
-  describe('Path 3: disabled (flag absent, state exists)', () => {
+  describe('Path 3: disabled (flag absent, state.enabled=false)', () => {
     let tmpHome;
     let result;
 
@@ -217,8 +271,8 @@ describe('feynman-activate hook', () => {
       const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
       fs.mkdirSync(feynmanDir, { recursive: true });
       const statePath = path.join(feynmanDir, 'state.json');
-      // Write state but DO NOT create flag file
-      fs.writeFileSync(statePath, JSON.stringify({ enabled: true, intensity: 'full', injections: 5 }));
+      // Write disabled state and DO NOT create flag file.
+      fs.writeFileSync(statePath, JSON.stringify({ enabled: false, intensity: 'full', injections: 5 }));
 
       result = runHook(tmpHome, { prompt: 'any prompt' });
     });
