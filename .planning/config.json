@@ -9,49 +9,6 @@
   "firecrawl": false,
   "exa_search": true,
   "model_profile": "balanced",
-  "model_overrides": {
-    "gsd-codebase-mapper": "haiku",
-    "gsd-pattern-mapper": "haiku",
-    "gsd-research-synthesizer": "haiku",
-    "gsd-plan-checker": "haiku",
-    "gsd-integration-checker": "haiku",
-    "gsd-nyquist-auditor": "haiku",
-    "gsd-ui-checker": "haiku",
-    "gsd-ui-auditor": "haiku",
-    "gsd-doc-verifier": "haiku",
-    "gsd-phase-researcher": "sonnet",
-    "gsd-project-researcher": "sonnet"
-  },
-  "model_profile_overrides": {
-    "claude": {
-      "opus": "claude-opus-4-7",
-      "sonnet": "claude-sonnet-4-6",
-      "haiku": "claude-haiku-4-5"
-    },
-    "codex": {
-      "opus": "gpt-5.5",
-      "sonnet": "gpt-5.3-codex",
-      "haiku": "gpt-5.4-mini"
-    }
-  },
-  "models": {
-    "planning": "opus",
-    "discuss": "opus",
-    "research": "sonnet",
-    "execution": "sonnet",
-    "verification": "sonnet",
-    "completion": "sonnet"
-  },
-  "dynamic_routing": {
-    "enabled": true,
-    "escalate_on_failure": true,
-    "max_escalations": 1,
-    "tier_models": {
-      "light": "haiku",
-      "standard": "sonnet",
-      "heavy": "opus"
-    }
-  },
   "workflow": {
     "research": true,
     "plan_check": true,
