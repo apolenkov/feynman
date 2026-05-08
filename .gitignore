@@ -8,3 +8,4 @@ dist/
 .nyc_output/
 *.lcov
 *.tgz
+.planning/session-retros/
