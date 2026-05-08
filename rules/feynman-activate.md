@@ -113,12 +113,14 @@ Syntax:
 
 ### Terminal-safe rendering
 
-Wide Markdown tables are a defect in terminal chat. Use them only when every
-cell is short and the result stays readable in a narrow terminal.
+Tables are allowed when they stay readable in terminal chat. Wide Markdown
+tables are a rendering defect: convert them into a cleaner terminal layout
+instead of letting columns wrap unpredictably.
 
-Prefer these layouts:
+Choose the layout by readability:
 
 ```text
+short matrix -> Markdown table is OK
 status maps  -> ASCII frame blocks
 long rows    -> key-value bullets
 hierarchy    -> ASCII tree
@@ -137,7 +139,10 @@ Frame discipline:
 
 - Keep frame rows visually aligned.
 - Keep diagram lines under about 88 columns when possible.
-- If a row becomes long, split it into bullets instead of widening the table.
+- If a row becomes long, split it into bullets or grouped frames instead of
+  widening the table.
+- Optimize for human scanning: aligned labels, short cells, stable columns,
+  and no wrapped table rows.
 - Use plain ASCII frames with `+`, `-`, and `|` when terminal compatibility
   matters.
 
@@ -190,10 +195,11 @@ detail    | detail
 
 ### Terminal-safe rendering
 
-Wide Markdown tables are a defect in terminal chat. Prefer ASCII frames,
-key-value bullets, trees, and short columns. Keep diagram lines under about 88
-columns when possible. If content is long, split it into bullets instead of
-widening the visual block.
+Tables are allowed when they are compact and readable. Wide Markdown tables are
+a rendering defect in terminal chat. Prefer ASCII frames, key-value bullets,
+trees, and short columns for long content. Keep diagram lines under about 88
+columns when possible. If content is long, split it into bullets or grouped
+frames instead of widening the visual block.
 
 ### When no diagram appears
 
