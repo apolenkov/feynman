@@ -6,16 +6,18 @@ Three independent layers: hook lifecycle, lint pipeline, and state schema.
 
 ## Layer 1: Hook Lifecycle
 
-The `UserPromptSubmit` hook fires before every Claude Code or Codex prompt.
-feynman intercepts the event, reads the active rules, and injects them as
-`additionalContext`.
+The `SessionStart` hook primes fresh Claude Code or Codex sessions with the
+active rules. The `UserPromptSubmit` hook fires before every prompt and
+reinforces the same rules as `additionalContext`.
 
 ```
 ~/.claude/settings.json       ~/.codex/hooks.json
          │
-         │  hooks.UserPromptSubmit fires on every prompt
+         ├─ hooks.SessionStart primes new sessions
+         │
+         └─ hooks.UserPromptSubmit reinforces every prompt
          ▼
-hooks/feynman-activate.js
+hooks/feynman-session-start.js + hooks/feynman-activate.js
          │
          ├─ [0] FEYNMAN_HOME selects client state root
          │        unset              → ~/.claude (backward compatible)
@@ -25,9 +27,10 @@ hooks/feynman-activate.js
          ├─ [1] validate session_id (path-traversal guard)
          │
          ├─ [2] $FEYNMAN_HOME/.feynman-active  ← flag file
-         │        absent + no state.json   → bootstrap first run
-         │        absent + state.json      → exit 0 (user disabled)
-         │        present                  → continue
+         │        absent + no state.json      → bootstrap first run
+         │        absent + state.enabled=true → recreate flag
+         │        absent + state.enabled=false → exit 0 (user disabled)
+         │        present                     → continue
          │
          ├─ [3] $FEYNMAN_HOME/.feynman/state.json
          │        enabled: false           → exit 0
@@ -121,7 +124,7 @@ All runtime state lives in two files under the selected client root:
 ~/.claude/ or ~/.codex/
 ├── .feynman-active          ← presence flag
 │     present  = feynman active
-│     absent   = user disabled (state.json preserved)
+│     absent   = user disabled only when state.enabled=false
 │     content  = current intensity string (informational)
 │
 └── .feynman/

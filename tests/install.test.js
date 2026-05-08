@@ -82,23 +82,33 @@ describe('install.sh', () => {
       assert.ok(fs.existsSync(settingsPath), 'codex hooks.json should be created');
     });
 
-    it('settings.json contains UserPromptSubmit hook', () => {
+    it('settings.json contains SessionStart and UserPromptSubmit hooks', () => {
       const cfg = readSettings(tmpHome);
       assert.ok(cfg.hooks, 'hooks key must exist');
+      assert.ok(Array.isArray(cfg.hooks.SessionStart), 'SessionStart must be array');
       assert.ok(Array.isArray(cfg.hooks.UserPromptSubmit), 'UserPromptSubmit must be array');
+      assert.ok(cfg.hooks.SessionStart.length >= 1, 'at least one session hook entry');
       assert.ok(cfg.hooks.UserPromptSubmit.length >= 1, 'at least one hook entry');
     });
 
-    it('hook entry points to feynman-activate.js with absolute path', () => {
+    it('hook entries point to feynman scripts with absolute paths', () => {
       const cfg = readSettings(tmpHome);
-      const entries = cfg.hooks.UserPromptSubmit;
-      const feynmanEntry = entries.find(e =>
+      const sessionEntries = cfg.hooks.SessionStart;
+      const promptEntries = cfg.hooks.UserPromptSubmit;
+      const sessionEntry = sessionEntries.find(e =>
+        e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
+      );
+      const feynmanEntry = promptEntries.find(e =>
         e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
       );
+      assert.ok(sessionEntry, 'feynman-session-start.js hook entry not found');
       assert.ok(feynmanEntry, 'feynman-activate.js hook entry not found');
+      const sessionHook = sessionEntry.hooks[0];
       const hook = feynmanEntry.hooks[0];
       // Must be absolute path (not tilde, not relative)
+      assert.ok(sessionHook.command.includes('/'), 'session hook command must contain absolute path');
       assert.ok(hook.command.includes('/'), 'hook command must contain absolute path');
+      assert.ok(!sessionHook.command.includes('~/'), 'session hook command must not use tilde');
       assert.ok(!hook.command.includes('~/'), 'hook command must not use tilde');
     });
 
@@ -133,11 +143,14 @@ describe('install.sh', () => {
 
     it('hook appears exactly once in settings.json', () => {
       const cfg = readSettings(tmpHome);
-      const entries = cfg.hooks.UserPromptSubmit;
-      const feynmanHooks = entries.filter(e =>
+      const feynmanHooks = cfg.hooks.UserPromptSubmit.filter(e =>
         e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
       );
+      const sessionHooks = cfg.hooks.SessionStart.filter(e =>
+        e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
+      );
       assert.equal(feynmanHooks.length, 1, `hook should appear exactly once, found ${feynmanHooks.length}`);
+      assert.equal(sessionHooks.length, 1, `session hook should appear exactly once, found ${sessionHooks.length}`);
     });
 
     it('second install stdout says "already installed"', () => {

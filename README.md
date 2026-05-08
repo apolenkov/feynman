@@ -199,8 +199,7 @@ Add to `~/.claude/settings.json` — use the absolute path, not `~/`
           {
             "type": "command",
             "command": "node \"/absolute/path/to/feynman/hooks/feynman-activate.js\"",
-            "timeout": 5,
-            "statusMessage": "Injecting diagram rules..."
+            "timeout": 5
           }
         ]
       }
@@ -221,8 +220,7 @@ For Codex, add the same shape to `~/.codex/hooks.json` and set
           {
             "type": "command",
             "command": "FEYNMAN_HOME=\"$HOME/.codex\" node \"/absolute/path/to/feynman/hooks/feynman-activate.js\"",
-            "timeout": 5,
-            "statusMessage": "Injecting diagram rules..."
+            "timeout": 5
           }
         ]
       }
@@ -231,6 +229,10 @@ For Codex, add the same shape to `~/.codex/hooks.json` and set
 }
 ```
 </details>
+
+After install, feynman starts in `full` mode by default. Disable or change it
+explicitly with `/feynman off`, `/feynman lite`, `/feynman full`, or
+`/feynman ultra`.
 
 ## Intensity Levels
 
@@ -481,11 +483,11 @@ from day one.
 
 ## How it works
 
-The `UserPromptSubmit` hook fires on every Claude Code or Codex prompt. The
-hook reads the target-local state file (`~/.claude/.feynman/state.json` or
-`~/.codex/.feynman/state.json`), extracts the rules for the active intensity
-level, and injects them as `additionalContext` — invisible to you, visible to
-the model on every message.
+The `SessionStart` hook primes fresh Claude Code or Codex sessions with the
+active rules, and the `UserPromptSubmit` hook reinforces them on every prompt.
+Both hooks read the target-local state file
+(`~/.claude/.feynman/state.json` or `~/.codex/.feynman/state.json`), extract
+the rules for the active intensity level, and inject them into model context.
 
 ```
 [your prompt]
