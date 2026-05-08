@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented here.
 
+## 0.2.6 - 2026-05-08
+
+Changes since v0.2.5.
+
+### Features
+
+- harden feynman runtime checks
+- add roadmap phase uat risk patterns
+- add sdlc output patterns to feynman
+- add terminal-safe feynman rendering rules
+
+### Fixes
+
+- clarify terminal table rendering rules
+- harden feynman hook lifecycle
+
+### Documentation
+
+- restore GSD validation coverage
+
+### Tests
+
+- cover codex app-server hook visibility
+- cover ci threshold branches
+
+### Maintenance
+
+- use global gsd defaults
+- remove gsd model bindings from repo config
+
 ## 0.2.5 - 2026-05-08
 
 ### Features
