@@ -545,6 +545,37 @@ describe('bin/feynman.js', () => {
       }
     });
 
+    it('preserves non-feynman hooks inside the same hook group', () => {
+      const tmp = makeTempHome();
+      try {
+        const codexDir = path.join(tmp, '.codex');
+        fs.mkdirSync(codexDir, { recursive: true });
+        const existingCfg = {
+          hooks: {
+            UserPromptSubmit: [
+              {
+                hooks: [
+                  { type: 'command', command: 'node /other/my-hook.js', timeout: 3 },
+                  { type: 'command', command: 'node /old/feynman-activate.js', timeout: 5 },
+                ],
+              },
+            ],
+          },
+        };
+        fs.writeFileSync(path.join(codexDir, 'hooks.json'), JSON.stringify(existingCfg, null, 2));
+
+        runFeynman(['uninstall'], tmp);
+
+        const cfg = readCodexHooks(tmp);
+        const promptHooks = cfg.hooks.UserPromptSubmit;
+        assert.equal(promptHooks.length, 1);
+        assert.equal(promptHooks[0].hooks.length, 1);
+        assert.ok(promptHooks[0].hooks[0].command.includes('my-hook.js'));
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
     it('--target codex removes hook and preserves state', () => {
       const tmp = makeTempHome();
       try {
@@ -610,7 +641,7 @@ describe('bin/feynman.js', () => {
       }
     });
 
-    it('falls back to packaged hook paths when commands are unquoted', () => {
+    it('accepts unquoted absolute hook paths', () => {
       const tmp = makeTempHome();
       try {
         const codexDir = path.join(tmp, '.codex');
@@ -645,6 +676,48 @@ describe('bin/feynman.js', () => {
         const result = runFeynman(['doctor'], tmp);
         assert.equal(result.status, 0, `doctor must exit 0: ${result.stderr}`);
         assert.ok(result.stdout.includes('Status: OK'), `expected "Status: OK": ${result.stdout}`);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('fails script-file checks when registered command path cannot be parsed', () => {
+      const tmp = makeTempHome();
+      try {
+        const codexDir = path.join(tmp, '.codex');
+        const stateDir = path.join(codexDir, '.feynman');
+        fs.mkdirSync(stateDir, { recursive: true });
+        fs.writeFileSync(path.join(stateDir, 'state.json'), JSON.stringify({ enabled: true, intensity: 'full', injections: 0 }));
+        fs.writeFileSync(path.join(codexDir, '.feynman-active'), 'full');
+        fs.writeFileSync(
+          path.join(codexDir, 'hooks.json'),
+          JSON.stringify({
+            hooks: {
+              SessionStart: [
+                {
+                  hooks: [{
+                    type: 'command',
+                    command: 'node \"$PLUGIN_ROOT/hooks/feynman-session-start.js\"',
+                  }],
+                },
+              ],
+              UserPromptSubmit: [
+                {
+                  hooks: [{
+                    type: 'command',
+                    command: 'node \"$PLUGIN_ROOT/hooks/feynman-activate.js\"',
+                  }],
+                },
+              ],
+            },
+          }, null, 2)
+        );
+
+        const result = runFeynman(['doctor'], tmp);
+        assert.equal(result.status, 0, 'doctor must exit 0');
+        assert.ok(result.stdout.includes('[FAIL] session hook script file exists and is readable'), result.stdout);
+        assert.ok(result.stdout.includes('[FAIL] prompt hook script file exists and is readable'), result.stdout);
+        assert.ok(result.stdout.includes('Status: ISSUES'), result.stdout);
       } finally {
         rmrf(tmp);
       }
