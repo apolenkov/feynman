@@ -17,14 +17,6 @@ const RULES_PATH  = path.join(__dirname, '..', 'rules', 'feynman-activate.md');
 const DEFAULT_STATE = { enabled: true, intensity: 'full', injections: 0 };
 const VALID_INTENSITIES = ['lite', 'full', 'ultra'];
 
-function readState() {
-  try {
-    return { ...DEFAULT_STATE, ...JSON.parse(fs.readFileSync(STATE_PATH, 'utf8')) };
-  } catch (_) {
-    return { ...DEFAULT_STATE };
-  }
-}
-
 function writeState(state) {
   fs.mkdirSync(FEYNMAN_DIR, { recursive: true });
   fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
@@ -53,9 +45,16 @@ process.stdin.on('end', () => {
 
     const stateExists = fs.existsSync(STATE_PATH);
     const flagExists = fs.existsSync(FLAG_PATH);
-    const state = readState();
+    let state = { ...DEFAULT_STATE };
 
-    if (!stateExists) {
+    if (stateExists) {
+      try {
+        state = { ...DEFAULT_STATE, ...JSON.parse(fs.readFileSync(STATE_PATH, 'utf8')) };
+      } catch (_) {
+        try { fs.unlinkSync(FLAG_PATH); } catch (_) {}
+        process.exit(0);
+      }
+    } else {
       writeState(state);
     }
 

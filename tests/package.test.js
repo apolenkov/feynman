@@ -71,4 +71,12 @@ describe('package metadata', () => {
     assert.ok(promptCommand.includes('FEYNMAN_HOME="$HOME/.claude"'));
     assert.ok(promptCommand.includes('${CLAUDE_PLUGIN_ROOT}/hooks/feynman-activate.js'));
   });
+
+  it('Feynman skill resolves Claude and Codex runtime homes', () => {
+    const skill = fs.readFileSync(path.join(REPO_DIR, 'skills/feynman/SKILL.md'), 'utf8');
+    assert.ok(skill.includes('FEYNMAN_TARGET'));
+    assert.ok(skill.includes('CODEX_THREAD_ID'));
+    assert.ok(skill.includes("path.join(os.homedir(), '.codex')"));
+    assert.ok(skill.includes("path.join(os.homedir(), '.claude')"));
+  });
 });
