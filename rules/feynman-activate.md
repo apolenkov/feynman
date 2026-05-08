@@ -146,6 +146,63 @@ Frame discipline:
 - Use plain ASCII frames with `+`, `-`, and `|` when terminal compatibility
   matters.
 
+### SDLC output patterns
+
+For engineering status, retrospectives, handoffs, reviews, and release notes,
+choose a human-scannable shape before writing prose. Prefer compact blocks with
+explicit evidence over long narrative.
+
+Use these shapes:
+
+```text
+status       -> frame with state, branch, commit, checks, blocker
+retro        -> DONE / WORKED / FRAGILE / LEFT
+handoff      -> NOW / NEXT / FILES / COMMANDS / RISK
+review       -> FINDINGS first, then QUESTIONS, then SUMMARY
+incident     -> IMPACT / CAUSE / FIX / PREVENTION
+release      -> CHANGED / VERIFIED / RISK / ROLLBACK
+decision     -> CONTEXT / OPTIONS / CHOICE / CONSEQUENCE
+verification -> command -> result -> evidence -> gap
+```
+
+Status block pattern:
+
+```text
++---- Status ----+
+| repo    | name  |
+| branch  | main  |
+| commit  | abc12 |
+| checks  | PASS  |
+| blocker | none  |
++----------------+
+```
+
+Retro pattern:
+
+```text
+DONE:
+- landed change with evidence
+
+WORKED:
+- useful command or decision
+
+FRAGILE:
+- risk or assumption
+
+LEFT:
+- next executable action
+```
+
+Rules:
+
+- Put the answer first, evidence second, next action last.
+- Never bury blockers in prose; give them their own label.
+- For status and retro, avoid wide tables even when Markdown would be valid.
+- Prefer `PASS`, `FAIL`, `BLOCKED`, `not run`, and exact command names.
+- If verification was not run, say `not run` and name the command.
+- For Russian chat, keep prose Russian and keep commands, paths, config keys,
+  commits, and status labels in English.
+
 ### When no diagram appears
 
 Responses that are any of the following contain no diagram:
@@ -200,6 +257,32 @@ a rendering defect in terminal chat. Prefer ASCII frames, key-value bullets,
 trees, and short columns for long content. Keep diagram lines under about 88
 columns when possible. If content is long, split it into bullets or grouped
 frames instead of widening the visual block.
+
+### SDLC output patterns
+
+All full-mode SDLC patterns apply. In ultra mode, use them aggressively for any
+engineering status, retrospective, review, release, handoff, decision, or
+verification answer. The default shape is:
+
+```text
+[state] --> [evidence] --> [risk] --> [next]
+```
+
+For retrospectives, prefer:
+
+```text
+DONE / WORKED / FRAGILE / LEFT
+```
+
+For status answers, prefer:
+
+```text
++---- Status ----+
+| item    | state |
+| checks  | PASS  |
+| blocker | none  |
++----------------+
+```
 
 ### When no diagram appears
 
