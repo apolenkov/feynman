@@ -211,6 +211,24 @@ describe('feynman-activate hook', () => {
         rmrf(tmpHome);
       }
     });
+
+    it('stays silent and removes flag when state is corrupt', () => {
+      const tmpHome = makeTempHome();
+      try {
+        const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+        fs.mkdirSync(feynmanDir, { recursive: true });
+        fs.writeFileSync(path.join(feynmanDir, 'state.json'), '{ not valid json');
+        fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), 'full');
+
+        const result = runSessionHook(tmpHome);
+        assert.equal(result.status, 0);
+        assert.equal(result.stdout, '');
+        assert.equal(result.stderr, '');
+        assert.ok(!fs.existsSync(path.join(tmpHome, '.claude', '.feynman-active')));
+      } finally {
+        rmrf(tmpHome);
+      }
+    });
   });
 
   // -------------------------------------------------------------------------

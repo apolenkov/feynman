@@ -507,6 +507,14 @@ function writeSettings(target, settings) {
   fs.writeFileSync(cfg.settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }
 
+function isFeynmanHookCommand(command) {
+  return typeof command === 'string' && (
+    command.includes('feynman-session-start.js') ||
+    command.includes('feynman-activate.js') ||
+    command.includes('feynman-lint.js')
+  );
+}
+
 function hasFeynmanHook(settings) {
   const promptHook = ((settings.hooks && settings.hooks.UserPromptSubmit) || []).some(g =>
     g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
@@ -517,19 +525,40 @@ function hasFeynmanHook(settings) {
   return promptHook && sessionHook;
 }
 
+function hasAnyFeynmanHook(settings) {
+  if (!settings.hooks) return false;
+  return ['SessionStart', 'UserPromptSubmit', 'Stop'].some(eventName =>
+    ((settings.hooks && settings.hooks[eventName]) || []).some(g =>
+      g.hooks && g.hooks.some(h => isFeynmanHookCommand(h.command))
+    )
+  );
+}
+
+function extractHookScriptPath(command, scriptName) {
+  if (typeof command !== 'string') return null;
+  const escaped = scriptName.replace(/\./g, '\\.');
+  const quotedPattern = new RegExp("[\"']([^\"']*" + escaped + ")[\"']");
+  const quoted = command.match(quotedPattern);
+  if (quoted) return quoted[1];
+
+  const unquotedPattern = new RegExp("(?:^|\\s)(/[^\\s\"';&|<>]*" + escaped + ")(?=$|\\s)");
+  const unquoted = command.match(unquotedPattern);
+  return unquoted ? unquoted[1] : null;
+}
+
 function removeFeynmanHooks(settings) {
   if (!settings.hooks) return settings;
   for (const eventName of ['SessionStart', 'UserPromptSubmit', 'Stop']) {
     if (!Array.isArray(settings.hooks[eventName])) continue;
-    settings.hooks[eventName] = settings.hooks[eventName].filter(g =>
-      !(g.hooks && g.hooks.some(h =>
-        h.command && (
-          h.command.includes('feynman-session-start.js') ||
-          h.command.includes('feynman-activate.js') ||
-          h.command.includes('feynman-lint.js')
-        )
-      ))
-    );
+    settings.hooks[eventName] = settings.hooks[eventName]
+      .map(g => {
+        if (!Array.isArray(g.hooks)) return g;
+        return {
+          ...g,
+          hooks: g.hooks.filter(h => !isFeynmanHookCommand(h.command)),
+        };
+      })
+      .filter(g => !Array.isArray(g.hooks) || g.hooks.length > 0);
     if (settings.hooks[eventName].length === 0) {
       delete settings.hooks[eventName];
     }
@@ -675,7 +704,7 @@ function uninstallOne(target) {
   }
 
   const cfg = readSettings(target);
-  const hadHook = hasFeynmanHook(cfg);
+  const hadHook = hasAnyFeynmanHook(cfg);
   removeFeynmanHooks(cfg);
   writeSettings(target, cfg);
 
@@ -735,8 +764,7 @@ function cmdDoctor(opts = {}) {
     sessionHookRegistered = !!feynmanSessionEntry;
     if (feynmanSessionEntry) {
       const hookCmd = feynmanSessionEntry.hooks.find(h => h.command && h.command.includes('feynman-session-start.js')).command;
-      const match = hookCmd.match(/"([^"]+feynman-session-start\.js)"/);
-      if (match) sessionHookAbsPath = match[1];
+      sessionHookAbsPath = extractHookScriptPath(hookCmd, 'feynman-session-start.js');
     }
 
     const entries = (cfg.hooks && cfg.hooks.UserPromptSubmit) || [];
@@ -745,10 +773,8 @@ function cmdDoctor(opts = {}) {
     );
     hookRegistered = !!feynmanEntry;
     if (feynmanEntry) {
-      // Extract the path from command: node "/abs/path/to/feynman-activate.js"
       const hookCmd = feynmanEntry.hooks.find(h => h.command && h.command.includes('feynman-activate.js')).command;
-      const match = hookCmd.match(/"([^"]+feynman-activate\.js)"/);
-      if (match) hookAbsPath = match[1];
+      hookAbsPath = extractHookScriptPath(hookCmd, 'feynman-activate.js');
     }
   }
   check('hook registered (feynman-session-start.js in SessionStart)', sessionHookRegistered);
@@ -761,11 +787,6 @@ function cmdDoctor(opts = {}) {
       fs.accessSync(sessionHookAbsPath, fs.constants.R_OK);
       sessionHookFileOk = true;
     } catch (_) {}
-  } else if (sessionHookRegistered) {
-    try {
-      fs.accessSync(SESSION_HOOK_PATH, fs.constants.R_OK);
-      sessionHookFileOk = true;
-    } catch (_) {}
   }
   check('session hook script file exists and is readable', sessionHookFileOk);
 
@@ -773,12 +794,6 @@ function cmdDoctor(opts = {}) {
   if (hookAbsPath) {
     try {
       fs.accessSync(hookAbsPath, fs.constants.R_OK);
-      hookFileOk = true;
-    } catch (_) {}
-  } else if (hookRegistered) {
-    // Hook registered but path extraction failed — check default location
-    try {
-      fs.accessSync(HOOK_PATH, fs.constants.R_OK);
       hookFileOk = true;
     } catch (_) {}
   }

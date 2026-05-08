@@ -1,66 +1,108 @@
 {
-  "model_profile": "budget",
-  "commit_docs": true,
+  "mode": "yolo",
+  "granularity": "coarse",
+  "runtime": "claude",
   "parallelization": true,
+  "commit_docs": true,
   "search_gitignored": false,
   "brave_search": false,
   "firecrawl": false,
   "exa_search": true,
+  "model_profile": "balanced",
+  "model_overrides": {
+    "gsd-codebase-mapper": "haiku",
+    "gsd-pattern-mapper": "haiku",
+    "gsd-research-synthesizer": "haiku",
+    "gsd-plan-checker": "haiku",
+    "gsd-integration-checker": "haiku",
+    "gsd-nyquist-auditor": "haiku",
+    "gsd-ui-checker": "haiku",
+    "gsd-ui-auditor": "haiku",
+    "gsd-doc-verifier": "haiku",
+    "gsd-phase-researcher": "sonnet",
+    "gsd-project-researcher": "sonnet"
+  },
+  "model_profile_overrides": {
+    "claude": {
+      "opus": "claude-opus-4-7",
+      "sonnet": "claude-sonnet-4-6",
+      "haiku": "claude-haiku-4-5"
+    },
+    "codex": {
+      "opus": "gpt-5.5",
+      "sonnet": "gpt-5.3-codex",
+      "haiku": "gpt-5.4-mini"
+    }
+  },
+  "models": {
+    "planning": "opus",
+    "discuss": "opus",
+    "research": "sonnet",
+    "execution": "sonnet",
+    "verification": "sonnet",
+    "completion": "sonnet"
+  },
+  "dynamic_routing": {
+    "enabled": true,
+    "escalate_on_failure": true,
+    "max_escalations": 1,
+    "tier_models": {
+      "light": "haiku",
+      "standard": "sonnet",
+      "heavy": "opus"
+    }
+  },
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true,
+    "pattern_mapper": true,
+    "nyquist_validation": true,
+    "ui_phase": true,
+    "ui_safety_gate": true,
+    "tdd_mode": true,
+    "code_review": true,
+    "code_review_depth": "deep",
+    "ui_review": true,
+    "skip_discuss": false,
+    "research_before_questions": true,
+    "discuss_mode": "discuss",
+    "text_mode": false,
+    "auto_advance": false,
+    "node_repair": true,
+    "node_repair_budget": 3,
+    "security_enforcement": true,
+    "security_asvs_level": 1,
+    "security_block_on": "high",
+    "use_worktrees": false,
+    "inline_plan_threshold": 0,
+    "subagent_timeout": 600000,
+    "auto_prune_state": false,
+    "plan_bounce": false,
+    "max_discuss_passes": 3,
+    "cross_ai_execution": false,
+    "ai_integration_phase": true,
+    "post_planning_gaps": true,
+    "_auto_chain_active": false
+  },
   "git": {
     "branching_strategy": "none",
     "phase_branch_template": "gsd/phase-{phase}-{slug}",
     "milestone_branch_template": "gsd/{milestone}-{slug}",
     "quick_branch_template": null
   },
-  "workflow": {
-    "research": false,
-    "plan_check": true,
-    "verifier": true,
-    "nyquist_validation": false,
-    "auto_advance": true,
-    "node_repair": true,
-    "node_repair_budget": 2,
-    "ui_phase": true,
-    "ui_safety_gate": true,
-    "ai_integration_phase": true,
-    "tdd_mode": false,
-    "text_mode": false,
-    "research_before_questions": false,
-    "discuss_mode": "discuss",
-    "skip_discuss": true,
-    "code_review": true,
-    "code_review_depth": "standard",
-    "code_review_command": null,
-    "pattern_mapper": true,
-    "plan_bounce": false,
-    "plan_bounce_script": null,
-    "plan_bounce_passes": 2,
-    "auto_prune_state": false,
-    "post_planning_gaps": true,
-    "security_enforcement": true,
-    "security_asvs_level": 1,
-    "security_block_on": "high"
-  },
   "hooks": {
     "context_warnings": true
   },
-  "project_code": null,
-  "phase_naming": "sequential",
   "agent_skills": {
-    "gsd-phase-researcher": "haiku",
-    "gsd-planner": "haiku",
-    "gsd-plan-checker": "haiku",
-    "gsd-pattern-mapper": "haiku",
-    "gsd-executor": "sonnet",
-    "gsd-verifier": "haiku",
-    "gsd-code-reviewer": "haiku",
-    "gsd-code-fixer": "sonnet"
+    "gsd-planner": "feynman,gsd-autonomous,gsd-capture,gsd-discuss-phase,gsd-explore,gsd-graphify,gsd-health,gsd-ingest-docs,gsd-map-codebase,gsd-new-milestone,gsd-new-project,gsd-ns-context,gsd-ns-ideate,gsd-ns-manage,gsd-ns-workflow,gsd-plan-phase,gsd-plan-review-convergence,gsd-spec-phase,gsd-ui-phase,cp-confluence,cp-design,cp-gitlab,cp-handoff,cp-jira,cp-review,jmix-expert",
+    "gsd-executor": "feynman,gsd-add-tests,gsd-ai-integration-phase,gsd-audit-fix,gsd-audit-milestone,gsd-audit-uat,gsd-autonomous,gsd-capture,gsd-cleanup,gsd-code-review,gsd-complete-milestone,gsd-config,gsd-debug,gsd-discuss-phase,gsd-docs-update,gsd-eval-review,gsd-execute-phase,gsd-explore,gsd-extract-learnings,gsd-fast,gsd-forensics,gsd-graphify,gsd-health,gsd-help,gsd-import,gsd-inbox,gsd-ingest-docs,gsd-manager,gsd-map-codebase,gsd-milestone-summary,gsd-mvp-phase,gsd-new-milestone,gsd-new-project,gsd-ns-context,gsd-ns-ideate,gsd-ns-manage,gsd-ns-project,gsd-ns-review,gsd-ns-workflow,gsd-pause-work,gsd-phase,gsd-plan-phase,gsd-plan-review-convergence,gsd-pr-branch,gsd-profile-user,gsd-progress,gsd-quick,gsd-resume-work,gsd-review,gsd-review-backlog,gsd-secure-phase,gsd-settings,gsd-ship,gsd-sketch,gsd-spec-phase,gsd-spike,gsd-stats,gsd-thread,gsd-ui-phase,gsd-ui-review,gsd-ultraplan-phase,gsd-undo,gsd-update,gsd-validate-phase,gsd-verify-work,gsd-workspace,gsd-workstreams,api-contract-review,banner-design,bencium-controlled-ux-designer,bencium-impact-designer,bencium-innovative-ux-designer,brand,composition-patterns,concurrency-review,cp-confluence,cp-design,cp-gitlab,cp-handoff,cp-jira,cp-review,database-optimizer,deploy-to-vercel,design,design-audit,design-system,devops-engineer,distributed-tracing,docker-expert,flux-gitops-patterns,gitlab-ci-patterns,helm-chart-development,helm-chart-maintenance,helm-chart-review,helm-chart-testing,java-architect,java-code-review,jmix-expert,jpa-patterns,k8s-platform-operations,k8s-security-hardening,kubernetes-specialist,monitoring-expert,nestjs-expert,observability-engineer,oracle-dba,performance-smell-detection,postgres-pro,postgresql-optimization,react-best-practices,react-native-skills,react-view-transitions,relationship-design,security-audit,slides,spring-boot-patterns,test-quality,typescript-expert,typescript-pro,typography,ui-styling,ui-ux-pro-max,vercel-cli-with-tokens,web-design-guidelines",
+    "gsd-verifier": "feynman,gsd-audit-fix,gsd-audit-milestone,gsd-audit-uat,gsd-code-review,gsd-eval-review,gsd-forensics,gsd-review,gsd-review-backlog,gsd-secure-phase,gsd-ui-review,gsd-validate-phase,gsd-verify-work,cp-confluence,cp-design,cp-gitlab,cp-handoff,cp-jira,cp-review,jmix-expert"
   },
-  "claude_md_path": "./CLAUDE.md",
-  "resolve_model_ids": "omit",
-  "mode": "yolo",
-  "granularity": "coarse",
   "graphify": {
     "enabled": true
+  },
+  "intel": {
+    "enabled": false
   }
 }

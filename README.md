@@ -22,7 +22,10 @@
   <a href="docs/object-passport.md">Passport</a> •
   <a href="#before--after">Before/After</a> •
   <a href="#install">Install</a> •
+  <a href="#verify-the-install">Verify</a> •
   <a href="#intensity-levels">Levels</a> •
+  <a href="#security-notes">Security</a> •
+  <a href="#token-budget-and-output-size">Tokens</a> •
   <a href="#lint">Lint</a> •
   <a href="#examples">Examples</a> •
   <a href="docs/launch.md">Launch</a> •
@@ -32,8 +35,8 @@
 ---
 
 A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex
-plugin that automatically injects ASCII diagram rules into every prompt via the
-`UserPromptSubmit` hook.
+plugin that automatically injects ASCII diagram rules through `SessionStart`
+and `UserPromptSubmit` hooks.
 
 ```bash
 npx -y @albinocrabs/feynman@latest install --target all
@@ -173,16 +176,15 @@ feynman hook instead of adding duplicates.
 git clone https://github.com/apolenkov/feynman && bash feynman/install.sh
 ```
 
-Restart Claude Code or Codex. Done.
-
-**Verify:** `npx @albinocrabs/feynman doctor --target claude` or `npx @albinocrabs/feynman doctor --target codex`
+Restart Claude Code or Codex after install so a fresh `SessionStart` hook can
+prime the session.
 
 **Uninstall:** `npx @albinocrabs/feynman uninstall --target claude|codex|both|all|*`
 
 **Plugin manifests:** this repo also ships `.claude-plugin/plugin.json`,
-`hooks/hooks.json`, `.codex-plugin/plugin.json`, and `hooks.json` so plugin
-marketplaces can discover feynman. The npx installer remains the production
-fallback because both clients still support direct user hook registration.
+`hooks/hooks.json`, `.codex-plugin/plugin.json`, and `hooks.json` for direct
+client integrations. The npx installer remains the production fallback because
+both clients still support direct user hook registration.
 
 <details>
 <summary>Manual install</summary>
@@ -193,6 +195,18 @@ Add to `~/.claude/settings.json` — use the absolute path, not `~/`
 ```json
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/absolute/path/to/feynman/hooks/feynman-session-start.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
@@ -214,6 +228,18 @@ For Codex, add the same shape to `~/.codex/hooks.json` and set
 ```json
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FEYNMAN_HOME=\"$HOME/.codex\" node \"/absolute/path/to/feynman/hooks/feynman-session-start.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
@@ -233,6 +259,37 @@ For Codex, add the same shape to `~/.codex/hooks.json` and set
 After install, feynman starts in `full` mode by default. Disable or change it
 explicitly with `/feynman off`, `/feynman lite`, `/feynman full`, or
 `/feynman ultra`.
+
+## Verify the install
+
+Run `doctor` after installing or after manually editing hooks:
+
+```bash
+npx @albinocrabs/feynman doctor --target codex
+npx @albinocrabs/feynman doctor --target claude
+npx @albinocrabs/feynman doctor --target all
+```
+
+A healthy target reports both hook events and both hook script files as `OK`:
+
+```text
+[OK] hook registered (feynman-session-start.js in SessionStart)
+[OK] hook registered (feynman-activate.js in UserPromptSubmit)
+[OK] session hook script file exists and is readable
+[OK] prompt hook script file exists and is readable
+Status: OK
+```
+
+For Codex, runtime state should live under `~/.codex`:
+
+```bash
+cat ~/.codex/.feynman/state.json
+test -f ~/.codex/.feynman-active
+```
+
+For Claude Code, use `~/.claude` instead of `~/.codex`. `doctor` fails if a
+registered hook command cannot be parsed to a real hook script, which catches
+stale or broken manual installs.
 
 ## Intensity Levels
 
@@ -277,6 +334,26 @@ rm ~/.codex/.feynman-disable-global       # hard ON
 This bypasses `~/.codex/hooks.json` hook execution entirely.
 Regular `/feynman off` and `/feynman on` continue to use normal profile state
 files (`~/.codex/.feynman-active`, `~/.codex/.feynman/state.json`).
+
+## Security notes
+
+feynman hooks are local prompt-context hooks. They do not require network
+access, do not read repository files, and do not read credentials. The active
+mode is stored only in the client-local state path:
+
+```text
+~/.claude/.feynman/state.json
+~/.codex/.feynman/state.json
+```
+
+The hook runtime treats invalid state as disabled for that turn, removes the
+activation flag, and stays silent. That prevents a corrupted state file from
+silently forcing diagram rules into future prompts.
+
+`uninstall` removes only feynman hook commands and preserves unrelated hooks in
+the same hook group. `doctor` validates that registered commands point to real
+hook scripts, so broken manual commands are visible before a session depends on
+them.
 
 ## CLI examples
 
@@ -492,14 +569,41 @@ the rules for the active intensity level, and inject them into model context.
 ```
 [your prompt]
       +
-[feynman rules]    ← injected by hook, ~2KB
+[feynman rules]    injected by hook
       │
       ▼
-  [Claude]
+ [Claude Code]
+      or
+   [Codex]
       │
       ▼
 [structured response with ASCII diagrams]
 ```
+
+## Token budget and output size
+
+feynman always adds some input context when it is enabled, because the active
+diagram rules are injected into the client prompt context. It does not add
+visible output by itself; output changes only when the assistant uses the
+rules.
+
+Current rule payload sizes are approximately:
+
+| Mode | Bytes | Approx tokens | Use when |
+| ---- | ----- | ------------- | -------- |
+| `lite` | 1307 | 317 | minimal flows and trees |
+| `full` | 2180 | 532 | default diagram coverage |
+| `ultra` | 1390 | 337 | force diagrams more often |
+
+The token count is a rough `chars / 4` estimate, not a billing counter. The
+actual number depends on the runtime tokenizer and surrounding hook envelope.
+
+The plugin can reduce output size when a diagram replaces repeated prose,
+especially for flows, status summaries, hierarchies, and comparisons. It can
+increase output for short answers where a diagram would be unnecessary, so the
+rules explicitly suppress diagrams for one- or two-sentence direct answers.
+Use `/feynman lite` for lower overhead or `/feynman off` when token budget is
+more important than visual structure.
 
 ## Release process
 
