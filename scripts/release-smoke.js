@@ -9,6 +9,7 @@ const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const pkg = require(path.join(ROOT, 'package.json'));
+const NPM_CACHE = process.env.FEYNMAN_NPM_CACHE || path.join(os.tmpdir(), 'npm-cache-feynman');
 
 function run(cmd, args, opts = {}) {
   const result = spawnSync(cmd, args, {
@@ -17,6 +18,7 @@ function run(cmd, args, opts = {}) {
     env: {
       ...process.env,
       NO_COLOR: '1',
+      npm_config_cache: NPM_CACHE,
       ...opts.env,
     },
   });
@@ -32,6 +34,90 @@ function run(cmd, args, opts = {}) {
 function binPath(projectDir, name) {
   const suffix = process.platform === 'win32' ? '.cmd' : '';
   return path.join(projectDir, 'node_modules', '.bin', `${name}${suffix}`);
+}
+
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+function runtimeConfigPath(homeDir, target) {
+  return path.join(homeDir, target === 'codex' ? '.codex/hooks.json' : '.claude/settings.json');
+}
+
+function runtimeHome(homeDir, target) {
+  return path.join(homeDir, target === 'codex' ? '.codex' : '.claude');
+}
+
+function findHookCommand(config, eventName, scriptName) {
+  const groups = (config.hooks && config.hooks[eventName]) || [];
+  for (const group of groups) {
+    for (const hook of group.hooks || []) {
+      if (hook.command && hook.command.includes(scriptName)) {
+        return hook.command;
+      }
+    }
+  }
+  throw new Error(`${scriptName} command missing in ${eventName}`);
+}
+
+function runHookCommand(command, homeDir, stdin) {
+  const result = spawnSync(command, [], {
+    cwd: ROOT,
+    shell: true,
+    input: JSON.stringify(stdin),
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      HOME: homeDir,
+      NO_COLOR: '1',
+    },
+    timeout: 10000,
+  });
+  if (result.status !== 0) {
+    if (result.stdout) process.stderr.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
+    throw new Error(`hook command failed: ${command}`);
+  }
+  return result.stdout || '';
+}
+
+function verifyInstalledHooks(homeDir, target) {
+  const cfg = readJson(runtimeConfigPath(homeDir, target));
+  const sessionCommand = findHookCommand(cfg, 'SessionStart', 'feynman-session-start.js');
+  const promptCommand = findHookCommand(cfg, 'UserPromptSubmit', 'feynman-activate.js');
+
+  const expectedHome = runtimeHome(homeDir, target);
+  if (!sessionCommand.includes(expectedHome) || !promptCommand.includes(expectedHome)) {
+    throw new Error(`${target} hook command missing expected FEYNMAN_HOME`);
+  }
+
+  const sessionOut = runHookCommand(sessionCommand, homeDir, {
+    hook_event_name: 'SessionStart',
+    session_id: `${target}-release-smoke`,
+  });
+  if (!sessionOut.includes('Feynman Diagram Rules')) {
+    throw new Error(`${target} SessionStart did not emit Feynman rules`);
+  }
+
+  const promptOut = runHookCommand(promptCommand, homeDir, {
+    session_id: `${target}-release-smoke`,
+    prompt: 'Explain deploy pipeline stages.',
+  });
+  if (promptOut.endsWith('\n')) {
+    throw new Error(`${target} UserPromptSubmit emitted trailing newline`);
+  }
+  const parsed = JSON.parse(promptOut);
+  const ctx = parsed.hookSpecificOutput && parsed.hookSpecificOutput.additionalContext;
+  if (parsed.hookSpecificOutput?.hookEventName !== 'UserPromptSubmit' ||
+      typeof ctx !== 'string' ||
+      !ctx.includes('Feynman Diagram Rules')) {
+    throw new Error(`${target} UserPromptSubmit did not emit valid additionalContext`);
+  }
+
+  const state = readJson(path.join(expectedHome, '.feynman', 'state.json'));
+  if (state.injections !== 1) {
+    throw new Error(`${target} prompt hook did not increment injections once`);
+  }
 }
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-release-smoke-'));
@@ -66,6 +152,8 @@ try {
   if (!claudeDoctor.includes('Status: OK') || !codexDoctor.includes('Status: OK')) {
     throw new Error('doctor smoke failed for packed install');
   }
+  verifyInstalledHooks(homeDir, 'claude');
+  verifyInstalledHooks(homeDir, 'codex');
 
   const lintOut = run(lint, ['--json', path.join(ROOT, 'tests', 'fixtures', 'valid-flow.md')]);
   const parsed = JSON.parse(lintOut);

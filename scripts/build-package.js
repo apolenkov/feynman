@@ -3,11 +3,13 @@
 'use strict';
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
+const NPM_CACHE = process.env.FEYNMAN_NPM_CACHE || path.join(os.tmpdir(), 'npm-cache-feynman');
 
 fs.rmSync(DIST, { recursive: true, force: true });
 fs.mkdirSync(DIST, { recursive: true });
@@ -15,7 +17,7 @@ fs.mkdirSync(DIST, { recursive: true });
 const result = spawnSync('npm', ['pack', '--pack-destination', DIST, '--json'], {
   cwd: ROOT,
   encoding: 'utf8',
-  env: { ...process.env, NO_COLOR: '1' },
+  env: { ...process.env, NO_COLOR: '1', npm_config_cache: NPM_CACHE },
 });
 
 if (result.status !== 0) {

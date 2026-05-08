@@ -109,7 +109,7 @@ ${c.bold('Options:')}
 ${c.bold('Examples:')}
   npx @albinocrabs/feynman install
   npx @albinocrabs/feynman install --target codex
-  npx @albinocrabs/feynman install --target both
+  npx @albinocrabs/feynman install --target all
   npx @albinocrabs/feynman install --target all
   npx @albinocrabs/feynman doctor
   feynman lint response.md
