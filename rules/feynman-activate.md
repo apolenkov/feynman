@@ -111,6 +111,36 @@ Syntax:
   item-3
 ```
 
+### Terminal-safe rendering
+
+Wide Markdown tables are a defect in terminal chat. Use them only when every
+cell is short and the result stays readable in a narrow terminal.
+
+Prefer these layouts:
+
+```text
+status maps  -> ASCII frame blocks
+long rows    -> key-value bullets
+hierarchy    -> ASCII tree
+sequence     -> arrow flow
+comparison   -> max 3 columns, max 10 words per cell
+```
+
+Frame discipline:
+
+```text
++---- Status ----+
+| item-a | done  |
+| item-b | risk  |
++----------------+
+```
+
+- Keep frame rows visually aligned.
+- Keep diagram lines under about 88 columns when possible.
+- If a row becomes long, split it into bullets instead of widening the table.
+- Use plain ASCII frames with `+`, `-`, and `|` when terminal compatibility
+  matters.
+
 ### When no diagram appears
 
 Responses that are any of the following contain no diagram:
@@ -154,9 +184,16 @@ detail    | detail
 
 **Comparisons** — Same as full mode. Includes side-by-side ASCII columns.
 
-**Status summaries** — Same as full mode. Uses ┌─ frame blocks.
+**Status summaries** — Same as full mode. Uses ASCII `+---` frame blocks.
 
 **Priority orderings** — Same as full mode. Uses ▲▼ scale.
+
+### Terminal-safe rendering
+
+Wide Markdown tables are a defect in terminal chat. Prefer ASCII frames,
+key-value bullets, trees, and short columns. Keep diagram lines under about 88
+columns when possible. If content is long, split it into bullets instead of
+widening the visual block.
 
 ### When no diagram appears
 
