@@ -77,6 +77,17 @@ describe('bin/feynman.js', () => {
         rmrf(tmp);
       }
     });
+
+    it('prints version help', () => {
+      const tmp = makeTempHome();
+      try {
+        const result = runFeynman(['version', '--help'], tmp);
+        assert.equal(result.status, 0, `exit status: ${result.stderr}`);
+        assert.ok(result.stdout.includes('feynman version'), `expected version help: ${result.stdout}`);
+      } finally {
+        rmrf(tmp);
+      }
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -598,6 +609,46 @@ describe('bin/feynman.js', () => {
         rmrf(tmp);
       }
     });
+
+    it('falls back to packaged hook paths when commands are unquoted', () => {
+      const tmp = makeTempHome();
+      try {
+        const codexDir = path.join(tmp, '.codex');
+        const stateDir = path.join(codexDir, '.feynman');
+        fs.mkdirSync(stateDir, { recursive: true });
+        fs.writeFileSync(path.join(stateDir, 'state.json'), JSON.stringify({ enabled: true, intensity: 'full', injections: 0 }));
+        fs.writeFileSync(path.join(codexDir, '.feynman-active'), 'full');
+        fs.writeFileSync(
+          path.join(codexDir, 'hooks.json'),
+          JSON.stringify({
+            hooks: {
+              SessionStart: [
+                {
+                  hooks: [{
+                    type: 'command',
+                    command: `FEYNMAN_HOME=${codexDir} node ${path.join(REPO_DIR, 'hooks', 'feynman-session-start.js')}`,
+                  }],
+                },
+              ],
+              UserPromptSubmit: [
+                {
+                  hooks: [{
+                    type: 'command',
+                    command: `FEYNMAN_HOME=${codexDir} node ${path.join(REPO_DIR, 'hooks', 'feynman-activate.js')}`,
+                  }],
+                },
+              ],
+            },
+          }, null, 2)
+        );
+
+        const result = runFeynman(['doctor'], tmp);
+        assert.equal(result.status, 0, `doctor must exit 0: ${result.stderr}`);
+        assert.ok(result.stdout.includes('Status: OK'), `expected "Status: OK": ${result.stdout}`);
+      } finally {
+        rmrf(tmp);
+      }
+    });
   });
 
   describe('feynman doctor (without install)', () => {
@@ -646,6 +697,45 @@ describe('bin/feynman.js', () => {
         const result = runFeynman(['lint', '--help'], tmp);
         assert.equal(result.status, 0);
         assert.ok(result.stdout.length > 0, 'expected help text');
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('lint --json emits machine-readable results', () => {
+      const tmp = makeTempHome();
+      try {
+        const fixture = path.join(REPO_DIR, 'tests', 'fixtures', 'valid-flow.md');
+        const result = runFeynman(['lint', '--json', fixture], tmp);
+        assert.equal(result.status, 0, `lint --json should exit 0: ${result.stderr}`);
+        const parsed = JSON.parse(result.stdout);
+        assert.equal(parsed.file, fixture);
+        assert.equal(parsed.passed, true);
+        assert.deepEqual(parsed.issues, []);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('lint --strict fails on warnings', () => {
+      const tmp = makeTempHome();
+      try {
+        const fixture = path.join(REPO_DIR, 'tests', 'fixtures', 'invalid-l06-half-priority.md');
+        const result = runFeynman(['lint', '--strict', fixture], tmp);
+        assert.equal(result.status, 1, `lint --strict should fail on warnings: ${result.stdout}`);
+        assert.ok(result.stderr.includes('1 warning'), `expected warning count: ${result.stderr}`);
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('lint reports missing files as usage errors', () => {
+      const tmp = makeTempHome();
+      try {
+        const missing = path.join(tmp, 'missing.md');
+        const result = runFeynman(['lint', missing], tmp);
+        assert.equal(result.status, 2, `missing file should exit 2: ${result.status}`);
+        assert.ok(result.stderr.includes('file not found'), `expected file-not-found message: ${result.stderr}`);
       } finally {
         rmrf(tmp);
       }
