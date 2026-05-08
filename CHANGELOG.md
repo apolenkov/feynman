@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+## 0.2.5 - 2026-05-08
+
+### Features
+
+- add SessionStart hook priming alongside UserPromptSubmit reinforcement
+- keep full diagram rules enabled by default for Claude Code and Codex
+
+### Fixes
+
+- preserve explicit /feynman off behavior with silent hooks
+- keep feynman hooks quiet by omitting status messages
+
+### Maintenance
+
+- bump package and plugin manifest versions to 0.2.5
+- expand tests for SessionStart registration and runtime behavior
+
 ## 0.2.4 - 2026-05-07
 
 Changes since v0.2.2.

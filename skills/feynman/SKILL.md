@@ -28,7 +28,7 @@ node -e "
 const fs = require('fs'), os = require('os'), path = require('path');
 const stateFile = path.join(os.homedir(), '.claude', '.feynman', 'state.json');
 const flagFile  = path.join(os.homedir(), '.claude', '.feynman-active');
-let st = {enabled: false, intensity: 'full', injections: 0};
+let st = {enabled: true, intensity: 'full', injections: 0};
 try { st = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch(e) {}
 console.log('enabled:', st.enabled, '| intensity:', st.intensity, '| injections:', (st.injections ?? st.count ?? 0), '| flag:', fs.existsSync(flagFile));
 "
@@ -43,7 +43,7 @@ const stateFile = path.join(os.homedir(), '.claude', '.feynman', 'state.json');
 const flagFile  = path.join(os.homedir(), '.claude', '.feynman-active');
 const arg = (process.argv[1] || '').trim().toLowerCase();
 const normalized = arg === 'start' ? 'on' : arg === 'stop' ? 'off' : arg;
-let st = {enabled: true, intensity: 'full', injections: 0};
+let st = {enabled: false, intensity: 'full', injections: 0};
 try { st = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch(e) {}
 if (normalized === 'on')  { st.enabled = true;  fs.writeFileSync(flagFile, st.intensity); }
 if (normalized === 'off') { st.enabled = false; try { fs.unlinkSync(flagFile); } catch(e) {} }
