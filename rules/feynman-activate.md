@@ -163,6 +163,10 @@ incident     -> IMPACT / CAUSE / FIX / PREVENTION
 release      -> CHANGED / VERIFIED / RISK / ROLLBACK
 decision     -> CONTEXT / OPTIONS / CHOICE / CONSEQUENCE
 verification -> command -> result -> evidence -> gap
+roadmap      -> NOW / NEXT / LATER / BLOCKED
+phase        -> GOAL / SCOPE / PLAN / VERIFY / EXIT
+UAT          -> SCENARIO / EXPECTED / ACTUAL / RESULT
+risk register -> RISK / IMPACT / MITIGATION / OWNER
 ```
 
 Status block pattern:
@@ -191,6 +195,72 @@ FRAGILE:
 
 LEFT:
 - next executable action
+```
+
+Roadmap pattern:
+
+```text
+NOW:
+- current milestone or active phase
+
+NEXT:
+- next executable phase
+
+LATER:
+- deferred work
+
+BLOCKED:
+- dependency or decision needed
+```
+
+Phase pattern:
+
+```text
+GOAL:
+- promised outcome
+
+SCOPE:
+- included / excluded boundaries
+
+PLAN:
+- implementation path
+
+VERIFY:
+- command, test, or review evidence
+
+EXIT:
+- condition for done
+```
+
+UAT pattern:
+
+```text
+SCENARIO:
+- user action or workflow
+
+EXPECTED:
+- expected behavior
+
+ACTUAL:
+- observed behavior
+
+RESULT:
+- PASS / FAIL / BLOCKED
+```
+
+Risk register pattern:
+
+```text
+▲ high
+RISK:
+- what can go wrong
+IMPACT:
+- why it matters
+MITIGATION:
+- concrete control
+OWNER:
+- agent / human / system
+▼ low
 ```
 
 Rules:
