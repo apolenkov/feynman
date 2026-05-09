@@ -1,0 +1,166 @@
+{
+  "skill_name": "feynman-rules",
+  "description": "Eval set for rules/feynman-activate.md (full intensity). Tests whether the injected rule set causes Claude to render appropriate ASCII diagrams for structured content, and avoid them for non-structured content.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "sequence-deploy-pipeline",
+      "category": "should-trigger",
+      "structure_class": "sequence",
+      "prompt": "Explain in 3-5 sentences how a typical CI/CD deploy pipeline works: code commit, then build, then test, then deploy to staging, then production rollout.",
+      "expected": "ASCII flow diagram with arrows: [commit] → [build] → [test] → [staging] → [prod]"
+    },
+    {
+      "id": 2,
+      "name": "sequence-http-request",
+      "category": "should-trigger",
+      "structure_class": "sequence",
+      "prompt": "Walk me through what happens when I type a URL in browser and hit enter, in 4-6 stages.",
+      "expected": "ASCII flow with arrows showing DNS → TCP → TLS → HTTP → render or similar"
+    },
+    {
+      "id": 3,
+      "name": "hierarchy-project-structure",
+      "category": "should-trigger",
+      "structure_class": "hierarchy",
+      "prompt": "Describe a typical Python project layout with src/, tests/, docs/, and config/ directories. Show me the structure with sub-files.",
+      "expected": "ASCII tree using ├── └── characters or 2-space indent"
+    },
+    {
+      "id": 4,
+      "name": "hierarchy-org-chart",
+      "category": "should-trigger",
+      "structure_class": "hierarchy",
+      "prompt": "Describe the organizational hierarchy of a typical software engineering team: VP, then Directors, then Managers, then ICs.",
+      "expected": "ASCII tree showing 3+ levels"
+    },
+    {
+      "id": 5,
+      "name": "comparison-3-databases",
+      "category": "should-trigger",
+      "structure_class": "comparison",
+      "prompt": "Compare PostgreSQL, MySQL, and SQLite across these criteria: typical use case, write throughput, replication support.",
+      "expected": "Side-by-side ASCII columns or markdown table with 3 rows"
+    },
+    {
+      "id": 6,
+      "name": "comparison-2-frameworks",
+      "category": "should-trigger",
+      "structure_class": "comparison",
+      "prompt": "What are the key differences between React and Vue across these dimensions: learning curve, ecosystem size, state management approach?",
+      "expected": "2-column comparison (table or side-by-side)"
+    },
+    {
+      "id": 7,
+      "name": "status-multi-component",
+      "category": "should-trigger",
+      "structure_class": "status",
+      "prompt": "Give me a status snapshot of a fictional release: API service is healthy, web app is degraded, mobile app is healthy, payment service is down, search is healthy, analytics is healthy, CDN is healthy.",
+      "expected": "ASCII frame block or aligned status list with 7 items"
+    },
+    {
+      "id": 8,
+      "name": "priority-bugs",
+      "category": "should-trigger",
+      "structure_class": "priority",
+      "prompt": "Rank these 5 incoming bugs by severity for me: data loss in checkout, broken email link, typo in footer, slow image loading on settings page, accessibility regression in nav.",
+      "expected": "Priority scale (▲ high / ▼ low) or numbered ordering with severity markers"
+    },
+    {
+      "id": 9,
+      "name": "state-machine-order",
+      "category": "should-trigger",
+      "structure_class": "state-machine",
+      "prompt": "Describe the state machine of an e-commerce order: from cart → placed → paid → shipped → delivered, with possible cancellation.",
+      "expected": "States with labelled transitions (arrows)"
+    },
+    {
+      "id": 10,
+      "name": "branching-flow-auth",
+      "category": "should-trigger",
+      "structure_class": "branching-flow",
+      "prompt": "Describe the auth check flow: request comes in, check token, if valid serve, if expired refresh, if missing reject 401.",
+      "expected": "Branching ASCII flow with yes/no paths"
+    },
+    {
+      "id": 11,
+      "name": "mapping-before-after",
+      "category": "should-trigger",
+      "structure_class": "mapping",
+      "prompt": "Show me before/after for migrating a monolith to microservices: monolith had auth, billing, notifications in one service; after split into 3 services with shared event bus.",
+      "expected": "Before/after pair grid or two side-by-side blocks"
+    },
+    {
+      "id": 12,
+      "name": "ru-status-block",
+      "category": "should-trigger",
+      "structure_class": "status",
+      "prompt": "Дай статус сборки нашего проекта: тесты — зелёные, линт — зелёный, деплой — заблокирован миграцией БД, документация — устарела, коммиты — на ветке staging, CI — простаивает.",
+      "expected": "Russian status block — bullets per language guardrail (cell text long), NOT a 2-col Cyrillic frame"
+    },
+    {
+      "id": 13,
+      "name": "negative-single-fact",
+      "category": "should-not-trigger",
+      "structure_class": "none",
+      "prompt": "What's the default port for HTTPS?",
+      "expected": "One-sentence prose answer, no diagram"
+    },
+    {
+      "id": 14,
+      "name": "negative-pure-code",
+      "category": "should-not-trigger",
+      "structure_class": "none",
+      "prompt": "Write a Python one-liner that reverses a string.",
+      "expected": "Code block only, no diagram"
+    },
+    {
+      "id": 15,
+      "name": "negative-prose-explanation",
+      "category": "should-not-trigger",
+      "structure_class": "none",
+      "prompt": "Explain in plain prose why TCP uses a 3-way handshake. Just narrative paragraphs, no diagrams or lists.",
+      "expected": "Pure prose paragraphs, NO diagram (user explicitly opted out)"
+    },
+    {
+      "id": 16,
+      "name": "negative-short-list",
+      "category": "should-not-trigger",
+      "structure_class": "none",
+      "prompt": "Give me 3 popular Linux distributions.",
+      "expected": "Simple list or inline answer — too short for a diagram (no real structure)"
+    },
+    {
+      "id": 17,
+      "name": "negative-single-recommendation",
+      "category": "should-not-trigger",
+      "structure_class": "none",
+      "prompt": "Should I use tabs or spaces for indenting Python? Just give me a recommendation.",
+      "expected": "1-2 sentence answer, no diagram"
+    },
+    {
+      "id": 18,
+      "name": "negative-question-back",
+      "category": "should-not-trigger",
+      "structure_class": "none",
+      "prompt": "I want to redesign my billing page but I'm not sure where to start. What would you ask me first?",
+      "expected": "Conversational question(s) back to user, no diagram"
+    },
+    {
+      "id": 19,
+      "name": "negative-greeting",
+      "category": "should-not-trigger",
+      "structure_class": "none",
+      "prompt": "Hey! How's it going?",
+      "expected": "Brief conversational reply, no diagram"
+    },
+    {
+      "id": 20,
+      "name": "negative-definition",
+      "category": "should-not-trigger",
+      "structure_class": "none",
+      "prompt": "What does the term 'idempotent' mean in HTTP context?",
+      "expected": "Definition in 1-3 sentences, no diagram"
+    }
+  ]
+}
