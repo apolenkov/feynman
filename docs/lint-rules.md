@@ -1,7 +1,7 @@
 # Lint Rules Reference
 
 feynman includes a linter for ASCII diagrams in markdown files.
-Eight rules (L01-L08) enforce structural correctness.
+Nine rules (L01-L09) enforce structural correctness.
 
 Run: `npx @albinocrabs/feynman lint <file.md>` or `feynman lint <file.md>`
 
@@ -294,6 +294,51 @@ double-width).
 Output:
 ```text
 file:3:1: L08 Frame row width 68 differs from frame header width 16 (line 1)
+```
+
+---
+
+## L09: Right-Edge Alignment (severity: error)
+
+**What:** For every frame block, the closing `│` on each inner row and the
+bottom-right `┘` corner must land at the exact same character-column as the
+top-right `┐` corner (the **anchor column**).
+
+**Why:** L08 catches overall row-width drift but uses `trimEnd()` and a single
+display-width metric — it does not catch the specific defect where a row's
+closing `│` lands at column W+1 (or W−1) while the top `┐` sits at column W.
+A common real-world example is `│  long row PASS │` whose right `│` extends
+past the top `┐`: L08 may flag the width difference, but L09 reports the
+column-precise drift on every offending row, including the bottom `┘`.
+
+**Source:** [`lib/lint/rules.js#L563`](../lib/lint/rules.js)
+
+L09 uses codepoint-aware indexing (matching the L01 column convention), so
+box-drawing characters and Cyrillic/Latin letters all count as 1. Lines with
+no `│` (decorative gap lines) are skipped. Frames that never close are not
+flagged here — L01 reports unclosed frames separately.
+
+### Valid
+
+```
+┌─ Status ─┐
+│  done    │
+│  wait    │
+└──────────┘
+```
+
+### Invalid
+
+```text
+┌─ Status ─┐
+│  done    │
+│  long row PASS │
+└──────────┘
+```
+
+Output:
+```text
+file:3:11: L09 Frame inner row '│' at col 17 does not align with top '┐' at col 11 (line 1)
 ```
 
 ---
