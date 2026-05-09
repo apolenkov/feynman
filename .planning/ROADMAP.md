@@ -30,6 +30,14 @@ The skills layer (`/feynman`, `/feynman-stats`), `install.sh`, MIT license, and 
 - [x] **Phase 6.5: Self-Improvement Research** - design spec for self-improvement loop (lint failure → rule update); research-only, no implementation
 - [x] **Phase 7: Release v0.2.0** - git tag, GitHub release notes, npm publish, uninstall.sh, badges green
 
+## Next Milestone: v0.3.0 Prompt Architecture
+
+### Phases
+
+- [ ] **Phase 8: Prompt Architecture Rewrite (XML contract)** - Переписать `rules/feynman-activate.md` под XML-контракт (F1+F2+F4+F7); миграция парсера хука с HTML-комментов на XML intensity-теги; secondary: F3 (расширенные few-shot) + F5 (CoT classify-first)
+- [ ] **Phase 8.5: Runtime alignment check + autofix** - Доработать линтер: L09 (right-edge alignment detection), L10 (mixed-script Cyr+Lat warn), L08 hardening; deterministic autofix engine `lib/lint/autofix.js` (pad inner lines + перерендер top/bottom border); Stop-hook применяет autofix BEFORE показа модели; 20+ golden фикстур (D1, D3, D4)
+- [ ] **v0.2.7 hotfix (вне фазы)** - L09 detection-only в текущий линтер; быстрый patch-релиз перед Phase 8/8.5; autofix откладывается до Phase 8.5
+
 ## Phase Details
 
 ### Phase 1: Core (v0.1 — completed)
@@ -146,6 +154,55 @@ Plans:
   3. `npm view @albinocrabs/feynman version` returns `0.2.0`; `npx @albinocrabs/feynman@0.2.0 install` works in a fresh container
   4. `bash uninstall.sh` removes the hook entry from `~/.claude/settings.json` and deletes `~/.claude/.feynman-active`; prompts the user before deleting `state.json`
   5. README badges (CI passing, coverage ≥95%, npm version 0.2.0, MIT license) all render green on the public repo page
+**Plans**: TBD
+
+**UI hint**: no
+
+### Phase 8.5: Runtime alignment check + autofix
+**Goal**: ASCII-фрейм блоки геометрически корректны на момент рендера; линтер автопочинит mis-aligned `│` колонны и broken top/bottom-border lengths; Stop-hook применяет autofix к ответу модели до показа пользователю; D1 (right-edge mis-align), D3 (line overflow), D4 (orphan tree branches) исчезают на любых rule-вариантах
+**Depends on**: Phase 7 (v0.2.0 release shipped) — independent of Phase 8 (работает на любых правилах; ship порядок 8.5 → 8)
+**Requirements**: TBD (соберутся в spec-phase)
+**Success Criteria** (what must be TRUE):
+  1. `lib/lint/rules.js` экспортирует `L09_right_edge_alignment` — для каждого frame блока проверяет, что все `│` стоят на колонне `W+1`, top `┐` и bottom `┘` на той же колонне; positive + negative golden фикстуры
+  2. `lib/lint/rules.js` экспортирует `L10_mixed_script` — regex `[А-я][A-Za-z]|[A-Za-z][А-я]` внутри одного слова → warn (не error, без autofix); `zachischены` ловится, `gsd-sdk` (legitimate proper noun) — нет (whitelist)
+  3. `lib/lint/autofix.js` экспортирует `autofixFrame(astNode) → string` — pure function: вычисляет `W = max(stripAnsi(line).length для inner lines)`, перерендерит top `┌─...─┐` (W+2), bottom `└─...─┘`, padит каждую inner-line spaces до column `W+1`, добавляет `│`
+  4. `bin/feynman-lint.js --fix` применяет autofix к файлу in-place; без флага — detection-only поведение Phase 3 сохраняется
+  5. `hooks/feynman-lint.js` (Stop-hook) применяет autofix к ответу модели через `additionalContext` patch; если patch невозможен (нет valid frame structure) → fallback на текущий behavior (фидбэк правил модели)
+  6. ≥20 golden фикстур в `tests/lint-cases.json` для L09/L10/autofix; 5+ end-to-end случаев с реальными мисалаймент-блоками из issue-репортов
+  7. `npm test` и `npm run lint:md` зелёные; coverage ≥95% сохраняется
+
+**Plans**: TBD
+
+**UI hint**: no
+
+### Phase 8: Prompt Architecture Rewrite (XML contract + token economy + suppression)
+**Goal**: `rules/feynman-activate.md` инжектит XML-структурированный rule-контракт с three-faced поведением: (1) **amplify** визуал где baseline пусто (sequence/branching), (2) **channel** в дешёвый формат где baseline уже визуализирует (comparison → MD table, status → dot-leader, hierarchy → indent), (3) **suppress** over-instrumentation для simple Q&A (definition/recommendation/greeting). Парсер хука читает `<intensity name="...">` вместо HTML-комментов. Compliance gain измерим через iteration-2 на eval-set из 20 промтов.
+**Depends on**: Phase 7 (v0.2.0 release shipped) + Q-2026-05-09-01 resolved (XML compatibility across Codex/Cursor)
+**Evidence base**: `.planning/notes/prompt-rewrite-research-2026-05-09.md` (research) + `.planning/notes/eval-iteration-1-findings-2026-05-09.md` (28 subagent runs)
+**Requirements**: TBD (соберутся в spec-phase)
+**Factor scope** (research + eval evidence):
+  - F1 XML-tagged sections (`<structure_triggers>`, `<diagram_syntax>`, `<examples>`, `<output_contract>`) — research
+  - F2 ~~drop negative conditions~~ **CANCELLED** — eval-13/15 prove negatives protect single-fact/prose-opt-out
+  - F3 expanded few-shot literals (3 per class) — research
+  - F4 decision-table `structure → visual` + **«ONE primary visual per response»** budget rule
+  - F5 CoT classify-first — research
+  - F7 XML intensity wrapper — parser migration
+  - F8 token-economy matrix (research-confirmed): dot-leader > frame; MD table > ASCII pipes; indent > box-tree
+  - F9 mutex visuals: SDLC patterns are alternatives — pick ONE, never stack (eval-07/08 evidence)
+  - F10 **NEW** suppress over-instrumentation: simple Q&A → prose, even when structure exists (eval-20 evidence)
+  - F11 **NEW** channel format: when baseline visualizes well, point to cheaper variant (eval-05/07/08)
+**Success Criteria** (what must be TRUE):
+  1. `rules/feynman-activate.md` использует XML-обёртку (F1); intensity-варианты — `<intensity name="...">`
+  2. Negative-condition section сохранена (F2 cancelled); опционально переформулирована позитивно — условия остаются
+  3. Decision-table `structure → visual` как primary trigger; включает «ONE primary visual» (F4 + F8 + F11)
+  4. Few-shot — 3 канонических на класс с литералами `├── └── ┌─┐` (F3)
+  5. CoT classify-first в `<output_contract>`: «(1) тип структуры? (2) baseline визуализирует это сам? (3) channel/amplify/suppress?»
+  6. SDLC patterns помечены mutex (F9): «выбери ОДИН, не стакай»
+  7. Suppress-rule (F10) явно покрывает definition/recommendation/question/greeting
+  8. `hooks/feynman-activate.js` парсит `<intensity name="...">`; миграционный коммит; `tests/hook.test.js` зелёные
+  9. README — compaction-survivor value-prop
+  10. iteration-2 A/B на 20-eval set: WIN-классы (sequence/branching) ≥ baseline compliance; HURT-классы (comparison/status/priority) → cheaper format AND ≤1 visual; negatives → NO regression
+  11. Token cost: `additionalContext` payload ≥20% меньше (~5.6KB → ≤4.5KB)
 **Plans**: TBD
 
 **UI hint**: no
