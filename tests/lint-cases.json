@@ -164,6 +164,45 @@
     "expected_issues": [{"rule": "L08"}]
   },
   {
+    "name": "L09 pass — single perfectly aligned frame",
+    "rule": "L09",
+    "expected": "pass",
+    "input": "```\n┌─ Status ─┐\n│  done    │\n│  wait    │\n└──────────┘\n```"
+  },
+  {
+    "name": "L09 pass — two stacked aligned frames in one diagram block",
+    "rule": "L09",
+    "expected": "pass",
+    "input": "```\n┌─ A ──────┐\n│  alpha   │\n│  bravo   │\n└──────────┘\n┌─ B ──────┐\n│  charlie │\n│  delta   │\n└──────────┘\n```"
+  },
+  {
+    "name": "L09 pass — frame with decorative gap line (no │) between aligned rows",
+    "rule": "L09",
+    "expected": "pass",
+    "input": "```\n┌─ Status ─┐\n│  done    │\n           \n│  wait    │\n└──────────┘\n```"
+  },
+  {
+    "name": "L09 fail — inner │ extends past anchor (PASS overflow defect)",
+    "rule": "L09",
+    "expected": "fail",
+    "input": "```\n┌─ Status ─┐\n│  done    │\n│  long row PASS │\n└──────────┘\n```",
+    "expected_issues": [{"rule": "L09"}]
+  },
+  {
+    "name": "L09 fail — inner │ falls short of anchor",
+    "rule": "L09",
+    "expected": "fail",
+    "input": "```\n┌─ Status ─┐\n│  ok│\n└──────────┘\n```",
+    "expected_issues": [{"rule": "L09"}]
+  },
+  {
+    "name": "L09 fail — bottom ┘ shifted past anchor",
+    "rule": "L09",
+    "expected": "fail",
+    "input": "```\n┌─ Status ─┐\n│  done    │\n└────────────┘\n```",
+    "expected_issues": [{"rule": "L09"}]
+  },
+  {
     "name": "No diagram — prose only, no issues",
     "rule": "none",
     "expected": "pass",

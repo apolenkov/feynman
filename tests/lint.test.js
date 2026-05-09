@@ -62,7 +62,7 @@ describe('Golden cases (lint-cases.json)', () => {
 // Rule coverage check: each L01-L08 exercised by ≥2 cases (1 pass + 1 fail)
 // ---------------------------------------------------------------------------
 describe('Rule coverage: each rule has ≥1 pass and ≥1 fail case', () => {
-  const ruleIds = ['L01', 'L02', 'L03', 'L04', 'L05', 'L06', 'L07', 'L08'];
+  const ruleIds = ['L01', 'L02', 'L03', 'L04', 'L05', 'L06', 'L07', 'L08', 'L09'];
 
   for (const ruleId of ruleIds) {
     it(`${ruleId} has at least one pass case`, () => {
