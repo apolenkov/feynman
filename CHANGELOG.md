@@ -2,6 +2,50 @@
 
 All notable changes to this project are documented here.
 
+## 0.3.0 - 2026-05-10
+
+Changes since v0.2.6.
+
+### Features
+
+- run iteration-2 3-way A/B harness — 60 answer.md files + findings
+- rewrite feynman-activate.md as XML three-faced contract (GREEN)
+- implement dual-format XML+HTML intensity extractor (GREEN)
+- add L09 right-edge alignment rule (detection-only); bump v0.2.7
+
+### Documentation
+
+- mark VERIFICATION passed — human-verify items approved during 08-04 checkpoint
+- complete iteration-2 plan — add SUMMARY.md
+- produce 08-VERIFICATION.md — all 14 SPEC criteria ✓ with evidence
+- complete plan — add SUMMARY.md (executor stalled, orchestrator rescue)
+- update CLAUDE.md rule-file format section to XML element form
+- complete hook XML intensity extractor plan
+- complete plan — add SUMMARY.md
+- explain compaction-survivor value-prop in README
+- capture phase context — implementation decisions for XML rewrite
+- SPEC + Q-2026-05-09-01 XML compat answer + runglish research
+- capture Phase 8 evidence base — research + 28-run eval iteration
+- pre-dispatch plan for L09 right-edge alignment lint rule
+
+### Tests
+
+- add failing rules-file integrity tests (RED)
+- add failing XML intensity extraction tests (RED)
+- add failing fixtures for L09 right-edge alignment
+
+### Maintenance
+
+- v0.3.0 — XML rule contract, token economy, suppression
+- merge executor worktree (worktree-agent-ad5a4e26a5943d96d)
+- merge executor worktree (worktree-agent-af28cf8b6f28457e1)
+- merge executor worktree (worktree-agent-a7bc6060fbee54b82)
+- merge quick task worktree (worktree-agent-a26deefae26181a12)
+
+### Other
+
+- 4 plans across 3 waves for XML rewrite phase
+
 ## 0.2.6 - 2026-05-08
 
 Changes since v0.2.5.
