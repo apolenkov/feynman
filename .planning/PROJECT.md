@@ -8,20 +8,26 @@ Tagline: "why explain in words when diagram do trick"
 
 ## Core Value
 
-Every response that has structure — flow, hierarchy, comparison, status — gets an ASCII diagram without the developer having to ask. v0.2.0 adds a diagram linter that validates ASCII output and feeds corrections back via Stop-hook.
+Every response that has structure — flow, hierarchy, comparison, status — gets an ASCII diagram without the developer having to ask. The plugin actively prefers the cheapest visual that still conveys the structure (smallest-visual-first), validates output via a Stop-hook linter, and autofixes misaligned frames before the user sees them.
 
-## Current Milestone: v0.2.0 Production-Ready
+## Shipped Milestones
 
-**Goal:** Polish v0.1 (Phase 1) into a stable, well-tested, well-documented open-source release. Quality bar high before any v1.0 talk. Add diagram linter as the main new feature. NPX install path. 100% test coverage. Full docs with domain-organized examples.
+| Milestone | Focus | Shipped | Archive |
+|-----------|-------|---------|---------|
+| v0.1 — Core | Hook + rules + plugin manifest | — | (in v0.1 history) |
+| v0.2.0 — Production-Ready | Linter L01-L08, NPX, CI, docs | 2026-05-07 | milestones/v0.2.0-ROADMAP.md |
+| v0.3.0 — Prompt Architecture | XML rule contract, autofix engine, L09/L10, Stop-hook autofix | 2026-05-10 | milestones/v0.3.0-ROADMAP.md |
+
+## Current Milestone: v0.4.0 Visual Economy
+
+**Goal:** Сделать feynman не просто инжектить диаграммы, а активно предпочитать самый дешёвый визуал, который ещё несёт структуру; замерить compliance gain от v0.3.0 XML-контракта; добрать IDE-coverage.
 
 **Target features:**
-- Cleanup of v0.1 dead files and caveman framing — standalone positioning
-- Diagram linter (parser + 8 lint rules + Stop hook + CLI)
-- 100% test coverage with GitHub Actions CI
-- NPX install path (`npx @albinocrabs/feynman install --target claude|codex|both`) + bash fallback
-- Full documentation: examples per domain, visual-patterns research, lint rules docs
-- Self-improvement loop design (research-only in this milestone)
-- v0.2.0 release tag + GitHub release
+- Smallest-visual-first lint rules (L11/L12/L13) — overdecoration, token-budget audit, double-wrap detection
+- Output-style presets `short / middle / full` — runtime control via additionalContext suffix; не раздувает rules-файл
+- Compliance measurement — A/B harness на 50 промтах: v0.2.x rules vs v0.3.x rules, pass/fail через feynman-lint
+- IDE compat polish — `.clinerules/` (Cline/Windsurf) и `.cursor/rules/*.mdc` (Cursor) до полного покрытия
+- v0.4.0 release tag + GitHub release
 
 ## Requirements
 
@@ -37,32 +43,52 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 - [x] MIT license + .claude-plugin/plugin.json manifest (DIST-04)
 - [x] Public on GitHub at apolenkov/feynman
 
-### Active (v0.2.0)
+### Validated (v0.2.0)
 
-- [x] Cleanup: remove caveman mentions, dead toml file, duplicate /feynman-stats, rename state.count
-- [x] Diagram linter: ASCII parser + 8 rules (L01-L08) + bin/feynman-lint CLI + Stop-hook integration
-- [x] 100% test coverage: hook + lint + install/uninstall via node:test
-- [x] GitHub Actions CI on Linux+macOS matrix, coverage badge
-- [x] NPX install path: npx @albinocrabs/feynman install / uninstall / doctor / lint
-- [x] Codex install path: npx @albinocrabs/feynman install --target codex writes ~/.codex/hooks.json and uses ~/.codex state
-- [x] bash install.sh refactored to call same Node logic (DRY)
-- [x] examples/ folder per domain (architecture, api-flow, db-schema, algorithm, deploy, code-review)
-- [x] docs/visual-patterns.md — visualization research adapted to ASCII
-- [x] docs/lint-rules.md — full L01-L08 documentation
-- [x] CONTRIBUTING.md improved + .github/ISSUE_TEMPLATE + PR template
-- [x] Self-improvement loop design spec (docs/self-improvement.md, no implementation)
-- [x] v0.2.0 git tag + GitHub release notes
-- [x] uninstall.sh for clean removal
+- [x] Cleanup: remove caveman mentions, dead toml file, duplicate /feynman-stats, rename state.count — v0.2.0
+- [x] Diagram linter: ASCII parser + 8 rules (L01-L08) + bin/feynman-lint CLI + Stop-hook integration — v0.2.0
+- [x] node:test coverage: hook + lint + install/uninstall — v0.2.0
+- [x] GitHub Actions CI on Linux+macOS matrix — v0.2.0
+- [x] NPX install path: npx @albinocrabs/feynman install / uninstall / doctor / lint — v0.2.0
+- [x] Codex install path: npx @albinocrabs/feynman install --target codex — v0.2.0
+- [x] bash install.sh refactored to call same Node logic (DRY) — v0.2.0
+- [x] examples/ folder per domain — v0.2.0
+- [x] docs/visual-patterns.md, docs/lint-rules.md (L01-L08) — v0.2.0
+- [x] CONTRIBUTING.md + .github/ISSUE_TEMPLATE + PR template — v0.2.0
+- [x] Self-improvement loop design spec (docs/self-improvement.md) — v0.2.0
+- [x] v0.2.0 git tag + GitHub release notes + uninstall.sh — v0.2.0
 
-### Future (v0.3.0+)
+### Validated (v0.3.0)
 
-- [ ] Empirical benchmark "diagram coverage with vs without feynman" (research-grade measurement)
+- [x] XML rule contract (`<intensity>`, `<triggers>`, `<contract>`, `<patterns>`) — v0.3.0
+- [x] Three-faced behavior: amplify / channel / suppress + classify-first CoT — v0.3.0
+- [x] Token economy: 4480-byte rules-file budget enforced — v0.3.0
+- [x] Hook dual-format extractor (XML + legacy HTML comments) — v0.3.0
+- [x] Compaction-survivor README section — v0.3.0
+- [x] L09 right-edge alignment lint rule — v0.2.7 hotfix + v0.3.3 visual-column hardening
+- [x] L10 mixed-script Cyrillic+Latin warn — v0.3.2
+- [x] L08 hardening (combining marks/ZWJ/CJK via lib/lint/width.js) — v0.3.3
+- [x] Autofix engine (`lib/lint/autofix.js`) — v0.3.2
+- [x] CLI `feynman-lint --fix` flag — v0.3.2
+- [x] Stop-hook autofix integration with `<feynman-autofix>` wrapper — v0.3.3
+- [x] Lint docs L01-L10 + README `--fix` mention — v0.3.3
+
+### Active (v0.4.0)
+
+- [ ] Smallest-visual-first lint rules: L11 (overdecoration), L12 (token-budget), L13 (double-wrap)
+- [ ] Output-style presets (`short / middle / full`) — runtime additionalContext suffix
+- [ ] Compliance measurement A/B harness — v0.2.x rules vs v0.3.x rules on 50-prompt corpus
+- [ ] IDE compat polish — `.clinerules/` (Cline/Windsurf) + `.cursor/rules/*.mdc` (Cursor) full coverage
+- [ ] v0.4.0 git tag + GitHub release + npm publish
+
+### Future (v0.5.0+)
+
 - [ ] Domain packs (arch / db / devops as separate rule sets)
 - [ ] feynman.config.yaml for team customization
 - [ ] Claude Code Marketplace submission
 - [ ] Codex marketplace submission once plugin-local hook behavior is fully documented
 - [ ] Self-improvement loop full implementation
-- [ ] IDE compatibility (.clinerules / .cursor / .windsurf) — deferred from v0.1
+- [ ] Windows install.ps1 (DIST-V3-01)
 
 ### Out of Scope
 
@@ -103,6 +129,12 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 | NPX as primary install path | Modern UX; bash fallback for npm-less users | v0.2.0 |
 | node:test (not jest/vitest) | Zero deps for testing, ships with Node >=18 | v0.2.0 |
 | Codex as first-class target | User asked for production-ready support in both Claude Code and Codex | v0.2.0 |
+| XML rule contract (replaces HTML comments) | F1+F2+F4+F7 evidence; ~58% size reduction; semantic clarity for hook parser | Validated v0.3.0 |
+| Three-faced behavior (amplify / channel / suppress) | Iteration-2 A/B: WIN=17 NEUTRAL=3 HURT=0 across 20 evals | Validated v0.3.0 |
+| `lib/lint/width.js` as single source of visual-width truth | Phase 8.5 — combining marks, ZWJ, ANSI, CJK widechar handled identically by L08, L09, autofix | Validated v0.3.0 |
+| Stop-hook autofix takes precedence over rule-feedback | When autofix can fix the frame, fix it silently rather than nag the model | Validated v0.3.0 |
+| Smallest-visual-first as v0.4.0 theme | User observed frame-for-≤5 wastes ~50% tokens vs dot-leader | v0.4.0 |
+| Output-style presets implemented as additionalContext suffix (not rules-file expansion) | Avoids rules-file budget impact; toggleable per session | v0.4.0 |
 
 ## Evolution
 
@@ -122,4 +154,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-06 — milestone v0.2.0 started*
+*Last updated: 2026-05-10 — milestone v0.4.0 started after v0.3.0 archive*

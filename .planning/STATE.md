@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.3.0
-milestone_name: Prompt Architecture
-status: archived
-stopped_at: v0.3.0 milestone archived; awaiting /gsd-new-milestone
-last_updated: "2026-05-10T19:25:00.000Z"
-last_activity: 2026-05-10 — Milestone v0.3.0 archived
+milestone: v0.4.0
+milestone_name: Visual Economy
+status: planning
+last_updated: "2026-05-10T19:25:54.812Z"
+last_activity: 2026-05-10
 progress:
-  total_phases: 10
-  completed_phases: 10
-  total_plans: 16
-  completed_plans: 16
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,15 +20,15 @@ progress:
 See: .planning/PROJECT.md
 See: .planning/MILESTONES.md (history of shipped milestones)
 
-**Core value:** Every response with structure gets an ASCII diagram without the developer asking. v0.3.x ships XML rule contract + three-faced behavior + autofix engine + Stop-hook autofix + L08/L09 visual-width awareness + L10 mixed-script warn.
-**Current focus:** Awaiting next milestone — run `/gsd-new-milestone` to start v0.4.x scoping.
+**Core value:** Every response with structure gets an ASCII diagram without the developer asking — and prefers the cheapest visual that fits.
+**Current focus:** v0.4.0 Visual Economy — smallest-visual-first lint rules (L11/L12/L13), output-style presets (short/middle/full), compliance A/B measurement, IDE compat polish.
 
 ## Current Position
 
-Phase: — (between milestones)
+Phase: Not started (defining requirements)
 Plan: —
-Status: archived; awaiting next milestone
-Last activity: 2026-05-10 — Milestone v0.3.0 archived (Phase 8 + Phase 8.5)
+Status: Defining requirements
+Last activity: 2026-05-10 — Milestone v0.4.0 started
 
 ## Shipped Milestones (recap)
 
