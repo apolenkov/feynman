@@ -74,11 +74,17 @@ process.stdin.on('end', () => {
       const validIntensities = ['lite', 'full', 'ultra'];
       const intensity = validIntensities.includes(state.intensity) ? state.intensity : 'full';
 
-      // XML matcher map: pre-compiled regexes, one per intensity (avoid RegExp constructor interpolation)
+      // Sanity: opening/closing intensity tags must balance, otherwise lazy quantifier
+      // can cross-block-contaminate (WR-02). Fail-safe exit 0.
+      const opens  = (rulesContent.match(/<intensity\b/gi) || []).length;
+      const closes = (rulesContent.match(/<\/intensity>/gi) || []).length;
+      if (opens === 0 || opens !== closes) process.exit(0);
+
+      // XML matcher map: tolerate trailing attributes (WR-01) and case (WR-03)
       const xmlMatchers = {
-        lite:  /<intensity\s+name\s*=\s*["']lite["']\s*>([\s\S]*?)<\/intensity>/,
-        full:  /<intensity\s+name\s*=\s*["']full["']\s*>([\s\S]*?)<\/intensity>/,
-        ultra: /<intensity\s+name\s*=\s*["']ultra["']\s*>([\s\S]*?)<\/intensity>/,
+        lite:  /<intensity\s+name\s*=\s*["']lite["'][^>]*>([\s\S]*?)<\/intensity>/i,
+        full:  /<intensity\s+name\s*=\s*["']full["'][^>]*>([\s\S]*?)<\/intensity>/i,
+        ultra: /<intensity\s+name\s*=\s*["']ultra["'][^>]*>([\s\S]*?)<\/intensity>/i,
       };
       const xmlMatch = xmlMatchers[intensity].exec(rulesContent);
       if (xmlMatch) {
