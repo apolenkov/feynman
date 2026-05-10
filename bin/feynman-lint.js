@@ -17,11 +17,13 @@ const USAGE = `Usage: feynman-lint <file.md>
        feynman-lint -          (read from stdin)
        feynman-lint --json <file>
        feynman-lint --strict <file>
+       feynman-lint --fix <file>
        feynman-lint --help
 
 Options:
   --json    Output issues as JSON object
   --strict  Treat warnings as errors (exit 1 on any issue)
+  --fix     Repair misaligned ASCII frames in-place; exit 0 on success
   --help    Show this help message
 
 Exit codes:
@@ -34,12 +36,14 @@ Exit codes:
 const argv = process.argv.slice(2);
 let useJson   = false;
 let useStrict = false;
+let useFix    = false;
 let filePath  = null;
 let useStdin  = false;
 
 for (const arg of argv) {
   if (arg === '--json')   { useJson   = true; continue; }
   if (arg === '--strict') { useStrict = true; continue; }
+  if (arg === '--fix')    { useFix    = true; continue; }
   if (arg === '--help')   { process.stdout.write(USAGE); process.exit(0); }
   if (arg === '-')        { useStdin  = true; continue; }
   if (arg.startsWith('-') && arg !== '-') {
@@ -56,6 +60,29 @@ for (const arg of argv) {
 if (!filePath && !useStdin) {
   process.stderr.write(USAGE);
   process.exit(2);
+}
+
+// --fix mode: read file, run autofix, write back. Stdin not supported (we'd
+// have nowhere to write the result without surprising downstream pipes).
+if (useFix) {
+  if (useStdin || !filePath) {
+    process.stderr.write('feynman-lint: --fix requires a file path (not stdin)\n');
+    process.exit(2);
+  }
+  const fs = require('node:fs');
+  const { autofix } = require('../lib/lint/autofix');
+  let before;
+  try {
+    before = fs.readFileSync(filePath, 'utf8');
+  } catch (e) {
+    process.stderr.write(`feynman-lint: cannot read ${filePath}: ${e.message}\n`);
+    process.exit(2);
+  }
+  const after = autofix(before);
+  if (after !== before) {
+    fs.writeFileSync(filePath, after);
+  }
+  process.exit(0);
 }
 
 function run(markdown, displayName) {
