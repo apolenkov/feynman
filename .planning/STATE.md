@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v0.3.0
 milestone_name: Prompt Architecture
-status: phase_partial
-stopped_at: v0.3.2 published; Phase 8.5 60% (autofix engine + L10 + CLI --fix landed; Stop-hook + L08 hardening + docs remain)
-last_updated: "2026-05-10T16:30:00.000Z"
-last_activity: 2026-05-10 -- v0.3.2 release (autofix engine + L10 mixed-script + CLI --fix flag)
+status: phase_complete
+stopped_at: v0.3.3 published; Phase 8.5 complete (width.js + Stop-hook autofix + L01-L10 docs)
+last_updated: "2026-05-10T18:30:00.000Z"
+last_activity: 2026-05-10 -- v0.3.3 release (lib/lint/width.js + Stop-hook autofix + L10 docs)
 progress:
   total_phases: 10
-  completed_phases: 9
-  in_progress_phases: 1
+  completed_phases: 10
+  in_progress_phases: 0
   total_plans: 16
-  completed_plans: 14
-  partial_plans: 1
-  percent: 88
+  completed_plans: 16
+  partial_plans: 0
+  percent: 100
 ---
 
 # Project State
@@ -22,15 +22,15 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-05-06)
 
-**Core value:** Every response with structure gets an ASCII diagram without the developer asking. v0.3.x ships XML rule contract + three-faced behavior + autofix engine for misaligned ASCII frames + L10 mixed-script warn.
-**Current focus:** Phase 8.5 60% complete; Stop-hook autofix integration + L08 hardening + docs remain (next fresh session)
+**Core value:** Every response with structure gets an ASCII diagram without the developer asking. v0.3.x ships XML rule contract + three-faced behavior + autofix engine + Stop-hook autofix + L10 mixed-script warn + L08/L09 visual-width awareness.
+**Current focus:** Phase 8.5 complete; milestone v0.3.0 ready for /gsd-complete-milestone archive.
 
 ## Current Position
 
-Phase: 08.5 (partial)
-Plan: 08-5-01, 08-5-02, 08-5-04 (partial) landed; 08-5-03 and 08-5-04 parts 2-3 pending
-Status: v0.3.2 published to npm; pending: Stop-hook autofix + L08 hardening + docs
-Last activity: 2026-05-10 — v0.3.2 released (autofix engine + L10 + CLI --fix)
+Phase: 08.5 (completed)
+Plan: 08-5-01, 08-5-02, 08-5-03, 08-5-04 all landed
+Status: v0.3.3 published to npm; milestone v0.3.0 closeable
+Last activity: 2026-05-10 — v0.3.3 released (width.js + Stop-hook autofix + docs)
 
 ## Performance Metrics
 
