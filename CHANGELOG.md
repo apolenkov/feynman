@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## 0.3.3 - 2026-05-10
+
+Changes since v0.3.2.
+
+### Features
+
+- wire autofix into Stop-hook with fallback to rule-feedback
+- extract lib/lint/width.js as single source — L08/L09 use visual width
+
+### Documentation
+
+- L10 entry + L09 visual-column note + README --fix mention
+- add short/middle/full output-style preset proposal
+- token-economical ASCII visuals + proposed L11/L12/L13
+- SUMMARY for 01/02/04(partial); STATE sync to v0.3.2
+
+### Tests
+
+- add L08/L09 fixtures for combining marks, ZWJ, CJK, Unicode markers (RED)
+
 ## 0.3.2 - 2026-05-10
 
 Changes since v0.3.1.
