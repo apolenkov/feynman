@@ -850,3 +850,103 @@ describe('feynman-activate hook', () => {
   });
 
 });
+
+// ─── Phase 10: Output-style presets (short / middle / full) ──────────────────
+
+describe('hook output_style suffix injection (Phase 10)', () => {
+  function seedState(tmpHome, state) {
+    const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+    fs.mkdirSync(feynmanDir, { recursive: true });
+    fs.writeFileSync(path.join(feynmanDir, 'state.json'), JSON.stringify(state, null, 2));
+    fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), state.intensity || 'full');
+  }
+
+  it('output_style=full → no suffix added (default behaviour)', () => {
+    const tmpHome = makeTempHome();
+    try {
+      seedState(tmpHome, { enabled: true, intensity: 'full', output_style: 'full', injections: 0 });
+      const result = runHook(tmpHome, { session_id: 's1', prompt: 'hi' });
+      assert.equal(result.status, 0);
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.doesNotMatch(ctx, /Output style:/, 'no suffix for output_style=full');
+    } finally {
+      rmrf(tmpHome);
+    }
+  });
+
+  it('output_style missing → no suffix (back-compat with v0.3.x state.json)', () => {
+    const tmpHome = makeTempHome();
+    try {
+      seedState(tmpHome, { enabled: true, intensity: 'full', injections: 0 });
+      const result = runHook(tmpHome, { session_id: 's1', prompt: 'hi' });
+      assert.equal(result.status, 0);
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.doesNotMatch(ctx, /Output style:/, 'missing output_style must default to full (no suffix)');
+    } finally {
+      rmrf(tmpHome);
+    }
+  });
+
+  it('output_style=short → short suffix appended', () => {
+    const tmpHome = makeTempHome();
+    try {
+      seedState(tmpHome, { enabled: true, intensity: 'full', output_style: 'short', injections: 0 });
+      const result = runHook(tmpHome, { session_id: 's1', prompt: 'hi' });
+      assert.equal(result.status, 0);
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.match(ctx, /Output style: short/, 'short suffix must appear');
+      assert.match(ctx, /no frames/i, 'short suffix must forbid frames');
+      assert.match(ctx, /dot-leader/i, 'short suffix must mention dot-leader');
+    } finally {
+      rmrf(tmpHome);
+    }
+  });
+
+  it('output_style=middle → middle suffix appended', () => {
+    const tmpHome = makeTempHome();
+    try {
+      seedState(tmpHome, { enabled: true, intensity: 'full', output_style: 'middle', injections: 0 });
+      const result = runHook(tmpHome, { session_id: 's1', prompt: 'hi' });
+      assert.equal(result.status, 0);
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.match(ctx, /Output style: middle/, 'middle suffix must appear');
+      assert.match(ctx, /≥6|>= ?6|6\+/, 'middle suffix must mention ≥6 threshold for frames');
+    } finally {
+      rmrf(tmpHome);
+    }
+  });
+
+  it('suffix appended AFTER rules text — rules content not corrupted', () => {
+    const tmpHome = makeTempHome();
+    try {
+      seedState(tmpHome, { enabled: true, intensity: 'full', output_style: 'short', injections: 0 });
+      const result = runHook(tmpHome, { session_id: 's1', prompt: 'hi' });
+      assert.equal(result.status, 0);
+      const ctx = parseAdditionalContext(result.stdout);
+      // The contract block lives in the rules file; suffix must come AFTER it.
+      const contractIdx = ctx.indexOf('<contract>');
+      const suffixIdx = ctx.indexOf('Output style:');
+      if (contractIdx >= 0) {
+        assert.ok(suffixIdx > contractIdx, 'suffix must come after rules content');
+      } else {
+        // Fallback: suffix exists.
+        assert.ok(suffixIdx > 0, 'suffix exists');
+      }
+    } finally {
+      rmrf(tmpHome);
+    }
+  });
+
+  it('invalid output_style value → treated as full (no suffix)', () => {
+    const tmpHome = makeTempHome();
+    try {
+      seedState(tmpHome, { enabled: true, intensity: 'full', output_style: 'garbage', injections: 0 });
+      const result = runHook(tmpHome, { session_id: 's1', prompt: 'hi' });
+      assert.equal(result.status, 0);
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.doesNotMatch(ctx, /Output style:/, 'invalid value must fall back to full (no suffix)');
+    } finally {
+      rmrf(tmpHome);
+    }
+  });
+});
