@@ -1,13 +1,25 @@
 # Lint Rules Reference
 
 feynman includes a linter for ASCII diagrams in markdown files.
-Ten rules (L01-L10) enforce structural correctness.
+Thirteen rules (L01-L13) enforce structural correctness and token economy.
+
+Rules L01-L09 enforce structural correctness (boxes close, trees end with `└──`,
+arrows are consistent, etc.). Rule L10 catches Cyrillic/Latin script mixing.
+Rules L11-L13 enforce token economy: don't use a frame for what a dot-leader
+can express; don't pad more than you fill; don't wrap a tree that already
+groups itself.
 
 Run: `npx @albinocrabs/feynman lint <file.md>` or `feynman lint <file.md>`
 
-Add `--fix` to repair misaligned frame borders in-place:
-`feynman lint --fix <file.md>` — see [L08](#l08-frame-width-discipline-severity-error)
-and [L09](#l09-right-edge-alignment-severity-error).
+Add `--fix` to repair misaligned frame borders OR convert L11-overdecorated
+frames to dot-leader:
+`feynman lint --fix <file.md>` — see [L08](#l08-frame-width-discipline-severity-error),
+[L09](#l09-right-edge-alignment-severity-error),
+and [L11](#l11-overdecoration-severity-warn).
+
+Add `--explain` to annotate each frame with a token-cost breakdown:
+`feynman lint --explain <file.md>` — emits per-frame
+`framing: ~N chars; dot-leader: ~M chars; saving: -K`.
 
 ---
 
@@ -420,3 +432,162 @@ skipped.
 
 This is the recommended way to document "bad" examples without causing
 lint failures in your documentation files.
+
+---
+
+## L11: Overdecoration (severity: warn)
+
+**What:** A frame block (`┌─...─┐ ... └─...─┘`) used to wrap ≤5 inner content
+lines. The frame's borders and padding waste tokens that a dot-leader list
+would not need.
+
+**Why:** The trigger-table prescribes dot-leader for ≤5 status items. A
+5-row frame at width 50 burns ~280 chars on borders + padding; the same
+data as a dot-leader list costs ~120. Compounded across many status replies
+per session, this is the largest single token-economy lever feynman has.
+
+**Whitelist:** frames containing nested trees (`├──` / `└──`) or embedded
+table columns (`│ key │ value │`) — those genuinely need the frame's
+grouping. L13 (double-wrap) handles the tree case separately.
+
+**Source:** [`lib/lint/rules.js#L11_overdecoration`](../lib/lint/rules.js)
+
+### Valid (same data as dot-leader)
+
+```
+alpha ............ ok
+beta  ............ wait
+gamma ............ wip
+delta ............ done
+epsilon .......... done
+```
+
+### Invalid (frame for ≤5 items)
+
+```text
+┌──────────────────┐
+│ alpha .... ok    │
+│ beta  .... wait  │
+│ gamma .... wip   │
+│ delta .... done  │
+│ epsilon .. done  │
+└──────────────────┘
+```
+
+Output:
+```text
+file:1:1: L11 warn frame used for 5 items; consider dot-leader list (saves ~150 chars)
+```
+
+Token-cost comparison:
+
+| form                  | ~chars | when uses              |
+|-----------------------|--------|------------------------|
+| inline pipe-separated | ~50    | context already set    |
+| dot-leader list       | ~120   | default for ≤5 items   |
+| frame block           | ~280   | ≥6 items, group needed |
+
+**Autofix:** `feynman lint --fix <file>` converts qualifying frames to
+dot-leader. Idempotent — running `--fix` twice produces zero further diff.
+Unicode markers (`✓ done`, `✗ fail`, `← готов`) and indentation are
+preserved. Non-pattern prose rows fall back to bullets (`- <content>`).
+
+---
+
+## L12: Token Budget (severity: warn)
+
+**What:** A frame whose padding chars exceed its content chars. Padding
+includes outer `│` chars and trailing spaces inside each row; content is
+the trimmed inner text.
+
+**Why:** When a frame is mostly air, the cost is mostly air. Either tighten
+the frame to fit content, drop to a lighter visual, or accept the
+token tax explicitly.
+
+**Source:** [`lib/lint/rules.js#L12_token_budget`](../lib/lint/rules.js)
+
+### Valid (content-dominated frame)
+
+```
+┌──────────────────────────────────┐
+│ deploy production rollout step a │
+│ deploy production rollout step b │
+│ deploy production rollout step c │
+└──────────────────────────────────┘
+```
+
+### Invalid (padding-dominated frame)
+
+```text
+┌────────────────────────────────────────┐
+│ ok                                     │
+│ no                                     │
+│ ok                                     │
+└────────────────────────────────────────┘
+```
+
+Output:
+```text
+file:1:1: L12 warn frame is padding-dominated (padding=120 > content=6); consider lighter visual
+```
+
+**`--explain` flag:** `feynman lint --explain <file>` emits a per-frame
+breakdown that quantifies the cost difference:
+
+```text
+file:1: explain: framing block: ~280 chars (border: 12, padding: 168, content: 100)
+file:1: explain: equivalent dot-leader: ~120 chars
+file:1: explain: saving: -160 chars
+```
+
+Cost data comes from `estimateFrameCost` in [`lib/lint/rules.js`](../lib/lint/rules.js)
+— the same source L12 uses for its threshold check.
+
+---
+
+## L13: Double Wrap (severity: warn)
+
+**What:** A tree (`├──` / `└──`) appearing inside a frame block. Tree
+indentation already conveys hierarchy — wrapping it adds zero information
+at full border cost.
+
+**Why:** A tree IS a visual structure. Wrapping it in a frame is
+double-encoding; the frame contributes nothing the indentation does not
+already deliver. Drop the frame, keep the tree.
+
+**Source:** [`lib/lint/rules.js#L13_double_wrap`](../lib/lint/rules.js)
+
+### Valid (bare tree, no frame)
+
+```
+project
+├── src
+│   ├── index.js
+│   └── utils.js
+└── package.json
+```
+
+### Invalid (tree wrapped in frame)
+
+```text
+┌──────────────────┐
+│ project          │
+│ ├── src          │
+│ │   ├── index.js │
+│ │   └── utils.js │
+│ └── package.json │
+└──────────────────┘
+```
+
+Output:
+```text
+file:1:1: L13 warn tree inside frame block — the tree already conveys hierarchy; drop the frame
+```
+
+**Complementary to L11:** L11 (overdecoration) whitelists tree-in-frame
+because nested trees can sometimes justify the wrap. L13 takes the
+opposite stance: even with grouping, the cost-benefit is negative. Both
+rules fire on the same tree-in-frame input, but communicate different
+fixes — L11 silent (whitelisted), L13 fires. A unit test
+(`L11 and L13 are complementary on tree-in-frame`) pins the contract.
+
