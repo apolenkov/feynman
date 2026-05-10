@@ -8,9 +8,10 @@
 | branching     | ASCII tree      |
 | comparison    | markdown table  |
 | status ≤5     | dot-leader list |
+| status ≥6     | frame block     |
 | priority      | ▲▼ scale        |
 | state-machine | states+arrows   |
-Comparison: markdown table (not ASCII pipes). Frames only for status ≥6 short-value rows.
+Comparison: markdown table (not ASCII pipes).
 </triggers>
 <syntax>
 `[A] → [B] → [C]`
@@ -108,9 +109,8 @@ One primary visual per response. SDLC patterns are mutex — use at most one per
 <contract>
 1. Classify shape: sequence, hierarchy, comparison, status, priority, branching,
    state-machine, mapping, or none.
-2. Channel / amplify / suppress per trigger table.
-3. Suppress: definition queries, recommendation queries, greeting, conversational
-   question-back — answer stays in prose, no visual added.
-The only response with no diagram is pure prose with no enumerable items, no steps, no comparisons, no structure.
+2. Suppression outranks triggers — apply triggers only after suppression check passes.
+3. Suppress: definition, recommendation, greeting, conversational question-back — prose only.
+4. Channel / amplify per trigger table for everything else.
 </contract>
 </intensity>
