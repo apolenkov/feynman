@@ -377,6 +377,53 @@ describe('L08 frame width — unit tests', () => {
 });
 
 // ---------------------------------------------------------------------------
+// L11 overdecoration — unit tests
+// ---------------------------------------------------------------------------
+describe('L11 overdecoration — unit tests', () => {
+  it('frame with 5 inner lines flagged as warn', () => {
+    const md = '```\n┌─────────┐\n│ a ... 1 │\n│ b ... 2 │\n│ c ... 3 │\n│ d ... 4 │\n│ e ... 5 │\n└─────────┘\n```';
+    const result = lint(md);
+    const l11 = result.issues.filter(i => i.rule === 'L11');
+    assert.ok(l11.length >= 1, 'should detect overdecoration');
+    assert.equal(l11[0].severity, 'warn');
+    assert.match(l11[0].message, /5 items/);
+    assert.match(l11[0].message, /saves ~\d+ chars/);
+  });
+
+  it('frame with 6 inner lines NOT flagged (boundary)', () => {
+    const md = '```\n┌─────────┐\n│ a ... 1 │\n│ b ... 2 │\n│ c ... 3 │\n│ d ... 4 │\n│ e ... 5 │\n│ f ... 6 │\n└─────────┘\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L11').length, 0);
+  });
+
+  it('frame containing tree NOT flagged (whitelist) — L11 only', () => {
+    const md = '```\n┌──────────────┐\n│ root         │\n│ ├── child    │\n│ └── leaf     │\n└──────────────┘\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L11').length, 0);
+  });
+
+  it('frame containing embedded table column NOT flagged (whitelist)', () => {
+    const md = '```\n┌────────────────────────┐\n│ phase │ owner  │ state │\n│ alpha │ tom    │ done  │\n│ beta  │ jules  │ wip   │\n└────────────────────────┘\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L11').length, 0);
+  });
+
+  it('frame with 1 inner line is overdecoration (lower bound)', () => {
+    const md = '```\n┌──────────┐\n│ alone ok │\n└──────────┘\n```';
+    const result = lint(md);
+    const l11 = result.issues.filter(i => i.rule === 'L11');
+    assert.equal(l11.length, 1);
+    assert.match(l11[0].message, /1 items/);
+  });
+
+  it('no frame, no L11 fire', () => {
+    const md = 'just prose\nwith no diagrams';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L11').length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Parser: standalone block detection (lines 195-220 in parser.js)
 // ---------------------------------------------------------------------------
 describe('Parser: standalone diagram detection', () => {
