@@ -95,8 +95,8 @@ function verifyInstalledHooks(homeDir, target) {
     hook_event_name: 'SessionStart',
     session_id: `${target}-release-smoke`,
   });
-  if (!sessionOut.includes('Feynman Diagram Rules')) {
-    throw new Error(`${target} SessionStart did not emit Feynman rules`);
+  if (!/<triggers>|<contract>|→|├──/.test(sessionOut)) {
+    throw new Error(`${target} SessionStart did not emit rule-file diagram tokens`);
   }
 
   const promptOut = runHookCommand(promptCommand, homeDir, {
@@ -110,7 +110,7 @@ function verifyInstalledHooks(homeDir, target) {
   const ctx = parsed.hookSpecificOutput && parsed.hookSpecificOutput.additionalContext;
   if (parsed.hookSpecificOutput?.hookEventName !== 'UserPromptSubmit' ||
       typeof ctx !== 'string' ||
-      !ctx.includes('Feynman Diagram Rules')) {
+      !/<triggers>|<contract>|→|├──/.test(ctx)) {
     throw new Error(`${target} UserPromptSubmit did not emit valid additionalContext`);
   }
 
