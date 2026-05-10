@@ -301,44 +301,54 @@ describe('autofixFrameToDotLeader — L11 conversion', () => {
     assert.ok(lines[1].startsWith('    '), 'indentation preserved on row 2');
   });
 
-  it('idempotency: autofix(autofix(x), {processFenced:true}) is no-op on second pass', () => {
+  it('idempotency: autofix(autofix(x), CLI opts) is no-op on second pass', () => {
     const input = '┌────────────┐\n│ a ... ok   │\n│ b ... wait │\n└────────────┘';
-    const once = autofixWithOpts(input);
-    const twice = autofixWithOpts(once);
+    const opts = { processFenced: true, convertL11: true };
+    const once = autofixWithOpts(input, opts);
+    const twice = autofixWithOpts(once, opts);
     assert.equal(twice, once, 'second pass must be no-op');
   });
 
   it('frame with ≥6 inner lines NOT converted (still autofixFrame alignment-only)', () => {
     const input = '┌──────────┐\n│ a       │\n│ b       │\n│ c       │\n│ d       │\n│ e       │\n│ f       │\n└──────────┘';
-    const out = autofixWithOpts(input);
+    const out = autofixWithOpts(input, { processFenced: true, convertL11: true });
     assert.ok(out.includes('┌'), 'frame top corner preserved');
     assert.ok(out.includes('└'), 'frame bottom corner preserved');
   });
 
   it('frame containing tree NOT converted (whitelist fall-through)', () => {
     const input = '┌──────────────┐\n│ root         │\n│ ├── child    │\n│ ├── leaf     │\n└──────────────┘';
-    const out = autofixWithOpts(input);
+    const out = autofixWithOpts(input, { processFenced: true, convertL11: true });
     assert.ok(out.includes('┌'), 'tree-frame top corner preserved');
     assert.ok(out.includes('├──'), 'tree chars preserved');
   });
 
   it('frame containing embedded table column NOT converted', () => {
     const input = '┌────────────────────────┐\n│ phase │ owner  │ state │\n│ alpha │ tom    │ done  │\n│ beta  │ jules  │ wip   │\n└────────────────────────┘';
-    const out = autofixWithOpts(input);
+    const out = autofixWithOpts(input, { processFenced: true, convertL11: true });
     assert.ok(out.includes('┌'), 'table-frame preserved');
   });
 
-  it('default autofix() WITHOUT opts.processFenced still skips fenced content (Phase 8.5 contract)', () => {
+  it('default autofix() WITHOUT opts still skips fenced content (Phase 8.5 contract)', () => {
     const fenced = '```\n┌────────────┐\n│ a ... ok   │\n│ b ... wait │\n└────────────┘\n```';
     const out = autofix(fenced);
     assert.equal(out, fenced, 'default autofix must NOT touch fenced content');
   });
 
-  it('autofix({processFenced:true}) processes fenced content (CLI --fix path)', () => {
+  it('default autofix() does NOT convert L11 frames (Phase 8.5 alignment-only)', () => {
+    // Frame OUTSIDE fences, ≤5 lines. Default autofix must align, not convert.
+    const input = '┌──────┐\n│ a ok │\n│ b wait │\n└──────┘';
+    const out = autofix(input);
+    assert.ok(out.includes('┌'), 'frame must be preserved without convertL11 opt');
+  });
+
+  it('CLI opts (processFenced + convertL11) processes fenced content AND converts L11', () => {
     const fenced = '```\n┌────────────┐\n│ a ... ok   │\n│ b ... wait │\n└────────────┘\n```';
-    const out = autofixWithOpts(fenced, { processFenced: true });
-    assert.notEqual(out, fenced, 'processFenced=true must transform fenced frame');
-    assert.doesNotMatch(out, /[┌┐└┘]/, 'frame corners removed');
+    const out = autofixWithOpts(fenced, { processFenced: true, convertL11: true });
+    assert.notEqual(out, fenced, 'CLI opts must transform fenced frame');
+    // Frame chars in the body must be gone (fence lines ``` remain).
+    const body = out.split('\n').filter(l => !/^\s*```/.test(l)).join('\n');
+    assert.doesNotMatch(body, /[┌┐└┘]/, 'frame corners removed from body');
   });
 });
 
@@ -357,8 +367,8 @@ describe('autofix end-to-end via lint-cases.json fixtures (shape-based)', () => 
 
   for (const fx of fixtures) {
     it(`autofix shape matches: ${fx.name}`, () => {
-      // CLI-context autofix: process fenced content.
-      const out = autofixE2E(fx.input, { processFenced: true });
+      // CLI-context autofix: process fenced + convert L11.
+      const out = autofixE2E(fx.input, { processFenced: true, convertL11: true });
       const shape = fx.expected_after_autofix_shape;
 
       if (shape.no_frame_chars) {
@@ -403,8 +413,9 @@ describe('autofix end-to-end via lint-cases.json fixtures (shape-based)', () => 
     });
 
     it(`autofix is idempotent: ${fx.name}`, () => {
-      const once = autofixE2E(fx.input, { processFenced: true });
-      const twice = autofixE2E(once, { processFenced: true });
+      const opts = { processFenced: true, convertL11: true };
+      const once = autofixE2E(fx.input, opts);
+      const twice = autofixE2E(once, opts);
       assert.equal(twice, once, `second pass must be no-op for "${fx.name}"`);
     });
   }
