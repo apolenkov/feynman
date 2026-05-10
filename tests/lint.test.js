@@ -467,6 +467,41 @@ describe('L12 token-budget — unit tests', () => {
 });
 
 // ---------------------------------------------------------------------------
+// L13 double-wrap — unit tests
+// ---------------------------------------------------------------------------
+describe('L13 double-wrap — unit tests', () => {
+  it('tree inside frame flagged', () => {
+    const md = '```\n┌──────────┐\n│ root     │\n│ ├── a    │\n│ └── b    │\n└──────────┘\n```';
+    const result = lint(md);
+    const l13 = result.issues.filter(i => i.rule === 'L13');
+    assert.ok(l13.length >= 1);
+    assert.equal(l13[0].severity, 'warn');
+  });
+
+  it('bare tree (no frame) NOT flagged', () => {
+    const md = '```\nroot\n├── a\n└── b\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L13').length, 0);
+  });
+
+  it('frame without tree NOT flagged', () => {
+    const md = '```\n┌─────────┐\n│ a       │\n│ b       │\n│ c       │\n│ d       │\n│ e       │\n│ f       │\n└─────────┘\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L13').length, 0);
+  });
+
+  it('L11 and L13 are complementary on tree-in-frame: L11 silent, L13 fires', () => {
+    // Tree inside frame: L11 whitelists (so does not fire), L13 detects.
+    const md = '```\n┌──────────┐\n│ root     │\n│ ├── a    │\n│ └── b    │\n└──────────┘\n```';
+    const result = lint(md);
+    const l11 = result.issues.filter(i => i.rule === 'L11');
+    const l13 = result.issues.filter(i => i.rule === 'L13');
+    assert.equal(l11.length, 0, 'L11 must whitelist tree-in-frame');
+    assert.ok(l13.length >= 1, 'L13 must detect tree-in-frame');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Parser: standalone block detection (lines 195-220 in parser.js)
 // ---------------------------------------------------------------------------
 describe('Parser: standalone diagram detection', () => {
