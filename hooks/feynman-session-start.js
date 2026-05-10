@@ -25,6 +25,17 @@ function writeState(state) {
 function readRules(intensity) {
   const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
   const selected = VALID_INTENSITIES.includes(intensity) ? intensity : 'full';
+
+  // XML format: <intensity name="...">...</intensity> (Plan 08-02 canonical form)
+  const xmlMatchers = {
+    lite:  /<intensity\s+name\s*=\s*["']lite["']\s*>([\s\S]*?)<\/intensity>/,
+    full:  /<intensity\s+name\s*=\s*["']full["']\s*>([\s\S]*?)<\/intensity>/,
+    ultra: /<intensity\s+name\s*=\s*["']ultra["']\s*>([\s\S]*?)<\/intensity>/,
+  };
+  const xmlMatch = xmlMatchers[selected].exec(rulesContent);
+  if (xmlMatch) return xmlMatch[1].trim();
+
+  // Legacy HTML-comment fallback
   const openMarker  = '<!-- ' + selected + ' -->';
   const closeMarker = '<!-- /' + selected + ' -->';
   const i1 = rulesContent.indexOf(openMarker);
