@@ -18,13 +18,15 @@ const USAGE = `Usage: feynman-lint <file.md>
        feynman-lint --json <file>
        feynman-lint --strict <file>
        feynman-lint --fix <file>
+       feynman-lint --explain <file>
        feynman-lint --help
 
 Options:
-  --json    Output issues as JSON object
-  --strict  Treat warnings as errors (exit 1 on any issue)
-  --fix     Repair misaligned ASCII frames in-place; exit 0 on success
-  --help    Show this help message
+  --json     Output issues as JSON object
+  --strict   Treat warnings as errors (exit 1 on any issue)
+  --fix      Repair misaligned ASCII frames in-place; exit 0 on success
+  --explain  Annotate each frame with token-cost breakdown (read-only)
+  --help     Show this help message
 
 Exit codes:
   0   No errors (or no issues in default mode)
@@ -34,18 +36,20 @@ Exit codes:
 
 // Parse arguments
 const argv = process.argv.slice(2);
-let useJson   = false;
-let useStrict = false;
-let useFix    = false;
-let filePath  = null;
-let useStdin  = false;
+let useJson    = false;
+let useStrict  = false;
+let useFix     = false;
+let useExplain = false;
+let filePath   = null;
+let useStdin   = false;
 
 for (const arg of argv) {
-  if (arg === '--json')   { useJson   = true; continue; }
-  if (arg === '--strict') { useStrict = true; continue; }
-  if (arg === '--fix')    { useFix    = true; continue; }
-  if (arg === '--help')   { process.stdout.write(USAGE); process.exit(0); }
-  if (arg === '-')        { useStdin  = true; continue; }
+  if (arg === '--json')    { useJson    = true; continue; }
+  if (arg === '--strict')  { useStrict  = true; continue; }
+  if (arg === '--fix')     { useFix     = true; continue; }
+  if (arg === '--explain') { useExplain = true; continue; }
+  if (arg === '--help')    { process.stdout.write(USAGE); process.exit(0); }
+  if (arg === '-')         { useStdin   = true; continue; }
   if (arg.startsWith('-') && arg !== '-') {
     process.stderr.write(`feynman-lint: unknown flag '${arg}'\n${USAGE}`);
     process.exit(2);
@@ -85,9 +89,49 @@ if (useFix) {
   process.exit(0);
 }
 
+/**
+ * Walk markdown text, locate frame blocks, return cost-annotated entries.
+ * Uses the canonical /^\s*│.*│\s*$/ inner-line match + continue pattern
+ * shared with lib/lint/rules.js (L11/L12/L13) and lib/lint/autofix.js.
+ * Does NOT break early on stray non-frame lines.
+ * @param {string} text
+ * @returns {{line:number, cost:object}[]}
+ */
+function explainFrames(text) {
+  const { estimateFrameCost } = require('../lib/lint/rules');
+  if (!text || text.indexOf('┌') === -1) return [];
+  const lines = text.split('\n');
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const topMatch = line.match(/^(\s*)┌─+┐\s*$/);
+    if (!topMatch) { i++; continue; }
+    const indent = topMatch[1];
+    let closeIdx = -1;
+    const inner = [];
+    for (let j = i + 1; j < lines.length; j++) {
+      const next = lines[j];
+      const botMatch = next.match(/^(\s*)└─+┘\s*$/);
+      if (botMatch && botMatch[1] === indent) { closeIdx = j; break; }
+      if (/^\s*│.*│\s*$/.test(next)) inner.push(next);
+    }
+    if (closeIdx === -1) { i++; continue; }
+    const cost = estimateFrameCost({
+      top: line,
+      inner,
+      bottom: lines[closeIdx],
+    });
+    out.push({ line: i + 1, cost });
+    i = closeIdx + 1;
+  }
+  return out;
+}
+
 function run(markdown, displayName) {
   const result = lint(markdown);
   const { issues } = result;
+  const explain = useExplain ? explainFrames(markdown) : null;
 
   if (useJson) {
     const out = {
@@ -95,6 +139,7 @@ function run(markdown, displayName) {
       passed: useStrict ? issues.length === 0 : result.passed,
       issues,
     };
+    if (explain) out.explain = explain;
     process.stdout.write(JSON.stringify(out, null, 2) + '\n');
     const failed = useStrict ? issues.length > 0 : !result.passed;
     process.exit(failed ? 1 : 0);
@@ -103,6 +148,15 @@ function run(markdown, displayName) {
   // gcc mode
   const isTTY = process.stdout.isTTY;
   const output = format(issues, 'gcc', displayName, isTTY);
+
+  if (explain && explain.length > 0) {
+    const explainLines = explain.map(e =>
+      `${displayName}:${e.line}: explain: framing block: ~${e.cost.framing_chars} chars (border: ${e.cost.border_chars}, padding: ${e.cost.padding_chars}, content: ${e.cost.content_chars})\n` +
+      `${displayName}:${e.line}: explain: equivalent dot-leader: ~${e.cost.dotleader_equivalent} chars\n` +
+      `${displayName}:${e.line}: explain: saving: -${e.cost.saving} chars`
+    );
+    process.stdout.write(explainLines.join('\n') + '\n');
+  }
 
   if (output) {
     process.stdout.write(output + '\n');
