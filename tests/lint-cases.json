@@ -203,6 +203,44 @@
     "expected_issues": [{"rule": "L09"}]
   },
   {
+    "name": "L10 fail — within-word Cyrillic+Latin mix (zaфикшено)",
+    "rule": "L10",
+    "expected": "fail",
+    "input": "повторить zaфикшено",
+    "expected_issues": [{"rule": "L10", "line": 1}]
+  },
+  {
+    "name": "L10 pass — kebab-case identifier whitelisted",
+    "rule": "L10",
+    "expected": "pass",
+    "input": "проверь gsd-sdk пакет"
+  },
+  {
+    "name": "L10 pass — package name token whitelisted",
+    "rule": "L10",
+    "expected": "pass",
+    "input": "использует feynman-lint"
+  },
+  {
+    "name": "L10 pass — numeric-suffixed kebab token",
+    "rule": "L10",
+    "expected": "pass",
+    "input": "скрипт quick-260509-hvy"
+  },
+  {
+    "name": "L10 pass — hyphenated worktree branch token",
+    "rule": "L10",
+    "expected": "pass",
+    "input": "worktree-agent-abc123"
+  },
+  {
+    "name": "L10 fail — Latin chars at the start of Cyrillic word",
+    "rule": "L10",
+    "expected": "fail",
+    "input": "тест Cyrвнутри слова",
+    "expected_issues": [{"rule": "L10", "line": 1}]
+  },
+  {
     "name": "No diagram — prose only, no issues",
     "rule": "none",
     "expected": "pass",
