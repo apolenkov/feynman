@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here.
 
+## 0.3.1 - 2026-05-10
+
+Changes since v0.3.0.
+
+### Fixes
+
+- close 6 WARNING from advisory code review (v0.3.1)
+
+### Documentation
+
+- sync ROADMAP+STATE after v0.3.0 release
+- add 0.3.0 entry — 25 commits since v0.2.6
+
 ## 0.3.0 - 2026-05-10
 
 Changes since v0.2.6.
