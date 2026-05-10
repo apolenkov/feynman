@@ -21,6 +21,12 @@ State commands (work on local install, no repo writes):
   - `lite` — enable at lite intensity (flows + trees only)
   - `full` — enable at full intensity (all diagram types)
   - `ultra` — enable at ultra intensity (force diagram always)
+  - `style short|middle|full` — set output_style preset (orthogonal to
+    intensity). `short` = inline glyphs + dot-leader only; `middle` =
+    frames only for ≥6 items, prefer trees + markdown tables; `full` =
+    default (all visuals allowed). The hook reads this and appends a
+    one-line suffix to additionalContext when style ≠ full; no rules-file
+    bytes are added.
   - no argument or `status` — show current state, no changes
 
 Maintenance commands (work on the repo, expect to be invoked from project root):
@@ -53,9 +59,10 @@ function clientHome() {
 const root = clientHome();
 const stateFile = path.join(root, '.feynman', 'state.json');
 const flagFile  = path.join(root, '.feynman-active');
-let st = {enabled: true, intensity: 'full', injections: 0};
+let st = {enabled: true, intensity: 'full', output_style: 'full', injections: 0};
 try { st = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch(e) {}
-console.log('target:', path.basename(root), '| enabled:', st.enabled, '| intensity:', st.intensity, '| injections:', (st.injections ?? st.count ?? 0), '| flag:', fs.existsSync(flagFile));
+const styleDisplay = st.output_style || 'full';
+console.log('target:', path.basename(root), '| enabled:', st.enabled, '| intensity:', st.intensity, '| output_style:', styleDisplay, '| injections:', (st.injections ?? st.count ?? 0), '| flag:', fs.existsSync(flagFile));
 "
 ```
 
@@ -78,12 +85,17 @@ const stateFile = path.join(root, '.feynman', 'state.json');
 const flagFile  = path.join(root, '.feynman-active');
 const arg = (process.argv[1] || '').trim().toLowerCase();
 const normalized = arg === 'start' ? 'on' : arg === 'stop' ? 'off' : arg;
-let st = {enabled: false, intensity: 'full', injections: 0};
+let st = {enabled: false, intensity: 'full', output_style: 'full', injections: 0};
 try { st = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch(e) {}
+// Back-compat: pre-Phase-10 state.json files lack output_style.
+if (!st.output_style) st.output_style = 'full';
 function writeFlag(value) { fs.mkdirSync(root, {recursive: true}); fs.writeFileSync(flagFile, value || 'full'); }
 if (normalized === 'on')  { st.enabled = true;  writeFlag(st.intensity); }
 if (normalized === 'off') { st.enabled = false; try { fs.unlinkSync(flagFile); } catch(e) {} }
 if (['lite','full','ultra'].includes(normalized)) { st.intensity = normalized; st.enabled = true; writeFlag(normalized); }
+// Phase 10 STYLE-02: 'style <preset>' subcommand.
+const styleMatch = normalized.match(/^style\s+(short|middle|full)$/);
+if (styleMatch) { st.output_style = styleMatch[1]; }
 fs.mkdirSync(path.dirname(stateFile), {recursive: true});
 fs.writeFileSync(stateFile, JSON.stringify(st, null, 2));
 console.log(JSON.stringify({target: path.basename(root), ...st}));
@@ -93,12 +105,17 @@ console.log(JSON.stringify({target: path.basename(root), ...st}));
 3. Report result:
 
 ```
-┌─ feynman ───────────────────────────┐
-  status     on / off
-  intensity  lite / full / ultra
-  injections N total
-└────────────────────────────────────┘
+target       claude / codex
+status       on / off
+intensity    lite / full / ultra      (controls rules-file size)
+output_style short / middle / full    (controls visual verbosity, orthogonal)
+injections   N total
 ```
+
+Two axes — `intensity` controls how much instruction the model sees;
+`output_style` controls how heavy the model's visuals can be. Pick
+`full + middle` for the proposed sane default; `lite + short` for
+mobile / dense chat.
 
 ## Maintenance dispatcher
 
