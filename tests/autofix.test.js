@@ -205,3 +205,236 @@ describe('autofix(text) — full document rewriting', () => {
     assert.equal(out, text);
   });
 });
+
+// ---------------------------------------------------------------------------
+// autofixFrameToDotLeader — L11 conversion (Plan 09-04 / LINT-14)
+// ---------------------------------------------------------------------------
+describe('autofixFrameToDotLeader — L11 conversion', () => {
+  const { autofixFrameToDotLeader, autofix: autofixWithOpts } =
+    require(path.resolve(__dirname, '..', 'lib', 'lint', 'autofix'));
+
+  it('exports autofixFrameToDotLeader', () => {
+    assert.equal(typeof autofixFrameToDotLeader, 'function');
+  });
+
+  it('5-row frame with label/state pattern converts to dot-leader (shape check)', () => {
+    const node = {
+      kind: 'frame',
+      top: '┌──────────────┐',
+      inner: [
+        '│ a ........ ok    │',
+        '│ b ........ wait  │',
+        '│ c ........ wip   │',
+        '│ d ........ done  │',
+        '│ e ........ done  │',
+      ],
+      bottom: '└──────────────┘',
+      indent: '',
+    };
+    const out = autofixFrameToDotLeader(node);
+    const lines = out.split('\n');
+    assert.equal(lines.length, 5, '5 output rows');
+    for (const ln of lines) {
+      // No frame chars
+      assert.doesNotMatch(ln, /[│┌┐└┘]/, `row "${ln}" must have no frame chars`);
+      // Dot-leader shape: label + spaces + dots(>=3) + spaces + state
+      assert.match(ln, / \.{3,} /, `row "${ln}" must be dot-leader`);
+    }
+    // Column alignment: every row has same dot-count
+    const dotCounts = lines.map(ln => (ln.match(/\.+/) || [''])[0].length);
+    assert.equal(new Set(dotCounts).size, 1, `dot-counts must be equal: ${dotCounts.join(',')}`);
+    // Content preserved
+    assert.ok(out.includes('ok'));
+    assert.ok(out.includes('wait'));
+    assert.ok(out.includes('done'));
+  });
+
+  it('preserves Unicode markers (✓, ✗, ←)', () => {
+    const node = {
+      kind: 'frame',
+      top: '┌──────────────────┐',
+      inner: [
+        '│ a ........ ✓ done  │',
+        '│ b ........ ✗ fail  │',
+        '│ c ........ ← готов │',
+      ],
+      bottom: '└──────────────────┘',
+      indent: '',
+    };
+    const out = autofixFrameToDotLeader(node);
+    assert.ok(out.includes('✓ done'), `expected '✓ done' in: ${out}`);
+    assert.ok(out.includes('✗ fail'), `expected '✗ fail' in: ${out}`);
+    assert.ok(out.includes('← готов'), `expected '← готов' in: ${out}`);
+  });
+
+  it('non-pattern prose emits bullets', () => {
+    const node = {
+      kind: 'frame',
+      top: '┌──────────────────┐',
+      inner: [
+        '│ free-form note   │',
+        '│ another sentence │',
+      ],
+      bottom: '└──────────────────┘',
+      indent: '',
+    };
+    const out = autofixFrameToDotLeader(node);
+    const lines = out.split('\n');
+    assert.match(lines[0], /^\s*-\s+/);
+    assert.match(lines[1], /^\s*-\s+/);
+  });
+
+  it('preserves indentation', () => {
+    const node = {
+      kind: 'frame',
+      top: '    ┌──────────┐',
+      inner: [
+        '    │ a ... ok   │',
+        '    │ b ... wait │',
+      ],
+      bottom: '    └──────────┘',
+      indent: '    ',
+    };
+    const out = autofixFrameToDotLeader(node);
+    const lines = out.split('\n');
+    assert.ok(lines[0].startsWith('    '), 'indentation preserved on row 1');
+    assert.ok(lines[1].startsWith('    '), 'indentation preserved on row 2');
+  });
+
+  it('idempotency: autofix(autofix(x), {processFenced:true}) is no-op on second pass', () => {
+    const input = '┌────────────┐\n│ a ... ok   │\n│ b ... wait │\n└────────────┘';
+    const once = autofixWithOpts(input);
+    const twice = autofixWithOpts(once);
+    assert.equal(twice, once, 'second pass must be no-op');
+  });
+
+  it('frame with ≥6 inner lines NOT converted (still autofixFrame alignment-only)', () => {
+    const input = '┌──────────┐\n│ a       │\n│ b       │\n│ c       │\n│ d       │\n│ e       │\n│ f       │\n└──────────┘';
+    const out = autofixWithOpts(input);
+    assert.ok(out.includes('┌'), 'frame top corner preserved');
+    assert.ok(out.includes('└'), 'frame bottom corner preserved');
+  });
+
+  it('frame containing tree NOT converted (whitelist fall-through)', () => {
+    const input = '┌──────────────┐\n│ root         │\n│ ├── child    │\n│ ├── leaf     │\n└──────────────┘';
+    const out = autofixWithOpts(input);
+    assert.ok(out.includes('┌'), 'tree-frame top corner preserved');
+    assert.ok(out.includes('├──'), 'tree chars preserved');
+  });
+
+  it('frame containing embedded table column NOT converted', () => {
+    const input = '┌────────────────────────┐\n│ phase │ owner  │ state │\n│ alpha │ tom    │ done  │\n│ beta  │ jules  │ wip   │\n└────────────────────────┘';
+    const out = autofixWithOpts(input);
+    assert.ok(out.includes('┌'), 'table-frame preserved');
+  });
+
+  it('default autofix() WITHOUT opts.processFenced still skips fenced content (Phase 8.5 contract)', () => {
+    const fenced = '```\n┌────────────┐\n│ a ... ok   │\n│ b ... wait │\n└────────────┘\n```';
+    const out = autofix(fenced);
+    assert.equal(out, fenced, 'default autofix must NOT touch fenced content');
+  });
+
+  it('autofix({processFenced:true}) processes fenced content (CLI --fix path)', () => {
+    const fenced = '```\n┌────────────┐\n│ a ... ok   │\n│ b ... wait │\n└────────────┘\n```';
+    const out = autofixWithOpts(fenced, { processFenced: true });
+    assert.notEqual(out, fenced, 'processFenced=true must transform fenced frame');
+    assert.doesNotMatch(out, /[┌┐└┘]/, 'frame corners removed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// autofix end-to-end via lint-cases.json fixtures (shape-based)
+// ---------------------------------------------------------------------------
+describe('autofix end-to-end via lint-cases.json fixtures (shape-based)', () => {
+  const cases = require(path.resolve(__dirname, 'lint-cases.json'));
+  const { autofix: autofixE2E } = require(path.resolve(__dirname, '..', 'lib', 'lint', 'autofix'));
+
+  const fixtures = cases.filter(c => c.expected_after_autofix_shape !== undefined);
+
+  it('has ≥4 fixtures with expected_after_autofix_shape', () => {
+    assert.ok(fixtures.length >= 4, `expected ≥4 shape fixtures, got ${fixtures.length}`);
+  });
+
+  for (const fx of fixtures) {
+    it(`autofix shape matches: ${fx.name}`, () => {
+      // CLI-context autofix: process fenced content.
+      const out = autofixE2E(fx.input, { processFenced: true });
+      const shape = fx.expected_after_autofix_shape;
+
+      if (shape.no_frame_chars) {
+        // The fence ``` lines may remain in output — that's fine. Only frame
+        // corners + outer pipes must be gone from any non-fence line.
+        const nonFence = out.split('\n').filter(l => !/^\s*```/.test(l)).join('\n');
+        assert.doesNotMatch(nonFence, /[┌┐└┘│]/,
+          `frame chars must be removed in "${fx.name}":\n${out}`);
+      }
+
+      // Extract the diagram body (strip surrounding ``` lines for row-count).
+      const body = out.split('\n')
+        .filter(l => !/^\s*```/.test(l))
+        .filter(l => l.length > 0);
+
+      if (typeof shape.row_count === 'number') {
+        assert.equal(body.length, shape.row_count,
+          `expected ${shape.row_count} rows, got ${body.length} in "${fx.name}":\n${out}`);
+      }
+
+      if (shape.mode === 'dot_leader') {
+        for (const ln of body) {
+          assert.match(ln, / \.{3,} /, `row "${ln}" must be dot-leader shape in "${fx.name}"`);
+        }
+        if (shape.aligned_dots) {
+          const dotCounts = body.map(ln => (ln.match(/\.+/) || [''])[0].length);
+          assert.equal(new Set(dotCounts).size, 1,
+            `dot-counts must align in "${fx.name}": got ${dotCounts.join(',')}\n${out}`);
+        }
+      } else if (shape.mode === 'bullet') {
+        for (const ln of body) {
+          assert.match(ln, /^\s*-\s+\S/, `row "${ln}" must be bullet in "${fx.name}"`);
+        }
+      } else if (shape.mode === 'no_change') {
+        assert.equal(out, fx.input, `no_change mode: output must equal input for "${fx.name}"`);
+      }
+
+      for (const token of (shape.preserves || [])) {
+        assert.ok(out.includes(token),
+          `expected to preserve "${token}" in output of "${fx.name}":\n${out}`);
+      }
+    });
+
+    it(`autofix is idempotent: ${fx.name}`, () => {
+      const once = autofixE2E(fx.input, { processFenced: true });
+      const twice = autofixE2E(once, { processFenced: true });
+      assert.equal(twice, once, `second pass must be no-op for "${fx.name}"`);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// feynman-lint --fix CLI for L11 dot-leader conversion (smoke)
+// ---------------------------------------------------------------------------
+describe('feynman-lint --fix CLI for L11 dot-leader conversion', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const { spawnSync } = require('node:child_process');
+
+  it('--fix converts L11-eligible frame in file in place', () => {
+    const tmp = path.join(os.tmpdir(), `feynman-l11-${process.pid}.md`);
+    const input = '# title\n\n```\n┌────────────┐\n│ a ... ok   │\n│ b ... wait │\n└────────────┘\n```\n';
+    fs.writeFileSync(tmp, input);
+    try {
+      const result = spawnSync(process.execPath, [
+        path.resolve(__dirname, '..', 'bin', 'feynman-lint.js'),
+        '--fix',
+        tmp,
+      ]);
+      assert.equal(result.status, 0,
+        `expected exit 0, got ${result.status}; stderr: ${result.stderr}`);
+      const after = fs.readFileSync(tmp, 'utf8');
+      assert.notEqual(after, input, 'file must have been modified');
+      assert.ok(!after.includes('┌'), 'frame must be removed by L11 dot-leader autofix');
+    } finally {
+      try { fs.unlinkSync(tmp); } catch (_) {}
+    }
+  });
+});

@@ -338,21 +338,65 @@
     "rule": "L11",
     "expected": "fail",
     "input": "```\n┌──────────────────┐\n│ a ........ ok    │\n│ b ........ wait  │\n│ c ........ wip   │\n│ d ........ done  │\n│ e ........ done  │\n└──────────────────┘\n```",
-    "expected_issues": [{"rule": "L11"}]
+    "expected_issues": [{"rule": "L11"}],
+    "expected_after_autofix_shape": {
+      "mode": "dot_leader",
+      "row_count": 5,
+      "no_frame_chars": true,
+      "aligned_dots": true,
+      "preserves": ["ok", "wait", "wip", "done"]
+    }
   },
   {
     "name": "L11 fail — frame for 2 items is overdecoration",
     "rule": "L11",
     "expected": "fail",
     "input": "```\n┌────────────┐\n│ a ... ok   │\n│ b ... wait │\n└────────────┘\n```",
-    "expected_issues": [{"rule": "L11"}]
+    "expected_issues": [{"rule": "L11"}],
+    "expected_after_autofix_shape": {
+      "mode": "dot_leader",
+      "row_count": 2,
+      "no_frame_chars": true,
+      "aligned_dots": true,
+      "preserves": ["ok", "wait"]
+    }
   },
   {
     "name": "L11 fail — frame for 5 status items with markers",
     "rule": "L11",
     "expected": "fail",
     "input": "```\n┌────────────────────┐\n│ a ........ ✓ done  │\n│ b ........ ✗ fail  │\n│ c ........ ← готов │\n│ d ........ wip     │\n│ e ........ done    │\n└────────────────────┘\n```",
-    "expected_issues": [{"rule": "L11"}]
+    "expected_issues": [{"rule": "L11"}],
+    "expected_after_autofix_shape": {
+      "mode": "dot_leader",
+      "row_count": 5,
+      "no_frame_chars": true,
+      "aligned_dots": true,
+      "preserves": ["✓ done", "✗ fail", "← готов", "wip"]
+    }
+  },
+  {
+    "name": "L11 autofix idempotent — already dot-leader, no change",
+    "rule": "L11",
+    "expected": "pass",
+    "input": "```\na ............ ok\nb ............ wait\nc ............ done\n```",
+    "expected_after_autofix_shape": {
+      "mode": "no_change",
+      "no_frame_chars": true
+    }
+  },
+  {
+    "name": "L11 autofix — non-pattern prose lines emit bullets",
+    "rule": "L11",
+    "expected": "fail",
+    "input": "```\n┌──────────────────────────┐\n│ free-form note about X   │\n│ unstructured commentary  │\n│ another sentence here    │\n└──────────────────────────┘\n```",
+    "expected_issues": [{"rule": "L11"}],
+    "expected_after_autofix_shape": {
+      "mode": "bullet",
+      "row_count": 3,
+      "no_frame_chars": true,
+      "preserves": ["free-form note about X", "unstructured commentary", "another sentence here"]
+    }
   },
   {
     "name": "L12 pass — tight frame, content dominates padding",
