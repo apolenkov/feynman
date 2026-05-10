@@ -1,0 +1,1 @@
+Use spaces. PEP 8 — Python's official style guide — mandates 4-space indentation, and the Python interpreter treats mixed tabs/spaces as a syntax error in Python 3. Every major Python linter (flake8, ruff, pylint) defaults to spaces. Tabs are nonstandard in the Python ecosystem and will cause friction in any shared codebase or CI pipeline.
