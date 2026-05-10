@@ -82,7 +82,11 @@ if (useFix) {
     process.stderr.write(`feynman-lint: cannot read ${filePath}: ${e.message}\n`);
     process.exit(2);
   }
-  const after = autofix(before);
+  // CLI --fix opts in to: (a) processFenced so fenced frames in user-
+  // authored docs are touched; (b) convertL11 so ≤5-line frames are
+  // converted to dot-leader instead of just aligned. Stop-hook uses
+  // default autofix(text) → both opts off, Phase 8.5 contract preserved.
+  const after = autofix(before, { processFenced: true, convertL11: true });
   if (after !== before) {
     fs.writeFileSync(filePath, after);
   }
