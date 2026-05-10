@@ -66,17 +66,32 @@ process.stdin.on('end', () => {
     if (!state.enabled) process.exit(0);
 
     // Step 5: read rules file and extract the correct intensity variant (D-01, D-02, HOOK-04)
+    // Dual-format: tries XML <intensity name="..."> first, falls back to HTML comments.
+    // Fallback kept until Plan 02 rule-file rewrite lands (CONTEXT.md Area G migration).
     let rulesText;
     try {
       const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
       const validIntensities = ['lite', 'full', 'ultra'];
       const intensity = validIntensities.includes(state.intensity) ? state.intensity : 'full';
-      const openMarker  = '<!-- ' + intensity + ' -->';
-      const closeMarker = '<!-- /' + intensity + ' -->';
-      const i1 = rulesContent.indexOf(openMarker);
-      const i2 = rulesContent.indexOf(closeMarker, i1);
-      if (i1 === -1 || i2 === -1) process.exit(0); // marker not found — malformed rules file
-      rulesText = rulesContent.slice(i1 + openMarker.length, i2).trim();
+
+      // XML matcher map: pre-compiled regexes, one per intensity (avoid RegExp constructor interpolation)
+      const xmlMatchers = {
+        lite:  /<intensity\s+name\s*=\s*["']lite["']\s*>([\s\S]*?)<\/intensity>/,
+        full:  /<intensity\s+name\s*=\s*["']full["']\s*>([\s\S]*?)<\/intensity>/,
+        ultra: /<intensity\s+name\s*=\s*["']ultra["']\s*>([\s\S]*?)<\/intensity>/,
+      };
+      const xmlMatch = xmlMatchers[intensity].exec(rulesContent);
+      if (xmlMatch) {
+        rulesText = xmlMatch[1].trim();
+      } else {
+        // Legacy HTML-comment fallback (kept until Plan 02 rule rewrite lands)
+        const openMarker  = '<!-- ' + intensity + ' -->';
+        const closeMarker = '<!-- /' + intensity + ' -->';
+        const i1 = rulesContent.indexOf(openMarker);
+        const i2 = rulesContent.indexOf(closeMarker, i1);
+        if (i1 === -1 || i2 === -1) process.exit(0); // marker not found — malformed rules file
+        rulesText = rulesContent.slice(i1 + openMarker.length, i2).trim();
+      }
     } catch (e) {
       // Rules file missing — self-heal silently (pitfall 6 in RESEARCH.md)
       process.exit(0);
