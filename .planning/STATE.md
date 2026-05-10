@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Visual Economy
-status: planning
-last_updated: "2026-05-10T23:30:00Z"
-last_activity: 2026-05-10
+status: executing
+last_updated: "2026-05-11T00:30:00Z"
+last_activity: 2026-05-11
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 0
-  percent: 0
+  completed_plans: 4
+  percent: 13
 current_phase: 9
-current_phase_status: planned_ready_to_execute
+current_phase_status: 4_of_6_plans_complete
 ---
 
 # Project State
@@ -28,21 +28,34 @@ See: .planning/MILESTONES.md (history of shipped milestones)
 ## Current Position
 
 Phase: 9 — Smallest-visual-first lint rules (L11/L12/L13/L14)
-Plans: 6 (09-01..09-06), 16 tasks, 5 waves
-Status: Planned, ready to execute Wave 1 (09-01 L11 detection)
-Last activity: 2026-05-10 — Phase 9 plans created + revised + verified (commit a36def0)
+Plans: 4 of 6 complete (09-01/02/03/05 done; 09-04 + 09-06 remain)
+Status: Executing — 4 plans shipped via inline-TDD, 09-04 awaits HUMAN gate
+Last activity: 2026-05-11 — Plan 09-05 closed (commit d0ffc7b)
 
-### Phase 9 Wave Structure
+### Phase 9 Wave Status
 
 ```
-Wave 1: 09-01 (L11 detection)
-Wave 2: 09-02 (L12 detection)
-Wave 3: 09-03 (L13 detection)
-Wave 4: 09-04 (LINT-14 autofix — HUMAN-GATE) ∥ 09-05 (--explain CLI)
-Wave 5: 09-06 (docs L01-L13)
+Wave 1: 09-01 L11 detection         ✓ shipped (4 commits, 293 tests)
+Wave 2: 09-02 L12 + estimateFrameCost ✓ shipped (4 commits, 305 tests)
+Wave 3: 09-03 L13 + L11/L13 split   ✓ shipped (4 commits, 317 tests)
+Wave 4: 09-04 LINT-14 autofix       ← HUMAN gate (4 decision points)
+        09-05 --explain CLI         ✓ shipped (3 commits, 323 tests)
+Wave 5: 09-06 docs L01-L13          ← depends on 09-04 for L11 autofix doc paragraph
 ```
 
-09-04 carries `human_review_required: true` + 4 design decision points (column-width policy, fallback, state-marker allowlist, whitelist composition). Operator must confirm before executing Wave 4.
+Test totals: 279 baseline → **323 pass** (+44 across 4 plans). No regressions.
+
+### Open: HUMAN gate for 09-04
+
+Plan 09-04 (LINT-14 autofix from frame to dot-leader) carries 4 decision points
+in `must_haves.decision_points`:
+- D-09-04-01: column-width policy (auto-detect from max content, cap 80)
+- D-09-04-02: non-pattern fallback (plain bullet `- <content>`)
+- D-09-04-03: state-marker allowlist (done, pending, wip, ok, fail, wait,
+  ✓, ✗, ◐, ⌛, →, ←)
+- D-09-04-04: whitelist composition (tree + embedded table → autofixFrame)
+
+Reviewer must confirm before Task 1 of 09-04 starts.
 
 ## Shipped Milestones (recap)
 
@@ -68,6 +81,9 @@ Wave 5: 09-06 (docs L01-L13)
 
 ## Operator Next Steps
 
-- Execute Phase 9 Wave 1: `/gsd-execute-phase 9 --wave 1` (recommended: fresh session per retro/advisor)
-- Or inline-TDD per Phase 8.5 pattern starting with 09-01 (RED → GREEN → REFACTOR)
-- After Wave 3 ships: HUMAN gate for 09-04 LINT-14 design decisions before Wave 4
+- HUMAN: review 4 design decisions in `phases/09-*/09-04-PLAN.md` → confirm
+  or edit before execution
+- Execute 09-04 inline-TDD (autofix engine extension + fixtures + tests)
+- Execute 09-06 inline (docs/lint-rules.md L11/L12/L13 + README --explain)
+- Then `/gsd-plan-phase 10` (output-style presets — no HUMAN gates)
+- Or `/gsd-plan-phase 12` (IDE compat polish — no HUMAN gates)
