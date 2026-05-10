@@ -130,18 +130,38 @@ All runtime state lives in two files under the selected client root:
 └── .feynman/
     └── state.json           ← runtime state
           {
-            "enabled":    boolean,   // true = inject rules on each prompt
-            "intensity":  string,    // "lite" | "full" | "ultra"
-            "injections": number     // cumulative hook fire count
+            "enabled":      boolean,   // true = inject rules on each prompt
+            "intensity":    string,    // "lite" | "full" | "ultra"  — rules-file size
+            "output_style": string,    // "short" | "middle" | "full" — visual verbosity (v0.4.0+)
+            "injections":   number     // cumulative hook fire count
           }
 ```
+
+**Two orthogonal axes (v0.4.0):**
+
+```
+axis           controls                        value space
+─────────────  ───────────────────────────────  ──────────────────
+intensity      size of injected ruleset         lite / full / ultra
+output_style   verbosity of model's visuals     short / middle / full
+```
+
+`intensity` shapes how MUCH instruction the model receives (which trigger
+patterns are loaded). `output_style` shapes how HEAVY the model's response
+visuals can be (runtime suffix). The two compose: `lite + short` is the
+minimal pair for mobile/voice chat; `full + middle` is the recommended
+default; `ultra + full` is the maximum-visual configuration.
+
+`output_style` is implemented as a one-line runtime suffix appended to
+`additionalContext` — `rules/feynman-activate.md` is NOT modified, so the
+4480-byte rules budget stays intact regardless of the chosen style.
 
 **State transitions:**
 
 ```
 [first run]
   both files absent → bootstrap
-  writes state.json {enabled:true, intensity:'full', injections:0}
+  writes state.json {enabled:true, intensity:'full', output_style:'full', injections:0}
   writes .feynman-active with intensity string
 
 [/feynman off]
@@ -156,11 +176,19 @@ All runtime state lives in two files under the selected client root:
   state.intensity = <value>
   .feynman-active content updated
 
+[/feynman style short | middle | full]
+  state.output_style = <value>
+  hook reads on next fire; no flag-file change
+
 [npx @albinocrabs/feynman uninstall --target claude|codex|both|all|*]
   hook removed from target hook config
   .feynman-active deleted
   state.json preserved (user data)
 ```
+
+**Back-compat:** Pre-v0.4.0 `state.json` files lack `output_style`. The
+hook reads `state.output_style || 'full'` so missing field is identical
+to `"full"`. No migration needed.
 
 **Schema is frozen** — field names are used by `hooks/feynman-activate.js`,
 `bin/feynman.js`, and `skills/feynman/SKILL.md`. Any rename requires

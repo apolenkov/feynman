@@ -316,8 +316,32 @@ Toggle via `/feynman`:
 /feynman ultra   — force diagrams always
 /feynman off     — disable
 /feynman on      — re-enable
-/feynman status  — show current state
+/feynman status  — show current state (intensity + output_style)
 ```
+
+### Output-Style Presets
+
+Orthogonal axis to intensity. **Intensity** controls how much instruction
+the model sees (rules-file size). **Output style** controls how heavy the
+model's visuals can be (runtime hint).
+
+| Preset | Visuals allowed | Token cost vs. full | Use when |
+|--------|-----------------|---------------------|----------|
+| **short** | Inline glyphs + dot-leader only | ~−60% on status-heavy replies | Mobile, dense chat, voice input |
+| **middle** | + trees + markdown tables; frame ≥6 items | ~−25% | Balanced default |
+| **full** | + frame blocks + side-by-side + ASCII art | baseline (current default) | Spec docs, retros, design |
+
+Toggle:
+
+```
+/feynman style short   — minimal visuals
+/feynman style middle  — balanced
+/feynman style full    — all visuals (default)
+```
+
+Implementation note: output-style is enforced via a one-line runtime
+suffix in the prompt-submit hook — it does NOT modify `rules/feynman-activate.md`,
+so the 4480-byte budget stays intact.
 
 ## Lint
 
