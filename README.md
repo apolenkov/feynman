@@ -269,6 +269,46 @@ After install, feynman starts in `full` mode by default. Disable or change it
 explicitly with `/feynman off`, `/feynman lite`, `/feynman full`, or
 `/feynman ultra`.
 
+## IDE Support
+
+feynman also installs into project-local rules folders for Cline, Cursor, and
+Windsurf. These targets write a single rules file in the current working
+directory — no global hook, no settings mutation. The rules file is derived
+from the `full` intensity block of `rules/feynman-activate.md`.
+
+| Target | Output path (relative to CWD) | Frontmatter |
+|--------|-------------------------------|-------------|
+| `claude` | `~/.claude/settings.json` (hook) | — |
+| `codex` | `~/.codex/hooks.json` (hook) | — |
+| `cline` | `.clinerules/feynman-rules.md` | none |
+| `cursor` | `.cursor/rules/feynman.mdc` | `alwaysApply: true`, `globs: "**"` |
+| `windsurf` | `.windsurf/rules/feynman.md` | none |
+
+Install:
+
+```bash
+cd your-project
+npx @albinocrabs/feynman install --target cline
+npx @albinocrabs/feynman install --target cursor
+npx @albinocrabs/feynman install --target windsurf
+```
+
+Doctor (verify):
+
+```bash
+npx @albinocrabs/feynman doctor --target cline
+npx @albinocrabs/feynman doctor --target cursor
+npx @albinocrabs/feynman doctor --target windsurf
+```
+
+`doctor` exits `0` when the rules file is present (and, for Cursor, when
+the YAML frontmatter has `alwaysApply: true`). Otherwise it exits `1` with
+a `[FAIL]` reason.
+
+To regenerate after upstream changes — just re-run `install`. The command
+is idempotent: it overwrites the rules file in place. No uninstall path
+is provided for IDE targets (delete the directory if you need to undo).
+
 ## Verify the install
 
 Run `doctor` after installing or after manually editing hooks:
