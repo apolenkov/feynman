@@ -66,25 +66,25 @@
 
 | REQ-ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| LINT-11 | TBD | TBD | Active |
-| LINT-12 | TBD | TBD | Active |
-| LINT-13 | TBD | TBD | Active |
-| LINT-14 | TBD | TBD | Active |
-| DOCS-L11 | TBD | TBD | Active |
-| STYLE-01 | TBD | TBD | Active |
-| STYLE-02 | TBD | TBD | Active |
-| STYLE-03 | TBD | TBD | Active |
-| STYLE-04 | TBD | TBD | Active |
-| EVAL-01 | TBD | TBD | Active |
-| EVAL-02 | TBD | TBD | Active |
-| EVAL-03 | TBD | TBD | Active |
-| IDE-01 | TBD | TBD | Active |
-| IDE-02 | TBD | TBD | Active |
-| IDE-03 | TBD | TBD | Active |
-| IDE-04 | TBD | TBD | Active |
-| IDE-05 | TBD | TBD | Active |
-| REL-01 | TBD | TBD | Active |
-| REL-02 | TBD | TBD | Active |
-| REL-03 | TBD | TBD | Active |
-| REL-04 | TBD | TBD | Active |
-| REL-05 | TBD | TBD | Active |
+| LINT-11 | Phase 9 | TBD | Active |
+| LINT-12 | Phase 9 | TBD | Active |
+| LINT-13 | Phase 9 | TBD | Active |
+| LINT-14 | Phase 9 | TBD | Active |
+| DOCS-L11 | Phase 9 | TBD | Active |
+| STYLE-01 | Phase 10 | TBD | Active |
+| STYLE-02 | Phase 10 | TBD | Active |
+| STYLE-03 | Phase 10 | TBD | Active |
+| STYLE-04 | Phase 10 | TBD | Active |
+| EVAL-01 | Phase 11 | TBD | Active |
+| EVAL-02 | Phase 11 | TBD | Active |
+| EVAL-03 | Phase 11 | TBD | Active |
+| IDE-01 | Phase 12 | TBD | Active |
+| IDE-02 | Phase 12 | TBD | Active |
+| IDE-03 | Phase 12 | TBD | Active |
+| IDE-04 | Phase 12 | TBD | Active |
+| IDE-05 | Phase 12 | TBD | Active |
+| REL-01 | Phase 13 | TBD | Active |
+| REL-02 | Phase 13 | TBD | Active |
+| REL-03 | Phase 13 | TBD | Active |
+| REL-04 | Phase 13 | TBD | Active |
+| REL-05 | Phase 13 | TBD | Active |
