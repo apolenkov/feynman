@@ -182,6 +182,86 @@ describe('feynman-lint Stop-hook', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Path 5: autofix engaged for misaligned bare frame in prose
+  // -------------------------------------------------------------------------
+  describe('Path 5: autofix engaged for misaligned frame', () => {
+    const misalignedResponse = [
+      'Here is a status:',
+      '',
+      '┌──┐',
+      '│ short │',
+      '│ much longer content line │',
+      '└──┘',
+    ].join('\n');
+
+    it('exits 0', () => {
+      const r = runLintHook(misalignedResponse);
+      assert.equal(r.status, 0);
+    });
+
+    it('emits additionalContext wrapped in <feynman-autofix>', () => {
+      const r = runLintHook(misalignedResponse);
+      assert.ok(r.stdout.trim().length > 0, 'should emit stdout');
+      const parsed = JSON.parse(r.stdout);
+      const ctx = parsed.hookSpecificOutput.additionalContext;
+      assert.ok(
+        ctx.includes('<feynman-autofix>') && ctx.includes('</feynman-autofix>'),
+        `expected autofix wrapper, got: ${ctx.substring(0, 200)}`
+      );
+    });
+
+    it('autofixed text passes lint cleanly', () => {
+      const r = runLintHook(misalignedResponse);
+      const parsed = JSON.parse(r.stdout);
+      const ctx = parsed.hookSpecificOutput.additionalContext;
+      const match = ctx.match(/<feynman-autofix>\n([\s\S]*?)\n<\/feynman-autofix>/);
+      assert.ok(match, 'wrapper format missing');
+      // Re-lint the fixed frame inside a code-block context (lint operates on fenced)
+      const fixedFenced = '```\n' + match[1].split('\n').filter(l => /^[┌│└]/.test(l)).join('\n') + '\n```';
+      const { lint } = require('../lib/lint');
+      const result = lint(fixedFenced);
+      const errors = result.issues.filter(i => i.severity === 'error' && (i.rule === 'L08' || i.rule === 'L09'));
+      assert.equal(errors.length, 0, `autofixed frame should pass L08/L09, got: ${JSON.stringify(errors)}`);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Path 6: autofix is no-op on clean frame or fenced frame (fall through)
+  // -------------------------------------------------------------------------
+  describe('Path 6: autofix no-op (fenced or clean) falls through to rule path', () => {
+    it('no autofix when frame is fenced (user-authored)', () => {
+      // Misaligned frame INSIDE fences — autofix skips fenced content
+      const response = '```\n┌──┐\n│ x │\n│ much longer │\n└──┘\n```';
+      const r = runLintHook(response);
+      assert.equal(r.status, 0);
+      // Either silent (lint passes since L08/L09 may not fire on this fenced block depending on parser)
+      // OR rule-feedback (no autofix wrapper)
+      if (r.stdout.trim().length > 0) {
+        const parsed = JSON.parse(r.stdout);
+        const ctx = parsed.hookSpecificOutput.additionalContext;
+        assert.ok(
+          !ctx.includes('<feynman-autofix>'),
+          'fenced frames should NOT trigger autofix wrapper'
+        );
+      }
+    });
+
+    it('clean response (no frames) does not emit autofix wrapper', () => {
+      const response = '```\n[A] --> [B]\n```';
+      const r = runLintHook(response);
+      assert.equal(r.status, 0);
+      if (r.stdout.trim().length > 0) {
+        const parsed = JSON.parse(r.stdout);
+        const ctx = parsed.hookSpecificOutput.additionalContext;
+        assert.ok(
+          !ctx.includes('<feynman-autofix>'),
+          'no frames should not trigger autofix wrapper'
+        );
+      }
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // L-rule corrections: verify specific rule corrections appear in output
   // -------------------------------------------------------------------------
   describe('Rule corrections in additionalContext', () => {
