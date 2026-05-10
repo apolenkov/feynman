@@ -41,7 +41,15 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 5. `docs/lint-rules.md` документирует L11/L12/L13 с valid/invalid примерами и token-cost rows; cross-reference номера строк в `lib/lint/rules.js`
 6. `npm test` зелёный, общее число тестов ≥ 290
 
-**Plans:** TBD
+**Plans:** 6 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — L11_overdecoration detection rule + fixtures (LINT-11)
+- [ ] 09-02-PLAN.md — L12_token_budget detection + estimateFrameCost helper (LINT-12)
+- [ ] 09-03-PLAN.md — L13_double_wrap detection rule + fixtures (LINT-13)
+- [ ] 09-04-PLAN.md — LINT-14 autofix to dot-leader (HUMAN_REVIEW_REQUIRED)
+- [ ] 09-05-PLAN.md — --explain CLI flag using estimateFrameCost
+- [ ] 09-06-PLAN.md — docs/lint-rules.md L11-L13 + README --explain (DOCS-L11)
 
 ### Phase 10: Output-style presets (`short / middle / full`)
 **Goal:** Пользователь переключает стиль вывода между `short` (никаких frames/деревьев, только dot-leader + inline glyphs), `middle` (баланс — frames для ≥6, prefer trees and markdown tables), `full` (текущий default). Реализация — runtime suffix в additionalContext без раздувания rules-файла.
@@ -102,7 +110,7 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 | 1. Core (v0.1) | v0.1 | 3/3 | Complete | — |
 | 2-7 | v0.2.0 | done | Complete | 2026-05-07 |
 | 8 + 8.5 | v0.3.0 | 8/8 | Complete | 2026-05-10 |
-| 9. L11/L12/L13/L14 | v0.4.0 | 0/TBD | Not started | — |
+| 9. L11/L12/L13/L14 | v0.4.0 | 0/6 | Planned | — |
 | 10. Output-style presets | v0.4.0 | 0/TBD | Not started | — |
 | 11. Compliance A/B | v0.4.0 | 0/TBD | Not started | — |
 | 12. IDE compat polish | v0.4.0 | 0/TBD | Not started | — |
