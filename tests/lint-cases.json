@@ -353,5 +353,44 @@
     "expected": "fail",
     "input": "```\n┌────────────────────┐\n│ a ........ ✓ done  │\n│ b ........ ✗ fail  │\n│ c ........ ← готов │\n│ d ........ wip     │\n│ e ........ done    │\n└────────────────────┘\n```",
     "expected_issues": [{"rule": "L11"}]
+  },
+  {
+    "name": "L12 pass — tight frame, content dominates padding",
+    "rule": "L12",
+    "expected": "pass",
+    "input": "```\n┌────────────────────────────────────────────────┐\n│ this is a very long content line filling sp    │\n│ another long content line that also fills w    │\n└────────────────────────────────────────────────┘\n```"
+  },
+  {
+    "name": "L12 pass — dot-leader list, no frame to score",
+    "rule": "L12",
+    "expected": "pass",
+    "input": "```\nalpha ............ ok\nbeta  ............ wait\ngamma ............ done\n```"
+  },
+  {
+    "name": "L12 pass — frame with substantial content per row",
+    "rule": "L12",
+    "expected": "pass",
+    "input": "```\n┌──────────────────────────────────┐\n│ deploy production rollout step a │\n│ deploy production rollout step b │\n│ deploy production rollout step c │\n└──────────────────────────────────┘\n```"
+  },
+  {
+    "name": "L12 fail — wide frame, tiny labels (padding dominates)",
+    "rule": "L12",
+    "expected": "fail",
+    "input": "```\n┌────────────────────────────────────────┐\n│ a                                      │\n│ b                                      │\n│ c                                      │\n└────────────────────────────────────────┘\n```",
+    "expected_issues": [{"rule": "L12"}]
+  },
+  {
+    "name": "L12 fail — frame with 2-char states padded to 30",
+    "rule": "L12",
+    "expected": "fail",
+    "input": "```\n┌──────────────────────────────────┐\n│ ok                               │\n│ no                               │\n│ ok                               │\n└──────────────────────────────────┘\n```",
+    "expected_issues": [{"rule": "L12"}]
+  },
+  {
+    "name": "L12 fail — frame with single-glyph status, padding dominates",
+    "rule": "L12",
+    "expected": "fail",
+    "input": "```\n┌─────────────────────────────┐\n│ ✓                           │\n│ ✗                           │\n│ ◐                           │\n└─────────────────────────────┘\n```",
+    "expected_issues": [{"rule": "L12"}]
   }
 ]
