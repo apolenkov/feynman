@@ -241,6 +241,69 @@
     "expected_issues": [{"rule": "L10", "line": 1}]
   },
   {
+    "name": "L08 pass — combining accent (é = e+U+0301) counts as 1 visual char",
+    "rule": "L08",
+    "expected": "pass",
+    "input": "```\n┌─────┐\n│ é   │\n└─────┘\n```"
+  },
+  {
+    "name": "L08 pass — zero-width joiner (U+200D) inside row does not bloat width",
+    "rule": "L08",
+    "expected": "pass",
+    "input": "```\n┌─────┐\n│ a‍b  │\n└─────┘\n```"
+  },
+  {
+    "name": "L08 pass — CJK wide chars (日本) count as 2 cols each",
+    "rule": "L08",
+    "expected": "pass",
+    "input": "```\n┌──────┐\n│ 日本 │\n└──────┘\n```"
+  },
+  {
+    "name": "L08 pass — Unicode markers (▲▼✓✗) count as 1 col each",
+    "rule": "L08",
+    "expected": "pass",
+    "input": "```\n┌────────┐\n│ ▲ high │\n│ ▼ low  │\n└────────┘\n```"
+  },
+  {
+    "name": "L09 pass — combining accent aligned by visual width",
+    "rule": "L09",
+    "expected": "pass",
+    "input": "```\n┌─────┐\n│ é   │\n└─────┘\n```"
+  },
+  {
+    "name": "L09 pass — Unicode markers ✓ ✗ ◐ align by grapheme width",
+    "rule": "L09",
+    "expected": "pass",
+    "input": "```\n┌────────┐\n│ ✓ done │\n│ ◐ wip  │\n│ ✗ skip │\n└────────┘\n```"
+  },
+  {
+    "name": "L09 pass — CJK content aligned (width 2 per char)",
+    "rule": "L09",
+    "expected": "pass",
+    "input": "```\n┌──────┐\n│ 日本 │\n│ 文字 │\n└──────┘\n```"
+  },
+  {
+    "name": "L09 fail — empty padding inside frame (line shorter than W)",
+    "rule": "L09",
+    "expected": "fail",
+    "input": "```\n┌──────────┐\n│ short  │\n└──────────┘\n```",
+    "expected_issues": [{"rule": "L09"}]
+  },
+  {
+    "name": "L09 fail — top border ┌─ shorter than inner content",
+    "rule": "L09",
+    "expected": "fail",
+    "input": "```\n┌──┐\n│ much longer line │\n└──────────────────┘\n```",
+    "expected_issues": [{"rule": "L09"}]
+  },
+  {
+    "name": "L08+L09 mixed fail — top wider than inner with shifted │",
+    "rule": "L08",
+    "expected": "fail",
+    "input": "```\n┌──────────┐\n│ x  │\n└──────────┘\n```",
+    "expected_issues": [{"rule": "L08"}, {"rule": "L09"}]
+  },
+  {
     "name": "No diagram — prose only, no issues",
     "rule": "none",
     "expected": "pass",
