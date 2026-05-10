@@ -79,4 +79,17 @@ describe('package metadata', () => {
     assert.ok(skill.includes("path.join(os.homedir(), '.codex')"));
     assert.ok(skill.includes("path.join(os.homedir(), '.claude')"));
   });
+
+  it('Feynman skill documents style subcommand (Phase 10 STYLE-02)', () => {
+    const skill = fs.readFileSync(path.join(REPO_DIR, 'skills/feynman/SKILL.md'), 'utf8');
+    // The skill must mention the new `style <preset>` argument.
+    assert.ok(/style\s+short\|middle\|full|style\s+\<preset\>|`style`/.test(skill),
+      'SKILL.md must document the style subcommand for STYLE-02');
+    // All three presets must be referenced.
+    assert.ok(skill.includes('short'), 'short preset documented');
+    assert.ok(skill.includes('middle'), 'middle preset documented');
+    // Status output must surface output_style alongside intensity.
+    assert.ok(skill.includes('output_style'),
+      'status output must include output_style field');
+  });
 });
