@@ -557,4 +557,201 @@ describe('feynman-activate hook', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // XML intensity extraction — TDD RED block (Plan 08-01)
+  // Tests that the hook extracts content from <intensity name="..."> XML tags.
+  // Uses the Path 6 patched-hook pattern: rewrites RULES_PATH to a temp file
+  // containing inline XML rule fixtures.
+  // -------------------------------------------------------------------------
+  describe('XML intensity extraction', () => {
+
+    /**
+     * Runs a patched copy of the hook with RULES_PATH pointing at a synthetic
+     * rules file written by the test. Mirrors Path 6 helper pattern.
+     */
+    function runHookWithRules(tmpHome, rulesContent, intensity) {
+      const hookSrc = fs.readFileSync(HOOK_PATH, 'utf8');
+      const rulesFilePath = path.join(tmpHome, 'synthetic-rules.md');
+      fs.writeFileSync(rulesFilePath, rulesContent);
+      const escapedPath = rulesFilePath.replace(/\\/g, '\\\\');
+      const patchedSrc = hookSrc.replace(
+        /const RULES_PATH\s*=.*$/m,
+        `const RULES_PATH = '${escapedPath}';`
+      );
+      const patchedHookPath = path.join(tmpHome, 'feynman-activate-xml-test.js');
+      fs.writeFileSync(patchedHookPath, patchedSrc);
+
+      return spawnSync('node', [patchedHookPath], {
+        input: JSON.stringify({ prompt: 'test' }),
+        encoding: 'utf8',
+        env: { ...process.env, HOME: tmpHome },
+        timeout: 10000,
+      });
+    }
+
+    function setupHome(intensity) {
+      const dir = makeTempHome();
+      const feynmanDir = path.join(dir, '.claude', '.feynman');
+      fs.mkdirSync(feynmanDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(feynmanDir, 'state.json'),
+        JSON.stringify({ enabled: true, intensity, injections: 0 })
+      );
+      fs.writeFileSync(path.join(dir, '.claude', '.feynman-active'), intensity);
+      return dir;
+    }
+
+    // Case 1: extracts lite content from <intensity name="lite">…</intensity>
+    it('extracts lite content from XML intensity block', () => {
+      const tmpHome = setupHome('lite');
+      try {
+        const rules = [
+          '<intensity name="lite">',
+          'Lite rules content here.',
+          '</intensity>',
+          '<intensity name="full">',
+          'Full rules content here.',
+          '</intensity>',
+          '<intensity name="ultra">',
+          'Ultra rules content here.',
+          '</intensity>',
+        ].join('\n');
+        const result = runHookWithRules(tmpHome, rules, 'lite');
+        assert.equal(result.status, 0);
+        const ctx = parseAdditionalContext(result.stdout);
+        assert.ok(ctx.includes('Lite rules content here.'), `expected lite content, got: ${ctx}`);
+        assert.ok(!ctx.includes('Full rules'), 'should not include full content');
+      } finally {
+        rmrf(tmpHome);
+      }
+    });
+
+    // Case 2: extracts full content from <intensity name="full">…</intensity>
+    it('extracts full content from XML intensity block', () => {
+      const tmpHome = setupHome('full');
+      try {
+        const rules = [
+          '<intensity name="lite">',
+          'Lite rules content here.',
+          '</intensity>',
+          '<intensity name="full">',
+          'Full rules content here.',
+          '</intensity>',
+          '<intensity name="ultra">',
+          'Ultra rules content here.',
+          '</intensity>',
+        ].join('\n');
+        const result = runHookWithRules(tmpHome, rules, 'full');
+        assert.equal(result.status, 0);
+        const ctx = parseAdditionalContext(result.stdout);
+        assert.ok(ctx.includes('Full rules content here.'), `expected full content, got: ${ctx}`);
+        assert.ok(!ctx.includes('Lite rules'), 'should not include lite content');
+      } finally {
+        rmrf(tmpHome);
+      }
+    });
+
+    // Case 3: extracts ultra content from <intensity name="ultra">…</intensity>
+    it('extracts ultra content from XML intensity block', () => {
+      const tmpHome = setupHome('ultra');
+      try {
+        const rules = [
+          '<intensity name="lite">',
+          'Lite rules content here.',
+          '</intensity>',
+          '<intensity name="full">',
+          'Full rules content here.',
+          '</intensity>',
+          '<intensity name="ultra">',
+          'Ultra rules content here.',
+          '</intensity>',
+        ].join('\n');
+        const result = runHookWithRules(tmpHome, rules, 'ultra');
+        assert.equal(result.status, 0);
+        const ctx = parseAdditionalContext(result.stdout);
+        assert.ok(ctx.includes('Ultra rules content here.'), `expected ultra content, got: ${ctx}`);
+        assert.ok(!ctx.includes('Lite rules'), 'should not include lite content');
+      } finally {
+        rmrf(tmpHome);
+      }
+    });
+
+    // Case 4: tolerates whitespace variants — <intensity name = "lite" > and single quotes
+    it('tolerates whitespace in XML tag attributes', () => {
+      const tmpHome = setupHome('lite');
+      try {
+        const rules = [
+          '<intensity name = "lite" >',
+          'Lite whitespace variant content.',
+          '</intensity>',
+        ].join('\n');
+        const result = runHookWithRules(tmpHome, rules, 'lite');
+        assert.equal(result.status, 0);
+        const ctx = parseAdditionalContext(result.stdout);
+        assert.ok(ctx.includes('Lite whitespace variant content.'), `expected whitespace-variant content, got: ${ctx}`);
+      } finally {
+        rmrf(tmpHome);
+      }
+    });
+
+    // Case 4b: tolerates single-quoted attributes — <intensity name='lite'>
+    it('tolerates single-quoted XML intensity attribute', () => {
+      const tmpHome = setupHome('lite');
+      try {
+        const rules = [
+          "<intensity name='lite'>",
+          'Lite single-quote content.',
+          '</intensity>',
+        ].join('\n');
+        const result = runHookWithRules(tmpHome, rules, 'lite');
+        assert.equal(result.status, 0);
+        const ctx = parseAdditionalContext(result.stdout);
+        assert.ok(ctx.includes('Lite single-quote content.'), `expected single-quote content, got: ${ctx}`);
+      } finally {
+        rmrf(tmpHome);
+      }
+    });
+
+    // Case 5: ignores text outside any <intensity> block
+    it('ignores content outside XML intensity blocks', () => {
+      const tmpHome = setupHome('full');
+      try {
+        const rules = [
+          'This preamble text should NOT be injected.',
+          '<intensity name="lite">',
+          'Lite only.',
+          '</intensity>',
+          '<intensity name="full">',
+          'Full target content.',
+          '</intensity>',
+          'This epilogue text should NOT be injected either.',
+        ].join('\n');
+        const result = runHookWithRules(tmpHome, rules, 'full');
+        assert.equal(result.status, 0);
+        const ctx = parseAdditionalContext(result.stdout);
+        assert.ok(ctx.includes('Full target content.'), `expected full content, got: ${ctx}`);
+        assert.ok(!ctx.includes('preamble'), 'preamble must not be injected');
+        assert.ok(!ctx.includes('epilogue'), 'epilogue must not be injected');
+      } finally {
+        rmrf(tmpHome);
+      }
+    });
+
+    // Case 6: legacy regression — HTML-comment markers still work (dual-format backward compat)
+    it('legacy regression: HTML-comment markers still extract content', () => {
+      const tmpHome = setupHome('full');
+      try {
+        // Use the REAL rules file (which still has HTML-comment markers)
+        // No patching needed — just run the real hook with legacy rules
+        const result = runHook(tmpHome, { prompt: 'test' });
+        assert.equal(result.status, 0);
+        const ctx = parseAdditionalContext(result.stdout);
+        assert.ok(ctx.length > 50, 'legacy HTML-comment rules must still be extracted');
+      } finally {
+        rmrf(tmpHome);
+      }
+    });
+
+  });
+
 });
