@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here.
 
+## 0.3.2 - 2026-05-10
+
+Changes since v0.3.1.
+
+### Features
+
+- CLI --fix flag — repair frames in place using autofix engine
+- Wave 1 — autofix engine + L10 mixed-script rule
+- /feynman accepts bump/highlight/eval subcommands
+
+### Fixes
+
+- replace c8 with native Node coverage (Node 26 compat)
+
+### Tests
+
+- add failing autofix tests (RED)
+
+### Other
+
+- runtime alignment check + autofix — CONTEXT, SPEC, 4 plans
+
 ## 0.3.1 - 2026-05-10
 
 Changes since v0.3.0.
