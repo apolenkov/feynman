@@ -30,13 +30,13 @@ The skills layer (`/feynman`, `/feynman-stats`), `install.sh`, MIT license, and 
 - [x] **Phase 6.5: Self-Improvement Research** - design spec for self-improvement loop (lint failure → rule update); research-only, no implementation
 - [x] **Phase 7: Release v0.2.0** - git tag, GitHub release notes, npm publish, uninstall.sh, badges green
 
-## Next Milestone: v0.3.0 Prompt Architecture
+## Current Milestone: v0.3.0 Prompt Architecture
 
 ### Phases
 
-- [ ] **Phase 8: Prompt Architecture Rewrite (XML contract)** - Переписать `rules/feynman-activate.md` под XML-контракт (F1+F2+F4+F7); миграция парсера хука с HTML-комментов на XML intensity-теги; secondary: F3 (расширенные few-shot) + F5 (CoT classify-first)
+- [x] **Phase 8: Prompt Architecture Rewrite (XML contract)** - Переписать `rules/feynman-activate.md` под XML-контракт (F1+F2+F4+F7); миграция парсера хука с HTML-комментов на XML intensity-теги; secondary: F3 (расширенные few-shot) + F5 (CoT classify-first) — released as v0.3.0 on 2026-05-10
 - [ ] **Phase 8.5: Runtime alignment check + autofix** - Доработать линтер: L09 (right-edge alignment detection), L10 (mixed-script Cyr+Lat warn), L08 hardening; deterministic autofix engine `lib/lint/autofix.js` (pad inner lines + перерендер top/bottom border); Stop-hook применяет autofix BEFORE показа модели; 20+ golden фикстур (D1, D3, D4)
-- [ ] **v0.2.7 hotfix (вне фазы)** - L09 detection-only в текущий линтер; быстрый patch-релиз перед Phase 8/8.5; autofix откладывается до Phase 8.5
+- [x] **v0.2.7 hotfix (вне фазы)** - L09 detection-only в текущий линтер; быстрый patch-релиз перед Phase 8/8.5; autofix откладывается до Phase 8.5 — landed 1d4ae5f
 
 ## Phase Details
 
@@ -204,10 +204,10 @@ Plans:
   10. iteration-2 A/B на 20-eval set: WIN-классы (sequence/branching) ≥ baseline compliance; HURT-классы (comparison/status/priority) → cheaper format AND ≤1 visual; negatives → NO regression
   11. Token cost: `additionalContext` payload ≥20% меньше (~5.6KB → ≤4.5KB)
 **Plans:** 4 plans
-- [ ] 08-01-PLAN.md — Hook parser dual-format support (XML + legacy HTML comments) + XML extraction tests (TDD)
-- [ ] 08-02-PLAN.md — Rewrite rules/feynman-activate.md as XML contract (≤4480 bytes; closes SPEC §1-§9, §11)
-- [ ] 08-03-PLAN.md — README compaction-survivor section (Why UserPromptSubmit, not SessionStart)
-- [ ] 08-04-PLAN.md — Iteration-2 3-way A/B harness + 08-VERIFICATION.md with all 14 SPEC criteria
+- [x] 08-01-PLAN.md — Hook parser dual-format support (XML + legacy HTML comments) + XML extraction tests (TDD)
+- [x] 08-02-PLAN.md — Rewrite rules/feynman-activate.md as XML contract (≤4480 bytes; closes SPEC §1-§9, §11)
+- [x] 08-03-PLAN.md — README compaction-survivor section (Why UserPromptSubmit, not SessionStart)
+- [x] 08-04-PLAN.md — Iteration-2 3-way A/B harness + 08-VERIFICATION.md with all 14 SPEC criteria
 
 **UI hint**: no
 

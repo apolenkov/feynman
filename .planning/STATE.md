@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.2.0
-milestone_name: Production-Ready
-status: Awaiting next milestone
-stopped_at: v0.2.0 release complete
-last_updated: "2026-05-09T09:55:00.000Z"
-last_activity: 2026-05-09 — Completed quick task 260509-hvy: L09 right-edge alignment lint rule (v0.2.7)
+milestone: v0.3.0
+milestone_name: Prompt Architecture
+status: phase_complete
+stopped_at: Phase 8 released as v0.3.0; Phase 8.5 (lint autofix) next
+last_updated: "2026-05-10T11:50:00.000Z"
+last_activity: 2026-05-10 -- Phase 08 released as v0.3.0 (XML rule contract, token economy, suppression)
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 10
+  completed_phases: 9
+  total_plans: 12
+  completed_plans: 12
+  percent: 90
 ---
 
 # Project State
@@ -20,21 +20,21 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-05-06)
 
-**Core value:** Every response with structure gets an ASCII diagram without the developer asking. v0.2.0 closes the loop with a Stop-hook linter that validates output.
-**Current focus:** Milestone v0.2.0 complete; follow-up v0.2.1 launch polish is planned (publish automation and version drift cleanup)
+**Core value:** Every response with structure gets an ASCII diagram without the developer asking. v0.3.0 ships an XML rule contract with three-faced behavior (amplify / channel / suppress) and a 58% smaller injection payload.
+**Current focus:** v0.3.0 released; Phase 8.5 (lint autofix L09/L10) next
 
 ## Current Position
 
-Phase: Milestone v0.2.0 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-07 — Milestone v0.2.0 completed and archived
+Phase: 08 complete; 8.5 not started
+Plan: -
+Status: v0.3.0 released, tag pushed; npm publish pending (HUMAN: 2FA + npm login)
+Last activity: 2026-05-10 — Phase 8 closed, v0.3.0 tag + CHANGELOG entry
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 7
+- Total plans completed: 11
 - Average duration: -
 - Total execution time: -
 
@@ -50,6 +50,7 @@ Last activity: 2026-05-07 — Milestone v0.2.0 completed and archived
 | 6. Docs | done | - | - |
 | 6.5. Research | done | - | - |
 | 7. Release | done | - | - |
+| 08 | 4 | - | - |
 
 **Recent Trend:**
 
