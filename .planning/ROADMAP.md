@@ -179,7 +179,7 @@ Plans:
 **Goal**: `rules/feynman-activate.md` инжектит XML-структурированный rule-контракт с three-faced поведением: (1) **amplify** визуал где baseline пусто (sequence/branching), (2) **channel** в дешёвый формат где baseline уже визуализирует (comparison → MD table, status → dot-leader, hierarchy → indent), (3) **suppress** over-instrumentation для simple Q&A (definition/recommendation/greeting). Парсер хука читает `<intensity name="...">` вместо HTML-комментов. Compliance gain измерим через iteration-2 на eval-set из 20 промтов.
 **Depends on**: Phase 7 (v0.2.0 release shipped) + Q-2026-05-09-01 resolved (XML compatibility across Codex/Cursor)
 **Evidence base**: `.planning/notes/prompt-rewrite-research-2026-05-09.md` (research) + `.planning/notes/eval-iteration-1-findings-2026-05-09.md` (28 subagent runs)
-**Requirements**: TBD (соберутся в spec-phase)
+**Requirements**: PROMPT-01..11 (defined in 08-SPEC.md; map 1:1 to SPEC requirements §1-§11)
 **Factor scope** (research + eval evidence):
   - F1 XML-tagged sections (`<structure_triggers>`, `<diagram_syntax>`, `<examples>`, `<output_contract>`) — research
   - F2 ~~drop negative conditions~~ **CANCELLED** — eval-13/15 prove negatives protect single-fact/prose-opt-out
@@ -203,7 +203,11 @@ Plans:
   9. README — compaction-survivor value-prop
   10. iteration-2 A/B на 20-eval set: WIN-классы (sequence/branching) ≥ baseline compliance; HURT-классы (comparison/status/priority) → cheaper format AND ≤1 visual; negatives → NO regression
   11. Token cost: `additionalContext` payload ≥20% меньше (~5.6KB → ≤4.5KB)
-**Plans**: TBD
+**Plans:** 4 plans
+- [ ] 08-01-PLAN.md — Hook parser dual-format support (XML + legacy HTML comments) + XML extraction tests (TDD)
+- [ ] 08-02-PLAN.md — Rewrite rules/feynman-activate.md as XML contract (≤4480 bytes; closes SPEC §1-§9, §11)
+- [ ] 08-03-PLAN.md — README compaction-survivor section (Why UserPromptSubmit, not SessionStart)
+- [ ] 08-04-PLAN.md — Iteration-2 3-way A/B harness + 08-VERIFICATION.md with all 14 SPEC criteria
 
 **UI hint**: no
 
