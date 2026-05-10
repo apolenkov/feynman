@@ -3,14 +3,16 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Visual Economy
 status: planning
-last_updated: "2026-05-10T19:25:54.812Z"
+last_updated: "2026-05-10T23:30:00Z"
 last_activity: 2026-05-10
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 6
   completed_plans: 0
   percent: 0
+current_phase: 9
+current_phase_status: planned_ready_to_execute
 ---
 
 # Project State
@@ -25,10 +27,22 @@ See: .planning/MILESTONES.md (history of shipped milestones)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-05-10 — Milestone v0.4.0 started
+Phase: 9 — Smallest-visual-first lint rules (L11/L12/L13/L14)
+Plans: 6 (09-01..09-06), 16 tasks, 5 waves
+Status: Planned, ready to execute Wave 1 (09-01 L11 detection)
+Last activity: 2026-05-10 — Phase 9 plans created + revised + verified (commit a36def0)
+
+### Phase 9 Wave Structure
+
+```
+Wave 1: 09-01 (L11 detection)
+Wave 2: 09-02 (L12 detection)
+Wave 3: 09-03 (L13 detection)
+Wave 4: 09-04 (LINT-14 autofix — HUMAN-GATE) ∥ 09-05 (--explain CLI)
+Wave 5: 09-06 (docs L01-L13)
+```
+
+09-04 carries `human_review_required: true` + 4 design decision points (column-width policy, fallback, state-marker allowlist, whitelist composition). Operator must confirm before executing Wave 4.
 
 ## Shipped Milestones (recap)
 
@@ -54,4 +68,6 @@ Last activity: 2026-05-10 — Milestone v0.4.0 started
 
 ## Operator Next Steps
 
-- Start the next milestone with `/gsd-new-milestone`
+- Execute Phase 9 Wave 1: `/gsd-execute-phase 9 --wave 1` (recommended: fresh session per retro/advisor)
+- Or inline-TDD per Phase 8.5 pattern starting with 09-01 (RED → GREEN → REFACTOR)
+- After Wave 3 ships: HUMAN gate for 09-04 LINT-14 design decisions before Wave 4
