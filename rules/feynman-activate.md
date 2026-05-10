@@ -35,6 +35,7 @@ repo
 <contract>
 classify shape → channel (replace inline visual), amplify (add when baseline produces none),
 or suppress (prose for definition, recommendation, greeting, question-back). Single facts: no diagram.
+**bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
 
@@ -88,6 +89,7 @@ UAT→SCENARIO/EXPECTED/ACTUAL/RESULT | risk-register→RISK/IMPACT/MITIGATION/O
 3. Suppress: definition queries, recommendation queries, greeting, conversational
    question-back — answer stays in prose, no visual added.
 Responses with no enumerable structure stay in prose. Single facts and code-only blocks have no diagram.
+**bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
 
@@ -112,5 +114,6 @@ One primary visual per response. SDLC patterns are mutex — use at most one per
 2. Suppression outranks triggers — apply triggers only after suppression check passes.
 3. Suppress: definition, recommendation, greeting, conversational question-back — prose only.
 4. Channel / amplify per trigger table for everything else.
+**bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
