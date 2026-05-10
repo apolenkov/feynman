@@ -165,6 +165,63 @@ Phase 8.5 fixes **misaligned** frames (autofix engine). This research is
 about **avoiding the frame in the first place** when a lighter visual
 fits. Different problem, different rules, different phase.
 
+## Output-style presets (`short` / `middle` / `full`) — new axis
+
+Proposed by user 2026-05-10. Orthogonal to current `lite | full | ultra`
+intensities (which control **rules-file size**, i.e. how much instruction
+the agent ingests). This new axis controls **output style** — how much
+visual decoration the agent produces.
+
+```
+axis                  what it controls           current state
+──────────────────── ─────────────────────────  ──────────────
+intensity (lite/full/  size of injected ruleset   shipped (Phase 8)
+ultra)                 the agent sees
+output-style (short/   how heavy the agent's      NEW — proposed
+middle/full)           visuals can be
+```
+
+Three presets:
+
+| preset  | visual ceiling                              | use case                  |
+|---------|---------------------------------------------|---------------------------|
+| short   | inline glyphs + dot-leader; no frames/trees | mobile/voice, dense chat  |
+| middle  | + trees, markdown tables; frame only ≥6    | balanced default          |
+| full    | + frame blocks, side-by-side, ASCII art    | spec docs, retros, design |
+
+Mapping to the smallest-visual-first ladder:
+
+```
+prose → inline-glyph → dot-leader → tree → md-table → frame-block
+  └──── short ────┘
+  └────────── middle ──────────┘
+  └──────────────────── full ────────────────────┘
+```
+
+How it ships (sketch):
+
+- Store `output_style` in `~/.claude/.feynman/state.json` alongside
+  existing `intensity` field. Schema change, but additive — back-compat
+  preserved via default = `full`.
+- `/feynman style short|middle|full` skill subcommand to switch.
+- Rules-file adds a `<style>` element per intensity (one line each)
+  read by hook before injection — but the simpler path is **runtime
+  filtering**: the hook reads `output_style`, and if `short`, appends
+  a single suppression line to additionalContext:
+  `Output style: short — no frame-blocks, no ASCII art, dot-leader only.`
+  No bytes added to rules-file unless user opted in.
+
+Why this is cheap to implement:
+- No new lint rules needed (orthogonal to L11/L12/L13).
+- No rules-file budget impact if implemented as runtime suffix.
+- Reversible per session — user toggles when context calls for it.
+
+Risk:
+- Three intensities × three output-styles = 9 combinations. Need a
+  preset matrix in docs to avoid combinatorial confusion. Most users
+  will likely stay on `full + middle` (the proposed sane default for
+  v0.4.x).
+
 ## Implementation note for v0.4.x
 
 Two phases worth:
