@@ -72,9 +72,10 @@ Tagline: "why explain in words when diagram do trick"
 - Без переноса строки в конце. Никогда `console.log` — добавляет `\n`, ломает JSON.
 
 ### Формат файла правил
-- Варианты интенсивности ограничены маркерами: `<!-- lite -->` … `<!-- /lite -->`
+- Варианты интенсивности задаются XML-элементами: `<intensity name="lite">…</intensity>`
 - Допустимые значения: `lite` | `full` | `ultra`. По умолчанию: `full`
 - Правила — только декларативные факты, не команды (баг #17804)
+- Хук поддерживает оба формата: XML (канонический, Phase 8) и HTML-комментарии (обратная совместимость; решение Q-2026-05-09-01)
 
 ### Файл состояния + флаг-файл
 - Состояние: `~/.claude/.feynman/state.json` или `~/.codex/.feynman/state.json` — схема `{enabled: boolean, intensity: string, injections: number}`
