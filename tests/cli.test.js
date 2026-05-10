@@ -956,3 +956,93 @@ describe('bin/feynman.js', () => {
   });
 
 });
+
+// ─── feynman-lint --explain (Plan 09-05) ─────────────────────────────────────
+
+describe('feynman-lint --explain flag', () => {
+  const BIN = path.resolve(REPO_DIR, 'bin', 'feynman-lint.js');
+
+  function runCli(args, stdin) {
+    return spawnSync(process.execPath, [BIN, ...args], {
+      input: stdin,
+      encoding: 'utf8',
+    });
+  }
+
+  it('--explain flag accepted (no unknown-flag error)', () => {
+    const tmp = path.join(os.tmpdir(), `feynman-explain-${process.pid}.md`);
+    fs.writeFileSync(tmp, 'no diagrams here\n');
+    try {
+      const r = runCli(['--explain', tmp]);
+      assert.notEqual(r.status, 2, `unknown-flag error: ${r.stderr}`);
+    } finally {
+      try { fs.unlinkSync(tmp); } catch (_) {}
+    }
+  });
+
+  it('--explain emits per-frame cost annotation', () => {
+    const tmp = path.join(os.tmpdir(), `feynman-explain2-${process.pid}.md`);
+    const input = '```\n┌────────────────┐\n│ a              │\n│ b              │\n│ c              │\n└────────────────┘\n```\n';
+    fs.writeFileSync(tmp, input);
+    try {
+      const r = runCli(['--explain', tmp]);
+      const out = r.stdout + r.stderr;
+      assert.match(out, /framing/i, `expected 'framing' in output: ${out}`);
+      assert.match(out, /dot-leader/i, `expected 'dot-leader' in output: ${out}`);
+      assert.match(out, /saving/i, `expected 'saving' in output: ${out}`);
+      assert.match(out, /\d+\s*chars/, `expected char counts in output: ${out}`);
+    } finally {
+      try { fs.unlinkSync(tmp); } catch (_) {}
+    }
+  });
+
+  it('--explain on no-frame input produces no annotation', () => {
+    const tmp = path.join(os.tmpdir(), `feynman-explain3-${process.pid}.md`);
+    fs.writeFileSync(tmp, 'just prose, no diagrams\n');
+    try {
+      const r = runCli(['--explain', tmp]);
+      const out = r.stdout + r.stderr;
+      assert.doesNotMatch(out, /framing/, `unexpected 'framing' annotation: ${out}`);
+    } finally {
+      try { fs.unlinkSync(tmp); } catch (_) {}
+    }
+  });
+
+  it('--explain --json emits JSON-formatted cost data', () => {
+    const tmp = path.join(os.tmpdir(), `feynman-explain4-${process.pid}.md`);
+    const input = '```\n┌──────────┐\n│ a        │\n│ b        │\n└──────────┘\n```\n';
+    fs.writeFileSync(tmp, input);
+    try {
+      const r = runCli(['--explain', '--json', tmp]);
+      const parsed = JSON.parse(r.stdout);
+      assert.ok(parsed, 'JSON parseable');
+      assert.ok('explain' in parsed, `expected explain key in JSON: ${r.stdout}`);
+      assert.ok(Array.isArray(parsed.explain), 'explain must be an array');
+      assert.ok(parsed.explain.length >= 1, 'one frame should produce one explain entry');
+      const e0 = parsed.explain[0];
+      assert.equal(typeof e0.line, 'number');
+      assert.equal(typeof e0.cost.framing_chars, 'number');
+      assert.equal(typeof e0.cost.saving, 'number');
+    } finally {
+      try { fs.unlinkSync(tmp); } catch (_) {}
+    }
+  });
+
+  it('--help documents --explain', () => {
+    const r = runCli(['--help']);
+    assert.match(r.stdout, /--explain/, `--explain must appear in --help output`);
+  });
+
+  it('--explain does NOT modify the file', () => {
+    const tmp = path.join(os.tmpdir(), `feynman-explain5-${process.pid}.md`);
+    const input = '```\n┌──────┐\n│ a    │\n│ b    │\n└──────┘\n```\n';
+    fs.writeFileSync(tmp, input);
+    try {
+      runCli(['--explain', tmp]);
+      const after = fs.readFileSync(tmp, 'utf8');
+      assert.equal(after, input, '--explain must be read-only on disk');
+    } finally {
+      try { fs.unlinkSync(tmp); } catch (_) {}
+    }
+  });
+});
