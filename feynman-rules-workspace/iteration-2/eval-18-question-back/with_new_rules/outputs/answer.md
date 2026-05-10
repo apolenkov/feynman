@@ -1,0 +1,1 @@
+What's the main pain point — conversion (users abandoning), confusion (support tickets), or aesthetics? And is the primary user self-serve or assisted by your support team? Those two answers determine whether to focus on flow simplification, information clarity, or visual polish.
