@@ -534,6 +534,101 @@ describe('feynman-activate hook', () => {
   });
 
   // -------------------------------------------------------------------------
+  // rules-file integrity (production rules) — asserts live rules/feynman-activate.md
+  // These tests read the production artifact directly. They FAIL on the old HTML-comment
+  // format (red phase) and PASS once Task 2 rewrites the file to XML contract.
+  // -------------------------------------------------------------------------
+  describe('rules-file integrity (production rules)', () => {
+    const RULES_FILE = path.resolve(__dirname, '..', 'rules', 'feynman-activate.md');
+    let rulesContent;
+    let rulesBytes;
+
+    before(() => {
+      rulesContent = fs.readFileSync(RULES_FILE, 'utf8');
+      rulesBytes   = fs.statSync(RULES_FILE).size;
+    });
+
+    it('file size ≤ 4480 bytes', () => {
+      assert.ok(rulesBytes <= 4480, `rules file is ${rulesBytes} bytes — must be ≤ 4480`);
+    });
+
+    it('contains exactly 3 <intensity name="…"> opening tags', () => {
+      const matches = rulesContent.match(/<intensity\s+name\s*=\s*["'][^"']+["']\s*>/g) || [];
+      assert.equal(matches.length, 3, `expected 3 <intensity name=...> tags, found ${matches.length}`);
+    });
+
+    it('contains exactly 3 </intensity> closing tags', () => {
+      const matches = rulesContent.match(/<\/intensity>/g) || [];
+      assert.equal(matches.length, 3, `expected 3 </intensity> closing tags, found ${matches.length}`);
+    });
+
+    it('contains zero legacy HTML-comment intensity markers', () => {
+      const legacy = (rulesContent.match(/<!--\s*\/?(lite|full|ultra)\s*-->/g) || []).length;
+      assert.equal(legacy, 0, `found ${legacy} legacy HTML-comment markers — must be removed`);
+    });
+
+    it('contains at least one each of <triggers> <syntax> <examples> <contract> tags', () => {
+      assert.ok(/<triggers>/.test(rulesContent), 'missing <triggers> tag');
+      assert.ok(/<syntax>/.test(rulesContent), 'missing <syntax> tag');
+      assert.ok(/<examples>/.test(rulesContent), 'missing <examples> tag');
+      assert.ok(/<contract>/.test(rulesContent), 'missing <contract> tag');
+    });
+
+    it('<contract> content contains classify, channel, amplify, suppress', () => {
+      const contractMatch = rulesContent.match(/<contract>([\s\S]*?)<\/contract>/i);
+      assert.ok(contractMatch, 'no <contract>…</contract> block found');
+      const body = contractMatch[1].toLowerCase();
+      for (const word of ['classify', 'channel', 'amplify', 'suppress']) {
+        assert.ok(body.includes(word), `<contract> missing word: ${word}`);
+      }
+    });
+
+    it('SDLC patterns wrapper: <patterns selection="one-of"> or "select ONE" or "mutex"', () => {
+      const hasWrapper  = /<patterns\s+selection\s*=\s*["']one-of["']>/.test(rulesContent);
+      const hasSelectOne = /select ONE/i.test(rulesContent);
+      const hasMutex    = /mutex/.test(rulesContent);
+      assert.ok(hasWrapper || hasSelectOne || hasMutex, 'missing mutex SDLC pattern marker');
+    });
+
+    it('suppression guidance names all four classes: definition, recommendation, question, greeting', () => {
+      const lower = rulesContent.toLowerCase();
+      for (const word of ['definition', 'recommendation', 'question', 'greeting']) {
+        assert.ok(lower.includes(word), `suppression guidance missing: ${word}`);
+      }
+    });
+
+    it('few-shot literal-character density: ≥6 "├──" occurrences', () => {
+      const count = (rulesContent.match(/├──/g) || []).length;
+      assert.ok(count >= 6, `found ${count} "├──" occurrences — need ≥ 6`);
+    });
+
+    it('few-shot arrow density: ≥6 "→" occurrences', () => {
+      const count = (rulesContent.match(/→/g) || []).length;
+      assert.ok(count >= 6, `found ${count} "→" occurrences — need ≥ 6`);
+    });
+
+    it('hook extracts each intensity (lite/full/ultra) as non-empty and distinct content', () => {
+      // Inline xmlMatchers — doubles as contract assertion against hook drift
+      const xmlMatchers = {
+        lite:  /<intensity\s+name\s*=\s*["']lite["']\s*>([\s\S]*?)<\/intensity>/,
+        full:  /<intensity\s+name\s*=\s*["']full["']\s*>([\s\S]*?)<\/intensity>/,
+        ultra: /<intensity\s+name\s*=\s*["']ultra["']\s*>([\s\S]*?)<\/intensity>/,
+      };
+      const extracted = {};
+      for (const [name, re] of Object.entries(xmlMatchers)) {
+        const m = re.exec(rulesContent);
+        assert.ok(m, `hook regex could not extract <intensity name="${name}"> block`);
+        const content = m[1].trim();
+        assert.ok(content.length > 0, `extracted ${name} content is empty`);
+        extracted[name] = content;
+      }
+      assert.notEqual(extracted.lite, extracted.full,  'lite and full must be distinct');
+      assert.notEqual(extracted.full, extracted.ultra, 'full and ultra must be distinct');
+      assert.notEqual(extracted.lite, extracted.ultra, 'lite and ultra must be distinct');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Extra: session_id path-traversal guard
   // -------------------------------------------------------------------------
   describe('Security: session_id path-traversal guard', () => {
