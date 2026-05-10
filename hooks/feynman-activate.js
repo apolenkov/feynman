@@ -17,7 +17,15 @@ const STATE_PATH  = path.join(FEYNMAN_DIR, 'state.json');
 const FLAG_PATH   = path.join(CLIENT_HOME, '.feynman-active');
 const RULES_PATH  = path.join(__dirname, '..', 'rules', 'feynman-activate.md');
 
-const DEFAULT_STATE = { enabled: true, intensity: 'full', injections: 0 };
+const DEFAULT_STATE = { enabled: true, intensity: 'full', output_style: 'full', injections: 0 };
+
+// One-line suffix per output_style. `full` is the default ⇒ no suffix.
+// Suffix is appended to additionalContext after the rules text (Phase 10
+// STYLE-03). Keeps rules-file 4480-byte budget intact — pure runtime hint.
+const OUTPUT_STYLE_SUFFIX = {
+  short:  '\n\nOutput style: short — dot-leader and inline glyphs only; no frames, no ASCII art, no trees.',
+  middle: '\n\nOutput style: middle — frame blocks only for ≥6 items; prefer trees and markdown tables.',
+};
 
 // --- stdin accumulator: buffer all input before processing ---
 let input = '';
@@ -104,6 +112,16 @@ process.stdin.on('end', () => {
     }
 
     if (!rulesText) process.exit(0);
+
+    // Step 5.5: append output_style suffix (Phase 10 STYLE-03)
+    // Orthogonal axis to intensity: intensity controls rules-file SIZE,
+    // output_style controls visual verbosity in the model's response.
+    // Invalid values fall back to 'full' (no suffix) for safety.
+    const styleValue = (typeof state.output_style === 'string') ? state.output_style : 'full';
+    const styleSuffix = OUTPUT_STYLE_SUFFIX[styleValue]; // undefined for 'full' or invalid
+    if (styleSuffix) {
+      rulesText = rulesText + styleSuffix;
+    }
 
     // Step 6: increment injection counter and write state back (HOOK-05)
     // Backward-compat: read legacy count field on first migration cycle
