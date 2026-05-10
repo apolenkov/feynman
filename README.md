@@ -19,6 +19,7 @@
 
 <p align="center">
   <a href="#why-feynman">Why</a> •
+  <a href="#why-feynman-uses-userpromptsubmit-not-sessionstart">Compaction</a> •
   <a href="docs/object-passport.md">Passport</a> •
   <a href="#before--after">Before/After</a> •
   <a href="#install">Install</a> •
@@ -53,6 +54,14 @@ structure is visible before you have to think about it.
 
 Conceptually, feynman is inspired by prompt-compression ideas from the Caveman
 agent style: smaller prompts, clearer intent, and explicit diagram-first thinking.
+
+### Why feynman uses UserPromptSubmit (not SessionStart)
+
+Claude Code compacts the context window automatically as a conversation grows.
+Anything injected by a `SessionStart` hook is part of that early context and is
+lost the moment compaction runs. The `UserPromptSubmit` hook fires on every turn,
+so feynman re-injects its diagram rules after every compaction event — the rules
+survive the entire session, not just the opening turn.
 
 ## Governance docs
 
