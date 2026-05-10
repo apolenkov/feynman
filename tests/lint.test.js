@@ -424,6 +424,49 @@ describe('L11 overdecoration — unit tests', () => {
 });
 
 // ---------------------------------------------------------------------------
+// L12 token-budget — unit tests
+// ---------------------------------------------------------------------------
+describe('L12 token-budget — unit tests', () => {
+  const { estimateFrameCost } = require(path.resolve(__dirname, '..', 'lib', 'lint', 'rules'));
+
+  it('estimateFrameCost returns required cost shape', () => {
+    const cost = estimateFrameCost({
+      top: '┌──────────┐',
+      inner: ['│ a     │', '│ b     │'],
+      bottom: '└──────────┘',
+    });
+    assert.equal(typeof cost.framing_chars, 'number');
+    assert.equal(typeof cost.content_chars, 'number');
+    assert.equal(typeof cost.border_chars, 'number');
+    assert.equal(typeof cost.padding_chars, 'number');
+    assert.equal(typeof cost.dotleader_equivalent, 'number');
+    assert.equal(typeof cost.saving, 'number');
+    assert.ok(cost.saving >= 0, 'saving must be non-negative');
+  });
+
+  it('padding-dominated frame flagged', () => {
+    const md = '```\n┌────────────────────────────┐\n│ a                          │\n│ b                          │\n│ c                          │\n└────────────────────────────┘\n```';
+    const result = lint(md);
+    const l12 = result.issues.filter(i => i.rule === 'L12');
+    assert.ok(l12.length >= 1);
+    assert.equal(l12[0].severity, 'warn');
+  });
+
+  it('content-dominated frame NOT flagged', () => {
+    const md = '```\n┌──────────────────────────────┐\n│ deploy production step alpha │\n│ deploy production step beta  │\n└──────────────────────────────┘\n```';
+    const result = lint(md);
+    const l12 = result.issues.filter(i => i.rule === 'L12');
+    assert.equal(l12.length, 0);
+  });
+
+  it('tree composition inside frame is NOT flagged (whitelist)', () => {
+    const md = '```\n┌──────────────┐\n│ root         │\n│ ├── child    │\n│ └── leaf     │\n└──────────────┘\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L12').length, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Parser: standalone block detection (lines 195-220 in parser.js)
 // ---------------------------------------------------------------------------
 describe('Parser: standalone diagram detection', () => {
