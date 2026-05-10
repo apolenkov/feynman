@@ -2,16 +2,18 @@
 gsd_state_version: 1.0
 milestone: v0.3.0
 milestone_name: Prompt Architecture
-status: phase_complete
-stopped_at: Phase 8 released as v0.3.0; Phase 8.5 (lint autofix) next
-last_updated: "2026-05-10T11:50:00.000Z"
-last_activity: 2026-05-10 -- Phase 08 released as v0.3.0 (XML rule contract, token economy, suppression)
+status: phase_partial
+stopped_at: v0.3.2 published; Phase 8.5 60% (autofix engine + L10 + CLI --fix landed; Stop-hook + L08 hardening + docs remain)
+last_updated: "2026-05-10T16:30:00.000Z"
+last_activity: 2026-05-10 -- v0.3.2 release (autofix engine + L10 mixed-script + CLI --fix flag)
 progress:
   total_phases: 10
   completed_phases: 9
-  total_plans: 12
-  completed_plans: 12
-  percent: 90
+  in_progress_phases: 1
+  total_plans: 16
+  completed_plans: 14
+  partial_plans: 1
+  percent: 88
 ---
 
 # Project State
@@ -20,15 +22,15 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-05-06)
 
-**Core value:** Every response with structure gets an ASCII diagram without the developer asking. v0.3.0 ships an XML rule contract with three-faced behavior (amplify / channel / suppress) and a 58% smaller injection payload.
-**Current focus:** v0.3.0 released; Phase 8.5 (lint autofix L09/L10) next
+**Core value:** Every response with structure gets an ASCII diagram without the developer asking. v0.3.x ships XML rule contract + three-faced behavior + autofix engine for misaligned ASCII frames + L10 mixed-script warn.
+**Current focus:** Phase 8.5 60% complete; Stop-hook autofix integration + L08 hardening + docs remain (next fresh session)
 
 ## Current Position
 
-Phase: 08 complete; 8.5 not started
-Plan: -
-Status: v0.3.0 released, tag pushed; npm publish pending (HUMAN: 2FA + npm login)
-Last activity: 2026-05-10 — Phase 8 closed, v0.3.0 tag + CHANGELOG entry
+Phase: 08.5 (partial)
+Plan: 08-5-01, 08-5-02, 08-5-04 (partial) landed; 08-5-03 and 08-5-04 parts 2-3 pending
+Status: v0.3.2 published to npm; pending: Stop-hook autofix + L08 hardening + docs
+Last activity: 2026-05-10 — v0.3.2 released (autofix engine + L10 + CLI --fix)
 
 ## Performance Metrics
 
