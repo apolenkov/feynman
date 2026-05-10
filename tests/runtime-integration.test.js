@@ -123,8 +123,8 @@ describe('installed Feynman hook command integration', () => {
         assert.equal(session.status, 0, `${target} SessionStart exited non-zero`);
         assert.equal(session.stderr, '', `${target} SessionStart stderr: ${session.stderr}`);
         assert.ok(
-          session.stdout.length > 50,
-          `${target} SessionStart should emit non-trivial rules text`
+          /<triggers>|<contract>|→|├──/.test(session.stdout),
+          `${target} SessionStart should emit rule-file diagram tokens`
         );
 
         const prompt = runConfiguredHook(tmpHome, promptCommand, {
@@ -137,8 +137,8 @@ describe('installed Feynman hook command integration', () => {
 
         const context = parsePromptHookOutput(prompt.stdout);
         assert.ok(
-          context.length > 50,
-          `${target} additionalContext should contain diagram rules`
+          /<triggers>|<contract>|→|├──/.test(context),
+          `${target} additionalContext should contain rule-file diagram tokens`
         );
 
         const state = readJson(path.join(runtimeHome(tmpHome, target), '.feynman', 'state.json'));

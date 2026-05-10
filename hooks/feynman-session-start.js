@@ -26,11 +26,16 @@ function readRules(intensity) {
   const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
   const selected = VALID_INTENSITIES.includes(intensity) ? intensity : 'full';
 
-  // XML format: <intensity name="...">...</intensity> (Plan 08-02 canonical form)
+  // Sanity: opening/closing intensity tags must balance (WR-02 cross-block guard)
+  const opens  = (rulesContent.match(/<intensity\b/gi) || []).length;
+  const closes = (rulesContent.match(/<\/intensity>/gi) || []).length;
+  if (opens === 0 || opens !== closes) return '';
+
+  // XML matcher map: tolerate trailing attributes (WR-01) and case (WR-03)
   const xmlMatchers = {
-    lite:  /<intensity\s+name\s*=\s*["']lite["']\s*>([\s\S]*?)<\/intensity>/,
-    full:  /<intensity\s+name\s*=\s*["']full["']\s*>([\s\S]*?)<\/intensity>/,
-    ultra: /<intensity\s+name\s*=\s*["']ultra["']\s*>([\s\S]*?)<\/intensity>/,
+    lite:  /<intensity\s+name\s*=\s*["']lite["'][^>]*>([\s\S]*?)<\/intensity>/i,
+    full:  /<intensity\s+name\s*=\s*["']full["'][^>]*>([\s\S]*?)<\/intensity>/i,
+    ultra: /<intensity\s+name\s*=\s*["']ultra["'][^>]*>([\s\S]*?)<\/intensity>/i,
   };
   const xmlMatch = xmlMatchers[selected].exec(rulesContent);
   if (xmlMatch) return xmlMatch[1].trim();

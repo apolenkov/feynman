@@ -263,9 +263,9 @@ describe('Codex app-server hook visibility contract', () => {
         assert.equal(completed.run.handlerType, 'command');
         assert.ok(
           completed.run.entries.some((entry) =>
-            entry.kind === 'context' && entry.text.length > 50
+            entry.kind === 'context' && /<triggers>|<contract>|→|├──/.test(entry.text)
           ),
-          'Codex should expose Feynman additionalContext in hook/completed entries'
+          'Codex should expose Feynman rule-file diagram tokens in hook/completed entries'
         );
       } finally {
         client.close();
