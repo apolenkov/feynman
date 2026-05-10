@@ -8,6 +8,7 @@
 'use strict';
 
 const { lint } = require('../lib/lint');
+const { autofix } = require('../lib/lint/autofix');
 
 // Rule descriptions for actionable feedback
 const RULE_DESCRIPTIONS = {
@@ -66,6 +67,29 @@ process.stdin.on('end', () => {
     const response = data.response || data.message || '';
 
     if (!response || typeof response !== 'string') {
+      process.exit(0);
+    }
+
+    // First pass: try autofix on misaligned ASCII frames in prose (outside fenced
+    // code blocks). If autofix changes anything, emit the fixed text wrapped in
+    // <feynman-autofix> so Claude can show it back to the user without
+    // re-running the rule-feedback machinery. Fenced frames are skipped by
+    // autofix itself — those are user-authored samples that should not be
+    // silently rewritten.
+    let autofixed = response;
+    try {
+      autofixed = autofix(response);
+    } catch (_) {
+      // autofix is best-effort — never crash the hook
+      autofixed = response;
+    }
+    if (autofixed !== response) {
+      process.stdout.write(JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'Stop',
+          additionalContext: '<feynman-autofix>\n' + autofixed + '\n</feynman-autofix>'
+        }
+      }));
       process.exit(0);
     }
 
