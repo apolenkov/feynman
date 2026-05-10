@@ -327,16 +327,24 @@ styles, inconsistent column counts, mixed-script words, and more.
 
 ```bash
 npx @albinocrabs/feynman lint response.md            # detect only (exit 1 on error)
-npx @albinocrabs/feynman lint --fix response.md      # detect + repair misaligned frames in place
+npx @albinocrabs/feynman lint --fix response.md      # detect + repair frames in place
+npx @albinocrabs/feynman lint --explain response.md  # annotate frames with token cost
 ```
 
 `--fix` rebuilds the top/bottom borders and pads inner rows of every frame
 block (`┌─...─┐ ... └─...─┘`) so the right edge aligns by visual column —
 ANSI escapes, combining marks, zero-width joiners are stripped, CJK wide
-chars count as 2 cols. Idempotent on already-clean files. Fenced frames
-(inside ` ``` `) are not touched.
+chars count as 2 cols. Additionally, L11-overdecorated frames (≤5 inner
+lines without nested trees or embedded table columns) convert to dot-leader
+lists (`label ........ state`) — Unicode markers preserved, indentation
+preserved. Idempotent on already-clean files.
 
-See [docs/lint-rules.md](docs/lint-rules.md) for the full L01-L10 reference.
+`--explain` is read-only — it emits a per-frame breakdown showing
+`framing: ~N chars (border: B, padding: P, content: C)`,
+`equivalent dot-leader: ~M chars`, and the saving. Use it to understand
+why L11 or L12 fired and how many chars a lighter visual would save.
+
+See [docs/lint-rules.md](docs/lint-rules.md) for the full L01-L13 reference.
 
 ### Quick hard-disable / re-enable (testing and emergency)
 
