@@ -1,9 +1,13 @@
 # Lint Rules Reference
 
 feynman includes a linter for ASCII diagrams in markdown files.
-Nine rules (L01-L09) enforce structural correctness.
+Ten rules (L01-L10) enforce structural correctness.
 
 Run: `npx @albinocrabs/feynman lint <file.md>` or `feynman lint <file.md>`
+
+Add `--fix` to repair misaligned frame borders in-place:
+`feynman lint --fix <file.md>` — see [L08](#l08-frame-width-discipline-severity-error)
+and [L09](#l09-right-edge-alignment-severity-error).
 
 ---
 
@@ -313,10 +317,18 @@ column-precise drift on every offending row, including the bottom `┘`.
 
 **Source:** [`lib/lint/rules.js#L563`](../lib/lint/rules.js)
 
-L09 uses codepoint-aware indexing (matching the L01 column convention), so
-box-drawing characters and Cyrillic/Latin letters all count as 1. Lines with
-no `│` (decorative gap lines) are skipped. Frames that never close are not
+L09 uses visual-column indexing via the shared `lib/lint/width.js` helper:
+ANSI escapes (`\x1b[...m`), combining marks (U+0300..U+036F), zero-width
+joiners (U+200B..U+200F), and BOM strip to width 0; CJK wide chars
+(U+4E00..U+9FFF and related ranges) count as 2 cols. Lines with no `│`
+(decorative gap lines) are skipped. Frames that never close are not
 flagged here — L01 reports unclosed frames separately.
+
+Frames in bare prose (outside fenced code blocks) can be **autofixed**
+in-place via `feynman lint --fix <file>`. The autofix engine rebuilds the
+top/bottom borders and pads inner rows so every `│`/`┘` lands at the same
+visual column. Fenced frames (` ```...``` `) are skipped — those are
+user-authored samples that should not be silently rewritten.
 
 ### Valid
 
@@ -340,6 +352,54 @@ Output:
 ```text
 file:3:11: L09 Frame inner row '│' at col 17 does not align with top '┐' at col 11 (line 1)
 ```
+
+---
+
+## L10: Mixed-Script Words (severity: warn)
+
+**What:** A single word must not mix Cyrillic and Latin letters (e.g.
+`zaфикшено` or `Cyrвнутри`). Project identifiers — anything in
+`package.json`'s `name`, `keywords`, or `bin` fields, hyphenated kebab
+tokens (`gsd-sdk`, `feynman-lint`, `worktree-agent-abc123`), and
+numeric-suffixed alphas (`foo123`) — are whitelisted.
+
+**Why:** Mixed Cyrillic+Latin tokens are a classic Runglish defect under
+fast typing or autocorrect ("Anti-Runglish" rule from
+`~/.claude/rules/language.md`). The token usually renders identically to
+its Latin counterpart but breaks search, grep, and IDE rename. Severity
+is `warn` not `error` — single-language teams may legitimately use
+Russian-spelled English-like terms, so the linter surfaces these without
+failing CI exit codes.
+
+**Source:** [`lib/lint/rules.js#L10_mixed_script`](../lib/lint/rules.js)
+
+L10 operates on full text (not per-diagram AST), so it catches mixed
+tokens in prose, list items, and headings — anywhere words appear. Words
+inside fenced code blocks are still checked (the linter treats them as
+documentation content, not user-authored samples).
+
+### Valid
+
+```text
+повторить зафикшено
+проверь gsd-sdk пакет
+worktree-agent-abc123
+```
+
+### Invalid
+
+```text
+повторить zaфикшено
+тест Cyrвнутри слова
+```
+
+Output:
+```text
+file:1:11: L10 warn mixed-script token: zaфикшено
+```
+
+`--strict` flag promotes L10 warnings to failures; the default exit code
+is unaffected by L10 hits.
 
 ---
 

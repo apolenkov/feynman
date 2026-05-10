@@ -323,13 +323,20 @@ Toggle via `/feynman`:
 
 feynman includes a linter for ASCII diagrams. It catches structural errors
 before they reach readers: unclosed boxes, wrong tree characters, mixed arrow
-styles, inconsistent column counts, and more.
+styles, inconsistent column counts, mixed-script words, and more.
 
 ```bash
-npx @albinocrabs/feynman lint response.md
+npx @albinocrabs/feynman lint response.md            # detect only (exit 1 on error)
+npx @albinocrabs/feynman lint --fix response.md      # detect + repair misaligned frames in place
 ```
 
-See [docs/lint-rules.md](docs/lint-rules.md) for the full L01-L08 reference.
+`--fix` rebuilds the top/bottom borders and pads inner rows of every frame
+block (`┌─...─┐ ... └─...─┘`) so the right edge aligns by visual column —
+ANSI escapes, combining marks, zero-width joiners are stripped, CJK wide
+chars count as 2 cols. Idempotent on already-clean files. Fenced frames
+(inside ` ``` `) are not touched.
+
+See [docs/lint-rules.md](docs/lint-rules.md) for the full L01-L10 reference.
 
 ### Quick hard-disable / re-enable (testing and emergency)
 
