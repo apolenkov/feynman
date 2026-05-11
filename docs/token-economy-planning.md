@@ -100,3 +100,25 @@ Over-decorated single item (use a dot-leader instead):
 - Does every parallel track have a side-by-side block instead of a numbered list?
 - Does every table or status frame stand alone, with prose only for what the visual cannot express?
 - Is there a preamble sentence that says what the diagram is about to show? Delete it.
+
+## Beyond planning — delegation
+
+For heavy multi-step planning sessions, feynman's token savings compound with
+the Subagent Delegation principle — delegate research and implementation waves
+to subagents, keep the orchestrator lean.
+
+```text
+[orchestrator — feynman active, lean context]
+      │
+      ├── Wave 1: N parallel subagents (each with full brief)
+      │     └── each agent: fresh context, compact summary returned
+      │
+      └── Wave 2: orchestrator merges summaries, writes plan
+```
+
+feynman ensures that every subagent response — including diagram-heavy planning
+output — stays compact. The orchestrator's context stays below the compaction
+threshold longer.
+
+See: [SUBAGENT-DELEGATION.md](https://github.com/apolenkov/core-principles/blob/main/docs/core/SUBAGENT-DELEGATION.md)
+in the core-principles repository for the full delegation principle.
