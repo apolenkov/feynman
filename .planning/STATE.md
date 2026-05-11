@@ -88,8 +88,15 @@ Full decision log: `.planning/notes/autonomous-log-2026-05-11.md`.
 
 ## Operator Next Steps
 
-1. **▲ ROTATE NPM TOKEN** — npmjs.com/settings/apolenkov/tokens. Create granular publish token scoped to `@albinocrabs/feynman`. Old `npm_7sfUg…` token is in transcript logs; treat as compromised.
-2. **After rotation:** `/gsd-plan-phase 13` → bump + manual `npm publish` with new token → GH release.
+1. **▲ ROTATE NPM TOKEN** (deferred — user said «потом») — npmjs.com/settings/apolenkov/tokens. Old token revoked server-side already, but user replaced inline at publish time, so a granular publish-scope token is recommended for future releases.
+2. **Wait for Claude Code Marketplace review** — submission received 2026-05-11, review team may reach out for clarifications.
+
+## Post-release status
+
+- v0.4.0 published to npm: `@albinocrabs/feynman@0.4.0`
+- GitHub Release: `v0.4.0` live
+- Marketplace submission: pending Anthropic review
+- Global install: 0.4.0 (was stale 0.2.6, fixed mid-session)
 
 ## Optional Follow-Ups (not blocking v0.4.0)
 
