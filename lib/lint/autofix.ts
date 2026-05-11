@@ -152,7 +152,7 @@ export function autofix(text: string, opts?: AutofixOptions): string {
   let i = 0;
   let inFence = false;
   while (i < lines.length) {
-    const line = lines[i];
+    const line = lines[i]!;
     // Fenced code block toggle — opt-out by default (Stop-hook contract).
     if (/^\s*```/.test(line)) {
       inFence = !inFence;
@@ -171,12 +171,12 @@ export function autofix(text: string, opts?: AutofixOptions): string {
       i++;
       continue;
     }
-    const indent = topMatch[1];
+    const indent = topMatch[1]!;
     let j = i + 1;
     const inner: string[] = [];
     let closed = false;
     while (j < lines.length) {
-      const next = lines[j];
+      const next = lines[j]!;
       const botMatch = next.match(/^(\s*)└─*┘\s*$/);
       if (botMatch && botMatch[1] === indent) {
         closed = true;
@@ -195,7 +195,7 @@ export function autofix(text: string, opts?: AutofixOptions): string {
     }
     if (inner.length === 0) {
       out.push(line);
-      out.push(lines[j]);
+      out.push(lines[j]!);
       i = j + 1;
       continue;
     }
@@ -203,7 +203,7 @@ export function autofix(text: string, opts?: AutofixOptions): string {
       kind: 'frame',
       top: line,
       inner,
-      bottom: lines[j],
+      bottom: lines[j]!,
       indent,
     };
     // Dispatch: L11-eligible AND opts.convertL11 → dot-leader; else → alignment.

@@ -73,9 +73,9 @@ export function L01_box_closure(ast: ASTNode): Issue[] {
   const botRights: Array<{line: number, col: number, charIdx: number}> = [];
 
   for (let li = 0; li < lines.length; li++) {
-    const ln = lines[li];
+    const ln = lines[li]!;
     for (let ci = 0; ci < ln.length; ci++) {
-      const ch = ln[ci];
+      const ch = ln[ci]!;
       if (ch === '┌') topLefts.push({ line: baseLineNum + li, col: ci + 1, charIdx: ci });
       else if (ch === '┐') topRights.push({ line: baseLineNum + li, col: ci + 1, charIdx: ci });
       else if (ch === '└') botLefts.push({ line: baseLineNum + li, col: ci + 1, charIdx: ci });
@@ -152,7 +152,7 @@ export function L02_tree_chars(ast: ASTNode): Issue[] {
   const baseLineNum = ast.startLine;
 
   for (let li = 0; li < lines.length; li++) {
-    const line = lines[li];
+    const line = lines[li]!;
 
     // Check for ├── lines
     const miteeMatch = line.match(/^(\s*(?:│\s*)*)├──/);
@@ -167,7 +167,7 @@ export function L02_tree_chars(ast: ASTNode): Issue[] {
     // Look for subsequent sibling lines: same prefix + (├── or └──)
     let hasNextSibling = false;
     for (let lj = li + 1; lj < lines.length; lj++) {
-      const next = lines[lj];
+      const next = lines[lj]!;
       if (next.trim() === '') break; // blank line ends the block
 
       // A sibling would start with same prefix then ├── or └──
@@ -222,7 +222,7 @@ export function L03_arrow_style(ast: ASTNode): Issue[] {
   const found = new Map<string, number>(); // style name -> first line number (1-based relative to doc)
 
   for (let li = 0; li < lines.length; li++) {
-    const line = lines[li];
+    const line = lines[li]!;
     const docLine = baseLineNum + li;
 
     for (const { name, re } of ARROW_PATTERNS) {
@@ -236,11 +236,11 @@ export function L03_arrow_style(ast: ASTNode): Issue[] {
 
   // Multiple styles found — report on the second+ style
   const styles = [...found.entries()];
-  const firstStyle = styles[0][0];
+  const firstStyle = styles[0]![0];
   const issues: Issue[] = [];
 
   for (let si = 1; si < styles.length; si++) {
-    const [name, lineNum] = styles[si];
+    const [name, lineNum] = styles[si]!;
     issues.push(issue(
       'L03', 'error', lineNum, 1,
       `Mixed arrow styles: diagram uses '${firstStyle}' and '${name}' — pick one style`,
@@ -270,7 +270,7 @@ export function L04_column_widths(ast: ASTNode): Issue[] {
   // A proper table row: starts with |, has at least one cell with a word char, multiple pipes
   const tableLines: Array<{li: number, line: string}> = [];
   for (let li = 0; li < lines.length; li++) {
-    const line = lines[li];
+    const line = lines[li]!;
     // Must start with optional whitespace then |
     if (!/^\s*\|/.test(line)) continue;
     // Must have at least 2 pipe chars (i.e. at least one cell between them)
@@ -291,8 +291,8 @@ export function L04_column_widths(ast: ASTNode): Issue[] {
     // Remove leading/trailing empty strings from the outer pipes
     let start = 0;
     let end = parts.length;
-    if (parts[0].trim() === '') start = 1;
-    if (parts[parts.length - 1].trim() === '') end = parts.length - 1;
+    if (parts[0]!.trim() === '') start = 1;
+    if (parts[parts.length - 1]!.trim() === '') end = parts.length - 1;
     return end - start;
   }
 
@@ -344,7 +344,7 @@ export function L05_flow_integrity(ast: ASTNode): Issue[] {
   const issues: Issue[] = [];
 
   for (let li = 0; li < lines.length; li++) {
-    const line = lines[li];
+    const line = lines[li]!;
     const boxes = [...line.matchAll(BOX_RE)];
 
     if (boxes.length < 2) continue;
@@ -352,8 +352,8 @@ export function L05_flow_integrity(ast: ASTNode): Issue[] {
     // Check between each consecutive pair of boxes
     let hasViolation = false;
     for (let bi = 0; bi < boxes.length - 1; bi++) {
-      const curEnd   = boxes[bi].index! + boxes[bi][0].length;
-      const nextStart = boxes[bi + 1].index!;
+      const curEnd   = boxes[bi]!.index! + boxes[bi]![0]!.length;
+      const nextStart = boxes[bi + 1]!.index!;
       const between  = line.slice(curEnd, nextStart);
 
       // If between region is pure whitespace (≥3 spaces), treat as parallel layout (not connected)
@@ -369,7 +369,7 @@ export function L05_flow_integrity(ast: ASTNode): Issue[] {
 
     if (hasViolation) {
       issues.push(issue(
-        'L05', 'error', baseLineNum + li, boxes[0].index! + 1,
+        'L05', 'error', baseLineNum + li, boxes[0]!.index! + 1,
         `${boxes.length} boxes on same line with no arrow between them: ${boxes.map(m => m[0]).join(', ')}`,
         `Add an arrow (-->, →) between consecutive boxes`
       ));
@@ -398,11 +398,11 @@ export function L06_priority_scale(ast: ASTNode): Issue[] {
 
   // Find the line with the existing marker
   for (let li = 0; li < lines.length; li++) {
-    const line = lines[li];
+    const line = lines[li]!;
     const upMatch = line.match(/^(\s*)▲\s+\S/);
     if (hasUp && upMatch) {
       issues.push(issue(
-        'L06', 'warn', baseLineNum + li, upMatch[1].length + 1,
+        'L06', 'warn', baseLineNum + li, upMatch[1]!.length + 1,
         `Priority scale has '▲' but missing '▼' — scales require both ends`,
         `Add a '▼' marker to indicate the low end of the priority scale`
       ));
@@ -411,7 +411,7 @@ export function L06_priority_scale(ast: ASTNode): Issue[] {
     const downMatch = line.match(/^(\s*)▼\s+\S/);
     if (hasDown && downMatch) {
       issues.push(issue(
-        'L06', 'warn', baseLineNum + li, downMatch[1].length + 1,
+        'L06', 'warn', baseLineNum + li, downMatch[1]!.length + 1,
         `Priority scale has '▼' but missing '▲' — scales require both ends`,
         `Add a '▲' marker to indicate the high end of the priority scale`
       ));
@@ -445,7 +445,7 @@ export function L07_no_mermaid_mix(_ast: ASTNode | null, fullText: string): Issu
   const lines = fullText.split('\n');
   let mermaidLine = 1;
   for (let li = 0; li < lines.length; li++) {
-    if (/```mermaid/i.test(lines[li])) {
+    if (/```mermaid/i.test(lines[li]!)) {
       mermaidLine = li + 1;
       break;
     }
@@ -477,7 +477,7 @@ export function L08_frame_width(ast: ASTNode): Issue[] {
   let frameWidth: number | null = null;
 
   for (let li = 0; li < lines.length; li++) {
-    const line = lines[li];
+    const line = lines[li]!;
     const docLine = baseLineNum + li;
 
     // Detect frame open line (contains ┌ and ┐)
@@ -540,7 +540,7 @@ export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
 
   let li = 0;
   while (li < lines.length) {
-    const topLine = lines[li];
+    const topLine = lines[li]!;
     // A frame opens on a line that contains both ┌ and ┐
     if (topLine.includes('┌') && topLine.includes('┐')) {
       const anchorTopCol = firstVisualColumnOf(topLine, '┌');
@@ -551,7 +551,7 @@ export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
       // visual column as ┌ AND the line contains ┘.
       let closeLi = -1;
       for (let lj = li + 1; lj < lines.length; lj++) {
-        const candidate = lines[lj];
+        const candidate = lines[lj]!;
         if (!candidate.includes('└') || !candidate.includes('┘')) continue;
         const candidateLeftCol = firstVisualColumnOf(candidate, '└');
         if (candidateLeftCol === anchorTopCol) {
@@ -568,7 +568,7 @@ export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
 
       // Inner rows: strictly between top and close
       for (let lj = li + 1; lj < closeLi; lj++) {
-        const innerLine = lines[lj];
+        const innerLine = lines[lj]!;
         if (!innerLine.includes('│')) continue; // skip decorative gap lines
         const actualCol = lastVisualColumnOf(innerLine, '│');
         if (actualCol !== anchorCol) {
@@ -581,7 +581,7 @@ export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
       }
 
       // Bottom corner: ┘ column must match anchorCol
-      const closeLine = lines[closeLi];
+      const closeLine = lines[closeLi]!;
       const actualBotCol = lastVisualColumnOf(closeLine, '┘');
       if (actualBotCol !== anchorCol) {
         issues.push(issue(
@@ -686,16 +686,16 @@ export function L11_overdecoration(ast: ASTNode): Issue[] {
 
   let li = 0;
   while (li < lines.length) {
-    const top = lines[li];
+    const top = lines[li]!;
     const topMatch = top.match(/^(\s*)┌─+┐\s*$/);
     if (!topMatch) { li++; continue; }
-    const indent = topMatch[1];
+    const indent = topMatch[1]!;
 
     // Find closing └─+┘ at same indent. Inner lines must match /^\s*│.*│\s*$/.
     let closeLi = -1;
     const inner: string[] = [];
     for (let lj = li + 1; lj < lines.length; lj++) {
-      const next = lines[lj];
+      const next = lines[lj]!;
       const botMatch = next.match(/^(\s*)└─+┘\s*$/);
       if (botMatch && botMatch[1] === indent) { closeLi = lj; break; }
       if (/^\s*│.*│\s*$/.test(next)) inner.push(next);
@@ -714,7 +714,7 @@ export function L11_overdecoration(ast: ASTNode): Issue[] {
         // Token-savings estimate (chars saved by dot-leader form).
         const frameChars =
           visualWidth(top) +
-          visualWidth(lines[closeLi]) +
+          visualWidth(lines[closeLi]!) +
           inner.reduce((acc, l) => acc + visualWidth(l), 0);
         const dotLeaderChars = inner.reduce((acc, l) => {
           const stripped = l.replace(/^\s*│/, '').replace(/\s*│\s*$/, '').trim();
@@ -806,15 +806,15 @@ export function L12_token_budget(ast: ASTNode): Issue[] {
 
   let li = 0;
   while (li < lines.length) {
-    const top = lines[li];
+    const top = lines[li]!;
     const topMatch = top.match(/^(\s*)┌─+┐\s*$/);
     if (!topMatch) { li++; continue; }
-    const indent = topMatch[1];
+    const indent = topMatch[1]!;
 
     let closeLi = -1;
     const inner: string[] = [];
     for (let lj = li + 1; lj < lines.length; lj++) {
-      const next = lines[lj];
+      const next = lines[lj]!;
       const botMatch = next.match(/^(\s*)└─+┘\s*$/);
       if (botMatch && botMatch[1] === indent) { closeLi = lj; break; }
       if (/^\s*│.*│\s*$/.test(next)) inner.push(next);
@@ -825,7 +825,7 @@ export function L12_token_budget(ast: ASTNode): Issue[] {
     if (inner.some(l => /[├└]──/.test(l))) { li = closeLi + 1; continue; }
     if (inner.length === 0) { li = closeLi + 1; continue; }
 
-    const cost = estimateFrameCost({ top, inner, bottom: lines[closeLi] });
+    const cost = estimateFrameCost({ top, inner, bottom: lines[closeLi]! });
 
     if (cost.padding_chars > cost.content_chars) {
       issues.push(issue(
@@ -856,15 +856,15 @@ export function L13_double_wrap(ast: ASTNode): Issue[] {
 
   let li = 0;
   while (li < lines.length) {
-    const top = lines[li];
+    const top = lines[li]!;
     const topMatch = top.match(/^(\s*)┌─+┐\s*$/);
     if (!topMatch) { li++; continue; }
-    const indent = topMatch[1];
+    const indent = topMatch[1]!;
 
     let closeLi = -1;
     let hasTree = false;
     for (let lj = li + 1; lj < lines.length; lj++) {
-      const next = lines[lj];
+      const next = lines[lj]!;
       const botMatch = next.match(/^(\s*)└─+┘\s*$/);
       if (botMatch && botMatch[1] === indent) { closeLi = lj; break; }
       if (/[├└]──/.test(next)) hasTree = true;

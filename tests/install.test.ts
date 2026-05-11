@@ -32,7 +32,7 @@ function runInstall(tmpHome: string, env: Record<string, string> = {}, args: str
     const stdout = execFileSync('bash', [INSTALL_SH, ...args], {
       encoding: 'utf8',
       env: {
-        PATH: process.env.PATH,
+        PATH: process.env['PATH'],
         HOME: tmpHome,
         ...env,
       },
@@ -84,29 +84,29 @@ describe('install.sh', () => {
 
     it('settings.json contains SessionStart and UserPromptSubmit hooks', () => {
       const cfg = readSettings(tmpHome);
-      assert.ok(cfg.hooks, 'hooks key must exist');
-      const hooks = cfg.hooks as Record<string, unknown[]>;
-      assert.ok(Array.isArray(hooks.SessionStart), 'SessionStart must be array');
-      assert.ok(Array.isArray(hooks.UserPromptSubmit), 'UserPromptSubmit must be array');
-      assert.ok(hooks.SessionStart.length >= 1, 'at least one session hook entry');
-      assert.ok(hooks.UserPromptSubmit.length >= 1, 'at least one hook entry');
+      assert.ok(cfg['hooks'], 'hooks key must exist');
+      const hooks = cfg['hooks'] as Record<string, unknown[]>;
+      assert.ok(Array.isArray(hooks['SessionStart']), 'SessionStart must be array');
+      assert.ok(Array.isArray(hooks['UserPromptSubmit']), 'UserPromptSubmit must be array');
+      assert.ok(hooks['SessionStart']!.length >= 1, 'at least one session hook entry');
+      assert.ok(hooks['UserPromptSubmit']!.length >= 1, 'at least one hook entry');
     });
 
     it('hook entries point to feynman scripts with absolute paths', () => {
       const cfg = readSettings(tmpHome);
-      const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
-      const sessionEntries = hooks.SessionStart;
-      const promptEntries = hooks.UserPromptSubmit;
-      const sessionEntry = sessionEntries.find(e =>
+      const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
+      const sessionEntries = hooks['SessionStart'];
+      const promptEntries = hooks['UserPromptSubmit'];
+      const sessionEntry = sessionEntries!.find(e =>
         e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-session-start.ts'))
       );
-      const feynmanEntry = promptEntries.find(e =>
+      const feynmanEntry = promptEntries!.find(e =>
         e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
       );
       assert.ok(sessionEntry, 'feynman-session-start.ts hook entry not found');
       assert.ok(feynmanEntry, 'feynman-activate.ts hook entry not found');
-      const sessionHook = sessionEntry!.hooks[0];
-      const hook = feynmanEntry!.hooks[0];
+      const sessionHook = sessionEntry!.hooks[0]!;
+      const hook = feynmanEntry!.hooks[0]!;
       // Must be absolute path (not tilde, not relative)
       assert.ok(sessionHook.command.includes('/'), 'session hook command must contain absolute path');
       assert.ok(hook.command.includes('/'), 'hook command must contain absolute path');
@@ -145,11 +145,11 @@ describe('install.sh', () => {
 
     it('hook appears exactly once in settings.json', () => {
       const cfg = readSettings(tmpHome);
-      const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
-      const feynmanHooks = hooks.UserPromptSubmit.filter(e =>
+      const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
+      const feynmanHooks = hooks['UserPromptSubmit']!.filter(e =>
         e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
       );
-      const sessionHooks = hooks.SessionStart.filter(e =>
+      const sessionHooks = hooks['SessionStart']!.filter(e =>
         e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-session-start.ts'))
       );
       assert.equal(feynmanHooks.length, 1, `hook should appear exactly once, found ${feynmanHooks.length}`);
@@ -199,8 +199,8 @@ describe('install.sh', () => {
 
     it('existing hook preserved after merge', () => {
       const cfg = readSettings(tmpHome);
-      const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
-      const existing = hooks.UserPromptSubmit.find(e =>
+      const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
+      const existing = hooks['UserPromptSubmit']!.find(e =>
         e.hooks && e.hooks.some(h => h.command && h.command.includes('my-hook.js'))
       );
       assert.ok(existing, 'pre-existing hook should be preserved in merged settings');
@@ -208,8 +208,8 @@ describe('install.sh', () => {
 
     it('feynman hook added alongside existing', () => {
       const cfg = readSettings(tmpHome);
-      const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
-      const feynman = hooks.UserPromptSubmit.find(e =>
+      const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
+      const feynman = hooks['UserPromptSubmit']!.find(e =>
         e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
       );
       assert.ok(feynman, 'feynman hook should be added');
@@ -217,15 +217,15 @@ describe('install.sh', () => {
 
     it('other config keys preserved', () => {
       const cfg = readSettings(tmpHome);
-      assert.deepEqual(cfg.someOtherConfig, { value: 42 }, 'non-hooks config should not be touched');
+      assert.deepEqual(cfg['someOtherConfig'], { value: 42 }, 'non-hooks config should not be touched');
     });
 
     it('total hook count is 2 (existing + feynman)', () => {
       const cfg = readSettings(tmpHome);
-      const hooks = cfg.hooks as Record<string, unknown[]>;
+      const hooks = cfg['hooks'] as Record<string, unknown[]>;
       assert.equal(
-        hooks.UserPromptSubmit.length, 2,
-        `expected 2 hooks, found ${hooks.UserPromptSubmit.length}`
+        hooks['UserPromptSubmit']!.length, 2,
+        `expected 2 hooks, found ${hooks['UserPromptSubmit']!.length}`
       );
     });
   });
@@ -247,13 +247,13 @@ describe('install.sh', () => {
           runInstall(tmpHome);
           execFileSync('bash', [UNINSTALL_SH], {
             encoding: 'utf8',
-            env: { PATH: process.env.PATH, HOME: tmpHome },
+            env: { PATH: process.env['PATH'], HOME: tmpHome },
             cwd: REPO_DIR,
           });
           // After uninstall, feynman hook should be removed from settings
           const cfg = readSettings(tmpHome);
-          const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]> | undefined;
-          const feynman = (hooks?.UserPromptSubmit || []).find(e =>
+          const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]> | undefined;
+          const feynman = (hooks?.['UserPromptSubmit'] || []).find(e =>
             e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
           );
           assert.equal(feynman, undefined, 'feynman hook should be removed by uninstall.sh');

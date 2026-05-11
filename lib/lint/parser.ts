@@ -127,20 +127,20 @@ export function parse(markdown: string): DiagramNode[] {
 
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i];
+    const line = lines[i]!;
     const trimmed = line.trim();
 
     // Check for fenced code block: ```
     const fenceMatch = trimmed.match(/^```(\w*)$/);
     if (fenceMatch) {
-      const lang = fenceMatch[1].toLowerCase();
+      const lang = fenceMatch[1]!.toLowerCase();
 
       // Skip named language blocks (js, bash, python, mermaid, etc.)
       // Only process generic ``` fences (empty lang tag)
       if (lang !== '') {
         // Advance to closing fence, skip this block
         i++;
-        while (i < lines.length && lines[i].trim() !== '```') i++;
+        while (i < lines.length && lines[i]!.trim() !== '```') i++;
         i++; // skip closing ```
         continue;
       }
@@ -150,8 +150,8 @@ export function parse(markdown: string): DiagramNode[] {
       const blockLines: string[] = [];
       i++; // move past opening fence
       const startLine = i + 1; // 1-based line number of first content line
-      while (i < lines.length && lines[i].trim() !== '```') {
-        blockLines.push(lines[i]);
+      while (i < lines.length && lines[i]!.trim() !== '```') {
+        blockLines.push(lines[i]!);
         i++;
       }
       const endLine = i + 1; // 1-based (points to closing ```)
@@ -186,7 +186,7 @@ export function parse(markdown: string): DiagramNode[] {
 
       // Extend block: include lines until we hit blank or markdown heading/fence
       while (j < lines.length) {
-        const nextLine = lines[j];
+        const nextLine = lines[j]!;
         const nextTrimmed = nextLine.trim();
 
         // Stop at blank lines, headings, or fences
@@ -206,8 +206,8 @@ export function parse(markdown: string): DiagramNode[] {
         const matches = [...l.matchAll(/\[[^\]]+\]/g)];
         if (matches.length < 2) return false;
         // Check what's between the first and last box
-        const firstEnd = matches[0].index! + matches[0][0].length;
-        const lastStart = matches[matches.length - 1].index!;
+        const firstEnd = matches[0]!.index! + matches[0]![0]!.length;
+        const lastStart = matches[matches.length - 1]!.index!;
         const between = l.slice(firstEnd, lastStart);
         // If "between" contains regular English words (sequences of alpha), it's prose
         // Allow: spaces, arrows, punctuation, special chars

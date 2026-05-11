@@ -48,14 +48,14 @@ function commitsSince(tag: string): Commit[] {
     .filter(Boolean)
     .map((entry: string) => {
       const [hash, subject, body = ''] = entry.split('\x1f');
-      return { hash: hash.slice(0, 7), subject, body };
+      return { hash: (hash ?? '').slice(0, 7), subject: subject ?? '', body };
     });
 }
 
 function classify(subject: string): [string, string] {
   const match = subject.match(/^(\w+)(?:\([^)]+\))?!?:\s+(.+)$/);
-  const type = match ? match[1] : 'other';
-  const text = match ? match[2] : subject;
+  const type = match ? (match[1] ?? 'other') : 'other';
+  const text = match ? (match[2] ?? subject) : subject;
   if (subject.includes('!:') || /\nBREAKING CHANGE:/i.test(subject)) {
     return ['Breaking Changes', text];
   }
@@ -70,7 +70,7 @@ function classify(subject: string): [string, string] {
     perf: 'Performance',
     build: 'Build',
   };
-  return [sections[type] || 'Other', text];
+  return [sections[type] ?? 'Other', text];
 }
 
 function render(version: string, tag: string, commits: Commit[]): string {

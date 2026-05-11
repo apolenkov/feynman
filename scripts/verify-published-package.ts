@@ -12,8 +12,8 @@ const require = createRequire(import.meta.url);
 const ROOT = path.resolve(import.meta.dirname, '..');
 const pkg = require(path.join(ROOT, 'package.json')) as { version: string; name: string };
 
-const packageName: string = process.env.PACKAGE_NAME || pkg.name;
-const packageVersion: string = process.env.PACKAGE_VERSION || pkg.version;
+const packageName: string = process.env['PACKAGE_NAME'] || pkg.name;
+const packageVersion: string = process.env['PACKAGE_VERSION'] || pkg.version;
 let workDir: string | undefined;
 
 interface RunOpts {
