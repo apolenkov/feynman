@@ -1,57 +1,65 @@
 #!/usr/bin/env node
-// scripts/generate-changelog.js — zero-dep changelog from conventional commits.
-'use strict';
+// scripts/generate-changelog.ts — zero-dep changelog from conventional commits.
 
-const fs = require('node:fs');
-const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 
-const ROOT = path.resolve(__dirname, '..');
-const pkg = require(path.join(ROOT, 'package.json'));
+const require = createRequire(import.meta.url);
+
+const ROOT = path.resolve(import.meta.dirname, '..');
+const pkg = require(path.join(ROOT, 'package.json')) as { version: string; name: string };
 const CHANGELOG = path.join(ROOT, 'CHANGELOG.md');
 
-function git(args, fallback = '') {
-  const result = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+interface Commit {
+  hash: string;
+  subject: string;
+  body: string;
+}
+
+function git(gitArgs: string[], fallback = ''): string {
+  const result = spawnSync('git', gitArgs, { cwd: ROOT, encoding: 'utf8' });
   if (result.status !== 0) return fallback;
   return (result.stdout || '').trim();
 }
 
-function previousTag() {
+function previousTag(): string {
   const currentTag = git(['describe', '--tags', '--abbrev=0', '--exact-match'], '');
   const tags = git(['tag', '--sort=-creatordate', '--merged', 'HEAD'], '')
     .split('\n')
-    .map(tag => tag.trim())
+    .map((tag: string) => tag.trim())
     .filter(Boolean);
 
   if (!currentTag) return tags[0] || '';
 
-  return tags.find(tag => tag !== currentTag) || '';
+  return tags.find((tag: string) => tag !== currentTag) || '';
 }
 
-function commitRange(tag) {
+function commitRange(tag: string): string {
   return tag ? `${tag}..HEAD` : 'HEAD';
 }
 
-function commitsSince(tag) {
+function commitsSince(tag: string): Commit[] {
   const format = '%H%x1f%s%x1f%b%x1e';
   const out = git(['log', commitRange(tag), `--pretty=format:${format}`], '');
   return out.split('\x1e')
-    .map(entry => entry.trim())
+    .map((entry: string) => entry.trim())
     .filter(Boolean)
-    .map(entry => {
+    .map((entry: string) => {
       const [hash, subject, body = ''] = entry.split('\x1f');
       return { hash: hash.slice(0, 7), subject, body };
     });
 }
 
-function classify(subject) {
+function classify(subject: string): [string, string] {
   const match = subject.match(/^(\w+)(?:\([^)]+\))?!?:\s+(.+)$/);
   const type = match ? match[1] : 'other';
   const text = match ? match[2] : subject;
   if (subject.includes('!:') || /\nBREAKING CHANGE:/i.test(subject)) {
     return ['Breaking Changes', text];
   }
-  const sections = {
+  const sections: Record<string, string> = {
     feat: 'Features',
     fix: 'Fixes',
     docs: 'Documentation',
@@ -65,17 +73,17 @@ function classify(subject) {
   return [sections[type] || 'Other', text];
 }
 
-function render(version, tag, commits) {
+function render(version: string, tag: string, commits: Commit[]): string {
   const date = new Date().toISOString().slice(0, 10);
-  const groups = new Map();
+  const groups = new Map<string, string[]>();
 
   for (const commit of commits) {
     const [section, text] = classify(commit.subject);
     if (!groups.has(section)) groups.set(section, []);
-    groups.get(section).push(`- ${text}`);
+    groups.get(section)!.push(`- ${text}`);
   }
 
-  const order = [
+  const order: string[] = [
     'Breaking Changes',
     'Features',
     'Fixes',
@@ -88,7 +96,7 @@ function render(version, tag, commits) {
     'Other',
   ];
 
-  const lines = [
+  const lines: string[] = [
     '# Changelog',
     '',
     'All notable changes to this project are documented here.',

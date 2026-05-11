@@ -1,34 +1,41 @@
-// tests/cli.test.js — tests for bin/feynman.js unified CLI
+// tests/cli.test.ts — tests for bin/feynman.ts unified CLI
 // Stubs HOME to os.tmpdir() — never touches real ~/.claude/
 // Uses node:test + node:assert/strict.
-'use strict';
 
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const { spawnSync } = require('node:child_process');
-const fs   = require('node:fs');
-const os   = require('node:os');
-const path = require('node:path');
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createRequire } from 'node:module';
 
-const FEYNMAN_JS = path.resolve(__dirname, '..', 'bin', 'feynman.js');
-const REPO_DIR   = path.resolve(__dirname, '..');
-const PKG = require(path.join(REPO_DIR, 'package.json'));
+const require = createRequire(import.meta.url);
+const FEYNMAN_JS = path.resolve(import.meta.dirname, '..', 'bin', 'feynman.ts');
+const REPO_DIR   = path.resolve(import.meta.dirname, '..');
+const PKG = require(path.join(REPO_DIR, 'package.json')) as Record<string, unknown>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function makeTempHome() {
+function makeTempHome(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-cli-test-'));
 }
 
-function rmrf(dir) {
+function rmrf(dir: string): void {
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
 }
 
+interface RunResult {
+  stdout: string;
+  stderr: string;
+  status: number;
+}
+
 /**
- * Run bin/feynman.js with given args and HOME stubbed to tmpHome.
+ * Run bin/feynman.ts with given args and HOME stubbed to tmpHome.
  * Returns { stdout, stderr, status }.
  */
-function runFeynman(args, tmpHome, env = {}) {
+function runFeynman(args: string[], tmpHome: string, env: Record<string, string> = {}): RunResult {
   const result = spawnSync(process.execPath, [FEYNMAN_JS, ...args], {
     encoding: 'utf8',
     env: {
@@ -49,12 +56,12 @@ function runFeynman(args, tmpHome, env = {}) {
 /**
  * Read and parse settings.json from the temp HOME.
  */
-function readSettings(tmpHome) {
+function readSettings(tmpHome: string): Record<string, unknown> {
   const settingsPath = path.join(tmpHome, '.claude', 'settings.json');
   return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 }
 
-function readCodexHooks(tmpHome) {
+function readCodexHooks(tmpHome: string): Record<string, unknown> {
   const hooksPath = path.join(tmpHome, '.codex', 'hooks.json');
   return JSON.parse(fs.readFileSync(hooksPath, 'utf8'));
 }
@@ -72,7 +79,7 @@ describe('bin/feynman.js', () => {
       try {
         const result = runFeynman(['version'], tmp);
         assert.equal(result.status, 0, `exit status: ${result.stderr}`);
-        assert.ok(result.stdout.includes(PKG.version), `expected "${PKG.version}" in stdout: ${result.stdout}`);
+        assert.ok(result.stdout.includes(PKG.version as string), `expected "${PKG.version}" in stdout: ${result.stdout}`);
       } finally {
         rmrf(tmp);
       }
@@ -131,8 +138,8 @@ describe('bin/feynman.js', () => {
         assert.ok(fs.existsSync(path.join(out, 'examples', 'feature-planning.md')));
         assert.ok(fs.existsSync(path.join(out, 'rules', 'feynman-activate.md')));
         assert.ok(fs.existsSync(path.join(out, 'hooks', 'hooks.json')));
-        assert.ok(fs.existsSync(path.join(out, 'hooks', 'feynman-activate.js')));
-        assert.ok(fs.existsSync(path.join(out, 'bin', 'feynman.js')));
+        assert.ok(fs.existsSync(path.join(out, 'hooks', 'feynman-activate.ts')));
+        assert.ok(fs.existsSync(path.join(out, 'bin', 'feynman.ts')));
         assert.ok(fs.existsSync(path.join(out, '.claude-plugin', 'plugin.json')));
         assert.ok(fs.existsSync(path.join(out, '.codex-plugin', 'plugin.json')));
         assert.ok(fs.existsSync(path.join(out, 'skills', 'feynman', 'SKILL.md')));
@@ -231,14 +238,15 @@ describe('bin/feynman.js', () => {
         assert.ok(fs.existsSync(settingsPath), 'settings.json must exist');
 
         const cfg = readCodexHooks(tmp);
-        assert.ok(cfg.hooks && Array.isArray(cfg.hooks.UserPromptSubmit), 'UserPromptSubmit must be array');
+        const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
+        assert.ok(hooks && Array.isArray(hooks.UserPromptSubmit), 'UserPromptSubmit must be array');
 
-        const entry = cfg.hooks.UserPromptSubmit.find(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const entry = hooks.UserPromptSubmit.find(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         );
         assert.ok(entry, 'feynman-activate.js hook entry not found in settings.json');
 
-        const hook = entry.hooks[0];
+        const hook = entry!.hooks[0];
         assert.ok(!hook.command.includes('~/'), 'hook command must not use tilde');
         assert.ok(hook.command.includes('/'), 'hook command must be absolute path');
       } finally {
@@ -308,11 +316,12 @@ describe('bin/feynman.js', () => {
         runFeynman(['install'], tmp); // second time
 
         const cfg = readCodexHooks(tmp);
-        const feynmanHooks = cfg.hooks.UserPromptSubmit.filter(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
+        const feynmanHooks = hooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         );
-        const sessionHooks = cfg.hooks.SessionStart.filter(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
+        const sessionHooks = hooks.SessionStart.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.ts'))
         );
         assert.equal(feynmanHooks.length, 1, `hook should appear exactly once, found ${feynmanHooks.length}`);
         assert.equal(sessionHooks.length, 1, `session hook should appear exactly once, found ${sessionHooks.length}`);
@@ -342,11 +351,12 @@ describe('bin/feynman.js', () => {
         runFeynman(['install', '--force'], tmp);
 
         const cfg = readCodexHooks(tmp);
-        const count = cfg.hooks.UserPromptSubmit.filter(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
+        const count = hooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         ).length;
-        const sessionCount = cfg.hooks.SessionStart.filter(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
+        const sessionCount = hooks.SessionStart.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.ts'))
         ).length;
         assert.equal(count, 1, `force install must not create duplicate, found ${count}`);
         assert.equal(sessionCount, 1, `force install must not create duplicate session hook, found ${sessionCount}`);
@@ -365,15 +375,16 @@ describe('bin/feynman.js', () => {
         assert.ok(fs.existsSync(hooksPath), 'Codex hooks.json must exist');
 
         const cfg = readCodexHooks(tmp);
-        const sessionEntry = cfg.hooks.SessionStart.find(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
+        const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
+        const sessionEntry = hooks.SessionStart.find(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.ts'))
         );
-        const entry = cfg.hooks.UserPromptSubmit.find(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const entry = hooks.UserPromptSubmit.find(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         );
         assert.ok(sessionEntry, 'feynman session hook missing from Codex hooks.json');
         assert.ok(entry, 'feynman hook missing from Codex hooks.json');
-        const hook = entry.hooks[0];
+        const hook = entry!.hooks[0];
         assert.ok(hook.command.includes('FEYNMAN_HOME='));
         assert.ok(hook.command.includes('.codex'));
       } finally {
@@ -402,11 +413,13 @@ describe('bin/feynman.js', () => {
 
         const claudeCfg = readSettings(tmp);
         const codexCfg = readCodexHooks(tmp);
-        const claudeCount = claudeCfg.hooks.UserPromptSubmit.filter(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const claudeHooks = claudeCfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
+        const codexHooks = codexCfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
+        const claudeCount = claudeHooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         ).length;
-        const codexCount = codexCfg.hooks.UserPromptSubmit.filter(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const codexCount = codexHooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         ).length;
         assert.equal(claudeCount, 1);
         assert.equal(codexCount, 1);
@@ -423,11 +436,13 @@ describe('bin/feynman.js', () => {
 
         const claudeCfg = readSettings(tmp);
         const codexCfg = readCodexHooks(tmp);
-        const claudeCount = claudeCfg.hooks.UserPromptSubmit.filter(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const claudeHooks = claudeCfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
+        const codexHooks = codexCfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
+        const claudeCount = claudeHooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         ).length;
-        const codexCount = codexCfg.hooks.UserPromptSubmit.filter(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const codexCount = codexHooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         ).length;
         assert.equal(claudeCount, 1);
         assert.equal(codexCount, 1);
@@ -444,11 +459,13 @@ describe('bin/feynman.js', () => {
 
         const claudeCfg = readSettings(tmp);
         const codexCfg = readCodexHooks(tmp);
-        const claudeCount = claudeCfg.hooks.UserPromptSubmit.filter(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const claudeHooks = claudeCfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
+        const codexHooks = codexCfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
+        const claudeCount = claudeHooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         ).length;
-        const codexCount = codexCfg.hooks.UserPromptSubmit.filter(g =>
-          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const codexCount = codexHooks.UserPromptSubmit.filter(g =>
+          g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         ).length;
         assert.equal(claudeCount, 1);
         assert.equal(codexCount, 1);
@@ -470,8 +487,9 @@ describe('bin/feynman.js', () => {
         assert.equal(result.status, 0, `uninstall failed: ${result.stderr}`);
 
         const cfg = readCodexHooks(tmp);
-        const feynman = (cfg.hooks?.UserPromptSubmit || []).find(e =>
-          e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]> | undefined;
+        const feynman = (hooks?.UserPromptSubmit || []).find(e =>
+          e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         );
         assert.equal(feynman, undefined, 'feynman hook should be removed');
       } finally {
@@ -536,7 +554,8 @@ describe('bin/feynman.js', () => {
         runFeynman(['uninstall'], tmp);
 
         const cfg = readCodexHooks(tmp);
-        const myHook = (cfg.hooks?.UserPromptSubmit || []).find(e =>
+        const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]> | undefined;
+        const myHook = (hooks?.UserPromptSubmit || []).find(e =>
           e.hooks && e.hooks.some(h => h.command && h.command.includes('my-hook.js'))
         );
         assert.ok(myHook, 'pre-existing hook should be preserved after uninstall');
@@ -567,7 +586,8 @@ describe('bin/feynman.js', () => {
         runFeynman(['uninstall'], tmp);
 
         const cfg = readCodexHooks(tmp);
-        const promptHooks = cfg.hooks.UserPromptSubmit;
+        const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
+        const promptHooks = hooks.UserPromptSubmit;
         assert.equal(promptHooks.length, 1);
         assert.equal(promptHooks[0].hooks.length, 1);
         assert.ok(promptHooks[0].hooks[0].command.includes('my-hook.js'));
@@ -584,8 +604,9 @@ describe('bin/feynman.js', () => {
         assert.equal(result.status, 0, `uninstall failed: ${result.stderr}`);
 
         const cfg = readCodexHooks(tmp);
-        const feynman = (cfg.hooks?.UserPromptSubmit || []).find(e =>
-          e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]> | undefined;
+        const feynman = (hooks?.UserPromptSubmit || []).find(e =>
+          e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         );
         assert.equal(feynman, undefined, 'Codex feynman hook should be removed');
         assert.ok(
@@ -657,7 +678,7 @@ describe('bin/feynman.js', () => {
                 {
                   hooks: [{
                     type: 'command',
-                    command: `FEYNMAN_HOME=${codexDir} node ${path.join(REPO_DIR, 'hooks', 'feynman-session-start.js')}`,
+                    command: `FEYNMAN_HOME=${codexDir} node ${path.join(REPO_DIR, 'hooks', 'feynman-session-start.ts')}`,
                   }],
                 },
               ],
@@ -665,7 +686,7 @@ describe('bin/feynman.js', () => {
                 {
                   hooks: [{
                     type: 'command',
-                    command: `FEYNMAN_HOME=${codexDir} node ${path.join(REPO_DIR, 'hooks', 'feynman-activate.js')}`,
+                    command: `FEYNMAN_HOME=${codexDir} node ${path.join(REPO_DIR, 'hooks', 'feynman-activate.ts')}`,
                   }],
                 },
               ],
@@ -935,20 +956,21 @@ describe('bin/feynman.js', () => {
         runFeynman(['install'], tmp);
 
         const cfg = readCodexHooks(tmp);
+        const hooks = cfg.hooks as Record<string, { hooks: { command: string }[] }[]>;
         // Other hook preserved
-        const otherHook = cfg.hooks.UserPromptSubmit.find(e =>
+        const otherHook = hooks.UserPromptSubmit.find(e =>
           e.hooks && e.hooks.some(h => h.command && h.command.includes('other/hook.js'))
         );
         assert.ok(otherHook, 'pre-existing hook should be preserved');
         // feynman hook added
-        const feynmanHook = cfg.hooks.UserPromptSubmit.find(e =>
-          e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
+        const feynmanHook = hooks.UserPromptSubmit.find(e =>
+          e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
         );
         assert.ok(feynmanHook, 'feynman hook should be added');
         // Other config preserved
         assert.deepEqual(cfg.someOtherKey, { value: 99 });
         // Total = 2
-        assert.equal(cfg.hooks.UserPromptSubmit.length, 2);
+        assert.equal(hooks.UserPromptSubmit.length, 2);
       } finally {
         rmrf(tmp);
       }
@@ -960,9 +982,9 @@ describe('bin/feynman.js', () => {
 // ─── feynman-lint --explain (Plan 09-05) ─────────────────────────────────────
 
 describe('feynman-lint --explain flag', () => {
-  const BIN = path.resolve(REPO_DIR, 'bin', 'feynman-lint.js');
+  const BIN = path.resolve(REPO_DIR, 'bin', 'feynman-lint.ts');
 
-  function runCli(args, stdin) {
+  function runCli(args: string[], stdin?: string): { status: number | null; stdout: string; stderr: string } {
     return spawnSync(process.execPath, [BIN, ...args], {
       input: stdin,
       encoding: 'utf8',
@@ -1050,12 +1072,12 @@ describe('feynman-lint --explain flag', () => {
 // ─── feynman install --target cline|cursor|windsurf (Phase 12 IDE compat) ────
 
 describe('feynman install --target <ide>', () => {
-  function makeTmpCwd() {
+  function makeTmpCwd(): string {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-ide-test-'));
   }
 
-  function runFromCwd(args, cwd) {
-    return spawnSync(process.execPath, [FEYNMAN_JS, ...args], {
+  function runFromCwd(args: string[], cwd: string): RunResult {
+    const result = spawnSync(process.execPath, [FEYNMAN_JS, ...args], {
       encoding: 'utf8',
       env: {
         PATH: process.env.PATH,
@@ -1064,6 +1086,11 @@ describe('feynman install --target <ide>', () => {
       },
       cwd,
     });
+    return {
+      stdout: result.stdout || '',
+      stderr: result.stderr || '',
+      status: result.status ?? 1,
+    };
   }
 
   it('install --target cline writes .clinerules/feynman-rules.md', () => {

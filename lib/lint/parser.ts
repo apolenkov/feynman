@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-// lib/lint/parser.js — ASCII diagram block parser
+// lib/lint/parser.ts — ASCII diagram block parser
 // Returns AST: [{type:'diagram', content, startLine, endLine, indent}]
 // Detection: ``` fences (generic only) OR standalone blocks ≥30% diagram chars, ≥3 lines
-// Zero deps. CJS only.
-'use strict';
+// Zero deps. ESM only.
 
 // Characters that indicate ASCII diagram content
 // Box-drawing: ┌┐└┘─│├┤┬┴┼ Tree: ├── └── Arrows: →←↑↓▲▼
@@ -20,12 +19,26 @@ const BOX_DRAWING_CHARS = new Set([
   '→', '←', '↑', '↓', '▲', '▼'
 ]);
 
+export interface DiagramNode {
+  type: 'diagram';
+  content: string;
+  startLine: number;
+  endLine: number;
+  indent: number;
+}
+
+interface DiagramCharStats {
+  diagramCount: number;
+  nonSpaceCount: number;
+  hasBoxDrawing: boolean;
+}
+
 /**
  * Count diagram chars in a string (non-space chars only for ratio)
  * @param {string} text
  * @returns {{diagramCount: number, nonSpaceCount: number, hasBoxDrawing: boolean}}
  */
-function countDiagramChars(text) {
+function countDiagramChars(text: string): DiagramCharStats {
   let diagramCount = 0;
   let nonSpaceCount = 0;
   let hasBoxDrawing = false;
@@ -46,7 +59,7 @@ function countDiagramChars(text) {
  * @param {string[]} lines
  * @returns {boolean}
  */
-function looksLikeDiagram(lines) {
+function looksLikeDiagram(lines: string[]): boolean {
   const text = lines.join('\n');
   const { nonSpaceCount, hasBoxDrawing } = countDiagramChars(text);
 
@@ -97,7 +110,7 @@ function looksLikeDiagram(lines) {
  * @param {string} line
  * @returns {number}
  */
-function getIndent(line) {
+function getIndent(line: string): number {
   let i = 0;
   while (i < line.length && line[i] === ' ') i++;
   return i;
@@ -106,11 +119,11 @@ function getIndent(line) {
 /**
  * Parse markdown string into AST of diagram nodes.
  * @param {string} markdown
- * @returns {Array<{type: 'diagram', content: string, startLine: number, endLine: number, indent: number}>}
+ * @returns {Array<DiagramNode>}
  */
-function parse(markdown) {
+export function parse(markdown: string): DiagramNode[] {
   const lines = markdown.split('\n');
-  const nodes = [];
+  const nodes: DiagramNode[] = [];
 
   let i = 0;
   while (i < lines.length) {
@@ -134,7 +147,7 @@ function parse(markdown) {
 
       // Generic fence — collect content
       const indent = getIndent(line);
-      const blockLines = [];
+      const blockLines: string[] = [];
       i++; // move past opening fence
       const startLine = i + 1; // 1-based line number of first content line
       while (i < lines.length && lines[i].trim() !== '```') {
@@ -193,8 +206,8 @@ function parse(markdown) {
         const matches = [...l.matchAll(/\[[^\]]+\]/g)];
         if (matches.length < 2) return false;
         // Check what's between the first and last box
-        const firstEnd = matches[0].index + matches[0][0].length;
-        const lastStart = matches[matches.length - 1].index;
+        const firstEnd = matches[0].index! + matches[0][0].length;
+        const lastStart = matches[matches.length - 1].index!;
         const between = l.slice(firstEnd, lastStart);
         // If "between" contains regular English words (sequences of alpha), it's prose
         // Allow: spaces, arrows, punctuation, special chars
@@ -225,5 +238,3 @@ function parse(markdown) {
 
   return nodes;
 }
-
-module.exports = { parse };

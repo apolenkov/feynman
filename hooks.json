@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PLUGIN_ROOT=\"${PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}\"; FEYNMAN_HOME=\"$HOME/.codex\" node \"$PLUGIN_ROOT/hooks/feynman-session-start.js\"",
+            "command": "PLUGIN_ROOT=\"${PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}\"; FEYNMAN_HOME=\"$HOME/.codex\" node \"$PLUGIN_ROOT/hooks/feynman-session-start.ts\"",
             "timeout": 5
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PLUGIN_ROOT=\"${PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}\"; FEYNMAN_HOME=\"$HOME/.codex\" node \"$PLUGIN_ROOT/hooks/feynman-activate.js\"",
+            "command": "PLUGIN_ROOT=\"${PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}\"; FEYNMAN_HOME=\"$HOME/.codex\" node \"$PLUGIN_ROOT/hooks/feynman-activate.ts\"",
             "timeout": 5
           }
         ]
