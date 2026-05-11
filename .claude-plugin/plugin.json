@@ -30,7 +30,7 @@
       "Write"
     ],
     "websiteURL": "https://github.com/apolenkov/feynman",
-    "privacyPolicyURL": "https://github.com/apolenkov/feynman/blob/main/README.md",
+    "privacyPolicyURL": "https://github.com/apolenkov/feynman/blob/main/PRIVACY.md",
     "termsOfServiceURL": "https://github.com/apolenkov/feynman/blob/main/LICENSE",
     "defaultPrompt": [
       "Use feynman diagrams for structured answers.",
