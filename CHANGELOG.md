@@ -2,6 +2,70 @@
 
 All notable changes to this project are documented here.
 
+## 0.4.0 - 2026-05-11
+
+Changes since v0.3.3.
+
+### Features
+
+- rules add smallest-visual-first ladder per intensity
+- compliance A/B harness — 2-arm subagent run + REPORT.md
+- IDE compat — install/doctor for cline, cursor, windsurf (IDE-01..04)
+- /feynman style subcommand + status output (STYLE-02)
+- output_style suffix injection in hook (STYLE-01 + STYLE-03)
+- autofixFrameToDotLeader + dispatcher with two orthogonal opts
+- add --explain CLI flag with per-frame cost annotation
+- implement L13_double_wrap detection rule
+- implement L12_token_budget + estimateFrameCost helper
+- implement L11_overdecoration detection rule
+
+### Documentation
+
+- morning housekeeping — Phase 11 closed, rule ext logged
+- autonomous overnight handoff — Phases 9/10/12 closed
+- add SUMMARY — Phase 12 IDE compat complete
+- README adds IDE Support section listing 5 targets (IDE-05)
+- add SUMMARY — Phase 10 output-style presets complete
+- README + architecture.md document output_style axis (STYLE-04)
+- add SUMMARY — Phase 9 complete (22/22 reqs, +70 tests)
+- document L11/L12/L13 + --explain flag (DOCS-L11)
+- SUMMARY — LINT-14 autofix shipped via two-opt dispatcher
+- Phase 9 — 4 of 6 plans shipped (323 tests)
+- add SUMMARY — --explain CLI flag complete
+- add SUMMARY — L13 complete; Phase 9 detection trio done
+- add SUMMARY — L12 + estimateFrameCost complete
+- add SUMMARY — L11 detection complete
+- Phase 9 planned and ready to execute
+- generate context for Phase 9 from research notes
+- create milestone v0.4.0 roadmap (5 phases)
+- define milestone v0.4.0 requirements
+- start milestone v0.4.0 Visual Economy
+- retroactive VERIFICATION.md + milestone audit passed
+- SUMMARY for 03 + close 04 (was PARTIAL) + STATE sync to v0.3.3
+
+### Tests
+
+- add failing hook tests for output_style suffix (RED)
+- add failing tests for autofixFrameToDotLeader (RED)
+- add failing CLI tests for --explain flag (RED)
+- add L13 unit tests + L11/L13 complementarity check
+- add failing fixtures for L13_double_wrap (RED)
+- add L12 unit tests for cost-shape and threshold
+- add failing fixtures for L12_token_budget (RED)
+- add L11 unit tests for boundary + whitelist behaviour
+- add failing fixtures for L11_overdecoration (RED)
+
+### Maintenance
+
+- gitignore .planning/memory/ (local handoff mirror)
+- remove REQUIREMENTS.md for v0.3.0 milestone
+- archive v0.3.0 milestone files
+
+### Other
+
+- revise 09-04 fixtures + 09-05 walker per plan-checker
+- smallest-visual-first lint rules — 6 plans, 16 tasks, 5 waves
+
 ## 0.3.3 - 2026-05-10
 
 Changes since v0.3.2.
