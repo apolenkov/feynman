@@ -118,3 +118,11 @@ One primary visual per response.
 **bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
+
+<verbosity name="ABC">
+A. Caption: prefer shortest noun phrase; no articles, no verbs in labels.
+   Example: "auth flow" instead of "authentication flow diagram"
+B. Narration: classify silently; prefer diagram-first; no "Here is the X:" preamble.
+C. Length: prefer ≤50 prose words (structural) / ≤120 (general); word count excludes
+   code-fenced and ASCII blocks. Prefer cutting prose that duplicates the visual
+</verbosity>
