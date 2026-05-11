@@ -1,0 +1,185 @@
+{
+  "arm": "v0.3.x",
+  "rules_path": "eval/v0.4.0-compliance/rules-v03.md",
+  "total_prompts": 15,
+  "per_prompt": [
+    {
+      "id": "seq-01",
+      "class": "sequence",
+      "response_chars": 543,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "`CI/CD` (непрерывная интеграция и доставка) пайплайн проекта последователь"
+    },
+    {
+      "id": "seq-02",
+      "class": "sequence",
+      "response_chars": 480,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Аутентификация запроса (`request authentication`) проходит четыре последова"
+    },
+    {
+      "id": "hier-01",
+      "class": "hierarchy",
+      "response_chars": 466,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Стандартный монорепозиторий на `Node.js` организован по двум ключевым дирек"
+    },
+    {
+      "id": "hier-02",
+      "class": "hierarchy",
+      "response_chars": 567,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Директория `tests/` делится на три уровня в зависимости от глубины тестиров"
+    },
+    {
+      "id": "cmp-01",
+      "class": "comparison",
+      "response_chars": 675,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Сравнение `PostgreSQL` и `MongoDB` по трём ключевым критериям."
+    },
+    {
+      "id": "cmp-02",
+      "class": "comparison",
+      "response_chars": 793,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Сравнение трёх менеджеров пакетов (`npm`, `pnpm`, `yarn`) по ключевым крит."
+    },
+    {
+      "id": "status-small",
+      "class": "status",
+      "response_chars": 267,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Статус четырёх задач текущего спринта."
+    },
+    {
+      "id": "status-large",
+      "class": "status",
+      "response_chars": 636,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Статус задач релиза `v1.0`."
+    },
+    {
+      "id": "prio-01",
+      "class": "priority",
+      "response_chars": 553,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Приоритизация пяти багов от критичного к незначительному."
+    },
+    {
+      "id": "branch-01",
+      "class": "branching",
+      "response_chars": 516,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Дерево принятия решений при обработке запроса."
+    },
+    {
+      "id": "state-01",
+      "class": "state-machine",
+      "response_chars": 684,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Машина состояний (`state machine`) для `PR` (запрос на слияние кода)."
+    },
+    {
+      "id": "map-01",
+      "class": "mapping",
+      "response_chars": 879,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Ключевые отличия при миграции с `REST` на `GraphQL`."
+    },
+    {
+      "id": "single-01",
+      "class": "none",
+      "response_chars": 515,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "«Идемпотентный» (`idempotent`) в контексте `HTTP` означает: многократное вы"
+    },
+    {
+      "id": "single-02",
+      "class": "none",
+      "response_chars": 502,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Этот паттерн называется «замыкание» (`closure`) в сочетании с «функцией высш"
+    },
+    {
+      "id": "rec-01",
+      "class": "none",
+      "response_chars": 607,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Для небольшого `SaaS`-стартапа (`SaaS` — программное обеспечение как услуга)"
+    }
+  ],
+  "per_class": {
+    "sequence": {"count": 2, "diagrams": 2, "clean": 2},
+    "hierarchy": {"count": 2, "diagrams": 2, "clean": 2},
+    "comparison": {"count": 2, "diagrams": 2, "clean": 2},
+    "status": {"count": 2, "diagrams": 1, "clean": 2},
+    "priority": {"count": 1, "diagrams": 0, "clean": 1},
+    "branching": {"count": 1, "diagrams": 1, "clean": 1},
+    "state-machine": {"count": 1, "diagrams": 1, "clean": 1},
+    "mapping": {"count": 1, "diagrams": 1, "clean": 1},
+    "none": {"count": 3, "diagrams": 0, "clean": 3}
+  },
+  "per_rule_hits": {
+    "L01": 0,
+    "L02": 0,
+    "L03": 0,
+    "L04": 0,
+    "L05": 0,
+    "L06": 0,
+    "L07": 0,
+    "L08": 0,
+    "L09": 0,
+    "L10": 0,
+    "L11": 0,
+    "L12": 0,
+    "L13": 0
+  },
+  "qualitative_summary": "The v0.3.x XML rules provided clear, unambiguous diagram-or-not guidance for all 15 prompts. Suppression worked correctly: the 3 'none' class prompts (definition, pattern name, recommendation) produced pure prose without any diagram characters. The status split between dot-leader (≤5 items, status-small) and frame block (≥6 items, status-large) was well-defined, though the heuristic `response_has_diagram` flag (checking only ┌/├/→/table) misses dot-leader and ▲▼ scale visuals — those are valid per-rules but count as 'no diagram' in the heuristic. Two drafts required fixes before passing: status-large had L08/L09 frame-width misalignment caused by Unicode box-drawing characters counted differently than expected, and state-01 had L05 (boxes without arrows on same line) and a spurious L06 (lone ▼ without ▲). Both were resolved by adjusting frame border widths and rewriting the state diagram to place boxes on separate lines with explicit arrows. After fixes, all 15 responses passed with 0 lint issues. The rules clearly separated structural from definitional content, and the class-to-visual mapping (sequence→arrow, hierarchy→tree, comparison→table, branching→decision tree, state-machine→states+arrows, mapping→pairs table, priority→▲▼ scale) was applied consistently.",
+  "tokens_spent_estimate": "~8000 chars of responses ≈ ~2000 tokens generated"
+}
