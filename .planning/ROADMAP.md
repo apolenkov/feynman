@@ -86,7 +86,8 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
   3. **Refuted path**: `grep -c 'refuted' eval/v0.5.0-compliance/REPORT.md` ≥ 1 AND `grep -c 'research-only' eval/v0.5.0-compliance/REPORT.md` ≥ 1
   4. Either path: `grep -c '0.5.0' CHANGELOG.md` ≥ 1 — CHANGELOG.md updated with v0.5.0 section
   5. Either path: `npm test` exits 0 — no regressions from winner application (or no change if refuted)
-**Plans**: TBD
+**Plans**: 1/1 complete
+**Status**: Done — ABC applied (4480B, 364/364 tests pass); npm publish pending user action
 
 ## Progress
 
@@ -100,4 +101,4 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 | 15. Budget Compaction | v0.5.0 | 1/1 | Complete | 2026-05-11 |
 | 16. Candidate Rule Sets | v0.5.0 | 1/1 | Complete | 2026-05-11 |
 | 17. Two-Wave Measurement | v0.5.0 | 1/1 | Complete | 2026-05-11 |
-| 18. Apply Winner + Release | v0.5.0 | 0/? | Not started | — |
+| 18. Apply Winner + Release | v0.5.0 | 1/1 | Complete | 2026-05-11 |

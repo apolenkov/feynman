@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## 0.5.0 - 2026-05-11
+
+Changes since v0.4.0.
+
+### Features
+
+- verbosity economy: apply winner ABC rule set to production rules
+  - A: caption brevity — shortest noun phrase labels, no articles or verbs
+  - B: no narration — diagram-first, no "Here is the X:" preamble
+  - C: length budget — ≤50 prose words (structural) / ≤120 (general)
+  - combined ABC achieves −54.7% verbosity vs v0.4.x on 50-prompt corpus
+  - lint compliance: 100% (364/364 tests pass)
+- rules compaction: free 431 bytes (4443 → 4049 base) before ABC addition
+
+### Evaluation
+
+- 7-arm measurement on 50-prompt corpus (eval/v0.5.0-compliance/)
+- all 4 candidates (A/B/C/ABC) exceed −20% verbosity threshold with 100% lint
+- ABC is the clear winner: −54.7% average verbosity reduction
+
 ## 0.4.0 - 2026-05-11
 
 Changes since v0.3.3.
