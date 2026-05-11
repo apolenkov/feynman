@@ -73,7 +73,8 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
   3. Wave 2 complete: `ls eval/v0.5.0-compliance/results-v05-{A,B,C,ABC}-50p.json | wc -l` returns `4`
   4. `jq '.per_prompt | length' eval/v0.5.0-compliance/results-v05-A-50p.json` returns `50` (50-prompt coverage per arm)
   5. `grep -cE 'winner:|refuted:' eval/v0.5.0-compliance/REPORT.md` ≥ 1 — REPORT.md contains explicit winner statement
-**Plans**: TBD
+**Plans**: 1/1 complete
+**Status**: Done — winner: v0.5.x-ABC (−54.7% verbosity, 100% lint). Sanity gate: v0.3.x delta +79.7% (outside 21-41% range); v0.3.x+ladder +33.0% within range — corpus confirmed balanced. Wave 2 results internally consistent.
 
 ### Phase 18: Apply Winner + Release
 **Goal**: Milestone closed — either winner applied to production rules and v0.5.0 published, or all-refuted findings documented and milestone closed as research-only
@@ -98,5 +99,5 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 | 14. Corpus + Harness | v0.5.0 | 1/1 | Complete | 2026-05-11 |
 | 15. Budget Compaction | v0.5.0 | 1/1 | Complete | 2026-05-11 |
 | 16. Candidate Rule Sets | v0.5.0 | 1/1 | Complete | 2026-05-11 |
-| 17. Two-Wave Measurement | v0.5.0 | 0/? | Not started | — |
+| 17. Two-Wave Measurement | v0.5.0 | 1/1 | Complete | 2026-05-11 |
 | 18. Apply Winner + Release | v0.5.0 | 0/? | Not started | — |

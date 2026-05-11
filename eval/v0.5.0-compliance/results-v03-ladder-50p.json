@@ -1,0 +1,557 @@
+{
+  "arm": "v0.3.x+ladder",
+  "rules_path": "eval/v0.5.0-compliance/rules-v03-ladder.md",
+  "total_prompts": 50,
+  "per_prompt": [
+    {
+      "id": "seq-01",
+      "class": "sequence",
+      "response_chars": 167,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "CI/CD пайплайн проходит следующие этапы:  [commit] → [build] → [test] → [staging"
+    },
+    {
+      "id": "seq-02",
+      "class": "sequence",
+      "response_chars": 181,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Аутентификация запроса проходит через четыре шага:  [запрос] → [проверка токена]"
+    },
+    {
+      "id": "seq-03",
+      "class": "sequence",
+      "response_chars": 213,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Откат деплоя выполняется в четыре этапа:  [обнаружение проблемы] → [переключение"
+    },
+    {
+      "id": "seq-04",
+      "class": "sequence",
+      "response_chars": 200,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Миграция базы данных выполняется по следующему сценарию:  [бэкап] → [применить м"
+    },
+    {
+      "id": "seq-05",
+      "class": "sequence",
+      "response_chars": 270,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "OAuth2 Authorization Code Flow состоит из пяти шагов:  [redirect → /authorize] →"
+    },
+    {
+      "id": "seq-06",
+      "class": "sequence",
+      "response_chars": 213,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "После отправки формы сервер выполняет следующую последовательность:  [валидация "
+    },
+    {
+      "id": "hier-01",
+      "class": "hierarchy",
+      "response_chars": 209,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Структура стандартного Node.js монорепо:  ``` monorepo ├── apps │   ├── web │   "
+    },
+    {
+      "id": "hier-02",
+      "class": "hierarchy",
+      "response_chars": 262,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Организация тестовой директории:  ``` tests ├── unit │   ├── services │   └── ut"
+    },
+    {
+      "id": "hier-03",
+      "class": "hierarchy",
+      "response_chars": 234,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Иерархия Kubernetes от верхнего уровня до контейнеров:  ``` cluster └── node    "
+    },
+    {
+      "id": "hier-04",
+      "class": "hierarchy",
+      "response_chars": 223,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Дерево React-компонентов для дашборда:  ``` App └── Layout     ├── Sidebar     └"
+    },
+    {
+      "id": "hier-05",
+      "class": "hierarchy",
+      "response_chars": 273,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Система прав в PostgreSQL организована иерархически:  ``` cluster └── database  "
+    },
+    {
+      "id": "hier-06",
+      "class": "hierarchy",
+      "response_chars": 193,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Типичный состав пакета `utils`:  ``` utils ├── string ├── date ├── validation └─"
+    },
+    {
+      "id": "cmp-01",
+      "class": "comparison",
+      "response_chars": 511,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Сравнение PostgreSQL и MongoDB по трём ключевым критериям:  | Критерий        | "
+    },
+    {
+      "id": "cmp-02",
+      "class": "comparison",
+      "response_chars": 470,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Сравнение пакетных менеджеров npm, pnpm и yarn:  | Критерий              | npm  "
+    },
+    {
+      "id": "cmp-03",
+      "class": "comparison",
+      "response_chars": 434,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Сравнение REST и gRPC по трём критериям:  | Критерий            | REST          "
+    },
+    {
+      "id": "cmp-04",
+      "class": "comparison",
+      "response_chars": 432,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Сравнение видов тестов по скорости, изоляции и покрытию:  | Вид тестов  | Скорос"
+    },
+    {
+      "id": "cmp-05",
+      "class": "comparison",
+      "response_chars": 558,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Сравнение blue-green и canary деплоя:  | Критерий              | Blue-green     "
+    },
+    {
+      "id": "cmp-06",
+      "class": "comparison",
+      "response_chars": 495,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Redis и Memcached по инвалидации кэша:  | Критерий              | Redis         "
+    },
+    {
+      "id": "status-small",
+      "class": "status",
+      "response_chars": 240,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Статус задач спринта:  design ............... done implementation ......... wip "
+    },
+    {
+      "id": "status-large",
+      "class": "status",
+      "response_chars": 437,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Статус задач релиза v1.0:  ┌─ release v1.0 ──────────────────────┐ │ schema migr"
+    },
+    {
+      "id": "status-03",
+      "class": "status",
+      "response_chars": 415,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Статус миграции по сервисам:  ┌─ migration status ────────────┐ │ auth ........."
+    },
+    {
+      "id": "status-04",
+      "class": "status",
+      "response_chars": 367,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Статус стадий пайплайна:  ┌─ CI/CD pipeline ─────────────┐ │ lint .............."
+    },
+    {
+      "id": "status-05",
+      "class": "status",
+      "response_chars": 233,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Статус feature flags:  dark_mode ............... 25% new_checkout ............ 5"
+    },
+    {
+      "id": "status-06",
+      "class": "status",
+      "response_chars": 147,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Статус задач:  написать тест ........... done сделать ревью ............. wip за"
+    },
+    {
+      "id": "prio-01",
+      "class": "priority",
+      "response_chars": 216,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Приоритет багов от высокого к низкому:  ▲ высокий   data loss   auth bypass ▼ ни"
+    },
+    {
+      "id": "prio-02",
+      "class": "priority",
+      "response_chars": 281,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Технический долг по приоритетам P0–P3:  ▲ P0 — критично   захардкоженные секреты"
+    },
+    {
+      "id": "prio-03",
+      "class": "priority",
+      "response_chars": 292,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Приоритет user story по бизнес-ценности и риску:  ▲ высокий   SSO-интеграция (бл"
+    },
+    {
+      "id": "prio-04",
+      "class": "priority",
+      "response_chars": 179,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "▲ утечка памяти — починить первой. ▼ медленный SQL-запрос — приоритет ниже.  Уте"
+    },
+    {
+      "id": "branch-01",
+      "class": "branching",
+      "response_chars": 391,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Обработка запроса с ветвлением по правам:  ``` [запрос] → [auth OK?]            "
+    },
+    {
+      "id": "branch-02",
+      "class": "branching",
+      "response_chars": 493,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Retry-логика вебхука:  ``` [первая попытка] → [успех?]                        │ "
+    },
+    {
+      "id": "branch-03",
+      "class": "branching",
+      "response_chars": 437,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Branching по feature flag:  ``` [читать флаг] → [ошибка?]                     │ "
+    },
+    {
+      "id": "branch-04",
+      "class": "branching",
+      "response_chars": 304,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Логика отображения кнопки удаления:  ``` [пользователь] → [администратор?]      "
+    },
+    {
+      "id": "state-01",
+      "class": "state-machine",
+      "response_chars": 338,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Переходы состояний PR:  ``` [draft] ──open──→ [in-review] ──approve──→ [approved"
+    },
+    {
+      "id": "state-02",
+      "class": "state-machine",
+      "response_chars": 308,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Жизненный цикл заказа:  ``` [placed] → [payment_pending] → [paid] → [fulfilling]"
+    },
+    {
+      "id": "state-03",
+      "class": "state-machine",
+      "response_chars": 333,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Состояния WebSocket-соединения:  ``` [CONNECTING] ──открыто──→ [OPEN] ──закрыть─"
+    },
+    {
+      "id": "state-04",
+      "class": "state-machine",
+      "response_chars": 142,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Переключение фичи:  [enabled] ──toggle──▶ [disabled] [disabled] ──toggle──▶ [ena"
+    },
+    {
+      "id": "map-01",
+      "class": "mapping",
+      "response_chars": 557,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Ключевые отличия при миграции с REST на GraphQL:  | Было (REST)               | "
+    },
+    {
+      "id": "map-02",
+      "class": "mapping",
+      "response_chars": 500,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Переход от callback hell к async/await:  | Было (callbacks)          | Стало (as"
+    },
+    {
+      "id": "map-03",
+      "class": "mapping",
+      "response_chars": 540,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Соответствие терминов при переезде на Kubernetes:  | Было (традиционно)        |"
+    },
+    {
+      "id": "map-04",
+      "class": "mapping",
+      "response_chars": 161,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Переименование эндпоинта:  old: /api/v1/users → new: /api/v2/members  Все клиент"
+    },
+    {
+      "id": "single-01",
+      "class": "none",
+      "response_chars": 282,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Идемпотентный (idempotent) HTTP-метод — это метод, который можно вызвать любое к"
+    },
+    {
+      "id": "single-02",
+      "class": "none",
+      "response_chars": 331,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Паттерн, когда функция возвращает другую функцию, называется замыканием (closure"
+    },
+    {
+      "id": "rec-01",
+      "class": "none",
+      "response_chars": 312,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Для small SaaS-стартапа рекомендую PostgreSQL: он поддерживает ACID-транзакции, "
+    },
+    {
+      "id": "single-03",
+      "class": "none",
+      "response_chars": 345,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Итоговая согласованность (eventual consistency) — модель консистентности в распр"
+    },
+    {
+      "id": "single-04",
+      "class": "none",
+      "response_chars": 325,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Состояние гонки (race condition) — ошибка в параллельном коде, когда результат п"
+    },
+    {
+      "id": "single-05",
+      "class": "none",
+      "response_chars": 310,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Аутентификация (authentication) отвечает на вопрос «кто ты?» — проверяет личност"
+    },
+    {
+      "id": "single-06",
+      "class": "none",
+      "response_chars": 270,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "HTTP-статус 429 означает «Too Many Requests» — клиент превысил допустимое количе"
+    },
+    {
+      "id": "rec-02",
+      "class": "none",
+      "response_chars": 361,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "В serverless-функциях каждый холодный старт открывает новое соединение с БД, что"
+    },
+    {
+      "id": "rec-03",
+      "class": "none",
+      "response_chars": 331,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Версионирование REST API лучше всего делать через URL-путь: /api/v1/, /api/v2/. "
+    },
+    {
+      "id": "single-07",
+      "class": "none",
+      "response_chars": 404,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "При загрузке страницы браузер сначала делает DNS-запрос для преобразования домен"
+    }
+  ],
+  "per_class": {
+    "sequence": {
+      "count": 6,
+      "diagrams": 6,
+      "clean": 6
+    },
+    "hierarchy": {
+      "count": 6,
+      "diagrams": 6,
+      "clean": 6
+    },
+    "comparison": {
+      "count": 6,
+      "diagrams": 6,
+      "clean": 6
+    },
+    "status": {
+      "count": 6,
+      "diagrams": 3,
+      "clean": 6
+    },
+    "priority": {
+      "count": 4,
+      "diagrams": 0,
+      "clean": 4
+    },
+    "branching": {
+      "count": 4,
+      "diagrams": 4,
+      "clean": 4
+    },
+    "state-machine": {
+      "count": 4,
+      "diagrams": 3,
+      "clean": 4
+    },
+    "mapping": {
+      "count": 4,
+      "diagrams": 4,
+      "clean": 4
+    },
+    "none": {
+      "count": 10,
+      "diagrams": 0,
+      "clean": 10
+    }
+  },
+  "per_rule_hits": {},
+  "qualitative_summary": "Arm v0.3.x+ladder: smallest-visual-first ladder applied throughout. Sequences use arrow flow, hierarchies use ASCII trees, comparisons use markdown tables, status ≤5 uses dot-leader lists, status ≥6 uses properly-aligned frame blocks, priority uses ▲/▼ scale, branching uses vertical ASCII decision trees (no two boxes on same line without arrows), state-machines use arrow notation, mappings use before/after tables, none-class prompts use prose only. All 50 prompts passed lint with zero errors and zero warnings. Priority diagrams count as 0 per strict spec (▲/▼ glyphs not in the spec-defined has_diagram set); per_class.priority.diagrams reflects this. Boundary cases (state-04, status-06, map-04) used minimal glyph forms as prescribed by ladder rule.",
+  "tokens_spent_estimate": "~50k"
+}
