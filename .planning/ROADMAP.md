@@ -10,7 +10,7 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 - ✅ **v0.2.0 — Production-Ready** — Phases 2-7 (shipped 2026-05-07) — see [milestones/v0.2.0-ROADMAP.md](./milestones/v0.2.0-ROADMAP.md)
 - ✅ **v0.3.0 — Prompt Architecture** — Phases 8 + 8.5 (shipped 2026-05-10) — see [milestones/v0.3.0-ROADMAP.md](./milestones/v0.3.0-ROADMAP.md)
 - ✅ **v0.4.0 — Visual Economy** — Phases 9-13 (shipped 2026-05-11) — see [milestones/v0.4.0-ROADMAP.md](./milestones/v0.4.0-ROADMAP.md)
-- 🔄 **v0.5.0 — Verbosity Economy** — Phases 14-18 (in progress)
+- ✅ **v0.5.0 — Verbosity Economy** — Phases 14-18 (Done 2026-05-11)
 
 ## Phase Numbering
 
@@ -21,10 +21,10 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 ## Phases
 
 - [x] **Phase 14: Corpus + Harness Setup** — Expand prompt corpus to 50, build aggregate.js, smoke-run baselines
-- [ ] **Phase 15: Budget Compaction** — Free ≥333 bytes in rules/feynman-activate.md; all tests green
-- [ ] **Phase 16: Candidate Rule Sets** — Create 4 candidate rule files (A/B/C/ABC) in eval/
-- [ ] **Phase 17: Two-Wave Measurement** — Wave 1 baselines → sanity gate → Wave 2 candidates → REPORT.md
-- [ ] **Phase 18: Apply Winner + Release** — Apply winner (if threshold met) or close as research-only
+- [x] **Phase 15: Budget Compaction** — Free ≥333 bytes in rules/feynman-activate.md; all tests green
+- [x] **Phase 16: Candidate Rule Sets** — Create 4 candidate rule files (A/B/C/ABC) in eval/
+- [x] **Phase 17: Two-Wave Measurement** — Wave 1 baselines → sanity gate → Wave 2 candidates → REPORT.md
+- [x] **Phase 18: Apply Winner + Release** — Apply winner (if threshold met) or close as research-only
 
 ## Phase Details
 

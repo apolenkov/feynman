@@ -1,7 +1,7 @@
 # Self-Improvement Loop Design
 
 This document designs a future feedback loop for feynman rules. It is a
-research spec only. Implementation is deferred to v0.3.0 under BENCH-V3-02.
+research spec only. Implementation is a candidate for v0.6.0 research.
 
 The goal is not automatic rule rewriting. The goal is a reviewable trail from
 lint failures to human-approved rule changes.
@@ -18,7 +18,7 @@ In scope:
 - Human review gate
 - Rollout cadence
 - Kill-switch
-- Open questions for v0.3.0
+- Open questions for v0.6.0
 
 Out of scope:
 
@@ -62,7 +62,7 @@ anything affects rules.
 
 ## Failure Log Schema
 
-Each failed lint run writes one JSONL row. The path is proposed for v0.3.0:
+Each failed lint run writes one JSONL row. The path is proposed for v0.6.0:
 `~/.claude/.feynman/failures.jsonl`.
 
 ```json
@@ -204,7 +204,7 @@ No proposal is accepted without tests and docs/examples self-lint.
 
 ## Rollout Cadence
 
-Recommended cadence for v0.3.0:
+Recommended cadence for v0.6.0:
 
 ```text
 weekly    collect local failures, no action
@@ -220,7 +220,7 @@ false positives.
 
 ## Kill-Switch
 
-The loop needs a hard local off switch before implementation.
+The loop needs a hard local off switch before implementation (candidate for v0.6.0 research).
 
 Proposed config:
 
@@ -258,7 +258,7 @@ Suggested defaults:
 - Keep aggregate reports until deleted by user.
 - Keep raw JSONL failure rows for 30 days.
 - Never write raw response text unless debug mode is explicitly enabled.
-- Provide `feynman self-improve purge` in v0.3.0 if the feature ships.
+- Provide `feynman self-improve purge` in v0.6.0 if the feature ships.
 
 ---
 
@@ -276,6 +276,6 @@ Suggested defaults:
 
 ## Deferred Implementation
 
-Implementation is explicitly deferred to v0.3.0 (BENCH-V3-02). v0.2.0 ships
+Implementation is explicitly a candidate for v0.6.0 research. v0.5.0 ships
 only this design document. No runtime code, CLI command, hook behavior, config
 schema, or logging path is added in this milestone.

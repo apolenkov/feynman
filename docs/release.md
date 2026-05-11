@@ -32,9 +32,9 @@ npm run ci
 - Use this section format:
 
 ```md
-## 0.2.3 - 2026-05-07
+## 0.5.0 - 2026-05-11
 
-Changes since v0.2.2.
+Changes since v0.4.0.
 
 ### Added
 - ...
@@ -85,10 +85,10 @@ Manual local command examples:
 
 ```bash
 git add package.json CHANGELOG.md
-git commit -m "chore: release v0.2.3"
+git commit -m "chore: release v0.5.0"
 git push origin main
 
-gh release create v0.2.3 --generate-notes --target main
+gh release create v0.5.0 --generate-notes --target main
 ```
 
 If you need a full dry run without publish, use workflow dispatch:
@@ -126,14 +126,14 @@ git rev-parse --short origin/main
 2. Release artifact validation:
 
 ```bash
-gh release view v0.2.3 --json name,tagName,isDraft,isPrerelease,url -q '.name+"\\n"+.tagName+"\\n"+.isDraft+"\\n"+.isPrerelease+"\\n"+.url'
-gh release view v0.2.3 --json body -q .body
+gh release view v0.5.0 --json name,tagName,isDraft,isPrerelease,url -q '.name+"\\n"+.tagName+"\\n"+.isDraft+"\\n"+.isPrerelease+"\\n"+.url'
+gh release view v0.5.0 --json body -q .body
 ```
 
 3. NPM publication:
 
 ```bash
-npm view @albinocrabs/feynman@0.2.3 version
+npm view @albinocrabs/feynman@0.5.0 version
 npm view @albinocrabs/feynman dist-tags
 ```
 
