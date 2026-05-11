@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Features
+
+- TypeScript + ESM migration (Node.js v26 native strip-types, no build step)
+- WR-01/02/03: sanity-assert `<intensity>` tag pairs with malformed-rules fallback
+- explicit application of rules to markdown plan files
+
+### Documentation
+
+- token-economy-planning article with v0.5.0 benchmark data
+- subagent-delegation cross-reference
+- v0.5.0 milestone archive + v0.4.0 audit backfill
+- lint `--fix` before/after sample for frame alignment
+
 ## 0.5.0 - 2026-05-11
 
 Changes since v0.4.0.
