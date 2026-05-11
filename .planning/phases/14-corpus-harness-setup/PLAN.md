@@ -222,7 +222,7 @@ Write the complete JSON file with all 50 entries in class-grouped order: all seq
   <verify>
     <automated>
 # Total count
-jq '.prompts | length' eval/v0.5.0-compliance/prompts.json 2>/dev/null || jq 'length' eval/v0.5.0-compliance/prompts.json
+jq 'length' eval/v0.5.0-compliance/prompts.json
 
 # Class distribution
 jq 'group_by(.class) | map({class: .[0].class, count: length}) | sort_by(.class)' eval/v0.5.0-compliance/prompts.json
@@ -346,7 +346,13 @@ Read the file `eval/v0.5.0-compliance/rules-v02.md` and treat its contents as yo
    - Apply the rules honestly — generate a diagram when the rules say to, prose-only when they say not to.
    - Responses should be realistic developer responses, in Russian (matching the corpus language).
    - Keep responses concise but complete — similar length to the examples in eval/v0.4.0-compliance/results-v02.json.
-3. For each response, run the linter: `node bin/feynman-lint.js --json "<response_text>"` where the response text is passed as a single string argument. If the response is multi-line, write it to a temp file and use `node bin/feynman-lint.js --json "$(cat /tmp/feynman-eval-response.txt)"` instead.
+3. For each response, run the linter by writing the response to a temp file first, then passing the file path:
+   ```bash
+   # Write response to temp file, then lint by file path (NOT inline text)
+   echo "$response" > /tmp/feynman-eval-response.txt
+   node bin/feynman-lint.js --json /tmp/feynman-eval-response.txt
+   ```
+   Or in Node.js: `fs.writeFileSync('/tmp/feynman-eval-response.txt', responseText); execSync('node bin/feynman-lint.js --json /tmp/feynman-eval-response.txt')`
    - Parse the JSON output to get `issue_count` and `issues_by_rule`.
    - `passed` = true when `issue_count === 0`.
 4. For `response_has_diagram`: set true if the response contains any of: `→`, `──`, `│`, `├`, `└`, `┌`, `┐`, `┘`, `▲`, `▼`, `|` (pipe used as table separator — must appear with spaces: ` | `).
