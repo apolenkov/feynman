@@ -1,0 +1,188 @@
+{
+  "arm": "v0.3.x+ladder",
+  "rules_path": "eval/v0.4.0-compliance/rules-v03-ladder.md",
+  "total_prompts": 15,
+  "per_prompt": [
+    {
+      "id": "seq-01",
+      "class": "sequence",
+      "response_chars": 477,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "`CI/CD` (непрерывная интеграция и доставка) пайплайн проходит пять эта"
+    },
+    {
+      "id": "seq-02",
+      "class": "sequence",
+      "response_chars": 500,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Аутентификация запроса (`request authentication`) проходит четыре посл"
+    },
+    {
+      "id": "hier-01",
+      "class": "hierarchy",
+      "response_chars": 549,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Стандартный монорепозиторий на `Node.js` делится на две корневые дирек"
+    },
+    {
+      "id": "hier-02",
+      "class": "hierarchy",
+      "response_chars": 544,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Директория `tests/` делится на три уровня в зависимости от глубины тес"
+    },
+    {
+      "id": "cmp-01",
+      "class": "comparison",
+      "response_chars": 670,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Сравнение `PostgreSQL` и `MongoDB` по трём ключевым критериям."
+    },
+    {
+      "id": "cmp-02",
+      "class": "comparison",
+      "response_chars": 728,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Сравнение трёх менеджеров пакетов по ключевым критериям."
+    },
+    {
+      "id": "status-small",
+      "class": "status",
+      "response_chars": 137,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Статус четырёх задач текущего спринта."
+    },
+    {
+      "id": "status-large",
+      "class": "status",
+      "response_chars": 574,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Статус задач релиза `v1.0`."
+    },
+    {
+      "id": "prio-01",
+      "class": "priority",
+      "response_chars": 504,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Приоритизация пяти багов от критичного к незначительному."
+    },
+    {
+      "id": "branch-01",
+      "class": "branching",
+      "response_chars": 419,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Дерево принятия решений при обработке запроса."
+    },
+    {
+      "id": "state-01",
+      "class": "state-machine",
+      "response_chars": 745,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Машина состояний (`state machine`) для `PR` (запрос на слияние кода)."
+    },
+    {
+      "id": "map-01",
+      "class": "mapping",
+      "response_chars": 858,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Ключевые отличия при миграции с `REST` на `GraphQL`."
+    },
+    {
+      "id": "single-01",
+      "class": "none",
+      "response_chars": 508,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "«Идемпотентный» (`idempotent`) в контексте `HTTP` означает: многократн"
+    },
+    {
+      "id": "single-02",
+      "class": "none",
+      "response_chars": 531,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Этот паттерн называется «функция высшего порядка» (`higher-order funct"
+    },
+    {
+      "id": "rec-01",
+      "class": "none",
+      "response_chars": 631,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Для небольшого `SaaS`-стартапа (`SaaS` — программное обеспечение как у"
+    }
+  ],
+  "per_class": {
+    "sequence": {"count": 2, "diagrams": 2, "clean": 2},
+    "hierarchy": {"count": 2, "diagrams": 2, "clean": 2},
+    "comparison": {"count": 2, "diagrams": 2, "clean": 2},
+    "status": {"count": 2, "diagrams": 1, "clean": 2},
+    "priority": {"count": 1, "diagrams": 0, "clean": 1},
+    "branching": {"count": 1, "diagrams": 1, "clean": 1},
+    "state-machine": {"count": 1, "diagrams": 1, "clean": 1},
+    "mapping": {"count": 1, "diagrams": 1, "clean": 1},
+    "none": {"count": 3, "diagrams": 0, "clean": 3}
+  },
+  "per_rule_hits": {
+    "L01": 0,
+    "L02": 0,
+    "L03": 0,
+    "L04": 0,
+    "L05": 0,
+    "L06": 0,
+    "L07": 0,
+    "L08": 0,
+    "L09": 0,
+    "L10": 0,
+    "L11": 0,
+    "L12": 0,
+    "L13": 0
+  },
+  "total_chars": 8375,
+  "baseline_chars": 8683,
+  "reduction_pct": 3.5,
+  "hypothesis_result": "REFUTED — ladder reduces total chars by 3.5% (308 chars), well below the hypothesized 15-25%. The ladder had the largest impact on status-small (137 vs 267 in baseline, -49%), where it correctly chose dot-leader over a frame block. Larger structure types (tables for comparison/mapping, trees for hierarchy, state-machine diagrams) produced responses of similar length to the baseline because the minimum viable visual for those classes is already a tree or table — no lighter form can convey the same information. The 15-25% hypothesis assumed that multiple prompts would step down the ladder (e.g. frame→tree), but in practice only status-small benefited; the remaining 14 prompts were already at the minimum viable form.",
+  "qualitative_summary": "The v0.3.x+ladder arm successfully applied the smallest-visual-first ladder (prose<glyph<dot-leader<tree<table<frame) across all 15 prompts. All 15 passed lint with 0 issues after one frame-alignment fix on status-large (L08/L09 from Unicode status glyphs in the original draft; switched to plain ASCII 'done/wip/pending' strings). Suppression worked correctly for the 3 'none' class prompts. The key ladder win was status-small: 4-item status list rendered as dot-leader instead of a frame block, saving 130 chars (-49%). All other structural classes were already at the minimum viable visual level. Hypothesis is refuted: 3.5% reduction vs 15-25% expected. The gap is closed only marginally — the +31% verbosity gap from v0.2.x to v0.3.x is not closed by the ladder alone."
+}
