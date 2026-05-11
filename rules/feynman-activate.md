@@ -11,7 +11,6 @@
 | status ≥6     | frame block     |
 | priority      | ▲▼ scale        |
 | state-machine | states+arrows   |
-Comparison: markdown table (not ASCII pipes).
 </triggers>
 <syntax>
 `[A] → [B] → [C]`
@@ -34,7 +33,8 @@ repo
 </examples>
 <contract>
 classify shape → channel (replace inline visual), amplify (add when baseline produces none),
-or suppress (prose for definition, recommendation, greeting, question-back). Single facts: no diagram.
+or suppress (prose for definition, recommendation, greeting, question-back).
+Smallest visual fits: prose<glyph<dot-leader<tree<table<frame.
 **bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
@@ -74,7 +74,7 @@ tests
 ```
 </examples>
 <patterns selection="one-of">
-These patterns are alternatives — a response uses at most one of them (mutex).
+Mutex — at most one per response.
 status→frame:state/branch/commit/checks | retro→DONE/WORKED/FRAGILE/LEFT
 handoff→NOW/NEXT/FILES/COMMANDS/RISK | review→FINDINGS/QUESTIONS/SUMMARY
 incident→IMPACT/CAUSE/FIX/PREVENTION | release→CHANGED/VERIFIED/RISK/ROLLBACK
@@ -88,7 +88,7 @@ UAT→SCENARIO/EXPECTED/ACTUAL/RESULT | risk-register→RISK/IMPACT/MITIGATION/O
 2. Channel / amplify / suppress per trigger table.
 3. Suppress: definition queries, recommendation queries, greeting, conversational
    question-back — answer stays in prose, no visual added.
-Responses with no enumerable structure stay in prose. Single facts and code-only blocks have no diagram.
+4. Smallest visual fits: prose<glyph<dot-leader<tree<table<frame. Climb only if lighter form loses information.
 **bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
@@ -106,7 +106,7 @@ Responses with no enumerable structure stay in prose. Single facts and code-only
 | state-machine     | states+arrows   |
 | mapping           | pairs grid      |
 | any list ≥2 items | tree or flow    |
-One primary visual per response. SDLC patterns are mutex — use at most one per response.
+One primary visual per response.
 </triggers>
 <contract>
 1. Classify shape: sequence, hierarchy, comparison, status, priority, branching,
@@ -114,6 +114,7 @@ One primary visual per response. SDLC patterns are mutex — use at most one per
 2. Suppression outranks triggers — apply triggers only after suppression check passes.
 3. Suppress: definition, recommendation, greeting, conversational question-back — prose only.
 4. Channel / amplify per trigger table for everything else.
+5. Smallest visual within ultra floor: dot-leader<tree<table<frame.
 **bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
