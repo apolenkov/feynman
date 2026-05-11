@@ -10,3 +10,4 @@ dist/
 *.tgz
 .planning/session-retros/
 .planning/memory/
+.sisyphus/
