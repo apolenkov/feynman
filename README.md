@@ -670,6 +670,8 @@ the rules for the active intensity level, and inject them into model context.
 
 ## Token budget and output size
 
+→ deeper: [docs/token-economy-planning.md](docs/token-economy-planning.md)
+
 feynman always adds some input context when it is enabled, because the active
 diagram rules are injected into the client prompt context. It does not add
 visible output by itself; output changes only when the assistant uses the
