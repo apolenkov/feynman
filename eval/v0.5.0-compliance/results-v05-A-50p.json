@@ -1,0 +1,557 @@
+{
+  "arm": "v0.5.x-A",
+  "rules_path": "eval/v0.5.0-compliance/rules-v05-A.md",
+  "total_prompts": 50,
+  "per_prompt": [
+    {
+      "id": "seq-01",
+      "class": "sequence",
+      "response_chars": 135,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "CI/CD flow:  `[commit] → [build] → [test] → [staging] → [prod]`  Каждый шаг блок"
+    },
+    {
+      "id": "seq-02",
+      "class": "sequence",
+      "response_chars": 129,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Auth flow:  `[request] → [token check] → [scope check] → [response]`  Провал на "
+    },
+    {
+      "id": "seq-03",
+      "class": "sequence",
+      "response_chars": 165,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Rollback flow:  `[detect issue] → [switch traffic] → [notify team] → [root cause"
+    },
+    {
+      "id": "seq-04",
+      "class": "sequence",
+      "response_chars": 181,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "DB migration:  `[backup] → [apply migration] → [smoke test] → [done]`  При ошибк"
+    },
+    {
+      "id": "seq-05",
+      "class": "sequence",
+      "response_chars": 182,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "OAuth2 auth code flow:  `[/authorize redirect] → [user login] → [code returned] "
+    },
+    {
+      "id": "seq-06",
+      "class": "sequence",
+      "response_chars": 154,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Form submit flow:  `[receive data] → [validate] → [business logic] → [persist] →"
+    },
+    {
+      "id": "hier-01",
+      "class": "hierarchy",
+      "response_chars": 184,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Monorepo layout:  ``` monorepo ├── apps │   ├── web │   └── api └── packages    "
+    },
+    {
+      "id": "hier-02",
+      "class": "hierarchy",
+      "response_chars": 241,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Test layout:  ``` tests ├── unit │   ├── services │   └── utils ├── integration "
+    },
+    {
+      "id": "hier-03",
+      "class": "hierarchy",
+      "response_chars": 147,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Kubernetes hierarchy:  ``` cluster └── nodes     └── pods         └── containers"
+    },
+    {
+      "id": "hier-04",
+      "class": "hierarchy",
+      "response_chars": 180,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "React dashboard tree:  ``` App └── Layout     ├── Sidebar     └── Main         ├"
+    },
+    {
+      "id": "hier-05",
+      "class": "hierarchy",
+      "response_chars": 197,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "PostgreSQL permissions:  ``` cluster └── database     └── schema         └── tab"
+    },
+    {
+      "id": "hier-06",
+      "class": "hierarchy",
+      "response_chars": 140,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "utils modules:  ``` utils ├── string ├── date ├── array └── http ```  Каждый мод"
+    },
+    {
+      "id": "cmp-01",
+      "class": "comparison",
+      "response_chars": 331,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "PostgreSQL vs MongoDB:  | Критерий   | PostgreSQL           | MongoDB           "
+    },
+    {
+      "id": "cmp-02",
+      "class": "comparison",
+      "response_chars": 382,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "npm vs pnpm vs yarn:  | Критерий       | npm        | pnpm       | yarn       | "
+    },
+    {
+      "id": "cmp-03",
+      "class": "comparison",
+      "response_chars": 269,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "REST vs gRPC:  | Критерий   | REST          | gRPC              | |------------|"
+    },
+    {
+      "id": "cmp-04",
+      "class": "comparison",
+      "response_chars": 288,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Unit vs Integration vs E2E:  | Критерий  | Unit    | Integration  | E2E        |"
+    },
+    {
+      "id": "cmp-05",
+      "class": "comparison",
+      "response_chars": 371,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Blue-green vs Canary:  | Критерий    | Blue-green       | Canary           | |--"
+    },
+    {
+      "id": "cmp-06",
+      "class": "comparison",
+      "response_chars": 402,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Redis vs Memcached (cache invalidation):  | Критерий       | Redis              "
+    },
+    {
+      "id": "status-small",
+      "class": "status",
+      "response_chars": 120,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Sprint tasks:  design ........... ✓ done implementation ... ✓ done tests ......."
+    },
+    {
+      "id": "status-large",
+      "class": "status",
+      "response_chars": 398,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "v1.0 release (7 > 5 → frame):  ``` ┌─ v1.0 ──────────────────────────────┐ │ sch"
+    },
+    {
+      "id": "status-03",
+      "class": "status",
+      "response_chars": 452,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Migration status (8 > 5 → frame):  ``` ┌─ migration ──────────────────────────┐ "
+    },
+    {
+      "id": "status-04",
+      "class": "status",
+      "response_chars": 407,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "CI/CD stages (7 > 5 → frame):  ``` ┌─ pipeline ───────────────────────────┐ │ li"
+    },
+    {
+      "id": "status-05",
+      "class": "status",
+      "response_chars": 142,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Feature flags:  dark_mode ........ 25% new_checkout ..... 50% search_v2 ........"
+    },
+    {
+      "id": "status-06",
+      "class": "status",
+      "response_chars": 94,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Tasks:  написать тест .... ○ pending сделать ревью .... ○ pending задеплоить ..."
+    },
+    {
+      "id": "prio-01",
+      "class": "priority",
+      "response_chars": 228,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Bug priority:  ▲ **data loss** — потеря данных, критично ▲ **auth bypass** — без"
+    },
+    {
+      "id": "prio-02",
+      "class": "priority",
+      "response_chars": 309,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Tech debt priority:  ▲ **P0** захардкоженные секреты — утечка в логах прямо сейч"
+    },
+    {
+      "id": "prio-03",
+      "class": "priority",
+      "response_chars": 200,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "User story priority:  ▲ **SSO** — блокирует корпоративных клиентов ▲ **bulk impo"
+    },
+    {
+      "id": "prio-04",
+      "class": "priority",
+      "response_chars": 211,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Fix priority:  ▲ **memory leak** — нестабильность, может упасть под нагрузкой ▼ "
+    },
+    {
+      "id": "branch-01",
+      "class": "branching",
+      "response_chars": 180,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Request handling decision:  ``` [request] └── auth?     ├── fail → [401]     └──"
+    },
+    {
+      "id": "branch-02",
+      "class": "branching",
+      "response_chars": 186,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Webhook retry logic:  ``` [send] └── success?     ├── yes → [done]     └── no   "
+    },
+    {
+      "id": "branch-03",
+      "class": "branching",
+      "response_chars": 146,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Feature flag branching:  ``` [read flag] └── result?     ├── enabled → [new UX] "
+    },
+    {
+      "id": "branch-04",
+      "class": "branching",
+      "response_chars": 104,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Role-based UI:  ``` [user] └── admin?     ├── yes → [show delete btn]     └── no"
+    },
+    {
+      "id": "state-01",
+      "class": "state-machine",
+      "response_chars": 225,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "PR lifecycle:  `[draft] →publish→ [in-review] →approve→ [approved] →merge→ [merg"
+    },
+    {
+      "id": "state-02",
+      "class": "state-machine",
+      "response_chars": 189,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Order lifecycle:  `[placed] →pay→ [payment_pending] →confirm→ [paid] →fulfill→ ["
+    },
+    {
+      "id": "state-03",
+      "class": "state-machine",
+      "response_chars": 176,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "WebSocket states:  `[CONNECTING] →open→ [OPEN] →close→ [CLOSING] →closed→ [CLOSE"
+    },
+    {
+      "id": "state-04",
+      "class": "state-machine",
+      "response_chars": 126,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Feature toggle:  `[disabled] →enable→ [enabled] →disable→ [disabled]`  Пользоват"
+    },
+    {
+      "id": "map-01",
+      "class": "mapping",
+      "response_chars": 462,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "REST → GraphQL migration:  | REST                          | GraphQL            "
+    },
+    {
+      "id": "map-02",
+      "class": "mapping",
+      "response_chars": 459,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Callback → async/await:  | Pattern       | Callback hell            | async/awai"
+    },
+    {
+      "id": "map-03",
+      "class": "mapping",
+      "response_chars": 271,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "VM → Kubernetes mapping:  | Вне K8s             | В K8s          | |------------"
+    },
+    {
+      "id": "map-04",
+      "class": "mapping",
+      "response_chars": 378,
+      "response_has_diagram": true,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "API rename /v1/users → /v2/members:  | До                      | После          "
+    },
+    {
+      "id": "single-01",
+      "class": "none",
+      "response_chars": 192,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "**Идемпотентный** (idempotent) HTTP-метод — такой, повторный вызов которого даёт"
+    },
+    {
+      "id": "single-02",
+      "class": "none",
+      "response_chars": 232,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Паттерн называется **замыкание** (closure). Если функция возвращает другую функц"
+    },
+    {
+      "id": "rec-01",
+      "class": "none",
+      "response_chars": 291,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Для небольшого SaaS-стартапа рекомендую **PostgreSQL**: надёжная, бесплатная, по"
+    },
+    {
+      "id": "single-03",
+      "class": "none",
+      "response_chars": 326,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "**Итоговая согласованность** (eventual consistency) — модель репликации, при кот"
+    },
+    {
+      "id": "single-04",
+      "class": "none",
+      "response_chars": 237,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "**Состояние гонки** (race condition) — ошибка, возникающая когда результат прогр"
+    },
+    {
+      "id": "single-05",
+      "class": "none",
+      "response_chars": 216,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "**Аутентификация** (authentication) — проверка того, кто вы есть (логин/пароль, "
+    },
+    {
+      "id": "single-06",
+      "class": "none",
+      "response_chars": 186,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "HTTP **429 Too Many Requests** — клиент превысил допустимый лимит запросов. Серв"
+    },
+    {
+      "id": "rec-02",
+      "class": "none",
+      "response_chars": 359,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "В serverless-функции стандартный пул соединений не работает, потому что каждый c"
+    },
+    {
+      "id": "rec-03",
+      "class": "none",
+      "response_chars": 340,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "Наиболее распространённый способ — **версионирование через URL** (`/api/v1/`, `/"
+    },
+    {
+      "id": "single-07",
+      "class": "none",
+      "response_chars": 317,
+      "response_has_diagram": false,
+      "issue_count": 0,
+      "issues_by_rule": {},
+      "passed": true,
+      "response_excerpt": "При загрузке страницы браузер проходит следующие этапы: DNS lookup, TCP handshak"
+    }
+  ],
+  "per_class": {
+    "sequence": {
+      "count": 6,
+      "diagrams": 6,
+      "clean": 6
+    },
+    "hierarchy": {
+      "count": 6,
+      "diagrams": 6,
+      "clean": 6
+    },
+    "comparison": {
+      "count": 6,
+      "diagrams": 6,
+      "clean": 6
+    },
+    "status": {
+      "count": 6,
+      "diagrams": 3,
+      "clean": 6
+    },
+    "priority": {
+      "count": 4,
+      "diagrams": 4,
+      "clean": 4
+    },
+    "branching": {
+      "count": 4,
+      "diagrams": 4,
+      "clean": 4
+    },
+    "state-machine": {
+      "count": 4,
+      "diagrams": 4,
+      "clean": 4
+    },
+    "mapping": {
+      "count": 4,
+      "diagrams": 4,
+      "clean": 4
+    },
+    "none": {
+      "count": 10,
+      "diagrams": 0,
+      "clean": 10
+    }
+  },
+  "per_rule_hits": {},
+  "qualitative_summary": "Arm v0.5.x-A applies verbosity block A (caption brevity). Average response length: 245 chars vs v0.3.x baseline ~436 chars — 44% reduction. Diagram labels are terse nouns: [auth] not [authentication service], [commit] not [commit to repository]. No verbose preambles like \"Sequence diagram showing X:\". Status ≤5 use bare dot-leader without editorial \"(N ≤ 5 → dot list)\" parentheticals — this is the primary discriminator vs v0.3.x; status class diagrams drop to 3/6 (only frame-based entries count). None-class (10 prompts): prose only, zero diagrams. Note: response_has_diagram detector extended to include ▲/▼ glyphs (priority scale) in addition to the spec-listed →, ├──, └──, |---|, ┌ — consistent with v0.3.x arm behaviour.",
+  "tokens_spent_estimate": "~50k"
+}
