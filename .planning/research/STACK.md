@@ -1,223 +1,106 @@
-# Stack: feynman
+# Stack: feynman v0.5.0 «Verbosity Economy»
 
-**Researched:** 2026-05-06
-**Overall confidence:** HIGH (all critical APIs verified against Claude Code official docs and caveman source)
-
----
-
-## Recommended Stack
-
-### Hook Runtime
-
-**Runtime:** Node.js (system-installed, no bundling)
-**Module format:** CommonJS (`require()` / `module.exports`), NOT ESM
-
-Rationale: caveman-activate.js and caveman-mode-tracker.js both use `require('fs')` and `require('path')`. Claude Code invokes hooks via `node <path>` directly — no transpilation, no build step. The hook file must be runnable as `node hooks/feynman.js` with zero dependencies. ESM (`import`/`export`) would require `"type": "module"` in a package.json, adds complexity, and diverges from the proven caveman pattern that users already trust.
-
-**Hook event:** `UserPromptSubmit`
-
-Rationale: Fires on every prompt submission, before the model sees the request. `SessionStart` only fires once per session — if feynman used it, rules would not re-inject after context compaction, which is exactly the failure mode the project must avoid. `UserPromptSubmit` re-injects on every turn.
-
-**Hook input (stdin):**
-
-```json
-{
-  "session_id": "abc123",
-  "transcript_path": "/Users/.../.claude/projects/.../session.jsonl",
-  "cwd": "/current/working/dir",
-  "permission_mode": "default",
-  "hook_event_name": "UserPromptSubmit",
-  "prompt": "the user's submitted text"
-}
-```
-
-Read via `process.stdin` as a buffered string, then `JSON.parse()`.
-
-**Hook output (stdout, exit 0):**
-
-```json
-{
-  "hookSpecificOutput": {
-    "hookEventName": "UserPromptSubmit",
-    "additionalContext": "<full feynman rules text here>"
-  }
-}
-```
-
-`additionalContext` is injected as a system reminder alongside the submitted prompt, visible to Claude but not shown as a chat message. Capped at 10,000 characters; feynman rules are well under that. Use `process.stdout.write(JSON.stringify(...))` — not `console.log` — to avoid trailing newline surprises.
-
-**Blocking prompts:** Set `"decision": "block"` with `"reason": "..."` to halt processing. Not needed for feynman (inject-only, never blocks).
-
-**No dependencies.** Zero npm packages. No `package.json` required for the hook itself.
+**Milestone:** v0.5.0 — measuring and closing the +31% verbosity gap
+**Researched:** 2026-05-11
+**Scope:** eval harness, text metrics, statistical validity, prior art
 
 ---
 
-### Plugin Manifest
+## 1. LLM Evaluation Frameworks
 
-Location: `.claude-plugin/plugin.json`
+The core constraint: the existing harness runs via Claude Code subagents with **no separate API key**. All evaluation options below are assessed against that constraint.
 
-**Minimal required fields:**
+| Tool | Version/License | API-key-free? | Verdict |
+|------|-----------------|---------------|---------|
+| `promptfoo` | latest / MIT | **No** — rubric assertions default to OpenAI for grading; needs external LLM even when testing local models | **Reject** for this project. Requires external grading LLM. |
+| `braintrust/autoevals` | latest / Apache-2.0 | **No** — BRAINTRUST_API_KEY optional but core grading calls an LLM | **Reject** — same problem. |
+| `LangSmith` | SaaS + SDK / MIT SDK | **No** — cloud-first, requires LangChain account | **Reject** — cloud dependency. |
+| `Arize Phoenix` | latest / Apache-2.0 | **Yes** — fully self-hosted, no cloud account | Too heavy (Python, Docker). Not worth the setup for 50-prompt suite. |
+| `Langfuse` | MIT / self-host | **Yes** — Docker self-host or cloud | Same as Phoenix: Python server overkill for a 7-arm × 50-prompt eval. |
+| **Existing subagent harness** | internal / N/A | **Yes** — uses Claude Code's built-in auth | **Keep**. Already works, zero new dependencies, aligned with zero-dep philosophy. |
 
-```json
-{
-  "name": "feynman"
-}
-```
-
-**Recommended full manifest:**
-
-```json
-{
-  "name": "feynman",
-  "version": "1.0.0",
-  "description": "Injects ASCII diagram rules into every Claude request via UserPromptSubmit hook",
-  "author": {
-    "name": "apolenkov",
-    "url": "https://github.com/apolenkov/feynman"
-  },
-  "repository": "https://github.com/apolenkov/feynman",
-  "license": "MIT",
-  "keywords": ["ascii", "diagrams", "visual", "hooks", "claude-code"]
-}
-```
-
-Rules:
-- `name` must be kebab-case (validated by Claude Code on plugin load)
-- `version` must be semver `MAJOR.MINOR.PATCH` if present — `"1.0"` is invalid
-- File must live at `.claude-plugin/plugin.json`, not `.claude-plugin.json` at root
-
-**Plugin hooks file:** `hooks/hooks.json`
-
-For the Claude Code plugin install path (`/plugin install feynman`), hooks are declared in `hooks/hooks.json` using the plugin format:
-
-```json
-{
-  "UserPromptSubmit": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/feynman.js\"",
-          "timeout": 5
-        }
-      ]
-    }
-  ]
-}
-```
-
-Note: `UserPromptSubmit` has no `matcher` field — it fires on every prompt, unconditionally.
+**Recommendation:** Stay with the existing subagent-based harness. None of the frameworks eliminate the API-key requirement while adding value over the current approach. The harness measures char-count, word-count, lint compliance, and diagram ratio — all computable without an external grading model.
 
 ---
 
-### Install Mechanism
+## 2. Node.js Text Analysis
 
-**Two parallel install paths — both required:**
+These metrics are needed per response: char-count, word-count, sentence-count, estimated token-count, prose-vs-diagram ratio.
 
-#### Path A: Standalone hooks install (primary, mirrors caveman)
+| Library | Version | License | Zero deps? | What it does | Verdict |
+|---------|---------|---------|------------|--------------|---------|
+| `tokenx` | 1.3.0 (Jan 2026) | MIT | **Yes** — 2kB bundle | Token estimation at ~96% accuracy vs full tokenizer | **Use** for token-count column in the 7-arm matrix |
+| `text-count` | — | — | unknown (403 on fetch) | chars + words + sentences + lines | **Skip** — unverifiable; trivial to implement inline |
+| `words-count` | — | MIT | likely | word count with CJK support | Overkill; `text.split(/\s+/).length` covers the need |
+| `word-count` | — | MIT | likely | word count with CJK | Same — not needed |
 
-`install.sh` — curl-pipe-bash one-liner:
+**Recommendation:** Implement metrics as a single ~40-line inline helper (`lib/eval/metrics.js`):
 
-```bash
-bash <(curl -s https://raw.githubusercontent.com/apolenkov/feynman/main/install.sh)
-```
-
-The script:
-1. Checks `node` is available (`command -v node`)
-2. Copies `hooks/feynman.js` to `~/.claude/hooks/feynman.js`
-3. Copies rules source to `~/.claude/hooks/feynman-rules.js` (or embeds inline)
-4. Merges hook entry into `~/.claude/settings.json` using Node.js inline (`node -e "const fs = require('fs'); ..."`) — NOT `jq`, mirrors caveman exactly
-5. Creates `~/.claude/settings.json` as `{}` if missing before merge
-6. Idempotent: checks if hook already registered before adding
-7. Prints install confirmation with mode info
-
-`install.ps1` — Windows PowerShell equivalent, hand-kept in sync.
-
-**settings.json entry written:**
-
-```json
-{
-  "UserPromptSubmit": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "node \"/Users/<user>/.claude/hooks/feynman.js\"",
-          "timeout": 5,
-          "statusMessage": "Injecting diagram rules..."
-        }
-      ]
-    }
-  ]
+```js
+// All pure Node.js, zero deps
+function measure(text) {
+  return {
+    chars: text.length,
+    words: text.trim().split(/\s+/).length,
+    sentences: (text.match(/[.!?]+/g) || []).length,
+    // tokenx formula: chars / 4 is the standard rough estimate
+    tokensEstimated: Math.ceil(text.length / 4),
+    diagramLines: (text.match(/^[│├└┌┐┘─┼┤┬┴]/gm) || []).length,
+    totalLines: text.split('\n').length,
+  };
 }
 ```
 
-Path is written as absolute at install time (caveman pattern). `statusMessage` shown in Claude Code UI while hook runs.
-
-#### Path B: Claude Code plugin install (secondary)
-
-```
-/plugin install feynman
-```
-
-Requires publishing to Claude Code Marketplace. Plugin discovery uses `hooks/hooks.json` + `${CLAUDE_PLUGIN_ROOT}` env var. Lower priority for v1.0 — hooks install is faster to ship and what caveman users already know.
+Use `tokenx` only if per-model accuracy matters; the `/4` approximation is accurate enough for comparing arm deltas (same model, same prompts). HIGH confidence this is sufficient for relative comparisons.
 
 ---
 
-### IDE Compatibility Layer
+## 3. Statistical Validity at N=50
 
-**Cline:** `.clinerules/feynman.md`
-- Plain markdown, no frontmatter, no special syntax
-- Directory `.clinerules/` is auto-scanned by Cline; all `.md` files injected
-- Content: the feynman rules text verbatim (same source as hook injects)
-- Windsurf also recognizes `.clinerules/` (cross-compatibility via shared format)
+**Key finding from the literature** (Cameron Wolfe, "Applying Statistics to LLM Evaluations"):
 
-**Windsurf native:** `.windsurf/rules/feynman.md`
-- Plain markdown, no frontmatter
-- Windsurf auto-discovers files in `.windsurf/rules/`
-- Content: same rules text
+- CLT-based confidence intervals become unreliable below N=100.
+- Detecting a 10% effect size at p<0.05 with 80% power requires ~N=200+ with standard tests.
+- At N=50, CLT assumptions may fail and CIs are overconfident.
 
-**Cursor:** `.cursor/rules/feynman.mdc`
-- YAML frontmatter required by Cursor's `.mdc` format:
-  ```yaml
-  ---
-  description: Inject ASCII diagram rules for visual responses
-  alwaysApply: true
-  ---
-  ```
-- Body: the feynman rules text (markdown)
-- Cursor applies `alwaysApply: true` rules to every conversation in the project
+**Practical options for v0.5.0:**
 
-**Single source of truth:** Keep rules in one canonical file (e.g., `rules/feynman-full.md`). The hook reads it at runtime; `install.sh --with-init` copies it into all three IDE locations. This mirrors caveman's `--with-init` flag pattern.
+| Approach | N=50 valid? | Notes |
+|----------|-------------|-------|
+| Two-sample t-test (char-count delta) | Marginal — works if distribution is roughly normal | OK for a directional signal, not for publication |
+| Paired t-test (same prompt × two arms) | **Yes** — variance reduction makes N=50 workable | **Recommended**: same 50 prompts in all 7 arms eliminates between-prompt variance |
+| Wilcoxon signed-rank (nonparametric) | **Yes** — no normality assumption, valid at N=50 | Use as backup check alongside paired t-test |
+| Bootstrap CI (1000 resamples) | **Yes** — model-free, works at any N | Best for reporting; pure JS, ~20 lines |
+| Binary sign test on per-prompt winner | Valid at N=50 (binomial exact test) | Simplest — count how many of 50 prompts arm X beats baseline |
 
-**CLAUDE.md manual fallback:** README instructs users to paste rules into their `CLAUDE.md` as an alternative to hook install. Same rules text, copy-paste.
+**Recommended harness design:** Paired measurement — run all 7 arms on the **same** 50 prompts. Report:
+1. Mean char-count delta vs baseline per arm.
+2. Paired t-test p-value (or Wilcoxon signed-rank as a sanity check).
+3. Bootstrap 95% CI on the delta.
+4. Binary: how many of 50 prompts show ≥-20% reduction?
+
+Effect size threshold −20% at N=50 via paired test is statistically reachable (MEDIUM confidence). Going to N=100 would make claims more robust; flagged for CORP-01.
 
 ---
 
-## What NOT to Use
+## 4. Prior Art: Prompt Brevity Techniques
 
-| Rejected | Why |
-|----------|-----|
-| ESM (`import`/`export`) | Requires `"type": "module"` in package.json, adds complexity, diverges from caveman CJS pattern |
-| `jq` for settings.json merge | Not universally installed; caveman uses `node -e` inline for portability |
-| npm dependencies | Zero-dep is a hard constraint; keeps install auditable and fast |
-| `SessionStart` hook instead of `UserPromptSubmit` | Only fires once — rules lost after context compaction |
-| `type: "prompt"` hook | LLM-interpreted, non-deterministic; rules injection must be exact text, not AI-summarized |
-| Mermaid / graphviz rendering | Out of scope per PROJECT.md; ASCII only |
-| Single flat `.clinerules` file | Cline deprecated flat file in favor of `.clinerules/` directory |
-| `console.log` for hook output | Adds trailing newline; use `process.stdout.write(JSON.stringify(...))` |
+Evidence from Anthropic official docs (current), claude-token-efficient repo, and The Prompt Report survey.
 
----
+**Confirmed interventions that reduce output length (HIGH confidence — Anthropic official docs):**
 
-## Open Questions
+| Technique | Example instruction | Expected effect |
+|-----------|--------------------|--------------------|
+| **A. Caption brevity** — explicit word budget | `"Respond in ≤N words."` / `"Keep captions to ≤5 words."` | Directly caps length per item |
+| **B. No-narration** — strip filler | `"No preamble. No closing remarks. Skip 'Sure!', 'Great question', 'I hope this helps'."` | Removes ~10-20% boilerplate (drona23 measured -63% in extreme form) |
+| **C. Response-length budget** — explicit total | `"Keep text between diagrams to ≤25 words. Final responses ≤100 words unless task requires more."` | Broadest scope; Anthropic internal guideline for Claude Code |
+| **D. Positive examples** | Show a concise reference response | More effective than telling the model what NOT to do (Anthropic confirmed) |
+| **E. Format constraint** | `"Use bullet points only. No preamble."` | Structural constraint blocks narrative expansion |
+| **F. Chain of Draft (CoD)** | Constrain words per reasoning step | Reduces latency + tokens; matches CoT accuracy |
 
-1. **`${CLAUDE_PLUGIN_ROOT}` vs absolute path in hooks.json:** Plugin install uses `${CLAUDE_PLUGIN_ROOT}` env var — confirmed by official docs. Standalone hooks install writes absolute path. Both needed. Question: does `${CLAUDE_PLUGIN_ROOT}` expand correctly on Windows in the plugin path? Needs testing on Windows before v1.0.
+The A/B/C nomenclature in the v0.5.0 REQUIREMENTS maps directly to techniques A, B, C above — this is confirmed prior art, not speculative. HIGH confidence each reduces verbosity; exact magnitude varies by model and prompt type.
 
-2. **Intensity levels and hook output size:** Full rules text for `ultra` mode may approach 3-5KB. `additionalContext` cap is 10,000 chars — safe. But does injecting on every prompt affect latency noticeably? Unknown without benchmarking.
-
-3. **`/feynman` toggle slash command format:** Commands live in `commands/feynman.md` as markdown files with YAML frontmatter (`allowed-tools`, `description`). Exact frontmatter schema needs verification against current Claude Code command docs before implementation.
-
-4. **Marketplace availability:** Publishing to Claude Code Marketplace is undocumented publicly as of 2026-05-06. `/plugin install feynman` path may require Anthropic review or registry access. Hooks-only install is the safe v1.0 delivery.
+**Note:** Anthropic explicitly states that positive examples outperform negative prohibitions. The ABC candidate rule files should include a short concrete "good response" example rather than just prohibitions.
 
 ---
 
@@ -225,15 +108,23 @@ Requires publishing to Claude Code Marketplace. Plugin discovery uses `hooks/hoo
 
 | Area | Confidence | Source |
 |------|------------|--------|
-| `UserPromptSubmit` hook input format (`prompt` field in stdin) | HIGH | Official Claude Code docs via Context7 `/anthropics/claude-code` |
-| `hookSpecificOutput.additionalContext` output format | HIGH | Official Claude Code docs (code.claude.com/docs/en/hooks) |
-| `additionalContext` 10,000 char cap | MEDIUM | Official docs page (single source, no corroboration) |
-| CommonJS requirement for hook scripts | HIGH | Caveman source (caveman-activate.js uses `require()`) + zero-dep constraint |
-| `.claude-plugin/plugin.json` manifest format | HIGH | Context7 `/anthropics/claude-code` official plugin docs |
-| hooks.json plugin format with `${CLAUDE_PLUGIN_ROOT}` | HIGH | Context7 official docs |
-| `node -e` inline Node.js for settings.json merge | HIGH | Caveman install.sh source — no jq dependency |
-| `.clinerules/` directory format (Cline) | HIGH | Multiple sources: caveman repo + everydev.ai analysis |
-| `.windsurf/rules/` format | MEDIUM | Single source (everydev.ai); Windsurf docs not directly verified |
-| `.cursor/rules/*.mdc` YAML frontmatter format | HIGH | Multiple sources: caveman README + Cursor documentation |
-| `UserPromptSubmit` has no matcher support | HIGH | Official docs: "No matcher support — fires on every prompt submission" |
-| Marketplace publish path | LOW | No public Anthropic documentation found for v1.0 marketplace submission |
+| Eval frameworks (API key required) | HIGH | WebSearch + official docs for promptfoo, braintrust |
+| tokenx library details | HIGH | GitHub README (johannschopplich/tokenx) |
+| Inline metrics implementation | HIGH | Standard JS, no library needed |
+| N=50 statistical validity | MEDIUM | Cameron Wolfe substack, LLM eval statistics literature |
+| Paired t-test + bootstrap recommendation | HIGH | Standard statistics |
+| Prompt brevity techniques A/B/C | HIGH | Anthropic official prompting docs (May 2026), drona23 repo |
+| CoD technique | MEDIUM | arxiv 2024, single source |
+
+---
+
+## Sources
+
+- [promptfoo/promptfoo — GitHub](https://github.com/promptfoo/promptfoo)
+- [Promptfoo FAQ](https://www.promptfoo.dev/docs/faq/)
+- [braintrustdata/autoevals — GitHub](https://github.com/braintrustdata/autoevals)
+- [tokenx — GitHub (johannschopplich)](https://github.com/johannschopplich/tokenx)
+- [Applying Statistics to LLM Evaluations (Cameron Wolfe)](https://cameronrwolfe.substack.com/p/stats-llm-evals)
+- [Prompting best practices — Anthropic official docs](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)
+- [claude-token-efficient (drona23)](https://github.com/drona23/claude-token-efficient)
+- [The Prompt Report, arXiv 2406.06608](https://arxiv.org/abs/2406.06608)

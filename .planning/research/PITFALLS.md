@@ -686,3 +686,124 @@ actual diagram render count. This is simpler and honest.
 - [Issue #32057 — rules re-injected on every tool call](https://github.com/anthropics/claude-code/issues/32057)
 - [Issue #11240 — no plugin install/uninstall lifecycle hooks](https://github.com/anthropics/claude-code/issues/11240)
 - [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) — reference implementation patterns
+
+---
+
+## v0.5.0 Verbosity Economy — Additional Pitfalls
+
+**Added:** 2026-05-11
+**Scope:** A/B measurement harness, brevity rule-writing, release gates, budget compaction
+
+---
+
+### M1: Claiming effect size without confidence intervals (harness-build phase)
+
+**Warning sign:** Report says "20% improvement" with no CI bounds.
+**Why it fails:** With n=50 and binary pass/fail, the 95% Wilson CI half-width is ≈±14 pp.
+A 10% effect is statistically invisible; 20% is right at the noise floor.
+**Prevention:** Use paired design — run each of the 50 prompts through both control and
+treatment in the same session, measure within-prompt delta, test with Wilcoxon signed-rank.
+Paired analysis collapses between-prompt variance; 50 pairs is sufficient for 10–15 pp effects.
+Report: median delta + IQR + Wilson CI, not a bare percentage.
+
+---
+
+### M2: Corpus coverage bias — all prompts from one shape class (harness-build phase)
+
+**Warning sign:** Distribution of shapes in the 50-prompt set clusters around status frames
+or sequences; state machines, mapping pairs, and suppression cases are absent.
+**Prevention:** Stratify — at least 3 prompts per shape class from the trigger table
+(`rules/feynman-activate.md` `<triggers>`), plus ≥5 "suppress" cases (definitions, greetings,
+questions). Unbalanced corpus overfits to covered shapes and cannot generalize.
+
+---
+
+### M3: Session carry-over — prompts are not i.i.d. (harness-build phase)
+
+**Warning sign:** All 50 prompt pairs run in a single session; earlier responses alter model
+behavior for later ones (context accumulation).
+**Prevention:** Each prompt pair gets a fresh session. No carry-over context.
+
+---
+
+### R1: Brevity rule collapses amplify → suppress (rules-edit phase)
+
+**Warning sign:** Control arm produces a diagram; treatment arm produces prose only.
+**Why it fails:** A "keep responses short" instruction pushes borderline amplify decisions
+into suppress — the model drops the diagram entirely to hit the word budget.
+This directly inverts feynman's purpose.
+**Prevention:** Scope the brevity constraint to prose-around-visual only. Phrase as
+"shorten prose *surrounding* the diagram, not the diagram itself." Never express budget as
+a total word count that includes code-fenced or ASCII blocks.
+
+---
+
+### R2: Caption brevity makes diagrams decorative (rules-edit phase)
+
+**Warning sign:** Few-shot `├──` count in the rules file drops below 6 (test at
+`tests/hook.test.js:600`). Node labels shrink to single letters.
+**Why it fails:** `[A] → [B]` saves tokens but communicates nothing. The diagram becomes
+decoration, not information.
+**Prevention:** Preserve full node labels in `<examples>` blocks. The test at line 600
+(≥6 `├──`) is a mechanical proxy for label completeness — treat it as a hard gate.
+
+---
+
+### R3: Word-budget rule conflicts with ASCII token cost (rules-edit phase)
+
+**Warning sign:** Treatment arm passes a word-count check but diagram rate drops versus
+control.
+**Why it fails:** Frame blocks are token-heavy. A total-words budget forces the model to
+trade the diagram for shorter prose.
+**Prevention:** Express budget as "prose words, excluding code-fenced blocks" or exclude
+`<intensity>` content from counting. Verify by measuring diagram rate separately from
+word count in the harness.
+
+---
+
+### R4: New brevity rule silently drops a `<contract>` keyword (rules-edit phase)
+
+**Warning sign:** `npm test` fails on "contract missing word" (`tests/hook.test.js:577–584`).
+**Why it fails:** Compacting the `<contract>` section to free 333 bytes will break the
+test if any of `classify`, `channel`, `amplify`, or `suppress` is removed. The same risk
+applies to the suppression classes: `definition`, `recommendation`, `question`, `greeting`
+(lines 593–598).
+**Prevention:** `npm test` is the complete oracle for compaction safety. Run it, read all
+failures, never ship with a red assertion. The byte-ceiling test (≤4480, line 551) does
+not catch content-shape violations — byte count can pass while contract words are lost.
+
+---
+
+### G1: Winning on 50-prompt corpus, regressing on v0.4.0 harness (release-gate phase)
+
+**Warning sign:** 50-prompt A/B score improves; v0.4.0 15-prompt harness score drops.
+**Why it fails:** The 15-prompt v0.4.0 corpus covers a different shape distribution. A rule
+tuned on 50 prompts can degrade behavior on shapes it never saw.
+**Prevention:** Run both corpora before release. Treat the v0.4.0 15-prompt harness as the
+regression gate, not a deprecated artifact.
+
+---
+
+### G2: Verbosity metric improves, readability drops (release-gate phase)
+
+**Warning sign:** Token count falls 15%; spot-check of 10 treatment-arm responses shows
+diagrams with terse unlabeled nodes.
+**Prevention:** Supplement the metric with a readability spot-check — at minimum, manually
+review 5–10 "after" samples from the treatment arm for label completeness before declaring
+a win. A diagram that saves tokens but confuses the reader is a regression, not a win.
+
+---
+
+### B1: Compaction passes byte gate but breaks structural invariants (rules-edit phase)
+
+The byte-ceiling assertion at `tests/hook.test.js:551` (≤4480 bytes) is a necessary but not
+sufficient gate. Compaction that stays under the ceiling can still silently break:
+
+- `lite`/`full`/`ultra` sections become empty or identical (lines 624–627)
+- SDLC patterns block loses the "one-of" / "select ONE" / "mutex" marker (line 586–590)
+- suppression guidance drops one of the four required class names (lines 593–598)
+- few-shot density falls below ≥6 `├──` or ≥6 `→` (lines 600–607)
+
+**Warning sign:** byte count passes; `npm test` red on any content-shape assertion.
+**Prevention:** `npm test` after every edit to the rules file. The full 8-assertion suite
+at lines 541–629 is the compaction oracle — not just the byte count.
