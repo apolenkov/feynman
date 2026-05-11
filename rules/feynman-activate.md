@@ -89,6 +89,7 @@ UAT→SCENARIO/EXPECTED/ACTUAL/RESULT | risk-register→RISK/IMPACT/MITIGATION/O
 3. Suppress: definition queries, recommendation queries, greeting, conversational
    question-back — answer stays in prose, no visual added.
 4. Smallest visual fits: prose<glyph<dot-leader<tree<table<frame. Climb only if lighter form loses information.
+5. Rules apply to .md plan files (plan.md, PLAN.md, .planning/**, goals/**).
 **bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
@@ -120,9 +121,7 @@ One primary visual per response.
 </intensity>
 
 <verbosity name="ABC">
-A. Caption: prefer shortest noun phrase; no articles, no verbs in labels.
-   Example: "auth flow" instead of "authentication flow diagram"
-B. Narration: classify silently; prefer diagram-first; no "Here is the X:" preamble.
-C. Length: prefer ≤50 prose words (structural) / ≤120 (general); word count excludes
-   code-fenced and ASCII blocks. Prefer cutting prose that duplicates the visual
+A. Caption: shortest noun phrase; no articles, no verbs in labels.
+B. Narration: classify silently; diagram-first; no "Here is the X:" preamble.
+C. Length: ≤50 prose words (structural) / ≤120 (general); excludes code-fenced and ASCII. Cut prose duplicating the visual.
 </verbosity>
