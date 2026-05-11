@@ -40,8 +40,6 @@ function frameNode(top: string, inner: string[], bottom: string, indent?: string
     inner,
     bottom,
     indent: indent || '',
-    start: 0,
-    end: 0,
   };
 }
 
@@ -61,14 +59,14 @@ describe('autofixFrame — single-frame repair', () => {
     // Top, two inner, bottom — 4 lines.
     assert.equal(lines.length, 4);
     // Top and bottom widths must match.
-    assert.equal(lines[0].length, lines[3].length);
+    assert.equal(lines[0]!.length, lines[3]!.length);
     // Every inner line must end with │ at the same column as ┐ on top.
-    const topBarEnd = [...lines[0]].length;
+    const topBarEnd = [...lines[0]!].length;
     for (let i = 1; i < lines.length - 1; i++) {
-      assert.equal([...lines[i]].length, topBarEnd, `inner line ${i} must match top width`);
-      assert.equal([...lines[i]].pop(), '│');
+      assert.equal([...lines[i]!].length, topBarEnd, `inner line ${i} must match top width`);
+      assert.equal([...lines[i]!].pop(), '│');
     }
-    assert.equal([...lines[3]].pop(), '┘');
+    assert.equal([...lines[3]!].pop(), '┘');
   });
 
   it('repairs a frame whose right-edge │ is past the top ┐ column', () => {
@@ -80,7 +78,7 @@ describe('autofixFrame — single-frame repair', () => {
     );
     const out = autofixFrame(node);
     const lines = out.split('\n');
-    const topBarEnd = [...lines[0]].length;
+    const topBarEnd = [...lines[0]!].length;
     for (const line of lines) {
       assert.equal([...line].length, topBarEnd);
     }
@@ -93,11 +91,11 @@ describe('autofixFrame — single-frame repair', () => {
       '│ world  │',
       '└────────┘',
     ];
-    const node = frameNode(clean[0], [clean[1], clean[2]], clean[3]);
+    const node = frameNode(clean[0]!, [clean[1]!, clean[2]!], clean[3]!);
     const out = autofixFrame(node);
     assert.equal(out, clean.join('\n'));
     // Apply twice — no further change.
-    const node2 = frameNode(clean[0], [clean[1], clean[2]], clean[3]);
+    const node2 = frameNode(clean[0]!, [clean[1]!, clean[2]!], clean[3]!);
     assert.equal(autofixFrame(node2), out);
   });
 
@@ -113,7 +111,7 @@ describe('autofixFrame — single-frame repair', () => {
     assert.match(out, /├── child/);
     // All lines aligned.
     const lines = out.split('\n');
-    const w = [...lines[0]].length;
+    const w = [...lines[0]!].length;
     for (const line of lines) assert.equal([...line].length, w);
   });
 
@@ -162,8 +160,8 @@ describe('autofix(text) — full document rewriting', () => {
     const frameMatch = after.match(/┌[─]+┐\n(?:│[^\n]*│\n)+└[─]+┘/);
     assert.ok(frameMatch, 'frame must be repaired and matchable');
     // Width consistency on the rewritten frame.
-    const flines = frameMatch[0].split('\n');
-    const w = [...flines[0]].length;
+    const flines = frameMatch![0]!.split('\n');
+    const w = [...flines[0]!].length;
     for (const l of flines) assert.equal([...l].length, w);
   });
 
@@ -195,9 +193,9 @@ describe('autofix(text) — full document rewriting', () => {
     // Two frames — each must be self-consistent.
     const frames = out.match(/┌[─]+┐\n(?:│[^\n]*│\n)+└[─]+┘/g);
     assert.ok(frames && frames.length === 2, `expected 2 frames, got ${frames && frames.length}`);
-    for (const f of frames) {
+    for (const f of frames!) {
       const fl = f.split('\n');
-      const w = [...fl[0]].length;
+      const w = [...fl[0]!].length;
       for (const l of fl) assert.equal([...l].length, w);
     }
   });
@@ -294,8 +292,8 @@ describe('autofixFrameToDotLeader — L11 conversion', () => {
     };
     const out = autofixFrameToDotLeader(node);
     const lines = out.split('\n');
-    assert.match(lines[0], /^\s*-\s+/);
-    assert.match(lines[1], /^\s*-\s+/);
+    assert.match(lines[0]!, /^\s*-\s+/);
+    assert.match(lines[1]!, /^\s*-\s+/);
   });
 
   it('preserves indentation', () => {
@@ -311,8 +309,8 @@ describe('autofixFrameToDotLeader — L11 conversion', () => {
     };
     const out = autofixFrameToDotLeader(node);
     const lines = out.split('\n');
-    assert.ok(lines[0].startsWith('    '), 'indentation preserved on row 1');
-    assert.ok(lines[1].startsWith('    '), 'indentation preserved on row 2');
+    assert.ok(lines[0]!.startsWith('    '), 'indentation preserved on row 1');
+    assert.ok(lines[1]!.startsWith('    '), 'indentation preserved on row 2');
   });
 
   it('idempotency: autofix(autofix(x), CLI opts) is no-op on second pass', () => {

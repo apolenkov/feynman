@@ -5,9 +5,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 
-const require = createRequire(import.meta.url);
 const REPO_DIR = path.resolve(import.meta.dirname, '..');
 
 function readJson(relPath: string): Record<string, unknown> {
@@ -17,42 +15,42 @@ function readJson(relPath: string): Record<string, unknown> {
 describe('package metadata', () => {
   it('uses the albinocrabs npm scope while keeping CLI bin names', () => {
     const pkg = readJson('package.json');
-    assert.equal(pkg.name, '@albinocrabs/feynman');
-    assert.equal((pkg.bin as Record<string, string>).feynman, 'bin/feynman.ts');
-    assert.equal((pkg.bin as Record<string, string>)['feynman-lint'], 'bin/feynman-lint.ts');
+    assert.equal(pkg['name'], '@albinocrabs/feynman');
+    assert.equal((pkg['bin'] as Record<string, string>)['feynman'], 'bin/feynman.ts');
+    assert.equal((pkg['bin'] as Record<string, string>)['feynman-lint'], 'bin/feynman-lint.ts');
   });
 
   it('ships Codex plugin files in npm package file list', () => {
     const pkg = readJson('package.json');
-    assert.ok((pkg.files as string[]).includes('.codex-plugin/'));
-    assert.ok((pkg.files as string[]).includes('hooks.json'));
+    assert.ok((pkg['files'] as string[]).includes('.codex-plugin/'));
+    assert.ok((pkg['files'] as string[]).includes('hooks.json'));
   });
 
   it('ships public open-source docs in npm package file list', () => {
     const pkg = readJson('package.json');
     for (const file of ['docs/', 'examples/', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md']) {
-      assert.ok((pkg.files as string[]).includes(file), `${file} should be included in package files`);
+      assert.ok((pkg['files'] as string[]).includes(file), `${file} should be included in package files`);
     }
   });
 
   it('Codex plugin manifest is valid and points at hooks + skills', () => {
     const pkg = readJson('package.json');
     const manifest = readJson('.codex-plugin/plugin.json');
-    assert.equal(manifest.name, 'feynman');
-    assert.equal(manifest.version, pkg.version);
-    assert.equal(manifest.hooks, './hooks.json');
-    assert.equal(manifest.skills, './skills/');
-    assert.ok((manifest.interface as { defaultPrompt: string[] }).defaultPrompt.length <= 3);
+    assert.equal(manifest['name'], 'feynman');
+    assert.equal(manifest['version'], pkg['version']);
+    assert.equal(manifest['hooks'], './hooks.json');
+    assert.equal(manifest['skills'], './skills/');
+    assert.ok((manifest['interface'] as { defaultPrompt: string[] }).defaultPrompt.length <= 3);
   });
 
   it('Codex hooks.json registers SessionStart and UserPromptSubmit feynman hooks', () => {
     const hooks = readJson('hooks.json');
-    const sessionEntries = (hooks.hooks as Record<string, unknown[]>).SessionStart;
-    const promptEntries = (hooks.hooks as Record<string, unknown[]>).UserPromptSubmit;
+    const sessionEntries = (hooks['hooks'] as Record<string, unknown[]>)['SessionStart'];
+    const promptEntries = (hooks['hooks'] as Record<string, unknown[]>)['UserPromptSubmit'];
     assert.ok(Array.isArray(sessionEntries));
     assert.ok(Array.isArray(promptEntries));
-    const sessionCommand = (((sessionEntries[0] as { hooks: { command: string }[] }).hooks)[0]).command;
-    const promptCommand = (((promptEntries[0] as { hooks: { command: string }[] }).hooks)[0]).command;
+    const sessionCommand = (((sessionEntries![0] as { hooks: { command: string }[] }).hooks)[0]!).command;
+    const promptCommand = (((promptEntries![0] as { hooks: { command: string }[] }).hooks)[0]!).command;
     assert.ok(sessionCommand.includes('FEYNMAN_HOME="$HOME/.codex"'));
     assert.ok(sessionCommand.includes('feynman-session-start.ts'));
     assert.ok(promptCommand.includes('FEYNMAN_HOME="$HOME/.codex"'));
@@ -61,12 +59,12 @@ describe('package metadata', () => {
 
   it('Claude plugin hooks.json registers SessionStart and UserPromptSubmit feynman hooks', () => {
     const hooks = readJson('hooks/hooks.json');
-    const sessionEntries = (hooks.hooks as Record<string, unknown[]>).SessionStart;
-    const promptEntries = (hooks.hooks as Record<string, unknown[]>).UserPromptSubmit;
+    const sessionEntries = (hooks['hooks'] as Record<string, unknown[]>)['SessionStart'];
+    const promptEntries = (hooks['hooks'] as Record<string, unknown[]>)['UserPromptSubmit'];
     assert.ok(Array.isArray(sessionEntries));
     assert.ok(Array.isArray(promptEntries));
-    const sessionCommand = (((sessionEntries[0] as { hooks: { command: string }[] }).hooks)[0]).command;
-    const promptCommand = (((promptEntries[0] as { hooks: { command: string }[] }).hooks)[0]).command;
+    const sessionCommand = (((sessionEntries![0] as { hooks: { command: string }[] }).hooks)[0]!).command;
+    const promptCommand = (((promptEntries![0] as { hooks: { command: string }[] }).hooks)[0]!).command;
     assert.ok(sessionCommand.includes('FEYNMAN_HOME="$HOME/.claude"'));
     assert.ok(sessionCommand.includes('${CLAUDE_PLUGIN_ROOT}/hooks/feynman-session-start.ts'));
     assert.ok(promptCommand.includes('FEYNMAN_HOME="$HOME/.claude"'));

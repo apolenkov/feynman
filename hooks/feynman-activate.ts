@@ -21,7 +21,7 @@ interface FeynmanState {
 // Path constants — use os.homedir(), never tilde strings (bug #8810).
 // FEYNMAN_HOME lets the same hook serve Claude Code (~/.claude) and Codex (~/.codex).
 const HOME        = os.homedir();
-const CLIENT_HOME = process.env.FEYNMAN_HOME || path.join(HOME, '.claude');
+const CLIENT_HOME = process.env['FEYNMAN_HOME'] || path.join(HOME, '.claude');
 const FEYNMAN_DIR = path.join(CLIENT_HOME, '.feynman');
 const STATE_PATH  = path.join(FEYNMAN_DIR, 'state.json');
 const FLAG_PATH   = path.join(CLIENT_HOME, '.feynman-active');
@@ -133,9 +133,9 @@ process.stdin.on('end', () => {
         full:  /<intensity\s+name\s*=\s*["']full["'][^>]*>([\s\S]*?)<\/intensity>/i,
         ultra: /<intensity\s+name\s*=\s*["']ultra["'][^>]*>([\s\S]*?)<\/intensity>/i,
       };
-      const xmlMatch = xmlMatchers[intensity].exec(rulesContent);
+      const xmlMatch = xmlMatchers[intensity]!.exec(rulesContent);
       if (xmlMatch) {
-        rulesText = xmlMatch[1].trim();
+        rulesText = xmlMatch[1]!.trim();
       } else {
         // Legacy HTML-comment fallback (kept until Plan 02 rule rewrite lands)
         const openMarker  = '<!-- ' + intensity + ' -->';
