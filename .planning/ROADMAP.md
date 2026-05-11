@@ -48,7 +48,8 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
   1. `wc -c < rules/feynman-activate.md` returns ≤ 4147 (4480 − 333 = ≤ 4147 bytes used)
   2. `npm test` exits 0 — all tests pass (hook.test.js:541-629 structural invariants green)
   3. `grep -oE 'classify|channel|amplify|suppress' rules/feynman-activate.md | sort -u | wc -l` returns `4` (all 4 vocabulary tokens preserved)
-**Plans**: TBD
+**Plans**: 1/1 complete
+**Status**: Done — Cut 1 (note column removal from full/triggers): 4443→4049 bytes, slack=431 B
 
 ### Phase 16: Candidate Rule Sets
 **Goal**: Four candidate rule files exist in eval/, each ≤4480 bytes, each with exactly one verbosity intervention over the compacted base
@@ -93,8 +94,8 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 | 2-7 | v0.2.0 | done | Complete | 2026-05-07 |
 | 8 + 8.5 | v0.3.0 | 8/8 | Complete | 2026-05-10 |
 | 9-13 | v0.4.0 | 18/18 | Complete | 2026-05-11 |
-| 14. Corpus + Harness | v0.5.0 | 0/? | Not started | — |
-| 15. Budget Compaction | v0.5.0 | 0/? | Not started | — |
+| 14. Corpus + Harness | v0.5.0 | 1/1 | Complete | 2026-05-11 |
+| 15. Budget Compaction | v0.5.0 | 1/1 | Complete | 2026-05-11 |
 | 16. Candidate Rule Sets | v0.5.0 | 0/? | Not started | — |
 | 17. Two-Wave Measurement | v0.5.0 | 0/? | Not started | — |
 | 18. Apply Winner + Release | v0.5.0 | 0/? | Not started | — |
