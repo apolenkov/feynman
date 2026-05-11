@@ -1,9 +1,43 @@
 {
   "name": "feynman",
   "version": "0.4.0",
-  "description": "Injects ASCII diagram rules into every Claude Code request. Why explain in words when diagram do trick.",
+  "description": "Auto-inject ASCII diagram rules into Claude Code prompts. Structure in your response gets a diagram without the developer asking.",
   "author": {
     "name": "apolenkov",
     "url": "https://github.com/apolenkov/feynman"
+  },
+  "homepage": "https://github.com/apolenkov/feynman",
+  "repository": "https://github.com/apolenkov/feynman",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "ascii",
+    "diagrams",
+    "hooks",
+    "productivity",
+    "visualization",
+    "structured-output"
+  ],
+  "interface": {
+    "displayName": "feynman",
+    "shortDescription": "Draw ASCII diagrams when structure appears.",
+    "longDescription": "feynman is a hook-based plugin that injects concise ASCII diagram rules on every prompt — flows, hierarchies, comparisons, priorities, and status summaries render as readable diagrams. Includes a built-in linter (13 rules) and autofix engine. Zero npm dependencies; pure CommonJS.",
+    "developerName": "apolenkov",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/apolenkov/feynman",
+    "privacyPolicyURL": "https://github.com/apolenkov/feynman/blob/main/README.md",
+    "termsOfServiceURL": "https://github.com/apolenkov/feynman/blob/main/LICENSE",
+    "defaultPrompt": [
+      "Use feynman diagrams for structured answers.",
+      "Explain this architecture visually.",
+      "Compare these options with ASCII columns."
+    ],
+    "brandColor": "#10B981",
+    "screenshots": []
   }
 }
