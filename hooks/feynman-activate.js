@@ -19,6 +19,19 @@ const RULES_PATH  = path.join(__dirname, '..', 'rules', 'feynman-activate.md');
 
 const DEFAULT_STATE = { enabled: true, intensity: 'full', output_style: 'full', injections: 0 };
 
+// Sanity-check: opening and closing <intensity> tags must balance (WR-01/02/03).
+// Called before block extraction to prevent lazy-quantifier cross-contamination.
+// Returns true when counts match (including 0===0 for non-XML files).
+function assertTagPairs(content) {
+  const opens  = (content.match(/<intensity\s+name\s*=/gi) || []).length;
+  const closes = (content.match(/<\/intensity>/gi)         || []).length;
+  return opens === closes;
+}
+
+// Fallback injected when rules file is malformed (WR-02).
+// Short enough to stay well under the 10 000-char additionalContext cap.
+const MALFORMED_FALLBACK = 'Classify structure → choose smallest visual: prose<glyph<dot-leader<tree<table<frame.';
+
 // One-line suffix per output_style. `full` is the default ⇒ no suffix.
 // Suffix is appended to additionalContext after the rules text (Phase 10
 // STYLE-03). Keeps rules-file 4480-byte budget intact — pure runtime hint.
@@ -27,7 +40,11 @@ const OUTPUT_STYLE_SUFFIX = {
   middle: '\n\nOutput style: middle — frame blocks only for ≥6 items; prefer trees and markdown tables.',
 };
 
+// Exported for unit tests — guards stdin attachment so require() doesn't hang.
+module.exports = { assertTagPairs, MALFORMED_FALLBACK };
+
 // --- stdin accumulator: buffer all input before processing ---
+if (require.main === module) {
 let input = '';
 process.stdin.on('data', chunk => { input += chunk; });
 process.stdin.on('end', () => {
@@ -82,11 +99,23 @@ process.stdin.on('end', () => {
       const validIntensities = ['lite', 'full', 'ultra'];
       const intensity = validIntensities.includes(state.intensity) ? state.intensity : 'full';
 
-      // Sanity: opening/closing intensity tags must balance, otherwise lazy quantifier
-      // can cross-block-contaminate (WR-02). Fail-safe exit 0.
-      const opens  = (rulesContent.match(/<intensity\b/gi) || []).length;
-      const closes = (rulesContent.match(/<\/intensity>/gi) || []).length;
-      if (opens === 0 || opens !== closes) process.exit(0);
+      // Sanity: <intensity> tag pairs must balance (WR-01/02/03).
+      // On mismatch: mark state malformed, inject short fallback, continue (no silent disable).
+      if (!assertTagPairs(rulesContent)) {
+        state.malformed_rules = true;
+        try { fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2)); } catch (_) {}
+        process.stdout.write(JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'UserPromptSubmit',
+            additionalContext: MALFORMED_FALLBACK,
+          }
+        }));
+        return;
+      }
+      // Rules file is well-formed — clear any previous malformed_rules flag.
+      if (state.malformed_rules) {
+        delete state.malformed_rules;
+      }
 
       // XML matcher map: tolerate trailing attributes (WR-01) and case (WR-03)
       const xmlMatchers = {
@@ -147,3 +176,4 @@ process.stdin.on('end', () => {
     process.exit(0);
   }
 });
+} // end require.main === module
