@@ -9,3 +9,4 @@ dist/
 *.lcov
 *.tgz
 .planning/session-retros/
+.planning/memory/
