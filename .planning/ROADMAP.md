@@ -25,7 +25,7 @@ None — v0.4.0 closed 2026-05-11. Start the next milestone with `/gsd-new-miles
 
 From `.planning/PROJECT.md` Future and from Phase 11 findings:
 
-- ~~Pixel/raster logo to replace README pencil emoji~~ ✓ shipped 2026-05-11 (commit 71c8c54). Albino crab drawing #10B981 ASCII diagram, user-generated via ChatGPT image; assets/logo-{256,128}.png.
+- **Pixel/raster logo to replace README pencil emoji** — user wants a real drawing (crab, on-brand with `@albinocrabs` scope) instead of Apple's pencil PNG. ASCII-crab variant rejected ("неаскитукраб"); pixel art via image-gen API or commissioned art. Deferred 2026-05-11.
 - **Verbosity reduction beyond ladder** — Phase 11 3-arm measurement showed the smallest-visual-first ladder closes only -3.5% of the +31% v0.2.x→v0.3.x gap. Real causes (caption brevity, classify-first CoT preamble, prose-around-visual) untouched. Highest-impact research target.
 - **Domain packs** — separate rule sets for arch / db / devops use cases
 - **feynman.config.yaml** — team-level customization without hot-patching state.json
