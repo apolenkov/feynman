@@ -1,0 +1,26 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "feynman",
+  "description": "Single-plugin marketplace for feynman — auto-inject ASCII diagram rules into Claude Code prompts. Add this repo as a marketplace source to install via `/plugin install feynman`.",
+  "owner": {
+    "name": "apolenkov",
+    "url": "https://github.com/apolenkov"
+  },
+  "plugins": [
+    {
+      "name": "feynman",
+      "description": "Auto-inject ASCII diagram rules into Claude Code prompts. Structure in your response gets a diagram without the developer asking. 13-rule linter + autofix engine. Zero npm deps; MIT.",
+      "author": {
+        "name": "apolenkov",
+        "url": "https://github.com/apolenkov/feynman"
+      },
+      "category": "productivity",
+      "source": {
+        "source": "git",
+        "url": "https://github.com/apolenkov/feynman.git",
+        "ref": "v0.4.0"
+      },
+      "homepage": "https://github.com/apolenkov/feynman"
+    }
+  ]
+}
