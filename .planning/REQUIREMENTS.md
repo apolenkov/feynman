@@ -9,10 +9,10 @@
 
 ### Corpus & Harness (Phase 14)
 
-- [ ] **CORP-01**: 50-prompt corpus built in `eval/v0.5.0-compliance/prompts.json`, balanced across 9 shape classes (sequence×6, hierarchy×6, comparison×6, status×6, priority×4, branching×4, state-machine×4, mapping×4, none×10), with `boundary`/`phrasing`/`domain` schema fields
-- [ ] **CORP-02**: Existing 15 prompts from v0.4.0 are preserved (35 new prompts added, not replacing)
-- [ ] **CORP-03**: Smoke-run of v0.2.x baseline (2× on same 50 prompts) to establish variance floor before Wave 1
-- [ ] **CORP-04**: `aggregate.js` script (~100 lines, CommonJS, zero deps) reads 7 result JSONs and outputs per-arm numeric summary for REPORT.md
+- [x] **CORP-01**: 50-prompt corpus built in `eval/v0.5.0-compliance/prompts.json`, balanced across 9 shape classes (sequence×6, hierarchy×6, comparison×6, status×6, priority×4, branching×4, state-machine×4, mapping×4, none×10), with `boundary`/`phrasing`/`domain` schema fields
+- [x] **CORP-02**: Existing 15 prompts from v0.4.0 are preserved (35 new prompts added, not replacing)
+- [x] **CORP-03**: Smoke-run of v0.2.x baseline (2× on same 50 prompts) to establish variance floor before Wave 1
+- [x] **CORP-04**: `aggregate.js` script (~100 lines, CommonJS, zero deps) reads 7 result JSONs and outputs per-arm numeric summary for REPORT.md
 
 ### Budget Compaction (Phase 15)
 
@@ -61,10 +61,10 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| CORP-01 | Phase 14 | Pending |
-| CORP-02 | Phase 14 | Pending |
-| CORP-03 | Phase 14 | Pending |
-| CORP-04 | Phase 14 | Pending |
+| CORP-01 | Phase 14 | Done — commit f18d93a |
+| CORP-02 | Phase 14 | Done — commit f18d93a |
+| CORP-03 | Phase 14 | Done — commit a0f32fe |
+| CORP-04 | Phase 14 | Done — commit 77e169b |
 | COMP-01 | Phase 15 | Pending |
 | COMP-02 | Phase 15 | Pending |
 | COMP-03 | Phase 15 | Pending |

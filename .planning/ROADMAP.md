@@ -20,7 +20,7 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 
 ## Phases
 
-- [ ] **Phase 14: Corpus + Harness Setup** — Expand prompt corpus to 50, build aggregate.js, smoke-run baselines
+- [x] **Phase 14: Corpus + Harness Setup** — Expand prompt corpus to 50, build aggregate.js, smoke-run baselines
 - [ ] **Phase 15: Budget Compaction** — Free ≥333 bytes in rules/feynman-activate.md; all tests green
 - [ ] **Phase 16: Candidate Rule Sets** — Create 4 candidate rule files (A/B/C/ABC) in eval/
 - [ ] **Phase 17: Two-Wave Measurement** — Wave 1 baselines → sanity gate → Wave 2 candidates → REPORT.md
@@ -33,11 +33,12 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 **Depends on**: Phase 13 (v0.4.0 closed)
 **Requirements**: CORP-01, CORP-02, CORP-03, CORP-04
 **Success Criteria** (what must be TRUE):
-  1. `jq '.prompts | length' eval/v0.5.0-compliance/prompts.json` returns `50`
-  2. Class distribution verified: `jq '[.prompts[].shape] | group_by(.) | map({key:.[0],count:length})' eval/v0.5.0-compliance/prompts.json` shows 9 classes with counts matching spec (sequence×6, hierarchy×6, comparison×6, status×6, priority×4, branching×4, state-machine×4, mapping×4, none×10)
+  1. `jq 'length' eval/v0.5.0-compliance/prompts.json` returns `50`
+  2. Class distribution verified: `jq '[.[].class] | group_by(.) | map({key:.[0],count:length})' eval/v0.5.0-compliance/prompts.json` shows 9 classes with counts matching spec (sequence×6, hierarchy×6, comparison×6, status×6, priority×4, branching×4, state-machine×4, mapping×4, none×10)
   3. `node eval/v0.5.0-compliance/aggregate.js` exits 0 (or with "no result files yet" — not a crash)
   4. `ls eval/v0.5.0-compliance/results-v02-smoke-*.json | wc -l` returns ≥ 1 (smoke-run variance file present)
-**Plans**: TBD
+**Plans**: 1/1 complete
+**Status**: Done — commit 50e65b7
 
 ### Phase 15: Budget Compaction
 **Goal**: rules/feynman-activate.md has ≥333 bytes free for ABC interventions without vocabulary loss

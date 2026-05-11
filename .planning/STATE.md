@@ -2,15 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.5.0
 milestone_name: Verbosity Economy
-status: in_progress
-last_updated: "2026-05-11T17:29:44.411Z"
-last_activity: 2026-05-11
+status: In progress
+last_updated: "2026-05-11T18:17:41.157Z"
+last_activity: 2026-05-11 — Phase 14 Plan 01 complete (corpus + harness setup)
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 1
+  completed_plans: 1
 ---
 
 # Project State
@@ -27,21 +26,21 @@ See: .planning/MILESTONES.md (history of shipped milestones)
 
 ```
 Phase:  14 — Corpus + Harness Setup
-Plan:   —
-Status: Not started
-Last activity: 2026-05-11 — Roadmap for v0.5.0 created
+Plan:   1/1 complete
+Status: Phase 14 done
+Last activity: 2026-05-11 — 14-01 complete: 50-prompt corpus + aggregate.js + 2 smoke-run baselines
 ```
 
 ### Milestone v0.5.0 Phase Status
 
 ```
-Phase 14   0/? ○ not started    Corpus + Harness Setup
+Phase 14   1/1 ✓ done          Corpus + Harness Setup
 Phase 15   0/? ○ not started    Budget Compaction
 Phase 16   0/? ○ not started    Candidate Rule Sets
 Phase 17   0/? ○ not started    Two-Wave Measurement
 Phase 18   0/? ○ not started    Apply Winner + Release
 ────────  ─────
-total      0/5 phases complete
+total      1/5 phases complete
 ```
 
 ### Phase Dependency Graph
@@ -95,6 +94,7 @@ Rules budget: 4480 → 4443 bytes (37 under).
 ```
 
 Post-release status:
+
 - v0.4.0 published to npm: `@albinocrabs/feynman@0.4.0`
 - GitHub Release: `v0.4.0` live
 - Marketplace submission: pending Anthropic review
@@ -119,6 +119,8 @@ Post-release status:
 2026-05-11 11:30  Rules extended with smallest-visual-first ladder per
                   intensity (4480 → 4443 bytes via compaction)
 2026-05-11 17:30  v0.5.0 Verbosity Economy — roadmap created (Phases 14-18)
+2026-05-11 18:30  Phase 14 Plan 01 complete: 50-prompt corpus + aggregate.js + 2 smoke-run baselines
+                  variance floor: avg_chars delta=19, diagram_rate spread=2pp, both runs 100% lint pass
 ```
 
 Full decision log: `.planning/notes/autonomous-log-2026-05-11.md`.
