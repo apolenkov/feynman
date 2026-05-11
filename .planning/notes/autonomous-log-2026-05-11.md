@@ -74,4 +74,75 @@ The advisor was right on Pivot 1: the fence-handling decision was load-bearing �
 
 No further advisor calls were needed; Phase 10 + 12 design decisions all flowed from research notes + CONTEXT.md without ambiguity.
 
+---
+
+## Morning continuation (2026-05-11 ~10:30-11:30)
+
+### Pivot 3 — Anthropic API unblock via Claude Code subagents (autonomous, no advisor)
+
+**Context.** Phase 11 was deferred overnight as blocked on Anthropic API access. User raised it in the morning. I proposed a self-contained subagent harness (no API key needed — Claude Code subagents inherit the session's auth). User accepted.
+
+**Implementation.**
+- Extracted v0.2.6 rules snapshot via `git show v0.2.6:rules/feynman-activate.md` (10450 bytes, HTML-comment format).
+- Used current `rules/feynman-activate.md` as v0.3.x arm (4480 bytes, XML contract).
+- Wrote 15-prompt structured corpus (`eval/v0.4.0-compliance/prompts.json`) covering 9 structure classes: sequence, hierarchy, comparison, status (small + large), priority, branching, state-machine, mapping, none.
+- Spawned 2 background subagents (general-purpose, sonnet model) in parallel. Each: read its rules-vXX.md as the "active" rule-set, generated responses to all 15 prompts in Russian, ran `feynman-lint` on each, recorded aggregate JSON.
+- Both arms returned 15/15 lint compliance, 0 issues. No regression from v0.3.x rewrite.
+
+**Headline finding.** v0.3.x produces +31% longer responses than v0.2.x on the same prompts (6653 → 8683 chars). The rules-file shrank 57% in bytes but model output grew 31%. Root cause: v0.3.x `<contract>` doesn't include a smallest-visual-first instruction, so the model picks the heavier form when both light and heavy convey the same structure.
+
+**REPORT.md** at `eval/v0.4.0-compliance/REPORT.md` documents methodology, per-class delta, caveats (N=15, single run, subagent-simulated rules injection vs live hook), reproducibility.
+
+### Pivot 4 — Rule extension: smallest-visual-first ladder
+
+**Trigger.** User pushed: «feynman должен это делать. Агент должен ДО выдачи ответа думать — можно ли подать экономнее И красиво одновременно».
+
+**Decision.** Add one-line ladder per intensity to `rules/feynman-activate.md`:
+
+```
+prose < glyph < dot-leader < tree < table < frame
+```
+
+**Budget challenge.** File was exactly at 4480-byte budget (hard ceiling per CLAUDE.md). Adding ~180 bytes of new contract lines required compacting elsewhere.
+
+**Compaction applied:**
+- Drop "Comparison: markdown table (not ASCII pipes)" from lite triggers (redundant with table row).
+- Drop "Single facts: no diagram." from lite contract (covered by new smallest-visual rule).
+- Drop "Responses with no enumerable structure stay in prose. Single facts and code-only blocks have no diagram." from full contract (covered by suppress + smallest-visual).
+- Trim "These patterns are alternatives — a response uses at most one of them (mutex)" to "Mutex — at most one per response."
+- Drop "SDLC patterns are mutex — use at most one per response" from ultra triggers (redundant with patterns mutex block).
+
+**Result.** 4480 → 4443 bytes (37 under). 364/364 tests pass — budget assertion + tag presence + `├──` density (≥6) + XML structure all green.
+
+**Expected impact** (falsifiable hypothesis for future Phase 11 re-run): v0.3.x + ladder reduces response chars by 15-25% vs current v0.3.x while maintaining 100% lint compliance.
+
+### Pivot 5 — Chat-output format (meta, applies to me)
+
+User feedback in this thread led to two memory rules:
+
+1. **Split HUMAN-required from AGENT-doing in every response.** Self-check «могу ли сам» BEFORE proposing user action. The "verify Anthropic API access" item I surfaced as HUMAN at handoff was solvable via subagents — user caught the missed self-check.
+
+2. **Compact visual format.** No 37-char `─` separator lines. No frame boxes for ≤5 items in chat. Two-block format `✓ Я / ▲ Ты` with 2-space indent, no surrounding decoration. Eat my own L11 dogfood.
+
+Both saved to `~/.claude/projects/-Users-ap-work-feynman/memory/`:
+- `feedback_clear_human_vs_agent_split.md`
+- `feedback_compact_chat_visuals.md`
+
+### Final state at full handoff (2026-05-11 11:30)
+
+```
+Phase 9    5/5 ✓ shipped       lint rules L11-L14 + DOCS-L11
+Phase 10   4/4 ✓ shipped       output-style presets
+Phase 11   3/3 ✓ shipped       compliance A/B + rule extension
+Phase 12   5/5 ✓ shipped       IDE compat (cline/cursor/windsurf)
+Phase 13   0/5 ▲ blocked       release v0.4.0 (npm token rotation)
+────────  ─────
+total     17/22 (77%)
+tests     364/364 green
+rules     4443 bytes / 4480 budget
+commits   37 since /gsd-resume-work
+```
+
+Single open blocker: npm token rotation. Everything else durable, committed, audited.
+
 
