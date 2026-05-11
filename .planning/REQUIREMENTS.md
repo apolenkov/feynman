@@ -59,10 +59,25 @@
 
 ## Traceability
 
-| REQ-ID | Phase | Notes |
-|--------|-------|-------|
-| CORP-01..04 | Phase 14 | |
-| COMP-01..03 | Phase 15 | |
-| CAND-01..04 | Phase 16 | |
-| MEAS-01..04 | Phase 17 | |
-| REL-01..05 | Phase 18 | conditional on MEAS-04 winner statement |
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| CORP-01 | Phase 14 | Pending |
+| CORP-02 | Phase 14 | Pending |
+| CORP-03 | Phase 14 | Pending |
+| CORP-04 | Phase 14 | Pending |
+| COMP-01 | Phase 15 | Pending |
+| COMP-02 | Phase 15 | Pending |
+| COMP-03 | Phase 15 | Pending |
+| CAND-01 | Phase 16 | Pending |
+| CAND-02 | Phase 16 | Pending |
+| CAND-03 | Phase 16 | Pending |
+| CAND-04 | Phase 16 | Pending |
+| MEAS-01 | Phase 17 | Pending |
+| MEAS-02 | Phase 17 | Pending |
+| MEAS-03 | Phase 17 | Pending |
+| MEAS-04 | Phase 17 | Pending |
+| REL-01 | Phase 18 | Pending — conditional on MEAS-04 winner statement |
+| REL-02 | Phase 18 | Pending — winner path only |
+| REL-03 | Phase 18 | Pending — winner path only |
+| REL-04 | Phase 18 | Pending — winner path only |
+| REL-05 | Phase 18 | Pending — refuted path only |
