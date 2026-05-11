@@ -1,90 +1,68 @@
-# Requirements: feynman v0.4.0 — Visual Economy
+# Requirements: feynman v0.5.0 — Verbosity Economy
 
-**Defined:** 2026-05-10
-**Last updated:** 2026-05-11 — v0.4.0 shipped (npm + GH release)
+**Defined:** 2026-05-11
+**Last updated:** 2026-05-11
 **Core value:** Every response with structure gets an ASCII diagram without the developer asking — and prefers the cheapest visual that still conveys the structure.
-**Research base:** `.planning/notes/token-economical-ascii-research-2026-05-10.md` + seed `measure-compliance-gain.md`.
+**Research base:** `.planning/notes/v0.5.0-verbosity-gap-research-2026-05-11.md` + `.planning/research/SUMMARY.md`.
 
-## v0.4.0 Requirements
+## v0.5.0 Requirements
 
-### Lint Rules (Smallest-Visual-First)
+### Corpus & Harness (Phase 14)
 
-- [x] **LINT-11**: `lib/lint/rules.js` exports `L11_overdecoration` — detects frame block (`┌─*┐ … └─*┘`) with ≤5 inner content lines; severity `warn`; suggests dot-leader list with estimated token savings; whitelist for frames that need explicit grouping (e.g. nested mixed content).
-- [x] **LINT-12**: `lib/lint/rules.js` exports `L12_token_budget` — estimates visual overhead vs content; warns when padding-chars exceed content-chars in any frame, table, or padded block; emits per-visual cost annotation when run with `--explain` flag.
-- [x] **LINT-13**: `lib/lint/rules.js` exports `L13_double_wrap` — detects tree (`├──`/`└──`) inside frame block; severity `warn`; suggests removing the frame because tree carries hierarchy on its own.
-- [x] **LINT-14**: `bin/feynman-lint.js --fix` extends to L11 — autofix converts qualifying frame block to dot-leader list (`item ............ state` format); L12/L13 remain warn-only.
-- [x] **DOCS-L11**: `docs/lint-rules.md` adds L11/L12/L13 entries with valid/invalid examples + token-cost comparison rows; cross-reference rule source line numbers.
+- [ ] **CORP-01**: 50-prompt corpus built in `eval/v0.5.0-compliance/prompts.json`, balanced across 9 shape classes (sequence×6, hierarchy×6, comparison×6, status×6, priority×4, branching×4, state-machine×4, mapping×4, none×10), with `boundary`/`phrasing`/`domain` schema fields
+- [ ] **CORP-02**: Existing 15 prompts from v0.4.0 are preserved (35 new prompts added, not replacing)
+- [ ] **CORP-03**: Smoke-run of v0.2.x baseline (2× on same 50 prompts) to establish variance floor before Wave 1
+- [ ] **CORP-04**: `aggregate.js` script (~100 lines, CommonJS, zero deps) reads 7 result JSONs and outputs per-arm numeric summary for REPORT.md
 
-### Output-Style Presets
+### Budget Compaction (Phase 15)
 
-- [x] **STYLE-01**: `~/.claude/.feynman/state.json` and `~/.codex/.feynman/state.json` schemas extend with `output_style: "short" | "middle" | "full"` field; default `full`; backwards-compatible (missing field reads as `full`).
-- [x] **STYLE-02**: `/feynman style short|middle|full` skill subcommand reads/writes `output_style`; `/feynman status` displays current style.
-- [x] **STYLE-03**: `hooks/feynman-activate.js` reads `output_style` and appends a one-line suppression suffix to `additionalContext` when style ≠ `full` (no rules-file modification): `short` → "Output style: short — no frame-blocks, no ASCII art, dot-leader only."; `middle` → "Output style: middle — frame only ≥6 items, prefer trees and markdown tables."; `full` → no suffix.
-- [x] **STYLE-04**: README.md documents the three presets with token-cost comparison table; `docs/architecture.md` updated with the orthogonal axes (intensity × output-style).
+- [ ] **COMP-01**: `rules/feynman-activate.md` compacted by ≥333 bytes via prose-only cuts (contracts, triggers note column, second full/examples tree); no vocabulary loss (`classify`/`channel`/`amplify`/`suppress` preserved)
+- [ ] **COMP-02**: All structural invariants in `tests/hook.test.js:541-629` pass after every compaction step — `npm test` is the gate
+- [ ] **COMP-03**: Resulting slack ≥333 bytes (4480 − used ≥333) confirmed with `wc -c`
 
-### Compliance Measurement
+### Candidate Rule Sets (Phase 16)
 
-- [x] **EVAL-01**: A/B harness on 50-prompt corpus comparing v0.2.x rules baseline vs v0.3.x rules current; corpus stored under `eval/v0.4.0-compliance/prompts.json` with structure-class tag (sequence, hierarchy, comparison, status, priority, none) per prompt.
-- [x] **EVAL-02**: Harness drives both rule-sets through the same model (Claude Opus 4.7), runs `feynman-lint` on every response, computes pass/fail per rule and aggregate compliance %; output to `eval/v0.4.0-compliance/REPORT.md`.
-- [x] **EVAL-03**: REPORT.md includes WIN/HURT/NEUTRAL classification per structure class with statistical context (sample size, confidence interval); identifies any HURT-class regressions for follow-up.
+- [ ] **CAND-01**: `eval/v0.5.0-compliance/rules-v05-A.md` — compacted base + caption brevity rule (≤4480 bytes); rule uses positive example, not pure prohibition
+- [ ] **CAND-02**: `eval/v0.5.0-compliance/rules-v05-B.md` — compacted base + no-narration rule (≤4480 bytes); positive framing required
+- [ ] **CAND-03**: `eval/v0.5.0-compliance/rules-v05-C.md` — compacted base + response-length budget rule (≤4480 bytes); rule explicitly excludes code-fenced and ASCII blocks from word count
+- [ ] **CAND-04**: `eval/v0.5.0-compliance/rules-v05-ABC.md` — compacted base + A+B+C combined (≤4480 bytes)
 
-### IDE Compat Polish
+### Measurement (Phase 17)
 
-- [x] **IDE-01**: `npx @albinocrabs/feynman install --target cline` writes `.clinerules/feynman-rules.md` derived from current intensity; idempotent.
-- [x] **IDE-02**: `npx @albinocrabs/feynman install --target cursor` writes `.cursor/rules/feynman.mdc` with proper YAML frontmatter (alwaysApply: true, globs: "**"); idempotent.
-- [x] **IDE-03**: `npx @albinocrabs/feynman install --target windsurf` writes `.windsurf/rules/feynman.md`; idempotent.
-- [x] **IDE-04**: `npx @albinocrabs/feynman doctor --target cline|cursor|windsurf` reports installation health for each target.
-- [x] **IDE-05**: README.md adds "IDE Support" section listing all 5 targets (claude, codex, cline, cursor, windsurf) with one-liner per target.
+- [ ] **MEAS-01**: Wave 1 executed — 3 baseline arms (`rules-v02`, `rules-v03`, `rules-v03-ladder`) measured on 50-prompt corpus; sanity gate checked (delta from Phase 11 <10%); `results-v02-50p.json`, `results-v03-50p.json`, `results-v03-ladder-50p.json` written
+- [ ] **MEAS-02**: Wave 2 executed — 4 candidate arms measured on 50-prompt corpus; `results-v05-A-50p.json`, `results-v05-B-50p.json`, `results-v05-C-50p.json`, `results-v05-ABC-50p.json` written
+- [ ] **MEAS-03**: Statistical analysis uses paired design (same 50 prompts across all 7 arms) + Wilcoxon signed-rank + Bootstrap 95% CI; diagram rate measured separately from verbosity
+- [ ] **MEAS-04**: `eval/v0.5.0-compliance/REPORT.md` with 7-arm matrix, per-class breakdown (9 classes), and explicit winner statement (or «refuted»); generated via `aggregate.js` for numbers, hand-authored interpretation
 
-### Release
+### Release (Phase 18)
 
-- [x] **REL-01**: `node scripts/feynman-bump.js minor` bumps to v0.4.0 across `package.json`, `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`.
-- [x] **REL-02**: `npm run ci` green; tests ≥ baseline 279 + new test count for L11/L12/L13/STYLE/EVAL/IDE.
-- [x] **REL-03**: `npm publish --access public` publishes `@albinocrabs/feynman@0.4.0` with all new bin/lib/docs files in package.
-- [x] **REL-04**: `git tag v0.4.0` annotated; GitHub Release created with summary of L11-L13 + output styles + compliance findings.
-- [x] **REL-05**: CHANGELOG.md regenerated with v0.4.0 entry.
+- [ ] **REL-01**: Winner arm passes threshold: ≥−20% verbosity vs v0.3.x on 50-prompt corpus AND ≥95% lint compliance (or «refuted» if no winner)
+- [ ] **REL-02**: If winner passes: winner rule applied to `rules/feynman-activate.md`; `npm test` green (364+ passing); v0.4.0 15-prompt corpus regression gate also passes
+- [ ] **REL-03**: If winner passes: version bumped 0.4.0 → 0.5.0 in `package.json`, `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`; `CHANGELOG.md` updated with REPORT.md metrics
+- [ ] **REL-04**: If winner passes: `npm publish @albinocrabs/feynman@0.5.0` + GitHub Release `v0.5.0`
+- [ ] **REL-05**: If all refuted: `eval/v0.5.0-compliance/REPORT.md` documents findings honestly; v0.5.0 milestone closed as research-only without publish
 
-## Future Requirements (v0.5.0+)
+## Future (v0.6.0+)
 
-- [ ] Domain packs (arch / db / devops as separate rule sets)
-- [ ] feynman.config.yaml for team customization
-- [ ] Claude Code Marketplace + Codex Marketplace submission
-- [ ] Self-improvement loop full implementation (was design-only in v0.2.0)
+- [ ] Telegraph English rewrite of `rules/feynman-activate.md` — −41% tokens (arXiv 2605.04426), ~1800 bytes freed; needs own eval cycle
+- [ ] Domain packs (arch / db / devops rule sets)
+- [ ] feynman.config.yaml team customization
+- [ ] Self-improvement loop full implementation
 - [ ] Windows install.ps1
-- [ ] Per-project intensity / style override (alternative to global state.json)
 
-## Out of Scope (v0.4.0)
+## Out of Scope (v0.5.0)
 
-- Custom diagram renderers / Mermaid / graphviz — ASCII only, dependency-free principle holds
-- Web UI / dashboard — CLI/hook plugin only
-- Server-side compliance dashboards — local-first, off by default
-- Cross-session aggregation of compliance metrics — single-session reports only for v0.4.0
+- ultra + ABC interaction — adding an 8th arm is out of scope; document as «undefined behavior» in REPORT.md
+- Live Anthropic API arm for harness (cost $5–15; subagent simulation sufficient for v0.5.0)
+- Modifying the linter (L01-L13) — verbosity is a rules problem, not a linter problem
+- Changing hook output format — additionalContext injection stays identical
 
 ## Traceability
 
-(filled by roadmapper / phase plans)
-
-| REQ-ID | Phase | Plan | Status |
-|--------|-------|------|--------|
-| LINT-11 | Phase 9 | TBD | Done   |
-| LINT-12 | Phase 9 | TBD | Done   |
-| LINT-13 | Phase 9 | TBD | Done   |
-| LINT-14 | Phase 9 | TBD | Done   |
-| DOCS-L11 | Phase 9 | TBD | Done   |
-| STYLE-01 | Phase 10 | TBD | Done   |
-| STYLE-02 | Phase 10 | TBD | Done   |
-| STYLE-03 | Phase 10 | TBD | Done   |
-| STYLE-04 | Phase 10 | TBD | Done   |
-| EVAL-01 | Phase 11 | TBD | Done   |
-| EVAL-02 | Phase 11 | TBD | Done   |
-| EVAL-03 | Phase 11 | TBD | Done   |
-| IDE-01 | Phase 12 | TBD | Done   |
-| IDE-02 | Phase 12 | TBD | Done   |
-| IDE-03 | Phase 12 | TBD | Done   |
-| IDE-04 | Phase 12 | TBD | Done   |
-| IDE-05 | Phase 12 | TBD | Done   |
-| REL-01 | Phase 13 | TBD | Done   |
-| REL-02 | Phase 13 | TBD | Done   |
-| REL-03 | Phase 13 | TBD | Done   |
-| REL-04 | Phase 13 | TBD | Done   |
-| REL-05 | Phase 13 | TBD | Done   |
+| REQ-ID | Phase | Notes |
+|--------|-------|-------|
+| CORP-01..04 | Phase 14 | |
+| COMP-01..03 | Phase 15 | |
+| CAND-01..04 | Phase 16 | |
+| MEAS-01..04 | Phase 17 | |
+| REL-01..05 | Phase 18 | conditional on MEAS-04 winner statement |

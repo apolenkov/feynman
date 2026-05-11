@@ -1,12 +1,76 @@
 # Features: feynman
-
 **Domain:** Claude Code hook plugin — ASCII diagram injection
-**Researched:** 2026-05-06
+**Researched:** 2026-05-06 (updated 2026-05-11 — v0.5.0 verbosity economy addendum)
 **Confidence:** HIGH (caveman codebase verified, Claude Code docs fetched from code.claude.com, community sentiment from HN + Product Hunt)
 
 ---
 
-## Table Stakes
+## v0.5.0 Addendum — Verbosity Economy
+
+### Context
+
+Phase 11 measured +31% longer responses under v0.3.x rules vs v0.2.x on same prompts (8683 vs 6653 chars, 15-prompt corpus). The smallest-visual-first ladder (v0.4.0) closed only −3.5%. Three candidate interventions remain: A (caption brevity), B (no-narration-before-visual), C (response-length budget). Combined byte cost ~370 bytes; current slack = 37 bytes → need to free ~333 bytes via compaction.
+
+---
+
+### Table Stakes (verbosity reduction)
+
+Features the domain ecosystem treats as baseline for any "inject brevity rules" approach. Missing any = the injection is incomplete or counter-productive.
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| **A. Caption brevity rule** — shortest noun phrase for box labels, no articles/verbs | Anthropic docs (2026): "positive examples showing appropriate concision are more effective than negative instructions." Model uncertainty → verbose labels is a documented failure mode (arXiv 2411.07858). | Low | ~150 bytes per intensity. Hits H1 (elaborate labels). Expected −10–20% response chars. |
+| **B. No-narration-before-visual** — diagram first, silent classification, explanation only if ambiguous | Anthropic best-practices page: explicitly says to suppress non-essential preamble. arXiv 2411.07858 confirms verbose responses perform ≤27.6 pp worse on same tasks — preamble is pure waste. | Low | ~120 bytes per intensity. Hits H2 (classify-first CoT bleed). Expected −8–15%. |
+| **C. Response-length budget** — prose < 50 words for structural prompts, < 120 general | Anthropic official: "Provide concise, focused responses. Skip non-essential context, keep examples minimal." Claude Opus 4.7 docs confirm explicit word-count constraints are the recommended lever. | Low | ~100 bytes per intensity. Hits H3 (prose wrapping diagram). Expected −15–25%. |
+| **Budget compaction before ABC** — free ~333 bytes by dropping `<examples>` block or trimming SDLC patterns | No bytes = no room for ABC. `<examples>` block ~250 bytes; trimming one SDLC pattern ~80 bytes. Must precede ABC landing. | Low | Required gate. Without it, rules exceed 4480-byte ceiling. |
+
+---
+
+### Differentiators (beyond baseline)
+
+Features that are not universally adopted but would close the remaining gap or future-proof the rules file.
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| **Hedge reduction suffix** — suppress "it depends", "there are many factors", commit to specific answers | Research (Sixty Prompt Techniques, 2026): paired positive+negative framing ("prefer direct declarative" + "no hedging") outperforms negation alone. Hedge phrases inflate response length without adding information. | Low | ~60 bytes total (one line per intensity). Orthogonal to ABC; can ship same phase. |
+| **Example suppression rule** — no in-response worked examples unless user explicitly asks | Example generation is the single largest driver of runaway response length in structural prompts. Rule: "No inline examples unless the user's prompt contains 'example', 'show me', 'for instance'." | Low | ~80 bytes. Medium risk: some structural prompts benefit from one canonical example — threshold matters. |
+| **Telegraph-style atomic encoding for the rules file itself** — rewrite prose instructions as symbol+operator lines | arXiv 2605.04426 (Telegraph English): ~41% token reduction at 99.1% fidelity. Applies to the injected rules text, not just user prompts. Each instruction line → `structure → visual; prose < diagram always`. | Medium | Requires careful rewrite + regression eval. Potential −40% on rules byte cost → opens ~1800 bytes of headroom. HIGH upside if validated. |
+| **Output-style axis (short/middle/full)** — runtime suffix that caps visual weight per session | Orthogonal to ABC. Implemented as runtime append to `additionalContext`, no rules-file budget impact. "Output style: short — dot-leader only, no frames." | Medium | Schema change to `state.json`. Needs `/feynman style` subcommand. Deferred from v0.4.0 but remains valuable. |
+
+---
+
+### Anti-Features (explicitly excluded)
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| **Hard word-count enforcement via lint** — L-rule that flags responses over N words | Post-hoc linting cannot change a response already generated; signals noise to user, no fix available | Enforce via injected rule (C above) — pre-generation constraint beats post-hoc detection |
+| **Cascade model selection** (route verbose responses to stronger model) | arXiv 2411.07858 proposes this but requires API-level control; hook plugin has no access to model routing | Out of scope; feynman operates at prompt-injection layer only |
+| **Prompt compression via LLMLingua / MetaGlyph tooling** | Requires a Python/Node dependency for compression inference; violates zero-dep constraint | Manual Telegraph-style rewrite (differentiator above) achieves same goal without deps |
+| **Negative-only verbosity constraints** ("do not explain", "do not add preamble") | Pink-elephant problem (NeQA bench 2025): negations alone less reliable. Anthropic docs confirm positive framing outperforms | Pair every constraint with a positive form: "diagram first" not "no preamble" |
+| **Removing `<examples>` block entirely without testing** | Few-shot literals (ArtPerception arXiv 2510.10281) demonstrably raise ASCII compliance; blind removal may hurt diagram correctness | Move examples to `docs/visual-patterns.md`, reference URL in rules; measure compliance delta before removing |
+
+---
+
+### Feature Dependencies (v0.5.0 specific)
+
+```
+compaction (free 333 bytes)
+  └── A. caption brevity      ~150 bytes/intensity
+  └── B. no-narration         ~120 bytes/intensity
+  └── C. length budget        ~100 bytes/intensity
+      └── 50-prompt harness re-run (6 arms × 50 = 300 responses)
+          └── REPORT.md → ship or rollback
+```
+
+Hedge reduction and example suppression are independent; can ship in same PR as ABC if budget allows.
+
+Telegraph-style rules rewrite is a separate phase — high reward but needs its own eval cycle.
+
+---
+
+## Original Feature Table (v0.1.0–v0.4.x)
+
+### Table Stakes
 
 Features users will expect because caveman already set the bar. Missing any of these means users skip feynman and stay with caveman alone, or add diagram rules manually to CLAUDE.md.
 
@@ -25,9 +89,7 @@ Features users will expect because caveman already set the bar. Missing any of t
 
 ---
 
-## Differentiators
-
-Features that set feynman apart from "add a diagram rule to CLAUDE.md" and from caveman. These justify the install.
+### Differentiators (v0.1.0–v0.4.x)
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
@@ -41,9 +103,7 @@ Features that set feynman apart from "add a diagram rule to CLAUDE.md" and from 
 
 ---
 
-## Anti-Features (Deliberately Excluded)
-
-Things to explicitly NOT build. Each one has a specific reason. If scope creeps, this list is the bloat detector.
+### Anti-Features (v0.1.0–v0.4.x)
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
@@ -59,7 +119,7 @@ Things to explicitly NOT build. Each one has a specific reason. If scope creeps,
 
 ---
 
-## Feature Dependencies
+### Feature Dependencies (v0.1.0–v0.4.x)
 
 ```
 install.sh
@@ -68,14 +128,14 @@ install.sh
   └── --minimal flag → plugin only, no hook wiring
 
 UserPromptSubmit hook (hooks/hooks.json)
-  └── reads ~/.claude/feynman-state.json (or /tmp/ scoped to session)
+  └── reads ~/.claude/.feynman/state.json (or /tmp/ scoped to session)
       ├── enabled? YES → inject rules from feynman.md
       │   └── which intensity level? → inject lite/full/ultra variant
       └── enabled? NO → inject nothing
 
 /feynman skill (skills/feynman/SKILL.md)
   └── accepts $ARGUMENTS: [on|off|lite|full|ultra]
-  └── writes state to ~/.claude/feynman-state.json
+  └── writes state to ~/.claude/.feynman/state.json
   └── depends on: hook reading that state file on next prompt
   └── disable-model-invocation: true (user-invoked only)
 
@@ -96,18 +156,18 @@ Caveman coexistence
   └── additionalContext from both appends independently (verify behavior with open bug #14281)
 ```
 
-**Ordering rationale:** State file path must be decided before hook + skill are built (both read/write it). Rules file (feynman.md) must be written before hook can reference it. install.sh comes last — it wires everything together.
-
 ---
 
-## Risk Flags
+### Risk Flags
 
 | Feature | Risk | Mitigation |
 |---------|------|------------|
 | additionalContext duplication (bug #14281) | Rules injected twice → wasted tokens, confusing Claude | Monitor Claude Code releases; add idempotency guard (session-scoped dedupe flag in state file) |
-| State file path for toggle | ~/.claude/ vs /tmp/ — /tmp is session-scoped but lost on restart | Use ~/.claude/feynman-state.json for toggle (survives session); /tmp for stats counter (ephemeral) |
+| State file path for toggle | ~/.claude/ vs /tmp/ — /tmp is session-scoped but lost on restart | Use ~/.claude/.feynman/state.json for toggle (survives session); /tmp for stats counter (ephemeral) |
 | ultra mode noise | Users enable ultra, every 2-line answer gets a diagram, they hate it | Make ultra require explicit `/feynman ultra` (not default); document clearly |
 | Cursor/Windsurf rule file path | .clinerules/ is correct for Cline; Cursor uses .cursor/rules/*.mdc; Windsurf uses .windsurf/rules/*.md | install.sh writes all three; verified from caveman installer source |
+| **v0.5.0: over-brevity regression** | ABC combined may over-correct — model becomes terse, drops necessary context, users complain | Measure lint compliance alongside response length; require both improve before ship |
+| **v0.5.0: word budget conflicts with ultra mode** | `ultra` forces diagrams even on short answers; `C` limits prose to 50 words — these interact | Test `ultra + ABC` as a separate arm in harness; document compound behavior |
 
 ---
 
@@ -121,3 +181,8 @@ Caveman coexistence
 - HN discussion on caveman vs "be brief" (news.ycombinator.com/item?id=47954745) — MEDIUM confidence, community sentiment
 - Product Hunt caveman page — MEDIUM confidence, user feedback
 - CHI 2024 paper: "Taking ASCII Drawings Seriously: How Programmers Diagram Code" — HIGH confidence, peer-reviewed
+- Anthropic Prompting Best Practices (platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices) — HIGH confidence, official, fetched 2026-05-11
+- arXiv 2411.07858 "Verbosity Compensation Behavior of LLMs" — HIGH confidence, peer-reviewed, verbosity = uncertainty proxy
+- arXiv 2605.04426 "Telegraph English: Semantic Prompt Compression" — HIGH confidence, peer-reviewed, ~41% token reduction at 99.1% fidelity
+- Sixty Prompt Techniques (promptassay.ai) — MEDIUM confidence, community aggregation
+- NeQA benchmark 2025 (negative instruction robustness) — MEDIUM confidence, single source

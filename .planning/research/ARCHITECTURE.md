@@ -1,302 +1,165 @@
-# Architecture: feynman
+# Architecture: feynman v0.5.0 «Verbosity Economy» — eval harness
 
 **Domain:** Claude Code hook plugin (ASCII diagram rule injection)
-**Researched:** 2026-05-06
-**Confidence:** HIGH — verified against official Claude Code docs (hooks, skills, plugins)
+**Updated:** 2026-05-11  
+**Scope of this update:** eval harness design for v0.5.0 50-prompt × 7-arm run
 
 ---
 
-## Component Map
+## Q1 — Corpus structure (50 prompts)
 
-```
-feynman/
-├── .claude-plugin/
-│   └── plugin.json           [MANIFEST] Plugin identity, name, version
-├── hooks/
-│   └── hooks.json            [HOOK REGISTRY] Registers UserPromptSubmit handler
-├── hooks/
-│   └── feynman-activate.js   [HOOK SCRIPT] Core logic: reads state, injects rules, writes counter
-├── rules/
-│   └── feynman-rules.md      [RULES SOURCE] ASCII diagram rules, parameterized by intensity level
-├── skills/
-│   └── feynman/
-│       └── SKILL.md          [TOGGLE SKILL] /feynman — on/off and intensity switch
-│   └── feynman-stats/
-│       └── SKILL.md          [STATS SKILL] /feynman-stats — session diagram count
-├── .clinerules/
-│   └── feynman.md            [CURSOR/WINDSURF] Same rules, static copy for non-Claude-Code agents
-├── install.sh                [INSTALLER] Copies plugin into ~/.claude/plugins/ (Unix/macOS)
-└── install.ps1               [INSTALLER] Same for Windows
-```
+**Decision: augment the existing 15, total = 50.** 35 new prompts added to `eval/v0.5.0-verbosity/prompts.json`. Do NOT replace Phase 11 baseline — continuity of the +31% number requires seq/hier/comp/status IDs to match.
 
-**Boundaries:**
+Target distribution (includes existing 15):
 
-| Component | Owns | Does NOT own |
-|-----------|------|--------------|
-| plugin.json | Plugin identity, namespace | Hook registration |
-| hooks.json | Hook event wiring | Rule content |
-| feynman-activate.js | State read/write, rule selection, stdout injection | Rule authoring |
-| feynman-rules.md | Diagram rule text for all intensity levels | Hook logic |
-| feynman/SKILL.md | Toggle on/off, set intensity level | Injecting rules |
-| feynman-stats/SKILL.md | Reporting counter | Mutating counter |
-| .clinerules/feynman.md | Cursor/Windsurf compatibility | Claude Code hook path |
+| class         | count | existing | new |
+|---------------|-------|----------|-----|
+| sequence      | 6     | 2        | 4   |
+| hierarchy     | 6     | 2        | 4   |
+| comparison    | 6     | 2        | 4   |
+| status        | 6     | 2        | 4   |
+| priority      | 4     | 1        | 3   |
+| branching     | 4     | 1        | 3   |
+| state-machine | 4     | 1        | 3   |
+| mapping       | 4     | 1        | 3   |
+| none          | 10    | 3        | 7   |
+| **total**     | **50**| 15       | 35  |
 
----
+### Coverage axes (mandatory per class)
 
-## Data Flow
+- **Size boundary:** `status` must include 3-item, 5-item (L11 boundary), 9-item variants.
+- **Domain variance:** spread across CI/CD, auth, finance, biology, ops, data. Not all engineering.
+- **Phrasing variance:** 50% explicit ("show as tree"), 50% implicit ("describe the structure").
+- **`none` sub-types:** definition, single-answer, recommendation, opinion, conversational — 2 per type.
+- **Boundary flag:** add `"boundary": true` to one prompt per class for focused analysis.
 
-### Rule Injection Flow
-
-Every user prompt triggers this path:
-
-```
-User submits prompt
-        |
-        v
-Claude Code fires UserPromptSubmit
-        |
-        v
-hooks/hooks.json routes to feynman-activate.js
-        |
-        v
-feynman-activate.js reads stdin JSON
-  {session_id, prompt, cwd, ...}
-        |
-        v
-Read state file: ${CLAUDE_PLUGIN_DATA}/state.json
-  {enabled: bool, intensity: "lite"|"full"|"ultra", count: int}
-        |
-        +--(enabled: false)--> exit 0, no output
-        |
-        v
-Select rule subset based on intensity:
-  lite  → flow + trees only
-  full  → all types (default)
-  ultra → all types + force short answers
-        |
-        v
-Increment count in state.json
-        |
-        v
-Write to stdout (plain text OR JSON additionalContext):
-  "DIAGRAM RULES: [selected rules text]"
-        |
-        v
-Claude Code appends stdout to prompt context
-        |
-        v
-Claude receives prompt + injected rules → responds with diagrams
-```
-
-**stdout format decision:** Use plain text (non-JSON) output. Claude Code appends it verbatim as additional context. This is the simplest path — no JSON wrapping needed for pure context injection.
-
-**State file location:** `${CLAUDE_PLUGIN_DATA}/state.json` — this directory survives plugin updates, making it the correct place for session-persistent data.
-
----
-
-### Toggle Flow (on/off)
-
-```
-User types /feynman [on|off|lite|full|ultra]
-        |
-        v
-skills/feynman/SKILL.md loads
-        |
-        v
-Claude reads $ARGUMENTS → determines action
-        |
-        v
-Claude writes updated state to ${CLAUDE_PLUGIN_DATA}/state.json
-  via Bash tool call (allowed-tools: Bash)
-        |
-        v
-Claude confirms change to user
-```
-
-**Key constraint:** The skill does not call the hook directly. The hook reads state; the skill writes state. They share only the state file. This is a clean separation — the skill is the writer, the hook is the reader.
-
-**allowed-tools in SKILL.md:** Must include `Bash` so Claude can write the state file without prompting for permission.
-
----
-
-### Stats Flow
-
-```
-User types /feynman-stats
-        |
-        v
-skills/feynman-stats/SKILL.md loads
-        |
-        v
-Claude reads ${CLAUDE_PLUGIN_DATA}/state.json via Bash
-        |
-        v
-Claude reports: enabled status, intensity, count for this session
-```
-
-**Session scope caveat:** `${CLAUDE_PLUGIN_DATA}` persists across sessions. The counter is cumulative unless explicitly reset. For "session count" behavior, the hook would need to write a separate session-scoped file using `${CLAUDE_SESSION_ID}`. Decision pending — simplest MVP uses cumulative count.
-
----
-
-## Build Order
-
-Dependencies between components determine build sequence:
-
-```
-Phase 1 (foundation — no deps)
-  feynman-rules.md         ← standalone content, no code deps
-  plugin.json              ← standalone manifest
-
-Phase 2 (hook — depends on rules)
-  feynman-activate.js      ← reads feynman-rules.md content
-  hooks/hooks.json         ← wires feynman-activate.js
-
-Phase 3 (skills — depends on state.json contract)
-  skills/feynman/SKILL.md  ← writes state.json (contract with hook)
-  skills/feynman-stats/SKILL.md ← reads state.json
-
-Phase 4 (compatibility + distribution — depends on rules)
-  .clinerules/feynman.md   ← static copy of full rules (no hook needed)
-  install.sh               ← copies everything to ~/.claude/plugins/
-  install.ps1              ← same for Windows
-```
-
-**Why this order matters:**
-- Rules must exist before the hook script can reference them (Phase 1 → 2)
-- The state.json schema must be agreed before both the hook (writer) and the skill (also writer) and stats skill (reader) are built (Phase 2 + 3 share a contract)
-- Install scripts are last — they can only be written once the file layout is final
-
----
-
-## File Structure (proposed)
-
-```
-feynman/
-├── .claude-plugin/
-│   └── plugin.json
-├── hooks/
-│   ├── hooks.json
-│   └── feynman-activate.js
-├── rules/
-│   └── feynman-rules.md
-├── skills/
-│   ├── feynman/
-│   │   └── SKILL.md
-│   └── feynman-stats/
-│       └── SKILL.md
-├── .clinerules/
-│   └── feynman.md
-├── install.sh
-├── install.ps1
-└── README.md
-```
-
-### plugin.json (minimal)
+Schema extension to `prompts.json`:
 
 ```json
 {
-  "name": "feynman",
-  "description": "Automatically inject ASCII diagram rules into every Claude request",
-  "version": "0.1.0",
-  "author": { "name": "apolenkov" }
+  "id": "status-03",
+  "class": "status",
+  "prompt": "...",
+  "boundary": true,
+  "phrasing": "implicit",
+  "domain": "finance"
 }
 ```
 
-Skill namespace becomes `/feynman:feynman` and `/feynman:feynman-stats`. The PROJECT.md shows `/feynman` and `/feynman-stats` without namespace — this means the plugin name must be something other than `feynman`, OR the skills are distributed as standalone `.claude/skills/` rather than inside a plugin namespace. **Decision required before Phase 2.**
-
-### hooks/hooks.json
-
-```json
-{
-  "description": "Inject ASCII diagram rules on every user prompt",
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/feynman-activate.js",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-No `matcher` field — UserPromptSubmit does not filter by matcher (fires on all prompts).
-
-### state.json schema (contract between hook and skills)
-
-```json
-{
-  "enabled": true,
-  "intensity": "full",
-  "count": 42,
-  "session_counts": {
-    "${CLAUDE_SESSION_ID}": 7
-  }
-}
-```
-
-### feynman-activate.js (core logic sketch)
-
-```
-stdin → parse JSON → read state.json → if !enabled: exit 0
-→ select rules by intensity → increment count → write state.json
-→ stdout: rules text → exit 0
-```
-
-Pure Node.js, no deps, no build step. Uses `fs`, `process.stdin`, `process.stdout` only.
-
-### skills/feynman/SKILL.md frontmatter
-
-```yaml
 ---
-name: feynman
-description: Toggle feynman ASCII diagram injection on/off or switch intensity (lite/full/ultra).
-  Use when user says feynman on, feynman off, feynman lite, feynman full, feynman ultra.
-disable-model-invocation: true
-allowed-tools: Bash(node *) Bash(cat *) Bash(echo *)
----
+
+## Q2 — Parallel execution strategy (7 arms × 50 prompts)
+
+**Decision: option (b) — phased waves.**
+
+```
+Wave 1 (3 parallel subagents)              Wave 2 (4 parallel subagents)
+  v0.2.x baseline                            v0.4.x + A (caption brevity)
+  v0.3.x current                             v0.4.x + B (no-narration)
+  v0.3.x + ladder                            v0.4.x + C (response-length budget)
+                                             v0.4.x + ABC (combined)
+         │
+         ▼
+  Sanity gate: compare total-chars vs Phase 11
+  If drift > 10% on any arm → ABORT, investigate
+  If pass → spawn Wave 2
 ```
 
-### install.sh (approach)
+**Why not option (a):** 7 concurrent subagents exceeds the 4-5 cap (global `CLAUDE.md`) — ECONNRESET risk.  
+**Why not option (c) 25+25 split:** Phase 11 ran 15 prompts per subagent without timeout. Sonnet finishes 50 in 5-15 min. Orchestration overhead of split > savings.
 
-Not using `claude plugin install` (requires marketplace). Instead: direct file copy into `~/.claude/plugins/feynman/` and optionally patch `~/.claude/settings.json` if standalone hook is needed. Mirrors caveman's approach: auto-detect agent, run appropriate install path.
+**Smoke run (mandatory before Wave 1):** re-run the v0.2.x baseline twice. Document variance band. Minimum detectable effect = 2× variance. Candidates below this band cannot be reliably ranked.
 
 ---
 
-## Key Architectural Decisions
+## Q3 — REPORT.md synthesis
 
-| Decision | Rationale |
-|----------|-----------|
-| Plain text stdout (not JSON) | Simplest injection path; no `additionalContext` wrapper needed |
-| State in `${CLAUDE_PLUGIN_DATA}/state.json` | Persists across updates; accessible from both hook and skills |
-| Hook reads rules from embedded string (not file at runtime) | Avoids file read latency; rules baked into hook script or imported at load |
-| No matcher on UserPromptSubmit | Official docs confirm UserPromptSubmit does not use matchers |
-| Skill writes state; hook reads state | Clean separation; no circular dependency |
-| Plugin name ≠ "feynman" OR standalone skills | Avoids namespaced `/feynman:feynman` — needs decision |
+**Decision: small aggregator script + manual verdicts.**
+
+Add `eval/v0.5.0-verbosity/aggregate.js` (~100 LoC, zero deps, CommonJS) that reads `results-*.json` and emits markdown tables with all numeric cells filled.
+
+```
+aggregate.js reads:
+  results-v02.json
+  results-v03.json
+  results-v03-ladder.json
+  results-arm-A.json
+  results-arm-B.json
+  results-arm-C.json
+  results-arm-ABC.json
+
+Automates:
+  total chars per arm
+  per-class mean chars
+  % delta vs v0.2.x baseline
+  % delta vs v0.3.x current
+  lint pass rate per arm
+  diagram-presence count per class
+
+Manual (requires human judgment):
+  WIN / HURT / NEUTRAL verdicts per class per arm
+  root-cause prose
+  recommendation: which arm ships as v0.5.0 winner
+```
+
+7 arms × 9 classes = 63 delta cells — computing these by hand is the highest defect risk in this milestone.
 
 ---
 
-## Open Questions
+## Q4 — Winner application
 
-1. **Plugin vs standalone:** If distributed as a plugin, skills are namespaced `/feynman:feynman`. PROJECT.md shows `/feynman`. Options: (a) plugin named something else, e.g. `diagram`, (b) skills installed as standalone into `~/.claude/skills/` by install.sh, (c) accept namespace. **Needs decision before Phase 2.**
+**Decision: candidates stay in `eval/`; single commit copies winner.**
 
-2. **Rules embedded vs file-read:** Should `feynman-activate.js` read `feynman-rules.md` at runtime (simpler authoring) or embed the rule strings inline (faster, no I/O)? Embedding is safer; file read requires knowing `${CLAUDE_PLUGIN_ROOT}` at runtime (available as env var).
+```
+eval/v0.5.0-verbosity/
+  rules-v02.md              ← baseline (read-only)
+  rules-v03.md              ← baseline (read-only)
+  rules-v03-ladder.md       ← baseline (read-only)
+  rules-arm-A.md            ← caption brevity candidate
+  rules-arm-B.md            ← no-narration candidate
+  rules-arm-C.md            ← budget candidate
+  rules-arm-ABC.md          ← combined candidate
 
-3. **Session vs cumulative count:** `/feynman-stats` — per-session or total? Using `${CLAUDE_SESSION_ID}` in state allows both. MVP can start with total, add per-session later.
+After REPORT.md verdict:
+  cp eval/v0.5.0-verbosity/rules-arm-<winner>.md rules/feynman-activate.md
+  git commit "feat(v0.5.0): apply <arm> verbosity reduction"
+```
 
-4. **BUG NOTE:** Official Claude Code issue #10225 reports that `UserPromptSubmit` hooks from plugins match but never execute. This is a known bug. **Mitigation:** Also support install.sh patching `~/.claude/settings.json` directly as a fallback hook registration path. Verify against current Claude Code version before shipping.
+No feature branch unless the winner also requires hook/lint changes (compaction to free 333 bytes MAY touch adjacent code — assess at report time).
 
 ---
 
-## Sources
+## Component map (v0.5.0 additions)
 
-- Claude Code Hooks reference: https://code.claude.com/docs/en/hooks (HIGH confidence)
-- Claude Code Skills reference: https://code.claude.com/docs/en/skills (HIGH confidence)
-- Claude Code Plugins reference: https://code.claude.com/docs/en/plugins (HIGH confidence)
-- caveman repo structure: https://github.com/JuliusBrussee/caveman (MEDIUM — indirect via WebFetch)
-- Plugin UserPromptSubmit bug: https://github.com/anthropics/claude-code/issues/10225 (MEDIUM — issue thread)
+```
+eval/
+└── v0.5.0-verbosity/
+    ├── prompts.json          ← 50-prompt corpus (extends Phase 11 set)
+    ├── aggregate.js          ← auto-compute numeric REPORT cells
+    ├── rules-v02.md          ← baseline (symlink or copy)
+    ├── rules-v03.md          ← baseline (symlink or copy)
+    ├── rules-v03-ladder.md   ← baseline (symlink or copy)
+    ├── rules-arm-A.md        ← caption brevity
+    ├── rules-arm-B.md        ← no-narration
+    ├── rules-arm-C.md        ← response-length budget
+    ├── rules-arm-ABC.md      ← combined ABC
+    └── REPORT.md             ← generated tables + manual verdicts
+```
+
+Subagent contract (unchanged from Phase 11):
+
+```
+stdin:  { rules_text, prompts[], model }
+stdout: { arm, results: [{ id, class, response, chars, lint_pass, has_diagram }] }
+```
+
+---
+
+## Open questions at milestone start
+
+| # | Question | Decision needed by |
+|---|----------|--------------------|
+| 1 | Which baseline files to symlink vs copy into v0.5.0 dir? | Corpus authoring |
+| 2 | Does arm-ABC require 333 bytes freed from rules? | Arm file authoring |
+| 3 | Smoke-run variance band — if >15%, is 50 prompts enough? | Wave 1 execution |
+| 4 | Does winner need a feature branch if compaction touches hook code? | REPORT.md verdict |
