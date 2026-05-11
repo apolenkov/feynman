@@ -1,35 +1,46 @@
-// lib/lint/index.js — diagram linter orchestrator
+// lib/lint/index.ts — diagram linter orchestrator
 // lint(markdown, options) => {issues, passed}
 // format(issues, mode) => string
-// Zero deps. CJS only.
-'use strict';
+// Zero deps. ESM only.
 
-const { parse } = require('./parser');
-const rules = require('./rules');
+import { parse } from './parser.ts';
+import * as rules from './rules.ts';
+import type { Issue, ASTNode } from './rules.ts';
+
+export type { Issue } from './rules.ts';
+
+export interface LintOptions {
+  rules?: string[];
+}
+
+export interface LintResult {
+  issues: Issue[];
+  passed: boolean;
+}
 
 /**
  * Lint a markdown string for ASCII diagram issues.
  * @param {string} markdown
- * @param {{rules?: string[]}} [options] - optional rule filter
- * @returns {{issues: object[], passed: boolean}}
+ * @param {LintOptions} [options] - optional rule filter
+ * @returns {LintResult}
  */
-function lint(markdown, options) {
+export function lint(markdown: string, options?: LintOptions): LintResult {
   if (typeof markdown !== 'string') {
     return { issues: [], passed: true };
   }
 
   const enabledRules = (options && options.rules) || null;
 
-  function isEnabled(ruleId) {
+  function isEnabled(ruleId: string): boolean {
     if (!enabledRules) return true;
     return enabledRules.includes(ruleId);
   }
 
   const ast = parse(markdown);
-  const allIssues = [];
+  const allIssues: Issue[] = [];
 
   // Per-node rules
-  const perNodeRules = [
+  const perNodeRules: Array<{id: string, fn: (node: ASTNode, markdown: string) => Issue[]}> = [
     { id: 'L01', fn: rules.L01_box_closure },
     { id: 'L02', fn: rules.L02_tree_chars },
     { id: 'L03', fn: rules.L03_arrow_style },
@@ -83,13 +94,13 @@ function lint(markdown, options) {
 
 /**
  * Format issues for output.
- * @param {object[]} issues
+ * @param {Issue[]} issues
  * @param {'gcc'|'json'} mode
  * @param {string} [filename] - for gcc mode
  * @param {boolean} [useColor] - ANSI color for TTY
  * @returns {string}
  */
-function format(issues, mode, filename, useColor) {
+export function format(issues: Issue[], mode: 'gcc' | 'json', filename?: string, useColor?: boolean): string {
   if (mode === 'json') {
     return JSON.stringify(issues, null, 2);
   }
@@ -110,5 +121,3 @@ function format(issues, mode, filename, useColor) {
     return `${file}:${iss.line}:${iss.column}: ${color}${BOLD}${iss.rule} ${sev}${RESET} ${iss.message}`;
   }).join('\n');
 }
-
-module.exports = { lint, format };

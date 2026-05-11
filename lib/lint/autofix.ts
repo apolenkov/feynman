@@ -1,13 +1,12 @@
-// lib/lint/autofix.js — pure-function autofix for ASCII frame blocks.
+// lib/lint/autofix.ts — pure-function autofix for ASCII frame blocks.
 // Repairs misaligned │ / ┌─┐ / └─┘ borders so the right edge lines up.
-// Zero deps. CommonJS. No I/O — text in, text out.
-'use strict';
+// Zero deps. ESM only. No I/O — text in, text out.
 
-const { visualWidth } = require('./width');
+import { visualWidth } from './width.ts';
 
 // Strip indent prefix and the outer │ chars from an inner line. Returns the
 // raw cell content without trailing space.
-function unwrapInner(line, indent) {
+function unwrapInner(line: string, indent: string): string {
   let s = line;
   if (indent && s.startsWith(indent)) s = s.slice(indent.length);
   // Drop leading │ and trailing │ (the latter may have padding before it).
@@ -15,7 +14,15 @@ function unwrapInner(line, indent) {
   return s;
 }
 
-function autofixFrame(node) {
+export interface FrameNodeFull {
+  kind?: string;
+  top: string;
+  inner: string[];
+  bottom: string;
+  indent: string;
+}
+
+export function autofixFrame(node: FrameNodeFull): string {
   const indent = node.indent || '';
   const inner = node.inner.map(line => unwrapInner(line, indent));
   // Compute target inner width. Floor on the top border's dash count so a
@@ -39,6 +46,10 @@ function autofixFrame(node) {
 // Cyrillic literals + ASCII glyphs; case-insensitive for ASCII.
 const STATE_MARKER_RE = /(← (?:готов|решение|заморожено|в работе|блок:[^│\n]+))|((?:✓|✗|◐|⌛|→) \S+)|\b(done|pending|wip|ok|fail|wait)\b\s*$/i;
 
+type RowKind =
+  | { kind: 'pattern'; label: string; state: string }
+  | { kind: 'bullet'; content: string };
+
 /**
  * Convert a frame node (≤5 inner lines, no tree, no embedded table) to a
  * dot-leader list. Each inner line becomes one row:
@@ -48,22 +59,22 @@ const STATE_MARKER_RE = /(← (?:готов|решение|заморожено|
  * @param {{top:string, inner:string[], bottom:string, indent:string}} node
  * @returns {string}
  */
-function autofixFrameToDotLeader(node) {
+export function autofixFrameToDotLeader(node: FrameNodeFull): string {
   const indent = node.indent || '';
   const stripped = node.inner.map(line => unwrapInner(line, indent).trim());
 
   // Classify each row: pattern (label + state) or free-form
-  const rows = stripped.map(content => {
+  const rows: RowKind[] = stripped.map(content => {
     // Match trailing STATE marker.
     const re = new RegExp(STATE_MARKER_RE.source, STATE_MARKER_RE.flags);
     const stateMatch = content.match(re);
-    if (!stateMatch) return { kind: 'bullet', content };
+    if (!stateMatch) return { kind: 'bullet' as const, content };
     const state = stateMatch[0].trim();
     const stateIdx = content.lastIndexOf(state);
     // Label = everything before state, with trailing dots/whitespace stripped.
     let label = content.slice(0, stateIdx).replace(/[\s.]+$/, '');
-    if (!label) return { kind: 'bullet', content };
-    return { kind: 'pattern', label, state };
+    if (!label) return { kind: 'bullet' as const, content };
+    return { kind: 'pattern' as const, label, state };
   });
 
   // Mixed mode: if ANY row is bullet, emit ALL as bullets.
@@ -81,8 +92,9 @@ function autofixFrameToDotLeader(node) {
   // space, then the state. Result: all rows have equal dot-counts AND the
   // state column is aligned. State width may differ across rows, so total row
   // width can differ — that is fine and matches conventional dot-leader.
-  const labelMax = Math.max(...rows.map(r => visualWidth(r.label)));
-  const stateMax = Math.max(...rows.map(r => visualWidth(r.state)));
+  const patternRows = rows as Array<{ kind: 'pattern'; label: string; state: string }>;
+  const labelMax = Math.max(...patternRows.map(r => visualWidth(r.label)));
+  const stateMax = Math.max(...patternRows.map(r => visualWidth(r.state)));
   const indentW = visualWidth(indent);
   // Want at least 4 dots so the leader is visible; expand on wide content,
   // capped so the row fits a typical 80-col terminal accounting for indent.
@@ -90,7 +102,7 @@ function autofixFrameToDotLeader(node) {
   const maxRowW = Math.min(80 - indentW, Math.max(wantW, labelMax + stateMax + 6));
   const dotsCount = Math.max(3, maxRowW - labelMax - stateMax - 2);
 
-  return rows.map(r => {
+  return patternRows.map(r => {
     const labelW = visualWidth(r.label);
     const labelPad = ' '.repeat(Math.max(0, labelMax - labelW));
     const dots = '.'.repeat(dotsCount);
@@ -99,13 +111,18 @@ function autofixFrameToDotLeader(node) {
 }
 
 // Eligibility check for L11 dot-leader autofix. Matches L11_overdecoration
-// whitelist exactly (lib/lint/rules.js).
-function isL11Eligible(inner) {
+// whitelist exactly (lib/lint/rules.ts).
+function isL11Eligible(inner: string[]): boolean {
   const n = inner.length;
   if (n < 1 || n > 5) return false;
   if (inner.some(l => /[├└]──/.test(l))) return false;   // nested tree
   if (inner.some(l => (l.match(/│/g) || []).length >= 3)) return false; // embedded table
   return true;
+}
+
+export interface AutofixOptions {
+  processFenced?: boolean;
+  convertL11?: boolean;
 }
 
 // Walk text, locate frame regions (sequence of lines starting with ┌ … ending
@@ -125,13 +142,13 @@ function isL11Eligible(inner) {
 // whitespace; inner lines start with `indent + │`.
 //
 // @param {string} text
-// @param {{processFenced?: boolean, convertL11?: boolean}} [opts]
-function autofix(text, opts) {
+// @param {AutofixOptions} [opts]
+export function autofix(text: string, opts?: AutofixOptions): string {
   const processFenced = !!(opts && opts.processFenced);
   const convertL11    = !!(opts && opts.convertL11);
   if (!text || text.indexOf('┌') === -1) return text;
   const lines = text.split('\n');
-  const out = [];
+  const out: string[] = [];
   let i = 0;
   let inFence = false;
   while (i < lines.length) {
@@ -156,7 +173,7 @@ function autofix(text, opts) {
     }
     const indent = topMatch[1];
     let j = i + 1;
-    const inner = [];
+    const inner: string[] = [];
     let closed = false;
     while (j < lines.length) {
       const next = lines[j];
@@ -182,7 +199,7 @@ function autofix(text, opts) {
       i = j + 1;
       continue;
     }
-    const node = {
+    const node: FrameNodeFull = {
       kind: 'frame',
       top: line,
       inner,
@@ -200,4 +217,5 @@ function autofix(text, opts) {
   return out.join('\n');
 }
 
-module.exports = { autofix, autofixFrame, autofixFrameToDotLeader, visualWidth };
+// Re-export visualWidth for backward compatibility (autofix.js exported it)
+export { visualWidth };

@@ -1,11 +1,10 @@
-// lib/lint/width.js — single source of truth for visual-width calculations.
-// Used by rules.js (L08, L09) and autofix.js. Zero deps. CJS only.
+// lib/lint/width.ts — single source of truth for visual-width calculations.
+// Used by rules.ts (L08, L09) and autofix.ts. Zero deps. ESM only.
 //
 // Folded together from rules.js displayWidth (CJK East Asian wide) and
 // autofix.js visualWidth (ANSI strip + combining/ZWJ strip). The unified
 // function is the canonical "how many terminal columns does this string
 // occupy" — used everywhere a frame border must align.
-'use strict';
 
 // ANSI CSI sequences (SGR color codes etc.). Hex-escape ESC to keep the
 // file free of literal control bytes.
@@ -21,7 +20,7 @@ const ZERO_WIDTH_TEST_RE = /[̀-ͯ​-‏﻿]/;
 // terminal columns in most monospace fonts. Box-drawing chars
 // (U+2500..U+257F) are intentionally NOT in this list — they render as
 // width 1.
-function isWide(code) {
+export function isWide(code: number): boolean {
   return (
     (code >= 0x1100 && code <= 0x115F) ||
     (code >= 0x2E80 && code <= 0x303E) ||
@@ -42,12 +41,12 @@ function isWide(code) {
   );
 }
 
-function visualWidth(line) {
+export function visualWidth(line: string | undefined | null): number {
   if (!line) return 0;
   const stripped = String(line).replace(ANSI_RE, '').replace(ZERO_WIDTH_RE, '');
   let w = 0;
   for (const ch of stripped) {
-    w += isWide(ch.codePointAt(0)) ? 2 : 1;
+    w += isWide(ch.codePointAt(0)!) ? 2 : 1;
   }
   return w;
 }
@@ -56,7 +55,7 @@ function visualWidth(line) {
 // `line` lands. Returns -1 if not found. Wide chars before the target
 // count for 2 columns; combining marks and ANSI escapes count for 0.
 // Used by L09 to compare actual closing-│ position against the anchor.
-function lastVisualColumnOf(line, ch) {
+export function lastVisualColumnOf(line: string, ch: string): number {
   if (!line) return -1;
   // Walk left→right while accumulating visual width; remember the column
   // of the last matching codepoint.
@@ -72,7 +71,7 @@ function lastVisualColumnOf(line, ch) {
       const m = s.slice(i).match(/^\x1b\[[0-9;]*m/);
       if (m) { i += m[0].length; continue; }
     }
-    const code = s.codePointAt(i);
+    const code = s.codePointAt(i)!;
     const charLen = code > 0xFFFF ? 2 : 1; // surrogate pair occupies 2 UTF-16 units
     // Zero-width: do not advance col
     if (ZERO_WIDTH_TEST_RE.test(String.fromCodePoint(code))) {
@@ -88,7 +87,7 @@ function lastVisualColumnOf(line, ch) {
   return last;
 }
 
-function firstVisualColumnOf(line, ch) {
+export function firstVisualColumnOf(line: string, ch: string): number {
   if (!line) return -1;
   let col = 0;
   let i = 0;
@@ -98,7 +97,7 @@ function firstVisualColumnOf(line, ch) {
       const m = s.slice(i).match(/^\x1b\[[0-9;]*m/);
       if (m) { i += m[0].length; continue; }
     }
-    const code = s.codePointAt(i);
+    const code = s.codePointAt(i)!;
     const charLen = code > 0xFFFF ? 2 : 1;
     if (ZERO_WIDTH_RE.test(String.fromCodePoint(code))) {
       ZERO_WIDTH_RE.lastIndex = 0;
@@ -114,5 +113,3 @@ function firstVisualColumnOf(line, ch) {
   }
   return -1;
 }
-
-module.exports = { visualWidth, isWide, firstVisualColumnOf, lastVisualColumnOf };
