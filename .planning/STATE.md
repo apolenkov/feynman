@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: Visual Economy
-status: executing
-last_updated: "2026-05-11T03:00:00Z"
+status: ready_for_release
+last_updated: "2026-05-11T11:30:00Z"
 last_activity: 2026-05-11
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 17
-  completed_plans: 14
-  percent: 64
-current_phase: 11
-current_phase_status: blocked_on_anthropic_api_access
+  completed_phases: 4
+  total_plans: 18
+  completed_plans: 17
+  percent: 77
+current_phase: 13
+current_phase_status: blocked_on_npm_token_rotation
 ---
 
 # Project State
@@ -27,33 +27,33 @@ See: .planning/MILESTONES.md (history of shipped milestones)
 
 ## Current Position
 
-Phase: 11 (compliance harness) — blocked on Anthropic API access verification
-       OR
-       Phase 13 (release v0.4.0) — blocked on npm token rotation
-
-Last activity: 2026-05-11 — Phase 12 closed (commit 474fbab)
+Phase: 13 (release v0.4.0) — blocked only on npm token rotation
+Last activity: 2026-05-11 — Phase 11 closed + rules smallest-visual-first extension shipped (commits eaeae91, db30f41)
 
 ### Milestone v0.4.0 Status
 
 ```
-Phase 9:  L11/L12/L13/L14 + DOCS-L11       ✓ shipped (6 plans, +70 tests)
-Phase 10: output-style presets             ✓ shipped (4 reqs, +7 tests)
-Phase 11: compliance A/B harness           ← BLOCKED: Anthropic API access
-Phase 12: IDE compat (cline/cursor/...)    ✓ shipped (5 reqs, +8 tests)
-Phase 13: release v0.4.0                   ← BLOCKED: npm token rotation
+Phase 9    5/5 ✓ shipped       L11/L12/L13/L14 + DOCS-L11 (+70 tests)
+Phase 10   4/4 ✓ shipped       output-style presets (+7 tests)
+Phase 11   3/3 ✓ shipped       compliance A/B + rule extension (offline harness)
+Phase 12   5/5 ✓ shipped       IDE compat (cline/cursor/windsurf) (+8 tests)
+Phase 13   0/5 ▲ blocked       npm token rotation (HUMAN)
+────────  ─────
+total     17/22
 ```
 
 Test totals: 279 baseline → **364 pass** (+85 across all closed phases). No regressions.
-
-Requirement coverage: 14 of 22 satisfied (Phase 9 = 5, Phase 10 = 4, Phase 12 = 5).
+Rules budget: 4480 → **4443 bytes** (37 under, smallest-visual-first ladder fit via compaction).
 
 ### Open Blockers
 
-| Block | What | Who | Action |
-|---|---|---|---|
-| ▲ npm token leak | `npm_7sfUg…` used 3× across transcripts | HUMAN | Rotate at npmjs.com/settings/apolenkov/tokens (granular, scope @albinocrabs/feynman) |
-| ▲ Anthropic API access | Compliance harness needs API client for Phase 11 | HUMAN | Verify ANTHROPIC_API_KEY set; pick npm anthropic or direct curl |
-| ▼ Phase 13 scope | Ship v0.4.0 with 14/22 reqs OR wait for Phase 11 | HUMAN | Decision: ship partial vs. complete |
+```
+▲ npm token leak  npm_7sfUg… used 3× in transcript logs (HUMAN)
+                   → npmjs.com/settings/apolenkov/tokens → granular scope @albinocrabs/feynman
+```
+
+That's the only blocker left. Phase 11 was unblocked by using Claude Code subagents
+(Anthropic API key not needed — subagents inherit auth).
 
 ## Shipped Milestones (recap)
 
@@ -72,12 +72,16 @@ Requirement coverage: 14 of 22 satisfied (Phase 9 = 5, Phase 10 = 4, Phase 12 = 
 2026-05-11 00:15  09-02 L12 + estimateFrameCost shipped (+12 tests)
 2026-05-11 00:45  09-03 L13 + L11/L13 split shipped (+12 tests)
 2026-05-11 01:15  09-05 --explain CLI shipped (+6 tests)
-2026-05-11 01:45  HUMAN gate confirmed for 09-04
-2026-05-11 02:00  09-04 LINT-14 autofix shipped (+26 tests, advisor pivot logged)
+2026-05-11 02:00  09-04 LINT-14 autofix shipped (+26 tests, advisor pivot)
 2026-05-11 02:20  09-06 docs L01-L13 shipped (DOCS-L11)
 2026-05-11 02:40  Phase 10 output-style presets shipped (+7 tests)
 2026-05-11 03:00  Phase 12 IDE compat shipped (+8 tests)
-                  ── handoff written ──
+                  ── morning handoff ──
+2026-05-11 10:30  Phase 11 unblocked via subagents (no API key needed)
+2026-05-11 11:00  Phase 11 A/B harness: 2 arms × 15 prompts → REPORT.md
+                  Finding: v0.3.x +31% verbosity (same lint compliance)
+2026-05-11 11:30  Rules extended with smallest-visual-first ladder per
+                  intensity (4480 → 4443 bytes via compaction)
 ```
 
 Full decision log: `.planning/notes/autonomous-log-2026-05-11.md`.
@@ -85,9 +89,12 @@ Full decision log: `.planning/notes/autonomous-log-2026-05-11.md`.
 ## Operator Next Steps
 
 1. **▲ ROTATE NPM TOKEN** — npmjs.com/settings/apolenkov/tokens. Create granular publish token scoped to `@albinocrabs/feynman`. Old `npm_7sfUg…` token is in transcript logs; treat as compromised.
-2. **▲ VERIFY Anthropic API access** for Phase 11 — `echo $ANTHROPIC_API_KEY | head -c 20` should show a key. If absent, skip Phase 11 for v0.4.0 and ship partial.
-3. **Decide v0.4.0 release scope:** ship 14/22 reqs now (drop Phase 11 EVAL track), or wait until Phase 11 closes too.
-4. After scope decided: `/gsd-resume-work` → `/gsd-plan-phase 13` → manual `npm publish` with new token.
+2. **After rotation:** `/gsd-plan-phase 13` → bump + manual `npm publish` with new token → GH release.
+
+## Optional Follow-Ups (not blocking v0.4.0)
+
+- Re-run Phase 11 harness with 3rd arm (v0.3.x + smallest-visual-first ladder) to measure actual reduction vs predicted -15-25%. Becomes evidence for v0.4.1 changelog.
+- Expand corpus from 15 → 50 prompts (original spec).
 
 ## Open Items (carry forward)
 
