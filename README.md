@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo-256.png" width="180" alt="feynman — albino crab drawing ASCII diagrams" />
+  <img src="https://em-content.zobj.net/source/apple/391/pencil_270f-fe0f.png" width="120" />
 </p>
 
 <h1 align="center">feynman</h1>
