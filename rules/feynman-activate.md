@@ -41,18 +41,18 @@ Smallest visual fits: prose<glyph<dot-leader<tree<table<frame.
 
 <intensity name="full">
 <triggers>
-| structure     | visual          | note                       |
-|---------------|-----------------|----------------------------|
-| sequence      | arrow flow      | A → B → C                  |
-| hierarchy ≥3  | ASCII tree      | ├── └──                    |
-| branching     | ASCII tree      | yes/no paths               |
-| comparison    | markdown table  | 3-col max, not ASCII pipes |
-| status ≤5     | dot-leader list | item ... state             |
-| status ≥6     | frame block     | +--- Status ---+           |
-| priority      | ▲▼ scale        | ▲ high / ▼ low             |
-| state-machine | states+arrows   | [A] →event→ [B]            |
-| mapping       | pairs grid      | before / after             |
-One primary visual per response. Secondary visuals only for orthogonal information.
+| structure     | visual          |
+|---------------|-----------------|
+| sequence      | arrow flow      |
+| hierarchy ≥3  | ASCII tree      |
+| branching     | ASCII tree      |
+| comparison    | markdown table  |
+| status ≤5     | dot-leader list |
+| status ≥6     | frame block     |
+| priority      | ▲▼ scale        |
+| state-machine | states+arrows   |
+| mapping       | pairs grid      |
+One primary visual per response.
 </triggers>
 <examples>
 `[commit] → [build] → [test] → [staging] → [production]`
