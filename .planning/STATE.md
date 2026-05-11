@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v0.5.0
 milestone_name: Verbosity Economy
-status: In progress
+status: Shipped
 last_updated: "2026-05-11T18:17:41.157Z"
-last_activity: 2026-05-11 — Phase 14 Plan 01 complete (corpus + harness setup)
+last_activity: 2026-05-11 — v0.5.0 shipped; winner ABC (−54.7%); npm published @albinocrabs/feynman@0.5.0
 progress:
   total_phases: 5
-  completed_phases: 0
-  total_plans: 1
-  completed_plans: 1
+  completed_phases: 5
+  total_plans: 5
+  completed_plans: 5
 ---
 
 # Project State
@@ -20,27 +20,27 @@ See: .planning/PROJECT.md
 See: .planning/MILESTONES.md (history of shipped milestones)
 
 **Core value:** Every response with structure gets an ASCII diagram without the developer asking — and prefers the cheapest visual that fits.
-**Current focus:** v0.5.0 Verbosity Economy — Phases 14-18. Goal: close the +31% verbosity gap via 7-arm A/B measurement on 50 prompts, ship winning intervention.
+**Current focus:** v0.5.0 shipped 2026-05-11 / 364 tests / winner ABC (−54.7%) / npm published @albinocrabs/feynman@0.5.0
 
 ## Current Position
 
 ```
-Phase:  14 — Corpus + Harness Setup
-Plan:   1/1 complete
-Status: Phase 14 done
-Last activity: 2026-05-11 — 14-01 complete: 50-prompt corpus + aggregate.js + 2 smoke-run baselines
+Milestone: v0.5.0 Verbosity Economy — COMPLETE
+Status:    Shipped 2026-05-11
+Winner:    ABC (−54.7% verbosity vs v0.3.x, 100% lint compliance)
+npm:       @albinocrabs/feynman@0.5.0 published
 ```
 
 ### Milestone v0.5.0 Phase Status
 
 ```
 Phase 14   1/1 ✓ done          Corpus + Harness Setup
-Phase 15   0/? ○ not started    Budget Compaction
-Phase 16   0/? ○ not started    Candidate Rule Sets
-Phase 17   0/? ○ not started    Two-Wave Measurement
-Phase 18   0/? ○ not started    Apply Winner + Release
+Phase 15   1/1 ✓ done          Budget Compaction
+Phase 16   1/1 ✓ done          Candidate Rule Sets
+Phase 17   1/1 ✓ done          Two-Wave Measurement
+Phase 18   1/1 ✓ done          Apply Winner + Release
 ────────  ─────
-total      1/5 phases complete
+total      5/5 phases complete
 ```
 
 ### Phase Dependency Graph
@@ -55,19 +55,15 @@ total      1/5 phases complete
                                              [Ph 18: Apply Winner OR Research-only close]
 ```
 
-### Open Blockers (carry forward from v0.4.0)
+### Open Blockers
 
 ```
-▲ npm token rotation  npm_7sfUg… used in transcript logs (HUMAN)
-                       → npmjs.com/settings/apolenkov/tokens
-                       → create granular publish-scope token for @albinocrabs/feynman
-                       (needed before Phase 18 publish step)
+(none — v0.5.0 shipped cleanly)
 ```
 
 ## Operator Next Steps
 
-1. Run `/gsd-plan-phase 14` — Corpus + Harness Setup
-2. **▲ ROTATE NPM TOKEN** before Phase 18 — granular publish scope at npmjs.com/settings/apolenkov/tokens
+Next milestone: v0.6.0 (candidates: Telegraph rewrite, domain packs, self-improvement loop — see REQUIREMENTS.md § Future)
 
 ## Shipped Milestones (recap)
 
@@ -77,6 +73,7 @@ total      1/5 phases complete
 | v0.2.0 Production-Ready | 2-7 | 2026-05-07 | — | milestones/v0.2.0-ROADMAP.md |
 | v0.3.0 Prompt Architecture | 8 + 8.5 | 2026-05-10 | — | milestones/v0.3.0-ROADMAP.md |
 | v0.4.0 Visual Economy | 9-13 | 2026-05-11 | 364 pass | milestones/v0.4.0-ROADMAP.md |
+| v0.5.0 Verbosity Economy | 14-18 | 2026-05-11 | 364 pass | winner ABC (−54.7%) |
 
 ### v0.4.0 Final Status (archived)
 

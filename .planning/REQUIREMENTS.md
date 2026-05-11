@@ -16,30 +16,30 @@
 
 ### Budget Compaction (Phase 15)
 
-- [ ] **COMP-01**: `rules/feynman-activate.md` compacted by ≥333 bytes via prose-only cuts (contracts, triggers note column, second full/examples tree); no vocabulary loss (`classify`/`channel`/`amplify`/`suppress` preserved)
-- [ ] **COMP-02**: All structural invariants in `tests/hook.test.js:541-629` pass after every compaction step — `npm test` is the gate
-- [ ] **COMP-03**: Resulting slack ≥333 bytes (4480 − used ≥333) confirmed with `wc -c`
+- [x] **COMP-01**: `rules/feynman-activate.md` compacted by ≥333 bytes via prose-only cuts (contracts, triggers note column, second full/examples tree); no vocabulary loss (`classify`/`channel`/`amplify`/`suppress` preserved)
+- [x] **COMP-02**: All structural invariants in `tests/hook.test.js:541-629` pass after every compaction step — `npm test` is the gate
+- [x] **COMP-03**: Resulting slack ≥333 bytes (4480 − used ≥333) confirmed with `wc -c`
 
 ### Candidate Rule Sets (Phase 16)
 
-- [ ] **CAND-01**: `eval/v0.5.0-compliance/rules-v05-A.md` — compacted base + caption brevity rule (≤4480 bytes); rule uses positive example, not pure prohibition
-- [ ] **CAND-02**: `eval/v0.5.0-compliance/rules-v05-B.md` — compacted base + no-narration rule (≤4480 bytes); positive framing required
-- [ ] **CAND-03**: `eval/v0.5.0-compliance/rules-v05-C.md` — compacted base + response-length budget rule (≤4480 bytes); rule explicitly excludes code-fenced and ASCII blocks from word count
-- [ ] **CAND-04**: `eval/v0.5.0-compliance/rules-v05-ABC.md` — compacted base + A+B+C combined (≤4480 bytes)
+- [x] **CAND-01**: `eval/v0.5.0-compliance/rules-v05-A.md` — compacted base + caption brevity rule (≤4480 bytes); rule uses positive example, not pure prohibition
+- [x] **CAND-02**: `eval/v0.5.0-compliance/rules-v05-B.md` — compacted base + no-narration rule (≤4480 bytes); positive framing required
+- [x] **CAND-03**: `eval/v0.5.0-compliance/rules-v05-C.md` — compacted base + response-length budget rule (≤4480 bytes); rule explicitly excludes code-fenced and ASCII blocks from word count
+- [x] **CAND-04**: `eval/v0.5.0-compliance/rules-v05-ABC.md` — compacted base + A+B+C combined (≤4480 bytes)
 
 ### Measurement (Phase 17)
 
-- [ ] **MEAS-01**: Wave 1 executed — 3 baseline arms (`rules-v02`, `rules-v03`, `rules-v03-ladder`) measured on 50-prompt corpus; sanity gate checked (delta from Phase 11 <10%); `results-v02-50p.json`, `results-v03-50p.json`, `results-v03-ladder-50p.json` written
-- [ ] **MEAS-02**: Wave 2 executed — 4 candidate arms measured on 50-prompt corpus; `results-v05-A-50p.json`, `results-v05-B-50p.json`, `results-v05-C-50p.json`, `results-v05-ABC-50p.json` written
-- [ ] **MEAS-03**: Statistical analysis uses paired design (same 50 prompts across all 7 arms) + Wilcoxon signed-rank + Bootstrap 95% CI; diagram rate measured separately from verbosity
-- [ ] **MEAS-04**: `eval/v0.5.0-compliance/REPORT.md` with 7-arm matrix, per-class breakdown (9 classes), and explicit winner statement (or «refuted»); generated via `aggregate.js` for numbers, hand-authored interpretation
+- [x] **MEAS-01**: Wave 1 executed — 3 baseline arms (`rules-v02`, `rules-v03`, `rules-v03-ladder`) measured on 50-prompt corpus; sanity gate checked (delta from Phase 11 <10%); `results-v02-50p.json`, `results-v03-50p.json`, `results-v03-ladder-50p.json` written
+- [x] **MEAS-02**: Wave 2 executed — 4 candidate arms measured on 50-prompt corpus; `results-v05-A-50p.json`, `results-v05-B-50p.json`, `results-v05-C-50p.json`, `results-v05-ABC-50p.json` written
+- [x] **MEAS-03**: Statistical analysis uses paired design (same 50 prompts across all 7 arms) + Wilcoxon signed-rank + Bootstrap 95% CI; diagram rate measured separately from verbosity
+- [x] **MEAS-04**: `eval/v0.5.0-compliance/REPORT.md` with 7-arm matrix, per-class breakdown (9 classes), and explicit winner statement (or «refuted»); generated via `aggregate.js` for numbers, hand-authored interpretation
 
 ### Release (Phase 18)
 
-- [ ] **REL-01**: Winner arm passes threshold: ≥−20% verbosity vs v0.3.x on 50-prompt corpus AND ≥95% lint compliance (or «refuted» if no winner)
-- [ ] **REL-02**: If winner passes: winner rule applied to `rules/feynman-activate.md`; `npm test` green (364+ passing); v0.4.0 15-prompt corpus regression gate also passes
-- [ ] **REL-03**: If winner passes: version bumped 0.4.0 → 0.5.0 in `package.json`, `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`; `CHANGELOG.md` updated with REPORT.md metrics
-- [ ] **REL-04**: If winner passes: `npm publish @albinocrabs/feynman@0.5.0` + GitHub Release `v0.5.0`
+- [x] **REL-01**: Winner arm passes threshold: ≥−20% verbosity vs v0.3.x on 50-prompt corpus AND ≥95% lint compliance (or «refuted» if no winner)
+- [x] **REL-02**: If winner passes: winner rule applied to `rules/feynman-activate.md`; `npm test` green (364+ passing); v0.4.0 15-prompt corpus regression gate also passes
+- [x] **REL-03**: If winner passes: version bumped 0.4.0 → 0.5.0 in `package.json`, `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`; `CHANGELOG.md` updated with REPORT.md metrics
+- [x] **REL-04**: If winner passes: `npm publish @albinocrabs/feynman@0.5.0` + GitHub Release `v0.5.0`
 - [ ] **REL-05**: If all refuted: `eval/v0.5.0-compliance/REPORT.md` documents findings honestly; v0.5.0 milestone closed as research-only without publish
 
 ## Future (v0.6.0+)
@@ -65,19 +65,19 @@
 | CORP-02 | Phase 14 | Done — commit f18d93a |
 | CORP-03 | Phase 14 | Done — commit a0f32fe |
 | CORP-04 | Phase 14 | Done — commit 77e169b |
-| COMP-01 | Phase 15 | Pending |
-| COMP-02 | Phase 15 | Pending |
-| COMP-03 | Phase 15 | Pending |
-| CAND-01 | Phase 16 | Pending |
-| CAND-02 | Phase 16 | Pending |
-| CAND-03 | Phase 16 | Pending |
-| CAND-04 | Phase 16 | Pending |
-| MEAS-01 | Phase 17 | Pending |
-| MEAS-02 | Phase 17 | Pending |
-| MEAS-03 | Phase 17 | Pending |
-| MEAS-04 | Phase 17 | Pending |
-| REL-01 | Phase 18 | Pending — conditional on MEAS-04 winner statement |
-| REL-02 | Phase 18 | Pending — winner path only |
-| REL-03 | Phase 18 | Pending — winner path only |
-| REL-04 | Phase 18 | Pending — winner path only |
-| REL-05 | Phase 18 | Pending — refuted path only |
+| COMP-01 | Phase 15 | Done — commit 7110582 |
+| COMP-02 | Phase 15 | Done — commit 7110582 |
+| COMP-03 | Phase 15 | Done — commit 7110582 |
+| CAND-01 | Phase 16 | Done — commit db99e6a |
+| CAND-02 | Phase 16 | Done — commit db99e6a |
+| CAND-03 | Phase 16 | Done — commit db99e6a |
+| CAND-04 | Phase 16 | Done — commit db99e6a |
+| MEAS-01 | Phase 17 | Done — commit 9e53e04 |
+| MEAS-02 | Phase 17 | Done — commit 9e53e04 |
+| MEAS-03 | Phase 17 | Done — commit 9e53e04 |
+| MEAS-04 | Phase 17 | Done — commit 9e53e04 |
+| REL-01 | Phase 18 | Done — winner ABC (−54.7%) — commit c149e89 |
+| REL-02 | Phase 18 | Done — 364/364 tests pass — commit c149e89 |
+| REL-03 | Phase 18 | Done — v0.5.0 bumped — commit c149e89 |
+| REL-04 | Phase 18 | Done — @albinocrabs/feynman@0.5.0 published — commit c149e89 |
+| REL-05 | Phase 18 | N/A — winner path taken |
