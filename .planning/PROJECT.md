@@ -19,15 +19,16 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 | v0.3.0 — Prompt Architecture | XML rule contract, autofix engine, L09/L10, Stop-hook autofix | 2026-05-10 | milestones/v0.3.0-ROADMAP.md |
 | v0.4.0 — Visual Economy | L11/L12/L13/L14, output-style presets, IDE compat, compliance harness, smallest-visual-first ladder | 2026-05-11 | milestones/v0.4.0-ROADMAP.md |
 
-## Current Milestone
+## Current Milestone: v0.5.0 «Verbosity Economy»
 
-None — v0.4.0 shipped 2026-05-11. Next milestone TBD via `/gsd-new-milestone`.
+**Goal:** Close the +31% verbosity gap discovered in Phase 11 via empirical 7-arm A/B measurement on 50 prompts, and ship the winning intervention as a v0.5.0 release.
 
-Candidate themes for v0.5.0 (from research + Phase 11 findings):
-- Domain packs (arch / db / devops as separate rule sets)
-- Verbosity reduction beyond ladder (Phase 11 showed +31% gap NOT closed by ladder — needs caption brevity / CoT suppression / response-length budget)
-- Marketplace submission (Claude Code + Codex stores)
-- Per-project intensity/style override
+**Target features:**
+- Corpus expansion: 15 → 50 prompts for the compliance harness
+- Budget compaction: free ≥333 bytes in rules/feynman-activate.md for ABC interventions
+- 4 candidate rule sets: A (caption brevity) / B (no-narration) / C (response-length budget) / ABC (combined)
+- 7-arm subagent harness: v0.2.x / v0.3.x / +ladder / +A / +B / +C / +ABC × 50 prompts
+- Winner application: if ≥−20% verbosity + ≥95% lint compliance → apply + release; else «refuted» documented
 
 ## Requirements
 
@@ -86,11 +87,21 @@ Candidate themes for v0.5.0 (from research + Phase 11 findings):
 - [x] IDE compat — cline / cursor / windsurf install + doctor — v0.4.0
 - [x] v0.4.0 git tag + GitHub release + npm publish — 2026-05-11
 
-### Active
+### Active (v0.5.0)
 
-None — milestone closed.
+- [ ] **CORP-01**: 50-prompt corpus built and balanced across 9 shape classes
+- [ ] **CORP-02**: 3 baseline arms re-measured on 50-prompt corpus (sanity check)
+- [ ] **COMP-01**: rules/feynman-activate.md compacted by ≥333 bytes (prose contracts only, no vocabulary loss)
+- [ ] **CAND-01**: rules-v05-A.md (caption brevity) created, ≤4480 bytes
+- [ ] **CAND-02**: rules-v05-B.md (no-narration) created, ≤4480 bytes
+- [ ] **CAND-03**: rules-v05-C.md (response-length budget) created, ≤4480 bytes
+- [ ] **CAND-04**: rules-v05-ABC.md (combined) created, ≤4480 bytes
+- [ ] **MEAS-01**: 4 candidate arms measured on 50-prompt corpus via subagent harness
+- [ ] **MEAS-02**: eval/v0.5.0-compliance/REPORT.md with 7-arm matrix, per-class breakdown, explicit winner statement
+- [ ] **REL-01**: winner rule applied to rules/feynman-activate.md + npm test pass (if threshold met)
+- [ ] **REL-02**: v0.5.0 published to npm + GitHub Release (if winner meets threshold)
 
-### Future (v0.5.0+)
+### Future (v0.6.0+)
 
 - [ ] Domain packs (arch / db / devops as separate rule sets)
 - [ ] feynman.config.yaml for team customization
@@ -163,4 +174,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-10 — milestone v0.4.0 started after v0.3.0 archive*
+*Last updated: 2026-05-11 — milestone v0.5.0 started*

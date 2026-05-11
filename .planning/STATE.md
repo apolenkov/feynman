@@ -1,18 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.4.0
-milestone_name: Visual Economy
-status: shipped
-last_updated: "2026-05-11T15:00:00Z"
+milestone: v0.5.0
+milestone_name: Verbosity Economy
+status: planning
+last_updated: "2026-05-11T17:29:44.411Z"
 last_activity: 2026-05-11
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 18
-  completed_plans: 18
-  percent: 100
-current_phase: none
-current_phase_status: milestone_archived
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -27,8 +25,10 @@ See: .planning/MILESTONES.md (history of shipped milestones)
 
 ## Current Position
 
-Phase: 13 (release v0.4.0) — blocked only on npm token rotation
-Last activity: 2026-05-11 — Phase 11 closed + rules smallest-visual-first extension shipped (commits eaeae91, db30f41)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-11 — Milestone v0.5.0 started
 
 ### Milestone v0.4.0 Status
 
