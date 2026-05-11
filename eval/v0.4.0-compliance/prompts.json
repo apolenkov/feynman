@@ -1,0 +1,77 @@
+[
+  {
+    "id": "seq-01",
+    "class": "sequence",
+    "prompt": "Опиши шаги CI/CD пайплайна для нашего проекта: коммит, билд, тест, стейджинг, прод."
+  },
+  {
+    "id": "seq-02",
+    "class": "sequence",
+    "prompt": "Расскажи как работает request authentication: запрос приходит, проверяется токен, проверяется scope, возвращается ответ."
+  },
+  {
+    "id": "hier-01",
+    "class": "hierarchy",
+    "prompt": "Покажи структуру стандартного Node.js монорепо с apps/web, apps/api, packages/shared, packages/types."
+  },
+  {
+    "id": "hier-02",
+    "class": "hierarchy",
+    "prompt": "Опиши организацию tests/: unit/, integration/, e2e/ — что лежит где."
+  },
+  {
+    "id": "cmp-01",
+    "class": "comparison",
+    "prompt": "Сравни PostgreSQL и MongoDB по трём критериям: схема, транзакции, типичный use case."
+  },
+  {
+    "id": "cmp-02",
+    "class": "comparison",
+    "prompt": "Сравни npm и pnpm и yarn по трём критериям: скорость install, дисковое пространство, монорепо-поддержка."
+  },
+  {
+    "id": "status-small",
+    "class": "status",
+    "prompt": "Дай статус по 4 задачам спринта: design, implementation, tests, docs — каждая в состоянии done/wip/pending."
+  },
+  {
+    "id": "status-large",
+    "class": "status",
+    "prompt": "Дай статус по 7 задачам релиза v1.0: schema migration, API endpoints, frontend integration, e2e tests, docs, deployment, monitoring — каждая в состоянии."
+  },
+  {
+    "id": "prio-01",
+    "class": "priority",
+    "prompt": "Приоритизируй 5 багов от высокого к низкому: data loss, auth bypass, slow query, typo in error msg, deprecated API warning."
+  },
+  {
+    "id": "branch-01",
+    "class": "branching",
+    "prompt": "Опиши decision tree обработки запроса: если auth OK — далее проверка прав; если прав хватает — выполнить; если нет — 403; если auth не OK — 401."
+  },
+  {
+    "id": "state-01",
+    "class": "state-machine",
+    "prompt": "Опиши state machine у PR: draft, in-review, approved, merged, rejected — какие переходы возможны?"
+  },
+  {
+    "id": "map-01",
+    "class": "mapping",
+    "prompt": "Покажи before/after для миграции с REST на GraphQL: 5 ключевых отличий."
+  },
+  {
+    "id": "single-01",
+    "class": "none",
+    "prompt": "Что означает термин «idempotent» в контексте HTTP?"
+  },
+  {
+    "id": "single-02",
+    "class": "none",
+    "prompt": "Как называется паттерн, когда функция возвращает другую функцию?"
+  },
+  {
+    "id": "rec-01",
+    "class": "none",
+    "prompt": "Какую СУБД ты бы посоветовал для small SaaS-стартапа?"
+  }
+]
