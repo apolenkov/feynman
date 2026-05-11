@@ -17,17 +17,17 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 | v0.1 — Core | Hook + rules + plugin manifest | — | (in v0.1 history) |
 | v0.2.0 — Production-Ready | Linter L01-L08, NPX, CI, docs | 2026-05-07 | milestones/v0.2.0-ROADMAP.md |
 | v0.3.0 — Prompt Architecture | XML rule contract, autofix engine, L09/L10, Stop-hook autofix | 2026-05-10 | milestones/v0.3.0-ROADMAP.md |
+| v0.4.0 — Visual Economy | L11/L12/L13/L14, output-style presets, IDE compat, compliance harness, smallest-visual-first ladder | 2026-05-11 | milestones/v0.4.0-ROADMAP.md |
 
-## Current Milestone: v0.4.0 Visual Economy
+## Current Milestone
 
-**Goal:** Сделать feynman не просто инжектить диаграммы, а активно предпочитать самый дешёвый визуал, который ещё несёт структуру; замерить compliance gain от v0.3.0 XML-контракта; добрать IDE-coverage.
+None — v0.4.0 shipped 2026-05-11. Next milestone TBD via `/gsd-new-milestone`.
 
-**Target features:**
-- Smallest-visual-first lint rules (L11/L12/L13) — overdecoration, token-budget audit, double-wrap detection
-- Output-style presets `short / middle / full` — runtime control via additionalContext suffix; не раздувает rules-файл
-- Compliance measurement — A/B harness на 50 промтах: v0.2.x rules vs v0.3.x rules, pass/fail через feynman-lint
-- IDE compat polish — `.clinerules/` (Cline/Windsurf) и `.cursor/rules/*.mdc` (Cursor) до полного покрытия
-- v0.4.0 release tag + GitHub release
+Candidate themes for v0.5.0 (from research + Phase 11 findings):
+- Domain packs (arch / db / devops as separate rule sets)
+- Verbosity reduction beyond ladder (Phase 11 showed +31% gap NOT closed by ladder — needs caption brevity / CoT suppression / response-length budget)
+- Marketplace submission (Claude Code + Codex stores)
+- Per-project intensity/style override
 
 ## Requirements
 
@@ -73,13 +73,22 @@ Every response that has structure — flow, hierarchy, comparison, status — ge
 - [x] Stop-hook autofix integration with `<feynman-autofix>` wrapper — v0.3.3
 - [x] Lint docs L01-L10 + README `--fix` mention — v0.3.3
 
-### Active (v0.4.0)
+### Validated (v0.4.0)
 
-- [ ] Smallest-visual-first lint rules: L11 (overdecoration), L12 (token-budget), L13 (double-wrap)
-- [ ] Output-style presets (`short / middle / full`) — runtime additionalContext suffix
-- [ ] Compliance measurement A/B harness — v0.2.x rules vs v0.3.x rules on 50-prompt corpus
-- [ ] IDE compat polish — `.clinerules/` (Cline/Windsurf) + `.cursor/rules/*.mdc` (Cursor) full coverage
-- [ ] v0.4.0 git tag + GitHub release + npm publish
+- [x] Smallest-visual-first lint rules: L11 (overdecoration), L12 (token-budget), L13 (double-wrap) — v0.4.0
+- [x] Autofix L11 to dot-leader (LINT-14) — two-opt dispatcher, Phase 8.5 contract preserved — v0.4.0
+- [x] --explain CLI flag emits per-frame cost breakdown — v0.4.0
+- [x] docs/lint-rules.md updated to L01-L13 + token-cost comparison rows — v0.4.0
+- [x] Output-style presets (`short / middle / full`) — runtime additionalContext suffix, zero rules-file bytes — v0.4.0
+- [x] /feynman style subcommand + status output — v0.4.0
+- [x] Compliance A/B harness via subagents (no API key needed) — v0.4.0
+- [x] Smallest-visual-first ladder shipped in rules (lite/full/ultra) — v0.4.0 (3-arm measurement: -3.5% vs predicted -15-25%, hypothesis refuted, ladder kept since no regression)
+- [x] IDE compat — cline / cursor / windsurf install + doctor — v0.4.0
+- [x] v0.4.0 git tag + GitHub release + npm publish — 2026-05-11
+
+### Active
+
+None — milestone closed.
 
 ### Future (v0.5.0+)
 
