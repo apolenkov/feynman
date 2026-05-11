@@ -60,7 +60,8 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
   2. `for f in eval/v0.5.0-compliance/rules-v05-*.md; do wc -c < "$f"; done` — every value ≤ 4480
   3. rules-v05-C.md contains prose excluding code-fenced and ASCII blocks from the word-count rule (verifiable via `grep -c 'code-fenced\|ASCII blocks' eval/v0.5.0-compliance/rules-v05-C.md` ≥ 1)
   4. Each candidate file (A, B, C) contains a positive-example formulation, not a pure prohibition (`for f in eval/v0.5.0-compliance/rules-v05-{A,B,C}.md; do grep -cE 'example|prefer|instead' "$f"; done` — each returns ≥ 1)
-**Plans**: TBD
+**Plans**: 1/1 complete
+**Status**: Done — A(4252B)/B(4249B)/C(4341B)/ABC(4480B) created
 
 ### Phase 17: Two-Wave Measurement
 **Goal**: All 7 arms measured on 50-prompt corpus; sanity gate passed; REPORT.md contains explicit winner statement or «refuted»
@@ -96,6 +97,6 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 | 9-13 | v0.4.0 | 18/18 | Complete | 2026-05-11 |
 | 14. Corpus + Harness | v0.5.0 | 1/1 | Complete | 2026-05-11 |
 | 15. Budget Compaction | v0.5.0 | 1/1 | Complete | 2026-05-11 |
-| 16. Candidate Rule Sets | v0.5.0 | 0/? | Not started | — |
+| 16. Candidate Rule Sets | v0.5.0 | 1/1 | Complete | 2026-05-11 |
 | 17. Two-Wave Measurement | v0.5.0 | 0/? | Not started | — |
 | 18. Apply Winner + Release | v0.5.0 | 0/? | Not started | — |
