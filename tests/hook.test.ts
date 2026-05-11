@@ -1,36 +1,42 @@
-// tests/hook.test.js — e2e tests for feynman hook scripts
+// tests/hook.test.ts — e2e tests for feynman hook scripts
 // Uses node:test + node:assert/strict. Spawns hook as child process.
 // Each test gets an isolated temp dir (HOME override) — no ~/.claude/ pollution.
-'use strict';
 
-const { describe, it, before, after } = require('node:test');
-const assert = require('node:assert/strict');
-const { spawnSync } = require('node:child_process');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+import { describe, it, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import type { SpawnSyncReturns } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
-const HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-activate.js');
-const SESSION_HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-session-start.js');
+const HOOK_PATH = path.resolve(import.meta.dirname, '..', 'hooks', 'feynman-activate.ts');
+const SESSION_HOOK_PATH = path.resolve(import.meta.dirname, '..', 'hooks', 'feynman-session-start.ts');
 
 /**
  * Create an isolated temp dir and return its path.
  * The dir is auto-cleaned after the test using the cleanup fn returned.
  */
-function makeTempHome() {
+function makeTempHome(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-hook-test-'));
   return dir;
 }
 
-function rmrf(dir) {
+function rmrf(dir: string): void {
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+}
+
+interface HookResult {
+  status: number;
+  stdout: string;
+  stderr: string;
 }
 
 /**
  * Run the hook with a given HOME and stdin JSON.
  * Returns { status, stdout, stderr }.
  */
-function runHook(tmpHome, stdinData) {
+function runHook(tmpHome: string, stdinData: unknown): HookResult {
   const result = spawnSync('node', [HOOK_PATH], {
     input: JSON.stringify(stdinData),
     encoding: 'utf8',
@@ -41,13 +47,13 @@ function runHook(tmpHome, stdinData) {
     timeout: 10000,
   });
   return {
-    status: result.status,
+    status: result.status ?? 0,
     stdout: result.stdout || '',
     stderr: result.stderr || '',
   };
 }
 
-function runHookWithFeynmanHome(tmpHome, feynmanHome, stdinData) {
+function runHookWithFeynmanHome(tmpHome: string, feynmanHome: string, stdinData: unknown): HookResult {
   const result = spawnSync('node', [HOOK_PATH], {
     input: JSON.stringify(stdinData),
     encoding: 'utf8',
@@ -59,13 +65,13 @@ function runHookWithFeynmanHome(tmpHome, feynmanHome, stdinData) {
     timeout: 10000,
   });
   return {
-    status: result.status,
+    status: result.status ?? 0,
     stdout: result.stdout || '',
     stderr: result.stderr || '',
   };
 }
 
-function runSessionHook(tmpHome, stdinData = { session_id: 'test-session' }) {
+function runSessionHook(tmpHome: string, stdinData: unknown = { session_id: 'test-session' }): HookResult {
   const result = spawnSync('node', [SESSION_HOOK_PATH], {
     input: JSON.stringify(stdinData),
     encoding: 'utf8',
@@ -76,7 +82,7 @@ function runSessionHook(tmpHome, stdinData = { session_id: 'test-session' }) {
     timeout: 10000,
   });
   return {
-    status: result.status,
+    status: result.status ?? 0,
     stdout: result.stdout || '',
     stderr: result.stderr || '',
   };
@@ -86,7 +92,7 @@ function runSessionHook(tmpHome, stdinData = { session_id: 'test-session' }) {
  * Parse additionalContext from hook stdout JSON.
  * Returns the additionalContext string or throws.
  */
-function parseAdditionalContext(stdout) {
+function parseAdditionalContext(stdout: string): string {
   const parsed = JSON.parse(stdout);
   assert.ok(
     parsed.hookSpecificOutput,
@@ -108,8 +114,8 @@ describe('feynman-activate hook', () => {
   // Path 1: First-run bootstrap
   // -------------------------------------------------------------------------
   describe('Path 1: first-run bootstrap', () => {
-    let tmpHome;
-    let result;
+    let tmpHome: string;
+    let result: HookResult;
 
     before(() => {
       tmpHome = makeTempHome();
@@ -147,9 +153,9 @@ describe('feynman-activate hook', () => {
   });
 
   describe('Codex target via FEYNMAN_HOME', () => {
-    let tmpHome;
-    let codexHome;
-    let result;
+    let tmpHome: string;
+    let codexHome: string;
+    let result: HookResult;
 
     before(() => {
       tmpHome = makeTempHome();
@@ -235,9 +241,9 @@ describe('feynman-activate hook', () => {
   // Path 2: Normal flow — enabled, intensity=full
   // -------------------------------------------------------------------------
   describe('Path 2: normal flow (enabled, intensity=full)', () => {
-    let tmpHome;
-    let result;
-    let stateAfter;
+    let tmpHome: string;
+    let result: HookResult;
+    let stateAfter: Record<string, unknown>;
 
     before(() => {
       tmpHome = makeTempHome();
@@ -281,8 +287,8 @@ describe('feynman-activate hook', () => {
   // Path 3: Disabled — .feynman-active absent, state.enabled=false
   // -------------------------------------------------------------------------
   describe('Path 3: disabled (flag absent, state.enabled=false)', () => {
-    let tmpHome;
-    let result;
+    let tmpHome: string;
+    let result: HookResult;
 
     before(() => {
       tmpHome = makeTempHome();
@@ -310,13 +316,13 @@ describe('feynman-activate hook', () => {
   // Path 4: Intensity switch — lite vs ultra produce different content
   // -------------------------------------------------------------------------
   describe('Path 4: intensity switch', () => {
-    let tmpHomeLite;
-    let tmpHomeUltra;
-    let resultLite;
-    let resultUltra;
+    let tmpHomeLite: string;
+    let tmpHomeUltra: string;
+    let resultLite: HookResult;
+    let resultUltra: HookResult;
 
     before(() => {
-      function makeHome(intensity) {
+      function makeHome(intensity: string): string {
         const dir = makeTempHome();
         const feynmanDir = path.join(dir, '.claude', '.feynman');
         fs.mkdirSync(feynmanDir, { recursive: true });
@@ -360,8 +366,7 @@ describe('feynman-activate hook', () => {
 
     it('lite section contains Lite in header', () => {
       const ctx = parseAdditionalContext(resultLite.stdout);
-      assert.ok(ctx.includes('Lite') || ctx.length < ctxUltraLen(), 'lite section should be lite variant');
-      function ctxUltraLen() { return parseAdditionalContext(resultUltra.stdout).length; }
+      assert.ok(ctx.includes('Lite') || ctx.length < parseAdditionalContext(resultUltra.stdout).length, 'lite section should be lite variant');
     });
   });
 
@@ -369,8 +374,8 @@ describe('feynman-activate hook', () => {
   // Path 5: Corrupt state recovery — malformed state.json
   // -------------------------------------------------------------------------
   describe('Path 5: corrupt state recovery', () => {
-    let tmpHome;
-    let result;
+    let tmpHome: string;
+    let result: HookResult;
 
     before(() => {
       tmpHome = makeTempHome();
@@ -403,8 +408,8 @@ describe('feynman-activate hook', () => {
   // Tests lines 72-74 (catch block when RULES_PATH unreadable)
   // -------------------------------------------------------------------------
   describe('Path 6: missing rules file (self-heal)', () => {
-    let tmpHome;
-    let result;
+    let tmpHome: string;
+    let result: SpawnSyncReturns<string>;
 
     before(() => {
       tmpHome = makeTempHome();
@@ -423,7 +428,7 @@ describe('feynman-activate hook', () => {
         /const RULES_PATH\s*=.*$/m,
         `const RULES_PATH = '/nonexistent/path/to/rules.md';`
       );
-      const patchedHookPath = path.join(tmpHome, 'feynman-activate-test.js');
+      const patchedHookPath = path.join(tmpHome, 'feynman-activate-test.ts');
       fs.writeFileSync(patchedHookPath, patchedSrc);
 
       result = spawnSync('node', [patchedHookPath], {
@@ -441,11 +446,11 @@ describe('feynman-activate hook', () => {
     });
 
     it('no stderr (silent fail)', () => {
-      assert.equal(result.stderr.trim(), '');
+      assert.equal((result.stderr || '').trim(), '');
     });
 
     it('no stdout (no injection)', () => {
-      assert.equal(result.stdout.trim(), '');
+      assert.equal((result.stdout || '').trim(), '');
     });
   });
 
@@ -454,31 +459,57 @@ describe('feynman-activate hook', () => {
   // Tests lines 97-100
   // -------------------------------------------------------------------------
   describe('Path 6b: outer catch (malformed JSON stdin)', () => {
-    let tmpHome;
-    let result;
+    let tmpHome: string;
+    let result: HookResult;
 
     before(() => {
       tmpHome = makeTempHome();
-      result = spawnSync('node', [HOOK_PATH], {
-        input: 'not json at all !!!',
-        encoding: 'utf8',
-        env: { ...process.env, HOME: tmpHome },
-        timeout: 10000,
-      });
+      result = {
+        ...spawnSync('node', [HOOK_PATH], {
+          input: 'not json at all !!!',
+          encoding: 'utf8',
+          env: { ...process.env, HOME: tmpHome },
+          timeout: 10000,
+        }),
+        status: spawnSync('node', [HOOK_PATH], {
+          input: 'not json at all !!!',
+          encoding: 'utf8',
+          env: { ...process.env, HOME: tmpHome },
+          timeout: 10000,
+        }).status ?? 0,
+      };
     });
 
     after(() => rmrf(tmpHome));
 
     it('exits 0 on malformed JSON stdin', () => {
-      assert.equal(result.status, 0);
+      const r = spawnSync('node', [HOOK_PATH], {
+        input: 'not json at all !!!',
+        encoding: 'utf8',
+        env: { ...process.env, HOME: tmpHome },
+        timeout: 10000,
+      });
+      assert.equal(r.status, 0);
     });
 
     it('no stderr (silent fail)', () => {
-      assert.equal(result.stderr.trim(), '');
+      const r = spawnSync('node', [HOOK_PATH], {
+        input: 'not json at all !!!',
+        encoding: 'utf8',
+        env: { ...process.env, HOME: tmpHome },
+        timeout: 10000,
+      });
+      assert.equal((r.stderr || '').trim(), '');
     });
 
     it('no stdout (no injection)', () => {
-      assert.equal(result.stdout.trim(), '');
+      const r = spawnSync('node', [HOOK_PATH], {
+        input: 'not json at all !!!',
+        encoding: 'utf8',
+        env: { ...process.env, HOME: tmpHome },
+        timeout: 10000,
+      });
+      assert.equal((r.stdout || '').trim(), '');
     });
   });
 
@@ -486,13 +517,13 @@ describe('feynman-activate hook', () => {
   // Path 7: State file write failure — still injects rules
   // -------------------------------------------------------------------------
   describe('Path 7: state write failure (read-only state dir)', () => {
-    let tmpHome;
-    let result;
+    let tmpHome: string;
+    let result: HookResult;
 
     before(function() {
       // Skip on environments where we can't test file permissions (e.g. root)
       if (process.getuid && process.getuid() === 0) {
-        this.skip('Cannot test read-only files as root');
+        (this as unknown as { skip: () => void }).skip();
         return;
       }
       tmpHome = makeTempHome();
@@ -539,9 +570,9 @@ describe('feynman-activate hook', () => {
   // format (red phase) and PASS once Task 2 rewrites the file to XML contract.
   // -------------------------------------------------------------------------
   describe('rules-file integrity (production rules)', () => {
-    const RULES_FILE = path.resolve(__dirname, '..', 'rules', 'feynman-activate.md');
-    let rulesContent;
-    let rulesBytes;
+    const RULES_FILE = path.resolve(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
+    let rulesContent: string;
+    let rulesBytes: number;
 
     before(() => {
       rulesContent = fs.readFileSync(RULES_FILE, 'utf8');
@@ -609,12 +640,12 @@ describe('feynman-activate hook', () => {
 
     it('hook extracts each intensity (lite/full/ultra) as non-empty and distinct content', () => {
       // Inline xmlMatchers — doubles as contract assertion against hook drift
-      const xmlMatchers = {
+      const xmlMatchers: Record<string, RegExp> = {
         lite:  /<intensity\s+name\s*=\s*["']lite["']\s*>([\s\S]*?)<\/intensity>/,
         full:  /<intensity\s+name\s*=\s*["']full["']\s*>([\s\S]*?)<\/intensity>/,
         ultra: /<intensity\s+name\s*=\s*["']ultra["']\s*>([\s\S]*?)<\/intensity>/,
       };
-      const extracted = {};
+      const extracted: Record<string, string> = {};
       for (const [name, re] of Object.entries(xmlMatchers)) {
         const m = re.exec(rulesContent);
         assert.ok(m, `hook regex could not extract <intensity name="${name}"> block`);
@@ -632,7 +663,7 @@ describe('feynman-activate hook', () => {
   // Extra: session_id path-traversal guard
   // -------------------------------------------------------------------------
   describe('Security: session_id path-traversal guard', () => {
-    let tmpHome;
+    let tmpHome: string;
 
     before(() => {
       tmpHome = makeTempHome();
@@ -664,7 +695,7 @@ describe('feynman-activate hook', () => {
      * Runs a patched copy of the hook with RULES_PATH pointing at a synthetic
      * rules file written by the test. Mirrors Path 6 helper pattern.
      */
-    function runHookWithRules(tmpHome, rulesContent, intensity) {
+    function runHookWithRules(tmpHome: string, rulesContent: string, intensity: string): SpawnSyncReturns<string> {
       const hookSrc = fs.readFileSync(HOOK_PATH, 'utf8');
       const rulesFilePath = path.join(tmpHome, 'synthetic-rules.md');
       fs.writeFileSync(rulesFilePath, rulesContent);
@@ -673,7 +704,7 @@ describe('feynman-activate hook', () => {
         /const RULES_PATH\s*=.*$/m,
         `const RULES_PATH = '${escapedPath}';`
       );
-      const patchedHookPath = path.join(tmpHome, 'feynman-activate-xml-test.js');
+      const patchedHookPath = path.join(tmpHome, 'feynman-activate-xml-test.ts');
       fs.writeFileSync(patchedHookPath, patchedSrc);
 
       return spawnSync('node', [patchedHookPath], {
@@ -684,7 +715,7 @@ describe('feynman-activate hook', () => {
       });
     }
 
-    function setupHome(intensity) {
+    function setupHome(intensity: string): string {
       const dir = makeTempHome();
       const feynmanDir = path.join(dir, '.claude', '.feynman');
       fs.mkdirSync(feynmanDir, { recursive: true });
@@ -713,7 +744,7 @@ describe('feynman-activate hook', () => {
         ].join('\n');
         const result = runHookWithRules(tmpHome, rules, 'lite');
         assert.equal(result.status, 0);
-        const ctx = parseAdditionalContext(result.stdout);
+        const ctx = parseAdditionalContext(result.stdout || '');
         assert.ok(ctx.includes('Lite rules content here.'), `expected lite content, got: ${ctx}`);
         assert.ok(!ctx.includes('Full rules'), 'should not include full content');
       } finally {
@@ -738,7 +769,7 @@ describe('feynman-activate hook', () => {
         ].join('\n');
         const result = runHookWithRules(tmpHome, rules, 'full');
         assert.equal(result.status, 0);
-        const ctx = parseAdditionalContext(result.stdout);
+        const ctx = parseAdditionalContext(result.stdout || '');
         assert.ok(ctx.includes('Full rules content here.'), `expected full content, got: ${ctx}`);
         assert.ok(!ctx.includes('Lite rules'), 'should not include lite content');
       } finally {
@@ -763,7 +794,7 @@ describe('feynman-activate hook', () => {
         ].join('\n');
         const result = runHookWithRules(tmpHome, rules, 'ultra');
         assert.equal(result.status, 0);
-        const ctx = parseAdditionalContext(result.stdout);
+        const ctx = parseAdditionalContext(result.stdout || '');
         assert.ok(ctx.includes('Ultra rules content here.'), `expected ultra content, got: ${ctx}`);
         assert.ok(!ctx.includes('Lite rules'), 'should not include lite content');
       } finally {
@@ -782,7 +813,7 @@ describe('feynman-activate hook', () => {
         ].join('\n');
         const result = runHookWithRules(tmpHome, rules, 'lite');
         assert.equal(result.status, 0);
-        const ctx = parseAdditionalContext(result.stdout);
+        const ctx = parseAdditionalContext(result.stdout || '');
         assert.ok(ctx.includes('Lite whitespace variant content.'), `expected whitespace-variant content, got: ${ctx}`);
       } finally {
         rmrf(tmpHome);
@@ -800,7 +831,7 @@ describe('feynman-activate hook', () => {
         ].join('\n');
         const result = runHookWithRules(tmpHome, rules, 'lite');
         assert.equal(result.status, 0);
-        const ctx = parseAdditionalContext(result.stdout);
+        const ctx = parseAdditionalContext(result.stdout || '');
         assert.ok(ctx.includes('Lite single-quote content.'), `expected single-quote content, got: ${ctx}`);
       } finally {
         rmrf(tmpHome);
@@ -823,7 +854,7 @@ describe('feynman-activate hook', () => {
         ].join('\n');
         const result = runHookWithRules(tmpHome, rules, 'full');
         assert.equal(result.status, 0);
-        const ctx = parseAdditionalContext(result.stdout);
+        const ctx = parseAdditionalContext(result.stdout || '');
         assert.ok(ctx.includes('Full target content.'), `expected full content, got: ${ctx}`);
         assert.ok(!ctx.includes('preamble'), 'preamble must not be injected');
         assert.ok(!ctx.includes('epilogue'), 'epilogue must not be injected');
@@ -854,11 +885,11 @@ describe('feynman-activate hook', () => {
 // ─── Phase 10: Output-style presets (short / middle / full) ──────────────────
 
 describe('hook output_style suffix injection (Phase 10)', () => {
-  function seedState(tmpHome, state) {
+  function seedState(tmpHome: string, state: Record<string, unknown>): void {
     const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
     fs.mkdirSync(feynmanDir, { recursive: true });
     fs.writeFileSync(path.join(feynmanDir, 'state.json'), JSON.stringify(state, null, 2));
-    fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), state.intensity || 'full');
+    fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), (state.intensity as string) || 'full');
   }
 
   it('output_style=full → no suffix added (default behaviour)', () => {

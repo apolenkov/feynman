@@ -1,28 +1,28 @@
-// tests/codex-app-server.test.js - Codex app-server contract test for hook output.
+// tests/codex-app-server.test.ts - Codex app-server contract test for hook output.
 // This test uses an isolated CODEX_HOME and stops as soon as the hook event is
 // observed, so it does not depend on a successful model request.
-'use strict';
 
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const { spawn, spawnSync } = require('node:child_process');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn, spawnSync } from 'node:child_process';
+import type { ChildProcessWithoutNullStreams } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
-const REPO_DIR = path.resolve(__dirname, '..');
-const FEYNMAN_JS = path.join(REPO_DIR, 'bin', 'feynman.js');
+const REPO_DIR = path.resolve(import.meta.dirname, '..');
+const FEYNMAN_JS = path.join(REPO_DIR, 'bin', 'feynman.ts');
 const TEST_MODEL = 'gpt-5.4-mini';
 
-function makeTempHome() {
+function makeTempHome(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-codex-app-'));
 }
 
-function rmrf(dir) {
+function rmrf(dir: string): void {
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
 }
 
-function codexAppServerAvailable() {
+function codexAppServerAvailable(): boolean {
   const result = spawnSync('codex', ['app-server', '--help'], {
     cwd: REPO_DIR,
     encoding: 'utf8',
@@ -31,7 +31,7 @@ function codexAppServerAvailable() {
   return result.status === 0;
 }
 
-function runFeynman(tmpHome, args) {
+function runFeynman(tmpHome: string, args: string[]): { status: number; stdout: string; stderr: string } {
   const result = spawnSync(process.execPath, [FEYNMAN_JS, ...args], {
     cwd: REPO_DIR,
     encoding: 'utf8',
@@ -48,7 +48,7 @@ function runFeynman(tmpHome, args) {
   };
 }
 
-function writeCodexConfig(codexHome) {
+function writeCodexConfig(codexHome: string): void {
   fs.writeFileSync(
     path.join(codexHome, 'config.toml'),
     [
@@ -64,8 +64,30 @@ function writeCodexConfig(codexHome) {
   );
 }
 
+interface PendingWaiter {
+  resolve: (value: unknown) => void;
+  reject: (err: Error) => void;
+}
+
+interface NotificationWaiter {
+  method: string;
+  predicate: (params: unknown) => boolean;
+  resolve: (value: unknown) => void;
+  reject: (err: Error) => void;
+  timeout: ReturnType<typeof setTimeout> | null;
+}
+
 class CodexAppServerClient {
-  constructor(tmpHome) {
+  tmpHome: string;
+  codexHome: string;
+  nextId: number;
+  buffer: string;
+  pendingResponses: Map<number, PendingWaiter>;
+  notificationWaiters: NotificationWaiter[];
+  stderr: string;
+  child!: ChildProcessWithoutNullStreams;
+
+  constructor(tmpHome: string) {
     this.tmpHome = tmpHome;
     this.codexHome = path.join(tmpHome, '.codex');
     this.nextId = 1;
@@ -75,7 +97,7 @@ class CodexAppServerClient {
     this.stderr = '';
   }
 
-  start() {
+  start(): void {
     this.child = spawn('codex', ['app-server', '--listen', 'stdio://'], {
       cwd: REPO_DIR,
       env: {
@@ -86,13 +108,13 @@ class CodexAppServerClient {
         OPENAI_API_KEY: 'feynman-test-key',
       },
       stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    }) as ChildProcessWithoutNullStreams;
 
-    this.child.stdout.on('data', (chunk) => this.onStdout(chunk));
-    this.child.stderr.on('data', (chunk) => {
+    this.child.stdout.on('data', (chunk: Buffer) => this.onStdout(chunk));
+    this.child.stderr.on('data', (chunk: Buffer) => {
       this.stderr += chunk.toString();
     });
-    this.child.on('exit', (code, signal) => {
+    this.child.on('exit', (code: number | null, signal: string | null) => {
       const error = new Error(`codex app-server exited: code=${code} signal=${signal}\n${this.stderr}`);
       for (const waiter of this.pendingResponses.values()) {
         waiter.reject(error);
@@ -105,16 +127,16 @@ class CodexAppServerClient {
     });
   }
 
-  onStdout(chunk) {
+  onStdout(chunk: Buffer): void {
     this.buffer += chunk.toString();
-    let newlineIndex;
+    let newlineIndex: number;
     while ((newlineIndex = this.buffer.indexOf('\n')) !== -1) {
       const line = this.buffer.slice(0, newlineIndex);
       this.buffer = this.buffer.slice(newlineIndex + 1);
       if (!line.trim()) continue;
-      const message = JSON.parse(line);
+      const message = JSON.parse(line) as { id?: number; error?: unknown; result?: unknown; method?: string; params?: unknown };
       if (message.id && this.pendingResponses.has(message.id)) {
-        const waiter = this.pendingResponses.get(message.id);
+        const waiter = this.pendingResponses.get(message.id)!;
         this.pendingResponses.delete(message.id);
         if (message.error) {
           waiter.reject(new Error(JSON.stringify(message.error)));
@@ -128,11 +150,11 @@ class CodexAppServerClient {
     }
   }
 
-  resolveNotificationWaiters(message) {
-    const remaining = [];
+  resolveNotificationWaiters(message: { method?: string; params?: unknown }): void {
+    const remaining: NotificationWaiter[] = [];
     for (const waiter of this.notificationWaiters) {
       if (waiter.method === message.method && waiter.predicate(message.params)) {
-        clearTimeout(waiter.timeout);
+        if (waiter.timeout) clearTimeout(waiter.timeout);
         waiter.resolve(message.params);
       } else {
         remaining.push(waiter);
@@ -141,7 +163,7 @@ class CodexAppServerClient {
     this.notificationWaiters = remaining;
   }
 
-  request(method, params) {
+  request(method: string, params: unknown): Promise<unknown> {
     const id = this.nextId++;
     const payload = { jsonrpc: '2.0', id, method, params };
     return new Promise((resolve, reject) => {
@@ -150,11 +172,11 @@ class CodexAppServerClient {
         reject(new Error(`timed out waiting for ${method}; stderr:\n${this.stderr}`));
       }, 5000);
       this.pendingResponses.set(id, {
-        resolve: (value) => {
+        resolve: (value: unknown) => {
           clearTimeout(timeout);
           resolve(value);
         },
-        reject: (error) => {
+        reject: (error: Error) => {
           clearTimeout(timeout);
           reject(error);
         },
@@ -163,9 +185,9 @@ class CodexAppServerClient {
     });
   }
 
-  waitForNotification(method, predicate, timeoutMs = 5000) {
+  waitForNotification(method: string, predicate: (params: unknown) => boolean, timeoutMs = 5000): Promise<unknown> {
     return new Promise((resolve, reject) => {
-      const waiter = {
+      const waiter: NotificationWaiter = {
         method,
         predicate,
         resolve,
@@ -180,25 +202,25 @@ class CodexAppServerClient {
     });
   }
 
-  async initialize() {
+  async initialize(): Promise<void> {
     await this.request('initialize', {
       clientInfo: { name: 'feynman-test', version: '0.0.0' },
       capabilities: { experimentalApi: true },
     });
   }
 
-  close() {
+  close(): void {
     if (!this.child || this.child.killed) return;
     this.child.kill('SIGTERM');
   }
 }
 
-async function trustCodexHooks(client) {
-  const initial = await client.request('hooks/list', { cwd: REPO_DIR });
+async function trustCodexHooks(client: CodexAppServerClient): Promise<{ command: string; trustStatus: string; eventName: string }> {
+  const initial = await client.request('hooks/list', { cwd: REPO_DIR }) as { data: { hooks: { key: string; currentHash: string }[] }[] };
   const hooks = initial.data.flatMap((entry) => entry.hooks);
   assert.ok(hooks.length >= 2, 'expected Feynman SessionStart and UserPromptSubmit hooks');
 
-  const trustState = {};
+  const trustState: Record<string, { trusted_hash: string }> = {};
   for (const hook of hooks) {
     trustState[hook.key] = { trusted_hash: hook.currentHash };
   }
@@ -212,7 +234,7 @@ async function trustCodexHooks(client) {
     reloadUserConfig: true,
   });
 
-  const verified = await client.request('hooks/list', { cwd: REPO_DIR });
+  const verified = await client.request('hooks/list', { cwd: REPO_DIR }) as { data: { hooks: { command: string; trustStatus: string; eventName: string }[] }[] };
   const trustedHooks = verified.data.flatMap((entry) => entry.hooks);
   const promptHook = trustedHooks.find((hook) => hook.eventName === 'userPromptSubmit');
   assert.ok(promptHook, 'UserPromptSubmit hook should be listed');
@@ -236,7 +258,7 @@ describe('Codex app-server hook visibility contract', () => {
         client.start();
         await client.initialize();
         const promptHook = await trustCodexHooks(client);
-        assert.match(promptHook.command, /feynman-activate\.js/);
+        assert.match(promptHook.command, /feynman-activate\.ts/);
 
         const thread = await client.request('thread/start', {
           cwd: REPO_DIR,
@@ -244,11 +266,11 @@ describe('Codex app-server hook visibility contract', () => {
           model: TEST_MODEL,
           approvalPolicy: 'never',
           sandbox: 'danger-full-access',
-        });
+        }) as { thread: { id: string } };
 
         const hookCompleted = client.waitForNotification(
           'hook/completed',
-          (params) => params.run?.eventName === 'userPromptSubmit'
+          (params) => (params as { run?: { eventName: string } }).run?.eventName === 'userPromptSubmit'
         );
 
         await client.request('turn/start', {
@@ -258,7 +280,13 @@ describe('Codex app-server hook visibility contract', () => {
           approvalPolicy: 'never',
         });
 
-        const completed = await hookCompleted;
+        const completed = await hookCompleted as {
+          run: {
+            status: string;
+            handlerType: string;
+            entries: { kind: string; text: string }[];
+          }
+        };
         assert.equal(completed.run.status, 'completed');
         assert.equal(completed.run.handlerType, 'command');
         assert.ok(

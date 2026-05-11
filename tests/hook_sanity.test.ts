@@ -1,12 +1,11 @@
-// tests/test_hook_sanity.js — unit tests for assertTagPairs (WR-01/02/03)
-// Uses node:test + node:assert/strict. Requires assertTagPairs directly from
+// tests/hook_sanity.test.ts — unit tests for assertTagPairs (WR-01/02/03)
+// Uses node:test + node:assert/strict. Imports assertTagPairs directly from
 // the hook module — no child-process spawn needed for pure-function tests.
-'use strict';
 
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
-const { assertTagPairs } = require('../hooks/feynman-activate.js');
+import { assertTagPairs } from '../hooks/feynman-activate.ts';
 
 describe('assertTagPairs', () => {
 

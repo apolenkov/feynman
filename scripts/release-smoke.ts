@@ -1,17 +1,24 @@
 #!/usr/bin/env node
-// scripts/release-smoke.js — verify the packed npm artifact installs and runs.
-'use strict';
+// scripts/release-smoke.ts — verify the packed npm artifact installs and runs.
 
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 
-const ROOT = path.resolve(__dirname, '..');
-const pkg = require(path.join(ROOT, 'package.json'));
-const NPM_CACHE = process.env.FEYNMAN_NPM_CACHE || path.join(os.tmpdir(), 'npm-cache-feynman');
+const require = createRequire(import.meta.url);
 
-function run(cmd, args, opts = {}) {
+const ROOT = path.resolve(import.meta.dirname, '..');
+const pkg = require(path.join(ROOT, 'package.json')) as { version: string; name: string };
+const NPM_CACHE: string = process.env.FEYNMAN_NPM_CACHE || path.join(os.tmpdir(), 'npm-cache-feynman');
+
+interface RunOpts {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+}
+
+function run(cmd: string, args: string[], opts: RunOpts = {}): string {
   const result = spawnSync(cmd, args, {
     cwd: opts.cwd || ROOT,
     encoding: 'utf8',
@@ -31,26 +38,27 @@ function run(cmd, args, opts = {}) {
   return result.stdout || '';
 }
 
-function binPath(projectDir, name) {
+function binPath(projectDir: string, name: string): string {
   const suffix = process.platform === 'win32' ? '.cmd' : '';
   return path.join(projectDir, 'node_modules', '.bin', `${name}${suffix}`);
 }
 
-function readJson(filePath) {
+function readJson(filePath: string): Record<string, unknown> {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
-function runtimeConfigPath(homeDir, target) {
+function runtimeConfigPath(homeDir: string, target: string): string {
   return path.join(homeDir, target === 'codex' ? '.codex/hooks.json' : '.claude/settings.json');
 }
 
-function runtimeHome(homeDir, target) {
+function runtimeHome(homeDir: string, target: string): string {
   return path.join(homeDir, target === 'codex' ? '.codex' : '.claude');
 }
 
-function findHookCommand(config, eventName, scriptName) {
-  const groups = (config.hooks && config.hooks[eventName]) || [];
-  for (const group of groups) {
+function findHookCommand(config: Record<string, unknown>, eventName: string, scriptName: string): string {
+  const hooks = config.hooks as Record<string, unknown[]> | undefined;
+  const groups = (hooks && hooks[eventName]) || [];
+  for (const group of groups as Array<{ hooks?: Array<{ command?: string }> }>) {
     for (const hook of group.hooks || []) {
       if (hook.command && hook.command.includes(scriptName)) {
         return hook.command;
@@ -60,7 +68,13 @@ function findHookCommand(config, eventName, scriptName) {
   throw new Error(`${scriptName} command missing in ${eventName}`);
 }
 
-function runHookCommand(command, homeDir, stdin) {
+interface HookStdin {
+  hook_event_name?: string;
+  session_id: string;
+  prompt?: string;
+}
+
+function runHookCommand(command: string, homeDir: string, stdin: HookStdin): string {
   const result = spawnSync(command, [], {
     cwd: ROOT,
     shell: true,
@@ -81,7 +95,7 @@ function runHookCommand(command, homeDir, stdin) {
   return result.stdout || '';
 }
 
-function verifyInstalledHooks(homeDir, target) {
+function verifyInstalledHooks(homeDir: string, target: string): void {
   const cfg = readJson(runtimeConfigPath(homeDir, target));
   const sessionCommand = findHookCommand(cfg, 'SessionStart', 'feynman-session-start.js');
   const promptCommand = findHookCommand(cfg, 'UserPromptSubmit', 'feynman-activate.js');
@@ -106,7 +120,9 @@ function verifyInstalledHooks(homeDir, target) {
   if (promptOut.endsWith('\n')) {
     throw new Error(`${target} UserPromptSubmit emitted trailing newline`);
   }
-  const parsed = JSON.parse(promptOut);
+  const parsed = JSON.parse(promptOut) as {
+    hookSpecificOutput?: { hookEventName?: string; additionalContext?: string };
+  };
   const ctx = parsed.hookSpecificOutput && parsed.hookSpecificOutput.additionalContext;
   if (parsed.hookSpecificOutput?.hookEventName !== 'UserPromptSubmit' ||
       typeof ctx !== 'string' ||
@@ -124,7 +140,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-release-smoke-'));
 
 try {
   const packOut = run('npm', ['pack', '--pack-destination', tmp, '--json']);
-  const packed = JSON.parse(packOut)[0];
+  const packed = JSON.parse(packOut)[0] as { filename: string };
   const tarball = path.join(tmp, packed.filename);
   if (!fs.existsSync(tarball)) {
     throw new Error(`tarball missing after npm pack: ${tarball}`);
@@ -156,14 +172,14 @@ try {
   verifyInstalledHooks(homeDir, 'codex');
 
   const lintOut = run(lint, ['--json', path.join(ROOT, 'tests', 'fixtures', 'valid-flow.md')]);
-  const parsed = JSON.parse(lintOut);
+  const parsed = JSON.parse(lintOut) as { issues: unknown[] };
   if (!Array.isArray(parsed.issues) || parsed.issues.length !== 0) {
     throw new Error('feynman-lint smoke expected zero issues');
   }
 
   console.log(`release smoke OK (${packed.filename})`);
 } catch (error) {
-  process.stderr.write(`${error.message}\n`);
+  process.stderr.write(`${(error as Error).message}\n`);
   process.exit(1);
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });

@@ -1,28 +1,34 @@
 #!/usr/bin/env node
 // feynman — SessionStart hook — injects active diagram rules at session start.
 // UserPromptSubmit still reinforces rules every turn; this primes fresh sessions.
-'use strict';
 
-const fs   = require('fs');
-const path = require('path');
-const os   = require('os');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
+interface FeynmanState {
+  enabled: boolean;
+  intensity: string;
+  output_style?: string;
+  injections: number;
+}
 
 const HOME        = os.homedir();
 const CLIENT_HOME = process.env.FEYNMAN_HOME || path.join(HOME, '.claude');
 const FEYNMAN_DIR = path.join(CLIENT_HOME, '.feynman');
 const STATE_PATH  = path.join(FEYNMAN_DIR, 'state.json');
 const FLAG_PATH   = path.join(CLIENT_HOME, '.feynman-active');
-const RULES_PATH  = path.join(__dirname, '..', 'rules', 'feynman-activate.md');
+const RULES_PATH  = path.join(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
 
-const DEFAULT_STATE = { enabled: true, intensity: 'full', injections: 0 };
+const DEFAULT_STATE: FeynmanState = { enabled: true, intensity: 'full', injections: 0 };
 const VALID_INTENSITIES = ['lite', 'full', 'ultra'];
 
-function writeState(state) {
+function writeState(state: FeynmanState): void {
   fs.mkdirSync(FEYNMAN_DIR, { recursive: true });
   fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
 }
 
-function readRules(intensity) {
+function readRules(intensity: string): string {
   const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
   const selected = VALID_INTENSITIES.includes(intensity) ? intensity : 'full';
 
@@ -32,7 +38,7 @@ function readRules(intensity) {
   if (opens === 0 || opens !== closes) return '';
 
   // XML matcher map: tolerate trailing attributes (WR-01) and case (WR-03)
-  const xmlMatchers = {
+  const xmlMatchers: Record<string, RegExp> = {
     lite:  /<intensity\s+name\s*=\s*["']lite["'][^>]*>([\s\S]*?)<\/intensity>/i,
     full:  /<intensity\s+name\s*=\s*["']full["'][^>]*>([\s\S]*?)<\/intensity>/i,
     ultra: /<intensity\s+name\s*=\s*["']ultra["'][^>]*>([\s\S]*?)<\/intensity>/i,
@@ -50,18 +56,18 @@ function readRules(intensity) {
 }
 
 let input = '';
-process.stdin.on('data', chunk => { input += chunk; });
+process.stdin.on('data', (chunk: Buffer | string) => { input += chunk; });
 process.stdin.on('end', () => {
   try {
     if (input.trim()) {
       const data = JSON.parse(input);
-      const sessionId = data.session_id || '';
+      const sessionId: string = data.session_id || '';
       if (sessionId && /[/\\]|\.\./.test(sessionId)) process.exit(0);
     }
 
     const stateExists = fs.existsSync(STATE_PATH);
     const flagExists = fs.existsSync(FLAG_PATH);
-    let state = { ...DEFAULT_STATE };
+    let state: FeynmanState = { ...DEFAULT_STATE };
 
     if (stateExists) {
       try {

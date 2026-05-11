@@ -1,15 +1,24 @@
-// tests/lint.test.js — rule-level tests for lib/lint
+// tests/lint.test.ts — rule-level tests for lib/lint
 // Tests golden cases from lint-cases.json + direct rule unit tests.
 // Uses node:test + node:assert/strict. Zero deps.
-'use strict';
 
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const path = require('node:path');
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { createRequire } from 'node:module';
 
-const { lint } = require(path.resolve(__dirname, '..', 'lib', 'lint'));
-const { parse } = require(path.resolve(__dirname, '..', 'lib', 'lint', 'parser'));
-const cases = require(path.resolve(__dirname, 'lint-cases.json'));
+import { lint, format } from '../lib/lint/index.ts';
+import { parse } from '../lib/lint/parser.ts';
+import { estimateFrameCost } from '../lib/lint/rules.ts';
+
+const require = createRequire(import.meta.url);
+const cases = require(path.resolve(import.meta.dirname, 'lint-cases.json')) as Array<{
+  name: string;
+  input: string;
+  expected: string;
+  rule: string;
+  expected_issues?: Array<{ rule?: string; line?: number }>;
+}>;
 
 // ---------------------------------------------------------------------------
 // Golden cases from lint-cases.json
@@ -427,8 +436,6 @@ describe('L11 overdecoration — unit tests', () => {
 // L12 token-budget — unit tests
 // ---------------------------------------------------------------------------
 describe('L12 token-budget — unit tests', () => {
-  const { estimateFrameCost } = require(path.resolve(__dirname, '..', 'lib', 'lint', 'rules'));
-
   it('estimateFrameCost returns required cost shape', () => {
     const cost = estimateFrameCost({
       top: '┌──────────┐',
@@ -557,9 +564,9 @@ describe('lint() API contract', () => {
   });
 
   it('non-string input returns passed=true with no issues', () => {
-    const r1 = lint(null);
-    const r2 = lint(undefined);
-    const r3 = lint(42);
+    const r1 = lint(null as unknown as string);
+    const r2 = lint(undefined as unknown as string);
+    const r3 = lint(42 as unknown as string);
     for (const r of [r1, r2, r3]) {
       assert.equal(r.passed, true);
       assert.equal(r.issues.length, 0);
@@ -586,17 +593,15 @@ describe('lint() API contract', () => {
 // format() function tests
 // ---------------------------------------------------------------------------
 describe('format() output modes', () => {
-  const { format } = require(path.resolve(__dirname, '..', 'lib', 'lint'));
-
   it('gcc mode produces file:line format', () => {
-    const issues = [{ rule: 'L01', severity: 'error', line: 5, column: 1, message: 'test error' }];
+    const issues = [{ rule: 'L01', severity: 'error' as const, line: 5, column: 1, message: 'test error' }];
     const out = format(issues, 'gcc', 'test.md', false);
     assert.ok(out.includes('test.md:5:1'), `expected 'test.md:5:1' in: ${out}`);
     assert.ok(out.includes('L01'));
   });
 
   it('json mode produces JSON array string', () => {
-    const issues = [{ rule: 'L02', severity: 'warn', line: 3, column: 2, message: 'warn test' }];
+    const issues = [{ rule: 'L02', severity: 'warn' as const, line: 3, column: 2, message: 'warn test' }];
     const out = format(issues, 'json', 'file.md', false);
     const parsed = JSON.parse(out);
     assert.ok(Array.isArray(parsed));

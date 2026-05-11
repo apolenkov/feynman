@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# feynman install — thin wrapper around bin/feynman.js
+# feynman install — thin wrapper around bin/feynman.ts
 # Usage: bash install.sh [--force]
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,4 +15,4 @@ if [ -z "$NODE_VER" ] || [ "$NODE_VER" -lt 18 ] 2>/dev/null; then
   exit 1
 fi
 
-exec node "$SCRIPT_DIR/bin/feynman.js" install "$@"
+exec node "$SCRIPT_DIR/bin/feynman.ts" install "$@"

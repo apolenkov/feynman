@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-// scripts/build-package.js — create the npm tarball artifact in dist/.
-'use strict';
+// scripts/build-package.ts — create the npm tarball artifact in dist/.
 
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 
-const ROOT = path.resolve(__dirname, '..');
+const require = createRequire(import.meta.url);
+
+const ROOT = path.resolve(import.meta.dirname, '..');
 const DIST = path.join(ROOT, 'dist');
-const NPM_CACHE = process.env.FEYNMAN_NPM_CACHE || path.join(os.tmpdir(), 'npm-cache-feynman');
+const NPM_CACHE: string = process.env.FEYNMAN_NPM_CACHE || path.join(os.tmpdir(), 'npm-cache-feynman');
 
 fs.rmSync(DIST, { recursive: true, force: true });
 fs.mkdirSync(DIST, { recursive: true });
@@ -26,15 +28,15 @@ if (result.status !== 0) {
   process.exit(result.status || 1);
 }
 
-let packed;
+let packed: { filename: string; size: number; entryCount: number };
 try {
   packed = JSON.parse(result.stdout)[0];
 } catch (error) {
-  process.stderr.write(`failed to parse npm pack output: ${error.message}\n${result.stdout}\n`);
+  process.stderr.write(`failed to parse npm pack output: ${(error as Error).message}\n${result.stdout}\n`);
   process.exit(1);
 }
 
-const tarball = path.join(DIST, packed.filename);
+const tarball: string = path.join(DIST, packed.filename);
 if (!fs.existsSync(tarball)) {
   process.stderr.write(`expected tarball missing: ${tarball}\n`);
   process.exit(1);

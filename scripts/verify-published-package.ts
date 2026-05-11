@@ -1,19 +1,27 @@
 #!/usr/bin/env node
-// scripts/verify-published-package.js — verify a released package from npm registry.
-'use strict';
+// scripts/verify-published-package.ts — verify a released package from npm registry.
 
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-const ROOT = path.resolve(__dirname, '..');
-const pkg = require(path.join(ROOT, 'package.json'));
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 
-const packageName = process.env.PACKAGE_NAME || pkg.name;
-const packageVersion = process.env.PACKAGE_VERSION || pkg.version;
-let workDir;
+const require = createRequire(import.meta.url);
 
-function run(cmd, args, opts = {}) {
+const ROOT = path.resolve(import.meta.dirname, '..');
+const pkg = require(path.join(ROOT, 'package.json')) as { version: string; name: string };
+
+const packageName: string = process.env.PACKAGE_NAME || pkg.name;
+const packageVersion: string = process.env.PACKAGE_VERSION || pkg.version;
+let workDir: string | undefined;
+
+interface RunOpts {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+}
+
+function run(cmd: string, args: string[], opts: RunOpts = {}): string {
   const result = spawnSync(cmd, args, {
     cwd: opts.cwd || ROOT,
     encoding: 'utf8',
@@ -33,7 +41,7 @@ function run(cmd, args, opts = {}) {
   return result.stdout || '';
 }
 
-function npmViewVersion(fullName) {
+function npmViewVersion(fullName: string): string {
   const out = run('npm', ['view', fullName, 'version']);
   const version = (out || '').trim();
   if (!version) {
@@ -66,7 +74,7 @@ try {
     '--ignore-scripts',
   ]);
 
-  const bin = path.join(projectDir, 'node_modules', '.bin', process.platform === 'win32' ? 'feynman.cmd' : 'feynman');
+  const bin: string = path.join(projectDir, 'node_modules', '.bin', process.platform === 'win32' ? 'feynman.cmd' : 'feynman');
   if (!fs.existsSync(bin)) {
     throw new Error(`feynman binary not found after install: ${bin}`);
   }
@@ -84,7 +92,7 @@ try {
 
   console.log(`release verification OK: ${fullName}`);
 } catch (error) {
-  process.stderr.write(`${error.message}\n`);
+  process.stderr.write(`${(error as Error).message}\n`);
   process.exit(1);
 } finally {
   if (workDir) {

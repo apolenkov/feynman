@@ -1,39 +1,79 @@
 #!/usr/bin/env node
-// bin/feynman.js — feynman unified CLI
+// bin/feynman.ts — feynman unified CLI
 // Subcommands: install, uninstall, doctor, lint, examples, bootstrap, version, help
-// Zero runtime deps. CJS only. Node >= 18.
-'use strict';
+// Zero runtime deps. ESM TypeScript. Node >= 22.6.
 
-const fs   = require('fs');
-const path = require('path');
-const os   = require('os');
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const PKG = require('../package.json') as { version: string; name: string };
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Color { (s: string): string; }
+interface ColorMap { bold: Color; green: Color; red: Color; dim: Color; }
+
+interface TargetConfig {
+  name: string;
+  label: string;
+  rootDir: string;
+  settingsPath: string;
+  feynmanDir: string;
+  statePath: string;
+  flagPath: string;
+  commandsDir: string | null;
+}
+
+interface IdeTargetConfig {
+  name: string;
+  label: string;
+  rootDir: string;
+  dir: string;
+  rulesPath: string;
+  frontmatter: Record<string, string | boolean> | null;
+}
+
+interface FeynmanState {
+  enabled: boolean;
+  intensity: string;
+  injections: number;
+  malformed_rules?: boolean;
+}
+
+interface InstallResult { target: string; already: boolean; tc?: TargetConfig; }
+interface UninstallResult { target: string; missing: boolean; hadHook?: boolean; }
+interface IdeInstallResult { target: string; already: boolean; rulesPath: string; }
+interface DoctorResult { target: string; ok: boolean; reason?: string; rulesPath?: string; bytes?: number; }
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 
-const NO_COLOR = !!process.env.NO_COLOR;
-const c = {
-  bold:  s => NO_COLOR ? s : `\x1b[1m${s}\x1b[0m`,
-  green: s => NO_COLOR ? s : `\x1b[32m${s}\x1b[0m`,
-  red:   s => NO_COLOR ? s : `\x1b[31m${s}\x1b[0m`,
-  dim:   s => NO_COLOR ? s : `\x1b[2m${s}\x1b[0m`,
+const NO_COLOR = !!process.env['NO_COLOR'];
+const c: ColorMap = {
+  bold:  (s: string) => NO_COLOR ? s : `\x1b[1m${s}\x1b[0m`,
+  green: (s: string) => NO_COLOR ? s : `\x1b[32m${s}\x1b[0m`,
+  red:   (s: string) => NO_COLOR ? s : `\x1b[31m${s}\x1b[0m`,
+  dim:   (s: string) => NO_COLOR ? s : `\x1b[2m${s}\x1b[0m`,
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PKG       = require('../package.json');
 const VERSION   = PKG.version;
-const ROOT_DIR = path.resolve(__dirname, '..');
+const ROOT_DIR  = path.resolve(import.meta.dirname, '..');
 
 // Resolve paths using os.homedir() — never tilde literal (bug #8810)
 const HOME = os.homedir();
 
 // Hook script lives relative to this file
-const HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-activate.js');
-const SESSION_HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-session-start.js');
-const RULES_PATH = path.resolve(__dirname, '..', 'rules', 'feynman-activate.md');
+const HOOK_PATH         = path.resolve(import.meta.dirname, '..', 'hooks', 'feynman-activate.ts');
+const SESSION_HOOK_PATH = path.resolve(import.meta.dirname, '..', 'hooks', 'feynman-session-start.ts');
+const RULES_PATH        = path.resolve(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
 
-const DEFAULT_STATE = { enabled: true, intensity: 'full', injections: 0 };
-const TARGET_ALIASES = {
+const DEFAULT_STATE: FeynmanState = { enabled: true, intensity: 'full', injections: 0 };
+const TARGET_ALIASES: Record<string, string> = {
   all: 'both',
   '*': 'both',
 };
@@ -42,14 +82,14 @@ const VALID_TARGETS = ['claude', 'codex', 'both', 'all', '*', 'cline', 'cursor',
 // IDE targets are project-local (write to CWD), unlike claude/codex which are
 // user-global (write to HOME). They install a rules file, not a hook.
 const IDE_TARGETS = ['cline', 'cursor', 'windsurf'];
-function isIdeTarget(name) { return IDE_TARGETS.includes(name); }
+function isIdeTarget(name: string): boolean { return IDE_TARGETS.includes(name); }
 
 // Per-IDE rules-file location, filename, and frontmatter requirement.
 // `frontmatter` keys map onto the YAML emitted at the top of the rules file
 // (Cursor's `.mdc` format requires alwaysApply + globs).
-function ideTargetConfig(name) {
+function ideTargetConfig(name: string): IdeTargetConfig | null {
   const cwd = process.cwd();
-  const configs = {
+  const configs: Record<string, { label: string; dir: string; file: string; frontmatter: Record<string, string | boolean> | null }> = {
     cline: {
       label: 'Cline / Windsurf-Cline',
       dir: '.clinerules',
@@ -81,7 +121,7 @@ function ideTargetConfig(name) {
   };
 }
 
-function targetConfig(name) {
+function targetConfig(name: string): TargetConfig {
   const dirName = name === 'codex' ? '.codex' : '.claude';
   const rootDir = path.join(HOME, dirName);
   return {
@@ -96,17 +136,17 @@ function targetConfig(name) {
   };
 }
 
-function targetNames(target) {
+function targetNames(target: string): string[] {
   return target === 'both' ? ['claude', 'codex'] : [target];
 }
 
-function parseTarget(args, fallback = 'codex') {
+function parseTarget(args: string[], fallback = 'codex'): { target: string; args: string[] } {
   let target = fallback;
-  const keep = [];
+  const keep: string[] = [];
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+    const arg = args[i] ?? '';
     if (arg === '--target') {
-      target = args[++i];
+      target = args[++i] ?? target;
     } else if (arg.startsWith('--target=')) {
       target = arg.slice('--target='.length);
     } else {
@@ -117,7 +157,7 @@ function parseTarget(args, fallback = 'codex') {
     console.error(`feynman: invalid --target '${target}' (expected claude, codex, both, all, *, cline, cursor, or windsurf)`);
     process.exit(2);
   }
-  target = TARGET_ALIASES[target] || target;
+  target = TARGET_ALIASES[target] ?? target;
   return { target, args: keep };
 }
 
@@ -126,7 +166,7 @@ function parseTarget(args, fallback = 'codex') {
 // Render YAML frontmatter (Cursor .mdc format) from an object. Keys emitted in
 // stable order. Values are emitted unquoted for booleans/numbers, quoted for
 // strings (single-quoted; no nested quotes expected).
-function renderFrontmatter(obj) {
+function renderFrontmatter(obj: Record<string, string | boolean> | null): string {
   if (!obj) return '';
   const order = ['description', 'alwaysApply', 'globs'];
   const lines = ['---'];
@@ -144,12 +184,12 @@ function renderFrontmatter(obj) {
 // runtime hook reads, but always emits the `full` intensity (IDEs are
 // developer tools, default to richest variant). The full intensity content
 // is extracted from rules/feynman-activate.md by the same XML matcher used
-// in hooks/feynman-activate.js.
-function readFullIntensityRules() {
+// in hooks/feynman-activate.ts.
+function readFullIntensityRules(): string {
   const rulesPath = path.resolve(ROOT_DIR, 'rules', 'feynman-activate.md');
   const content = fs.readFileSync(rulesPath, 'utf8');
   const xml = /<intensity\s+name\s*=\s*["']full["'][^>]*>([\s\S]*?)<\/intensity>/i.exec(content);
-  if (xml) return xml[1].trim();
+  if (xml) return (xml[1] ?? '').trim();
   // Legacy fallback (matches hook).
   const open = '<!-- full -->';
   const close = '<!-- /full -->';
@@ -159,7 +199,7 @@ function readFullIntensityRules() {
   return content.slice(i1 + open.length, i2).trim();
 }
 
-function installIde(target) {
+function installIde(target: string): IdeInstallResult {
   const cfg = ideTargetConfig(target);
   if (!cfg) throw new Error(`unknown IDE target: ${target}`);
   ensureDir(cfg.dir);
@@ -171,7 +211,7 @@ function installIde(target) {
   return { target, already, rulesPath: cfg.rulesPath };
 }
 
-function doctorIde(target) {
+function doctorIde(target: string): DoctorResult {
   const cfg = ideTargetConfig(target);
   if (!cfg) return { target, ok: false, reason: 'unknown target' };
   if (!fs.existsSync(cfg.rulesPath)) {
@@ -189,7 +229,7 @@ function doctorIde(target) {
   return { target, ok: true, rulesPath: cfg.rulesPath, bytes: content.length };
 }
 
-function hookCommandFor(target) {
+function hookCommandFor(target: string): string {
   const cfg = targetConfig(target);
   return `FEYNMAN_HOME="${cfg.rootDir}" node "${HOOK_PATH}"`;
 }
@@ -252,15 +292,15 @@ Example filenames:
   - feature-planning
 `;
 
-const EXAMPLES_DIR = path.resolve(__dirname, '..', 'examples');
-const SKILL_SRC = path.resolve(ROOT_DIR, 'skills', 'feynman', 'SKILL.md');
-const CLAUDE_PLUGIN = path.resolve(ROOT_DIR, '.claude-plugin', 'plugin.json');
-const CODEX_PLUGIN = path.resolve(ROOT_DIR, '.codex-plugin', 'plugin.json');
-const PACKAGE_HOOKS = path.resolve(ROOT_DIR, 'hooks', 'hooks.json');
+const EXAMPLES_DIR = path.resolve(import.meta.dirname, '..', 'examples');
+const SKILL_SRC    = path.resolve(ROOT_DIR, 'skills', 'feynman', 'SKILL.md');
+const CLAUDE_PLUGIN  = path.resolve(ROOT_DIR, '.claude-plugin', 'plugin.json');
+const CODEX_PLUGIN   = path.resolve(ROOT_DIR, '.codex-plugin', 'plugin.json');
+const PACKAGE_HOOKS  = path.resolve(ROOT_DIR, 'hooks', 'hooks.json');
 const DEFAULT_BOOTSTRAP_DIR = 'feynman-package';
-const ACTIVATOR_JS = path.resolve(ROOT_DIR, 'hooks', 'feynman-activate.js');
-const CLI_JS = path.resolve(ROOT_DIR, 'bin', 'feynman.js');
-const PACKAGE_JSON = path.resolve(ROOT_DIR, 'package.json');
+const ACTIVATOR_JS   = path.resolve(ROOT_DIR, 'hooks', 'feynman-activate.ts');  // name kept for backward compat
+const CLI_JS         = path.resolve(ROOT_DIR, 'bin', 'feynman.ts');
+const PACKAGE_JSON   = path.resolve(ROOT_DIR, 'package.json');
 
 const BOOTSTRAP_HELP = `${c.bold('feynman bootstrap')} — export Feynman assets into local folder
 
@@ -274,23 +314,23 @@ ${c.bold('Options:')}
   --help   Show this help
 `;
 
-function ensureDir(dir) {
+function ensureDir(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });
 }
 
-function copyFileIfExists(src, dest) {
+function copyFileIfExists(src: string, dest: string): boolean {
   if (!fs.existsSync(src)) return false;
   ensureDir(path.dirname(dest));
   fs.copyFileSync(src, dest);
   return true;
 }
 
-function copyMarkdownDir(src, dest) {
+function copyMarkdownDir(src: string, dest: string): number {
   if (!fs.existsSync(src)) return 0;
   let copied = 0;
   for (const entry of fs.readdirSync(src, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     const sourcePath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
+    const destPath   = path.join(dest, entry.name);
 
     if (entry.isDirectory()) {
       copied += copyMarkdownDir(sourcePath, destPath);
@@ -308,7 +348,14 @@ function copyMarkdownDir(src, dest) {
   return copied;
 }
 
-function examplesIndex() {
+interface ExampleEntry {
+  name: string;
+  title: string;
+  question: string;
+  path: string;
+}
+
+function examplesIndex(): ExampleEntry[] {
   if (!fs.existsSync(EXAMPLES_DIR)) return [];
 
   return fs.readdirSync(EXAMPLES_DIR)
@@ -317,8 +364,8 @@ function examplesIndex() {
     .map((name) => {
       const file = path.join(EXAMPLES_DIR, name);
       const content = fs.readFileSync(file, 'utf8');
-      const title = (content.match(/^#\s*(.+)$/m) || [null, name])[1].trim();
-      const question = (content.match(/^> (.*)$/m) || [null, ''])[1].trim();
+      const title = (content.match(/^#\s*(.+)$/m) ?? [null, name])[1]?.trim() ?? name;
+      const question = (content.match(/^> (.*)$/m) ?? [null, ''])[1]?.trim() ?? '';
       return {
         name: name.replace(/\.md$/, ''),
         title,
@@ -328,7 +375,7 @@ function examplesIndex() {
     });
 }
 
-function cmdExamples(args) {
+function cmdExamples(args: string[]): void {
   if (args.includes('--help') || args.includes('-h')) {
     console.log(EXAMPLES_HELP);
     process.exit(0);
@@ -341,11 +388,11 @@ function cmdExamples(args) {
   }
 
   let random = false;
-  let wantsName = null;
-  const unknown = [];
+  let wantsName: string | null = null;
+  const unknown: string[] = [];
 
   for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
+    const arg = args[i] ?? '';
     if (arg === '--name' || arg === '-n') {
       const value = args[i + 1];
       if (!value || value.startsWith('-')) {
@@ -387,6 +434,7 @@ function cmdExamples(args) {
 
   if (random) {
     const entry = entries[Math.floor(Math.random() * entries.length)];
+    if (!entry) { process.exit(0); }
     const content = fs.readFileSync(entry.path, 'utf8');
     console.log(`\n[${entry.name}] ${entry.title}\n`);
     console.log('Question:');
@@ -420,7 +468,7 @@ function cmdExamples(args) {
   }
 }
 
-function cmdBootstrap(args) {
+function cmdBootstrap(args: string[]): void {
   if (args.includes('--help') || args.includes('-h')) {
     console.log(BOOTSTRAP_HELP);
     process.exit(0);
@@ -428,10 +476,10 @@ function cmdBootstrap(args) {
 
   let out = path.resolve(process.cwd(), DEFAULT_BOOTSTRAP_DIR);
   let force = false;
-  const unknown = [];
+  const unknown: string[] = [];
 
   for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
+    const arg = args[i] ?? '';
 
     if (arg === '--force') {
       force = true;
@@ -484,15 +532,15 @@ function cmdBootstrap(args) {
   }
 
   const counts = {
-    examples: copyMarkdownDir(EXAMPLES_DIR, path.join(out, 'examples')),
-    rules: copyFileIfExists(RULES_PATH, path.join(out, 'rules', 'feynman-activate.md')) ? 1 : 0,
-    hooks: copyFileIfExists(PACKAGE_HOOKS, path.join(out, 'hooks', 'hooks.json')) ? 1 : 0,
-    hookRuntime: copyFileIfExists(ACTIVATOR_JS, path.join(out, 'hooks', 'feynman-activate.js')) ? 1 : 0,
-    cliRuntime: copyFileIfExists(CLI_JS, path.join(out, 'bin', 'feynman.js')) ? 1 : 0,
+    examples:        copyMarkdownDir(EXAMPLES_DIR, path.join(out, 'examples')),
+    rules:           copyFileIfExists(RULES_PATH, path.join(out, 'rules', 'feynman-activate.md')) ? 1 : 0,
+    hooks:           copyFileIfExists(PACKAGE_HOOKS, path.join(out, 'hooks', 'hooks.json')) ? 1 : 0,
+    hookRuntime:     copyFileIfExists(ACTIVATOR_JS, path.join(out, 'hooks', 'feynman-activate.ts')) ? 1 : 0,
+    cliRuntime:      copyFileIfExists(CLI_JS, path.join(out, 'bin', 'feynman.ts')) ? 1 : 0,
     packageManifest: copyFileIfExists(PACKAGE_JSON, path.join(out, 'package.json')) ? 1 : 0,
     plugins:
       (copyFileIfExists(CLAUDE_PLUGIN, path.join(out, '.claude-plugin', 'plugin.json')) ? 1 : 0) +
-      (copyFileIfExists(CODEX_PLUGIN, path.join(out, '.codex-plugin', 'plugin.json')) ? 1 : 0),
+      (copyFileIfExists(CODEX_PLUGIN,  path.join(out, '.codex-plugin',  'plugin.json')) ? 1 : 0),
     skill: copyFileIfExists(SKILL_SRC, path.join(out, 'skills', 'feynman', 'SKILL.md')) ? 1 : 0,
   };
 
@@ -507,7 +555,7 @@ function cmdBootstrap(args) {
     }, null, 2) + '\n'
   );
 
-  const total = Object.values(counts).reduce((sum, count) => sum + (count || 0), 1);
+  const total = Object.values(counts).reduce((sum, count) => sum + (count ?? 0), 1);
   console.log('');
   console.log('┌─ feynman bootstrap ────────────────────────────────────────┐');
   console.log(`│ output:   ${out}`);
@@ -584,7 +632,7 @@ ${c.bold('Options:')}
   --json    Output issues as JSON
   --strict  Treat warnings as errors (exit 1 on any issue)
 
-Delegates to bin/feynman-lint.js. See feynman-lint --help for full docs.
+Delegates to bin/feynman-lint.ts. See feynman-lint --help for full docs.
 
 Exit codes:
   0   No errors
@@ -602,92 +650,112 @@ Prints: ${VERSION}
 
 // ─── Settings helpers ─────────────────────────────────────────────────────────
 
-function readSettings(target) {
+function readSettings(target: string): Record<string, unknown> {
   const cfg = targetConfig(target);
   try {
-    return JSON.parse(fs.readFileSync(cfg.settingsPath, 'utf8'));
+    return JSON.parse(fs.readFileSync(cfg.settingsPath, 'utf8')) as Record<string, unknown>;
   } catch (_) {
     return {};
   }
 }
 
-function writeSettings(target, settings) {
+function writeSettings(target: string, settings: Record<string, unknown>): void {
   const cfg = targetConfig(target);
   fs.mkdirSync(cfg.rootDir, { recursive: true });
   fs.writeFileSync(cfg.settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }
 
-function isFeynmanHookCommand(command) {
-  return typeof command === 'string' && (
+function isFeynmanHookCommand(command: string): boolean {
+  return (
+    command.includes('feynman-session-start.ts') ||
     command.includes('feynman-session-start.js') ||
+    command.includes('feynman-activate.ts') ||
     command.includes('feynman-activate.js') ||
+    command.includes('feynman-lint.ts') ||
     command.includes('feynman-lint.js')
   );
 }
 
-function hasFeynmanHook(settings) {
-  const promptHook = ((settings.hooks && settings.hooks.UserPromptSubmit) || []).some(g =>
-    g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
-  );
-  const sessionHook = ((settings.hooks && settings.hooks.SessionStart) || []).some(g =>
-    g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
-  );
+function hasFeynmanHook(settings: Record<string, unknown>): boolean {
+  const hooks = settings['hooks'] as Record<string, unknown[]> | undefined;
+  const promptHook = ((hooks?.['UserPromptSubmit'] ?? []) as Array<Record<string, unknown>>).some(g => {
+    const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
+    return hs?.some(h => typeof h['command'] === 'string' && (
+      (h['command'] as string).includes('feynman-activate.ts') ||
+      (h['command'] as string).includes('feynman-activate.js')
+    ));
+  });
+  const sessionHook = ((hooks?.['SessionStart'] ?? []) as Array<Record<string, unknown>>).some(g => {
+    const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
+    return hs?.some(h => typeof h['command'] === 'string' && (
+      (h['command'] as string).includes('feynman-session-start.ts') ||
+      (h['command'] as string).includes('feynman-session-start.js')
+    ));
+  });
   return promptHook && sessionHook;
 }
 
-function hasAnyFeynmanHook(settings) {
-  if (!settings.hooks) return false;
+function hasAnyFeynmanHook(settings: Record<string, unknown>): boolean {
+  const hooks = settings['hooks'] as Record<string, unknown[]> | undefined;
+  if (!hooks) return false;
   return ['SessionStart', 'UserPromptSubmit', 'Stop'].some(eventName =>
-    ((settings.hooks && settings.hooks[eventName]) || []).some(g =>
-      g.hooks && g.hooks.some(h => isFeynmanHookCommand(h.command))
-    )
+    ((hooks[eventName] ?? []) as Array<Record<string, unknown>>).some(g => {
+      const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
+      return hs?.some(h => typeof h['command'] === 'string' && isFeynmanHookCommand(h['command'] as string));
+    })
   );
 }
 
-function extractHookScriptPath(command, scriptName) {
+function extractHookScriptPath(command: string, scriptName: string): string | null {
   if (typeof command !== 'string') return null;
   const escaped = scriptName.replace(/\./g, '\\.');
   const quotedPattern = new RegExp("[\"']([^\"']*" + escaped + ")[\"']");
   const quoted = command.match(quotedPattern);
-  if (quoted) return quoted[1];
+  if (quoted) return quoted[1] ?? null;
 
   const unquotedPattern = new RegExp("(?:^|\\s)(/[^\\s\"';&|<>]*" + escaped + ")(?=$|\\s)");
   const unquoted = command.match(unquotedPattern);
-  return unquoted ? unquoted[1] : null;
+  return unquoted ? (unquoted[1] ?? null) : null;
 }
 
-function removeFeynmanHooks(settings) {
-  if (!settings.hooks) return settings;
+function removeFeynmanHooks(settings: Record<string, unknown>): Record<string, unknown> {
+  const hooks = settings['hooks'] as Record<string, unknown[]> | undefined;
+  if (!hooks) return settings;
   for (const eventName of ['SessionStart', 'UserPromptSubmit', 'Stop']) {
-    if (!Array.isArray(settings.hooks[eventName])) continue;
-    settings.hooks[eventName] = settings.hooks[eventName]
+    if (!Array.isArray(hooks[eventName])) continue;
+    const groups = hooks[eventName] as Array<Record<string, unknown>>;
+    hooks[eventName] = groups
       .map(g => {
-        if (!Array.isArray(g.hooks)) return g;
+        const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
+        if (!Array.isArray(hs)) return g;
         return {
           ...g,
-          hooks: g.hooks.filter(h => !isFeynmanHookCommand(h.command)),
+          hooks: hs.filter(h => !(typeof h['command'] === 'string' && isFeynmanHookCommand(h['command'] as string))),
         };
       })
-      .filter(g => !Array.isArray(g.hooks) || g.hooks.length > 0);
-    if (settings.hooks[eventName].length === 0) {
-      delete settings.hooks[eventName];
+      .filter(g => {
+        const hs = g['hooks'] as Array<unknown> | undefined;
+        return !Array.isArray(hs) || hs.length > 0;
+      });
+    if ((hooks[eventName] as unknown[]).length === 0) {
+      delete hooks[eventName];
     }
   }
-  if (Object.keys(settings.hooks).length === 0) {
-    delete settings.hooks;
+  if (Object.keys(hooks).length === 0) {
+    delete settings['hooks'];
   }
   return settings;
 }
 
-function bootstrapState(target) {
+function bootstrapState(target: string): void {
   const cfg = targetConfig(target);
   fs.mkdirSync(cfg.feynmanDir, { recursive: true });
-  let state = DEFAULT_STATE;
+  let state: FeynmanState = { ...DEFAULT_STATE };
   if (!fs.existsSync(cfg.statePath)) {
     fs.writeFileSync(cfg.statePath, JSON.stringify(DEFAULT_STATE, null, 2) + '\n');
   } else {
     try {
-      state = { ...DEFAULT_STATE, ...JSON.parse(fs.readFileSync(cfg.statePath, 'utf8')) };
+      state = { ...DEFAULT_STATE, ...(JSON.parse(fs.readFileSync(cfg.statePath, 'utf8')) as Partial<FeynmanState>) };
     } catch (_) {
       fs.writeFileSync(cfg.statePath, JSON.stringify(DEFAULT_STATE, null, 2) + '\n');
     }
@@ -699,9 +767,10 @@ function bootstrapState(target) {
   }
 }
 
-function installClaudeCommand() {
+function installClaudeCommand(): void {
   const cfg = targetConfig('claude');
-  const skillSrc = path.resolve(__dirname, '..', 'skills', 'feynman', 'SKILL.md');
+  const skillSrc = path.resolve(import.meta.dirname, '..', 'skills', 'feynman', 'SKILL.md');
+  if (!cfg.commandsDir) return;
   const commandDest = path.join(cfg.commandsDir, 'feynman.md');
   if (fs.existsSync(skillSrc)) {
     fs.mkdirSync(cfg.commandsDir, { recursive: true });
@@ -713,18 +782,17 @@ function installClaudeCommand() {
 
 // ─── Install ──────────────────────────────────────────────────────────────────
 
-function installOne(target, opts) {
-  const force = opts.force || false;
-  const tc = targetConfig(target);
+function installOne(target: string, opts: { force: boolean }): InstallResult {
+  const force = opts.force ?? false;
 
   // Read or create settings
-  const cfg = readSettings(target);
-  cfg.hooks = cfg.hooks || {};
-  cfg.hooks.SessionStart = cfg.hooks.SessionStart || [];
-  cfg.hooks.UserPromptSubmit = cfg.hooks.UserPromptSubmit || [];
+  const cfg = readSettings(target) as Record<string, Record<string, unknown[]>>;
+  cfg['hooks'] = cfg['hooks'] ?? {};
+  cfg['hooks']['SessionStart'] = cfg['hooks']['SessionStart'] ?? [];
+  cfg['hooks']['UserPromptSubmit'] = cfg['hooks']['UserPromptSubmit'] ?? [];
 
   // Idempotency check
-  const already = hasFeynmanHook(cfg);
+  const already = hasFeynmanHook(cfg as Record<string, unknown>);
 
   if (already && !force) {
     bootstrapState(target);
@@ -734,19 +802,19 @@ function installOne(target, opts) {
 
   // If force or partial legacy install, remove old feynman entries first.
   if (already && force) {
-    removeFeynmanHooks(cfg);
-    cfg.hooks = cfg.hooks || {};
-    cfg.hooks.SessionStart = cfg.hooks.SessionStart || [];
-    cfg.hooks.UserPromptSubmit = cfg.hooks.UserPromptSubmit || [];
+    removeFeynmanHooks(cfg as Record<string, unknown>);
+    cfg['hooks'] = cfg['hooks'] ?? {};
+    cfg['hooks']['SessionStart'] = cfg['hooks']['SessionStart'] ?? [];
+    cfg['hooks']['UserPromptSubmit'] = cfg['hooks']['UserPromptSubmit'] ?? [];
   } else if (!already) {
-    removeFeynmanHooks(cfg);
-    cfg.hooks = cfg.hooks || {};
-    cfg.hooks.SessionStart = cfg.hooks.SessionStart || [];
-    cfg.hooks.UserPromptSubmit = cfg.hooks.UserPromptSubmit || [];
+    removeFeynmanHooks(cfg as Record<string, unknown>);
+    cfg['hooks'] = cfg['hooks'] ?? {};
+    cfg['hooks']['SessionStart'] = cfg['hooks']['SessionStart'] ?? [];
+    cfg['hooks']['UserPromptSubmit'] = cfg['hooks']['UserPromptSubmit'] ?? [];
   }
 
   // Append hook entries
-  const sessionEntry = {
+  const sessionEntry: Record<string, unknown> = {
     hooks: [{
       type: 'command',
       command: hookCommandFor(target).replace(HOOK_PATH, SESSION_HOOK_PATH),
@@ -754,10 +822,10 @@ function installOne(target, opts) {
     }]
   };
   if (target === 'codex') {
-    sessionEntry.matcher = 'startup|resume';
+    sessionEntry['matcher'] = 'startup|resume';
   }
-  cfg.hooks.SessionStart.push(sessionEntry);
-  cfg.hooks.UserPromptSubmit.push({
+  cfg['hooks']['SessionStart'].push(sessionEntry);
+  cfg['hooks']['UserPromptSubmit'].push({
     hooks: [{
       type: 'command',
       command: hookCommandFor(target),
@@ -766,7 +834,7 @@ function installOne(target, opts) {
   });
 
   // Write settings
-  writeSettings(target, cfg);
+  writeSettings(target, cfg as Record<string, unknown>);
 
   // Bootstrap state dir + state.json
   bootstrapState(target);
@@ -774,15 +842,16 @@ function installOne(target, opts) {
   // Install /feynman command to ~/.claude/commands/ (preserves user's existing skill)
   if (target === 'claude') installClaudeCommand();
 
-  return { target, already: false, tc };
+  return { target, already: false, tc: targetConfig(target) };
 }
 
-function cmdInstall(opts) {
+function cmdInstall(opts: { force: boolean; target: string }): void {
   // IDE targets follow a different install path — project-local rules file,
   // no hook registration, no HOME writes. Route early and return.
   if (isIdeTarget(opts.target)) {
     const r = installIde(opts.target);
     const cfg = ideTargetConfig(opts.target);
+    if (!cfg) { process.exit(1); }
     console.log('');
     console.log(`feynman ${r.already ? 'updated' : 'installed'}: ${cfg.label}`);
     console.log(`  rules: ${r.rulesPath.replace(process.cwd(), '.')}`);
@@ -818,7 +887,7 @@ function cmdInstall(opts) {
 
 // ─── Uninstall ────────────────────────────────────────────────────────────────
 
-function uninstallOne(target) {
+function uninstallOne(target: string): UninstallResult {
   const tc = targetConfig(target);
   if (!fs.existsSync(tc.settingsPath)) {
     if (fs.existsSync(tc.flagPath)) fs.unlinkSync(tc.flagPath);
@@ -838,7 +907,7 @@ function uninstallOne(target) {
   return { target, missing: false, hadHook };
 }
 
-function cmdUninstall(opts) {
+function cmdUninstall(opts: { target: string }): void {
   const results = targetNames(opts.target).map(uninstallOne);
   const labels = results.map(r => targetConfig(r.target).label).join(' + ');
   if (results.every(r => r.missing || !r.hadHook)) {
@@ -851,17 +920,18 @@ function cmdUninstall(opts) {
 
 // ─── Doctor ───────────────────────────────────────────────────────────────────
 
-function cmdDoctor(opts = {}) {
-  const target = opts.target || 'claude';
+function cmdDoctor(opts: { target?: string; noExit?: boolean } = {}): void {
+  const target = opts.target ?? 'claude';
 
   // IDE doctor — simpler check: rules file exists, frontmatter valid.
   if (isIdeTarget(target)) {
     const r = doctorIde(target);
     const cfg = ideTargetConfig(target);
+    if (!cfg) { process.exit(1); }
     console.log('');
     console.log(`feynman doctor — ${cfg.label}`);
     if (r.ok) {
-      console.log(`  [OK]   ${r.rulesPath.replace(process.cwd(), '.')} (${r.bytes} bytes)`);
+      console.log(`  [OK]   ${(r.rulesPath ?? '').replace(process.cwd(), '.')} (${r.bytes} bytes)`);
       console.log('');
       process.exit(0);
     } else {
@@ -876,10 +946,10 @@ function cmdDoctor(opts = {}) {
     process.exit(0);
   }
   const tc = targetConfig(target);
-  const checks = [];
+  const checks: string[] = [];
   let failCount = 0;
 
-  function check(label, pass, info = false) {
+  function check(label: string, pass: boolean, info = false): void {
     const marker = info ? '[INFO]' : (pass ? '[OK]  ' : '[FAIL]');
     const colorFn = info ? c.dim : (pass ? c.green : c.red);
     checks.push(colorFn(`${marker} ${label}`));
@@ -893,32 +963,57 @@ function cmdDoctor(opts = {}) {
   // 2. SessionStart and UserPromptSubmit hooks reference feynman scripts
   let sessionHookRegistered = false;
   let hookRegistered = false;
-  let sessionHookAbsPath = null;
-  let hookAbsPath = null;
+  let sessionHookAbsPath: string | null = null;
+  let hookAbsPath: string | null = null;
   if (settingsExists) {
     const cfg = readSettings(target);
-    const sessionEntries = (cfg.hooks && cfg.hooks.SessionStart) || [];
-    const feynmanSessionEntry = sessionEntries.find(g =>
-      g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-session-start.js'))
-    );
+    const hooks = cfg['hooks'] as Record<string, Array<Record<string, unknown>>> | undefined;
+    const sessionEntries = hooks?.['SessionStart'] ?? [];
+    const feynmanSessionEntry = sessionEntries.find(g => {
+      const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
+      return hs?.some(h => typeof h['command'] === 'string' && (
+        (h['command'] as string).includes('feynman-session-start.ts') ||
+        (h['command'] as string).includes('feynman-session-start.js')
+      ));
+    });
     sessionHookRegistered = !!feynmanSessionEntry;
     if (feynmanSessionEntry) {
-      const hookCmd = feynmanSessionEntry.hooks.find(h => h.command && h.command.includes('feynman-session-start.js')).command;
-      sessionHookAbsPath = extractHookScriptPath(hookCmd, 'feynman-session-start.js');
+      const hs = feynmanSessionEntry['hooks'] as Array<Record<string, unknown>>;
+      const hookCmd = hs.find(h => typeof h['command'] === 'string' && (
+        (h['command'] as string).includes('feynman-session-start.ts') ||
+        (h['command'] as string).includes('feynman-session-start.js')
+      ))?. ['command'] as string | undefined;
+      if (hookCmd) {
+        sessionHookAbsPath =
+          extractHookScriptPath(hookCmd, 'feynman-session-start.ts') ??
+          extractHookScriptPath(hookCmd, 'feynman-session-start.js');
+      }
     }
 
-    const entries = (cfg.hooks && cfg.hooks.UserPromptSubmit) || [];
-    const feynmanEntry = entries.find(g =>
-      g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-activate.js'))
-    );
+    const entries = hooks?.['UserPromptSubmit'] ?? [];
+    const feynmanEntry = entries.find(g => {
+      const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
+      return hs?.some(h => typeof h['command'] === 'string' && (
+        (h['command'] as string).includes('feynman-activate.ts') ||
+        (h['command'] as string).includes('feynman-activate.js')
+      ));
+    });
     hookRegistered = !!feynmanEntry;
     if (feynmanEntry) {
-      const hookCmd = feynmanEntry.hooks.find(h => h.command && h.command.includes('feynman-activate.js')).command;
-      hookAbsPath = extractHookScriptPath(hookCmd, 'feynman-activate.js');
+      const hs = feynmanEntry['hooks'] as Array<Record<string, unknown>>;
+      const hookCmd = hs.find(h => typeof h['command'] === 'string' && (
+        (h['command'] as string).includes('feynman-activate.ts') ||
+        (h['command'] as string).includes('feynman-activate.js')
+      ))?. ['command'] as string | undefined;
+      if (hookCmd) {
+        hookAbsPath =
+          extractHookScriptPath(hookCmd, 'feynman-activate.ts') ??
+          extractHookScriptPath(hookCmd, 'feynman-activate.js');
+      }
     }
   }
-  check('hook registered (feynman-session-start.js in SessionStart)', sessionHookRegistered);
-  check('hook registered (feynman-activate.js in UserPromptSubmit)', hookRegistered);
+  check('hook registered (feynman-session-start in SessionStart)', sessionHookRegistered);
+  check('hook registered (feynman-activate in UserPromptSubmit)', hookRegistered);
 
   // 3. Hook script files exist + readable
   let sessionHookFileOk = false;
@@ -926,7 +1021,7 @@ function cmdDoctor(opts = {}) {
     try {
       fs.accessSync(sessionHookAbsPath, fs.constants.R_OK);
       sessionHookFileOk = true;
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   }
   check('session hook script file exists and is readable', sessionHookFileOk);
 
@@ -935,7 +1030,7 @@ function cmdDoctor(opts = {}) {
     try {
       fs.accessSync(hookAbsPath, fs.constants.R_OK);
       hookFileOk = true;
-    } catch (_) {}
+    } catch (_) { /* intentionally empty */ }
   }
   check('prompt hook script file exists and is readable', hookFileOk);
 
@@ -944,17 +1039,17 @@ function cmdDoctor(opts = {}) {
   try {
     const stat = fs.statSync(RULES_PATH);
     rulesOk = stat.size > 0;
-  } catch (_) {}
+  } catch (_) { /* intentionally empty */ }
   check('rules/feynman-activate.md exists and non-empty', rulesOk);
 
   // 5. state.json valid JSON + has enabled field
   let stateOk = false;
   let stateEnabled = false;
   try {
-    const state = JSON.parse(fs.readFileSync(tc.statePath, 'utf8'));
+    const state = JSON.parse(fs.readFileSync(tc.statePath, 'utf8')) as Record<string, unknown>;
     stateOk = 'enabled' in state;
-    stateEnabled = state.enabled === true;
-  } catch (_) {}
+    stateEnabled = state['enabled'] === true;
+  } catch (_) { /* intentionally empty */ }
   check('state.json valid (has enabled field)', stateOk);
 
   // 6. .feynman-active flag matches state
@@ -968,14 +1063,19 @@ function cmdDoctor(opts = {}) {
   let lintHookRegistered = false;
   if (settingsExists) {
     const cfg = readSettings(target);
+    const hooks = cfg['hooks'] as Record<string, Array<Record<string, unknown>>> | undefined;
     // Check Stop hooks too
     const allHookGroups = [
-      ...((cfg.hooks && cfg.hooks.UserPromptSubmit) || []),
-      ...((cfg.hooks && cfg.hooks.Stop) || []),
+      ...(hooks?.['UserPromptSubmit'] ?? []),
+      ...(hooks?.['Stop'] ?? []),
     ];
-    lintHookRegistered = allHookGroups.some(g =>
-      g.hooks && g.hooks.some(h => h.command && h.command.includes('feynman-lint.js'))
-    );
+    lintHookRegistered = allHookGroups.some(g => {
+      const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
+      return hs?.some(h => typeof h['command'] === 'string' && (
+        (h['command'] as string).includes('feynman-lint.ts') ||
+        (h['command'] as string).includes('feynman-lint.js')
+      ));
+    });
   }
   const lintStatus = lintHookRegistered ? 'registered' : 'not registered (optional)';
   check(`lint hook: ${lintStatus}`, true, true); // always INFO
@@ -989,9 +1089,9 @@ function cmdDoctor(opts = {}) {
   const topDashes = '─'.repeat(innerW - titlePart.length - 1);
   console.log(`┌─ ${titlePart}${topDashes}┐`);
   for (let i = 0; i < checks.length; i++) {
-    const stripped = strippedLines[i];
+    const stripped = strippedLines[i] ?? '';
     const pad = innerW - 1 - stripped.length; // 1 for leading space
-    console.log(`│ ${checks[i]}${' '.repeat(Math.max(0, pad))}│`);
+    console.log(`│ ${checks[i] ?? ''}${' '.repeat(Math.max(0, pad))}│`);
   }
   console.log(`└${border}┘`);
 
@@ -1003,25 +1103,25 @@ function cmdDoctor(opts = {}) {
   if (!opts.noExit) process.exit(0);
 }
 
-// ─── Lint (delegate to feynman-lint.js) ──────────────────────────────────────
+// ─── Lint (delegate to feynman-lint.ts via spawnSync) ─────────────────────────
 
-function cmdLint(args) {
-  // Re-invoke feynman-lint.js in-process by overriding process.argv
-  // and calling it via require (D-04: delegate by require, NOT spawn)
+function cmdLint(args: string[]): void {
   const lintArgs = args.filter(a => a !== '--help');
   if (args.includes('--help') || lintArgs.length === 0) {
     console.log(LINT_HELP);
     process.exit(0);
   }
 
-  // Override argv and invoke lint module
-  process.argv = ['node', 'feynman-lint.js', ...lintArgs];
-  require('./feynman-lint.js');
+  const lintBin = path.resolve(import.meta.dirname, 'feynman-lint.ts');
+  const result = spawnSync(process.execPath, [lintBin, ...lintArgs], {
+    stdio: 'inherit',
+  });
+  process.exit(result.status ?? 1);
 }
 
 // ─── Version ──────────────────────────────────────────────────────────────────
 
-function cmdVersion(args) {
+function cmdVersion(args: string[]): void {
   if (args.includes('--help')) {
     console.log(VERSION_HELP);
     process.exit(0);
@@ -1032,7 +1132,7 @@ function cmdVersion(args) {
 
 // ─── Help ─────────────────────────────────────────────────────────────────────
 
-function cmdHelp() {
+function cmdHelp(): void {
   console.log(HELP);
   process.exit(0);
 }

@@ -1,24 +1,23 @@
 #!/usr/bin/env node
-// scripts/check-docs.js — lint public markdown docs with feynman-lint.
-'use strict';
+// scripts/check-docs.ts — lint public markdown docs with feynman-lint.
 
-const fs = require('node:fs');
-const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 const LINT = path.join(ROOT, 'bin', 'feynman-lint.js');
 
-function listMarkdown(dir) {
+function listMarkdown(dir: string): string[] {
   const abs = path.join(ROOT, dir);
   if (!fs.existsSync(abs)) return [];
   return fs.readdirSync(abs)
-    .filter(name => name.endsWith('.md'))
-    .map(name => path.join(dir, name))
+    .filter((name: string) => name.endsWith('.md'))
+    .map((name: string) => path.join(dir, name))
     .sort();
 }
 
-const files = [
+const files: string[] = [
   'README.md',
   'CONTRIBUTING.md',
   ...listMarkdown('docs'),
@@ -40,7 +39,7 @@ for (const file of files) {
   }
 }
 
-const publicText = [
+const publicText: string = [
   fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8'),
   fs.readFileSync(path.join(ROOT, 'bin', 'feynman.js'), 'utf8'),
 ].join('\n');

@@ -1,17 +1,28 @@
 #!/usr/bin/env node
-// hooks/feynman-lint.js — feynman Stop-hook variant
+// hooks/feynman-lint.ts — feynman Stop-hook variant
 // Reads Claude's response from stdin JSON {response, session_id, ...}
 // If lint fails: emit additionalContext with corrections
 // If lint passes: exit 0 silently
 // ALWAYS exits 0 — never block Claude (best practice)
-// Zero deps. CJS only.
-'use strict';
+// Zero deps. ESM + TypeScript (Node.js v22.6+ strip-types, no build step).
 
-const { lint } = require('../lib/lint');
-const { autofix } = require('../lib/lint/autofix');
+import { lint } from '../lib/lint/index.ts';
+import { autofix } from '../lib/lint/autofix.ts';
+
+interface LintIssue {
+  rule: string;
+  line: number;
+  message: string;
+  suggestion?: string;
+}
+
+interface LintResult {
+  passed: boolean;
+  issues: LintIssue[];
+}
 
 // Rule descriptions for actionable feedback
-const RULE_DESCRIPTIONS = {
+const RULE_DESCRIPTIONS: Record<string, string> = {
   L01: 'Box closure: every ┌─...─┐ opening must have a matching └─...─┘ at the same column',
   L02: 'Tree chars: last child must use └── not ├──',
   L03: 'Arrow style: use only one arrow style per diagram (-->, →, ─→, or ──>)',
@@ -24,17 +35,15 @@ const RULE_DESCRIPTIONS = {
 
 /**
  * Build a concise additionalContext message from lint issues
- * @param {object[]} issues
- * @returns {string}
  */
-function buildCorrectionMessage(issues) {
+function buildCorrectionMessage(issues: LintIssue[]): string {
   if (!issues || issues.length === 0) return '';
 
   // Group by rule
-  const byRule = new Map();
+  const byRule = new Map<string, LintIssue[]>();
   for (const iss of issues) {
     if (!byRule.has(iss.rule)) byRule.set(iss.rule, []);
-    byRule.get(iss.rule).push(iss);
+    byRule.get(iss.rule)!.push(iss);
   }
 
   const lines = [
@@ -60,11 +69,11 @@ function buildCorrectionMessage(issues) {
 // Accumulate stdin
 let input = '';
 process.stdin.setEncoding('utf8');
-process.stdin.on('data', chunk => { input += chunk; });
+process.stdin.on('data', (chunk: string) => { input += chunk; });
 process.stdin.on('end', () => {
   try {
     const data = JSON.parse(input);
-    const response = data.response || data.message || '';
+    const response: unknown = data.response || data.message || '';
 
     if (!response || typeof response !== 'string') {
       process.exit(0);
@@ -76,7 +85,7 @@ process.stdin.on('end', () => {
     // re-running the rule-feedback machinery. Fenced frames are skipped by
     // autofix itself — those are user-authored samples that should not be
     // silently rewritten.
-    let autofixed = response;
+    let autofixed: string = response;
     try {
       autofixed = autofix(response);
     } catch (_) {
@@ -93,7 +102,7 @@ process.stdin.on('end', () => {
       process.exit(0);
     }
 
-    const result = lint(response);
+    const result: LintResult = lint(response);
 
     if (result.passed) {
       // No errors — exit 0 silently

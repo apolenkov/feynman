@@ -22,13 +22,14 @@
   "bugs": {
     "url": "https://github.com/apolenkov/feynman/issues"
   },
+  "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": ">=22.6"
   },
-  "main": "lib/lint/index.js",
+  "main": "lib/lint/index.ts",
   "bin": {
-    "feynman": "bin/feynman.js",
-    "feynman-lint": "bin/feynman-lint.js"
+    "feynman": "bin/feynman.ts",
+    "feynman-lint": "bin/feynman-lint.ts"
   },
   "files": [
     "hooks/",
@@ -49,17 +50,25 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test tests/*.test.js",
-    "coverage": "mkdir -p coverage && node --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test tests/*.test.js",
-    "lint": "node bin/feynman-lint.js",
+    "test": "node --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "coverage": "mkdir -p coverage && node --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test tests/*.test.ts",
+    "lint": "node bin/feynman-lint.ts",
+    "eslint": "eslint .",
     "audit": "npm audit --audit-level=moderate",
-    "test:docs": "node scripts/check-docs.js",
-    "test:release": "node scripts/release-smoke.js",
-    "test:published": "node scripts/verify-published-package.js",
-    "build": "node scripts/build-package.js",
-    "changelog": "node scripts/generate-changelog.js",
-    "ci": "npm run audit && npm run coverage && npm run test:docs && npm run test:release && npm run build",
+    "test:docs": "node scripts/check-docs.ts",
+    "test:release": "node scripts/release-smoke.ts",
+    "test:published": "node scripts/verify-published-package.ts",
+    "build": "node scripts/build-package.ts",
+    "changelog": "node scripts/generate-changelog.ts",
+    "ci": "npm run audit && npm run typecheck && npm run coverage && npm run test:docs && npm run test:release && npm run build",
     "prepublishOnly": "npm run ci"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.22.0",
+    "@typescript-eslint/parser": "^8.22.0",
+    "eslint": "^8.57.1",
+    "typescript": "^5.7.3"
+  }
 }

@@ -1,27 +1,27 @@
-// tests/lint-hook.test.js — e2e tests for hooks/feynman-lint.js (Stop-hook)
+// tests/lint-hook.test.ts — e2e tests for hooks/feynman-lint.ts (Stop-hook)
 // Spawns the hook as a child process, pipes stdin JSON {response}, checks stdout.
 // Uses node:test + node:assert/strict.
-'use strict';
 
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const { spawnSync } = require('node:child_process');
-const path = require('node:path');
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { lint } from '../lib/lint/index.ts';
 
-const HOOK_PATH = path.resolve(__dirname, '..', 'hooks', 'feynman-lint.js');
+const HOOK_PATH = path.resolve(import.meta.dirname, '..', 'hooks', 'feynman-lint.ts');
 
 /**
  * Run the lint hook with a given response string.
  * Returns { status, stdout, stderr }.
  */
-function runLintHook(response) {
+function runLintHook(response: string): { status: number; stdout: string; stderr: string } {
   const result = spawnSync('node', [HOOK_PATH], {
     input: JSON.stringify({ response }),
     encoding: 'utf8',
     timeout: 10000,
   });
   return {
-    status: result.status,
+    status: result.status ?? 0,
     stdout: result.stdout || '',
     stderr: result.stderr || '',
   };
@@ -33,7 +33,7 @@ describe('feynman-lint Stop-hook', () => {
   // Path 1: Clean response (no diagrams) — exit 0, no additionalContext
   // -------------------------------------------------------------------------
   describe('Path 1: clean response (no diagrams)', () => {
-    let result;
+    let result: { status: number; stdout: string; stderr: string };
 
     it('exits 0', () => {
       result = runLintHook('This is just regular prose. No diagrams here.');
@@ -92,7 +92,7 @@ describe('feynman-lint Stop-hook', () => {
       '```',
     ].join('\n');
 
-    let result;
+    let result: { status: number; stdout: string; stderr: string };
 
     it('exits 0 (never blocks Claude)', () => {
       result = runLintHook(invalidResponse);
@@ -217,10 +217,9 @@ describe('feynman-lint Stop-hook', () => {
       const match = ctx.match(/<feynman-autofix>\n([\s\S]*?)\n<\/feynman-autofix>/);
       assert.ok(match, 'wrapper format missing');
       // Re-lint the fixed frame inside a code-block context (lint operates on fenced)
-      const fixedFenced = '```\n' + match[1].split('\n').filter(l => /^[┌│└]/.test(l)).join('\n') + '\n```';
-      const { lint } = require('../lib/lint');
+      const fixedFenced = '```\n' + match[1].split('\n').filter((l: string) => /^[┌│└]/.test(l)).join('\n') + '\n```';
       const result = lint(fixedFenced);
-      const errors = result.issues.filter(i => i.severity === 'error' && (i.rule === 'L08' || i.rule === 'L09'));
+      const errors = result.issues.filter((i: { severity: string; rule: string }) => i.severity === 'error' && (i.rule === 'L08' || i.rule === 'L09'));
       assert.equal(errors.length, 0, `autofixed frame should pass L08/L09, got: ${JSON.stringify(errors)}`);
     });
   });

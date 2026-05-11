@@ -1,10 +1,28 @@
-// lib/lint/rules.js — 8 lint rules for ASCII diagrams
+// lib/lint/rules.ts — 8 lint rules for ASCII diagrams
 // Each rule: (ast: ASTNode, fullText: string) => Issue[]
 // Issue: {rule, severity, line, column, message, suggestion?}
-// Zero deps. CJS only.
-'use strict';
+// Zero deps. ESM only.
 
-const { visualWidth, firstVisualColumnOf, lastVisualColumnOf } = require('./width');
+import { visualWidth, firstVisualColumnOf, lastVisualColumnOf } from './width.ts';
+import { createRequire } from 'node:module';
+
+export interface Issue {
+  rule: string;
+  severity: 'error' | 'warn';
+  line: number;
+  column: number;
+  message: string;
+  suggestion?: string;
+  token?: string;
+}
+
+export interface ASTNode {
+  type: string;
+  content: string;
+  startLine: number;
+  endLine: number;
+  indent: number;
+}
 
 /**
  * Create an issue object
@@ -14,16 +32,16 @@ const { visualWidth, firstVisualColumnOf, lastVisualColumnOf } = require('./widt
  * @param {number} column - 1-based
  * @param {string} message
  * @param {string} [suggestion]
- * @returns {object}
+ * @returns {Issue}
  */
-function issue(rule, severity, line, column, message, suggestion) {
-  const obj = { rule, severity, line, column, message };
+function issue(rule: string, severity: 'error' | 'warn', line: number, column: number, message: string, suggestion?: string): Issue {
+  const obj: Issue = { rule, severity, line, column, message };
   if (suggestion) obj.suggestion = suggestion;
   return obj;
 }
 
 // displayWidth was the old per-file helper; superseded by visualWidth from
-// ./width.js, which additionally strips ANSI and combining/ZW chars.
+// ./width.ts, which additionally strips ANSI and combining/ZW chars.
 const displayWidth = visualWidth;
 
 // ---------------------------------------------------------------------------
@@ -32,7 +50,7 @@ const displayWidth = visualWidth;
 // Every ─┐ must have a matching ─┘ at the same column.
 // Vertical │ chars must align between top and bottom.
 // ---------------------------------------------------------------------------
-function L01_box_closure(ast) {
+export function L01_box_closure(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
 
   const lines = ast.content.split('\n');
@@ -41,7 +59,7 @@ function L01_box_closure(ast) {
     return [];
   }
 
-  const issues = [];
+  const issues: Issue[] = [];
   const baseLineNum = ast.startLine;
 
   // Find all top-left corners (┌) and their columns
@@ -49,10 +67,10 @@ function L01_box_closure(ast) {
   // We track "open" top corners and look for matching bottoms
 
   // Collect positions of each corner type
-  const topLefts = [];   // {line, col}
-  const topRights = [];  // {line, col}
-  const botLefts = [];   // {line, col}
-  const botRights = [];  // {line, col}
+  const topLefts: Array<{line: number, col: number, charIdx: number}> = [];
+  const topRights: Array<{line: number, col: number, charIdx: number}> = [];
+  const botLefts: Array<{line: number, col: number, charIdx: number}> = [];
+  const botRights: Array<{line: number, col: number, charIdx: number}> = [];
 
   for (let li = 0; li < lines.length; li++) {
     const ln = lines[li];
@@ -122,7 +140,7 @@ function L01_box_closure(ast) {
 // Detect: line with ├── where the NEXT tree-level sibling doesn't exist
 // (i.e. ├── is used as the last item in its group)
 // ---------------------------------------------------------------------------
-function L02_tree_chars(ast) {
+export function L02_tree_chars(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
 
   const content = ast.content;
@@ -130,7 +148,7 @@ function L02_tree_chars(ast) {
   if (!content.includes('├') && !content.includes('└')) return [];
 
   const lines = content.split('\n');
-  const issues = [];
+  const issues: Issue[] = [];
   const baseLineNum = ast.startLine;
 
   for (let li = 0; li < lines.length; li++) {
@@ -186,14 +204,14 @@ function L02_tree_chars(ast) {
 // Only ONE arrow style allowed per diagram.
 // Allowed styles: -->, →, ─→, ──>
 // ---------------------------------------------------------------------------
-const ARROW_PATTERNS = [
+const ARROW_PATTERNS: Array<{name: string, re: RegExp}> = [
   { name: '→',   re: /(?<![─-])→/ },
   { name: '-->',  re: /-->/ },
   { name: '─→',  re: /─→/ },
   { name: '──>', re: /──>/ },
 ];
 
-function L03_arrow_style(ast) {
+export function L03_arrow_style(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
 
   const content = ast.content;
@@ -201,7 +219,7 @@ function L03_arrow_style(ast) {
   const baseLineNum = ast.startLine;
 
   // Collect which arrow styles appear and on which lines
-  const found = new Map(); // style name -> first line number (1-based relative to doc)
+  const found = new Map<string, number>(); // style name -> first line number (1-based relative to doc)
 
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
@@ -219,7 +237,7 @@ function L03_arrow_style(ast) {
   // Multiple styles found — report on the second+ style
   const styles = [...found.entries()];
   const firstStyle = styles[0][0];
-  const issues = [];
+  const issues: Issue[] = [];
 
   for (let si = 1; si < styles.length; si++) {
     const [name, lineNum] = styles[si];
@@ -238,7 +256,7 @@ function L03_arrow_style(ast) {
 // Rows | col | col | must have same column count
 // Separator |---|---| must match column count
 // ---------------------------------------------------------------------------
-function L04_column_widths(ast) {
+export function L04_column_widths(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
 
   const content = ast.content;
@@ -250,7 +268,7 @@ function L04_column_widths(ast) {
   // Find table-like rows: lines starting with | AND that look like markdown table rows
   // Exclude lines that are just diagram connectors (| as vertical bar in flow diagrams)
   // A proper table row: starts with |, has at least one cell with a word char, multiple pipes
-  const tableLines = [];
+  const tableLines: Array<{li: number, line: string}> = [];
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
     // Must start with optional whitespace then |
@@ -267,7 +285,7 @@ function L04_column_widths(ast) {
   if (tableLines.length < 2) return [];
 
   // Count columns per row by splitting on |
-  function countCols(line) {
+  function countCols(line: string): number {
     // Split by |, trim outer empty strings
     const parts = line.split('|');
     // Remove leading/trailing empty strings from the outer pipes
@@ -279,12 +297,12 @@ function L04_column_widths(ast) {
   }
 
   // Determine reference column count (from first non-separator row)
-  function isSeparatorRow(line) {
+  function isSeparatorRow(line: string): boolean {
     return /^\s*\|[\s\-|:]+\|?\s*$/.test(line);
   }
 
-  let refCols = null;
-  const issues = [];
+  let refCols: number | null = null;
+  const issues: Issue[] = [];
 
   for (const { li, line } of tableLines) {
     const docLine = baseLineNum + li;
@@ -315,7 +333,7 @@ function L04_column_widths(ast) {
 const BOX_RE = /\[[^\]]+\]/g;
 const ARROW_RE = /-->|→|─→|──>/;
 
-function L05_flow_integrity(ast) {
+export function L05_flow_integrity(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
 
   const content = ast.content;
@@ -323,7 +341,7 @@ function L05_flow_integrity(ast) {
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues = [];
+  const issues: Issue[] = [];
 
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
@@ -334,8 +352,8 @@ function L05_flow_integrity(ast) {
     // Check between each consecutive pair of boxes
     let hasViolation = false;
     for (let bi = 0; bi < boxes.length - 1; bi++) {
-      const curEnd   = boxes[bi].index + boxes[bi][0].length;
-      const nextStart = boxes[bi + 1].index;
+      const curEnd   = boxes[bi].index! + boxes[bi][0].length;
+      const nextStart = boxes[bi + 1].index!;
       const between  = line.slice(curEnd, nextStart);
 
       // If between region is pure whitespace (≥3 spaces), treat as parallel layout (not connected)
@@ -351,7 +369,7 @@ function L05_flow_integrity(ast) {
 
     if (hasViolation) {
       issues.push(issue(
-        'L05', 'error', baseLineNum + li, boxes[0].index + 1,
+        'L05', 'error', baseLineNum + li, boxes[0].index! + 1,
         `${boxes.length} boxes on same line with no arrow between them: ${boxes.map(m => m[0]).join(', ')}`,
         `Add an arrow (-->, →) between consecutive boxes`
       ));
@@ -365,7 +383,7 @@ function L05_flow_integrity(ast) {
 // L06 — Priority scale
 // If ▲ appears, ▼ must also appear (and vice versa)
 // ---------------------------------------------------------------------------
-function L06_priority_scale(ast) {
+export function L06_priority_scale(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
 
   const content = ast.content;
@@ -376,7 +394,7 @@ function L06_priority_scale(ast) {
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues = [];
+  const issues: Issue[] = [];
 
   // Find the line with the existing marker
   for (let li = 0; li < lines.length; li++) {
@@ -409,7 +427,7 @@ function L06_priority_scale(ast) {
 // If ``` mermaid ``` block exists alongside ASCII diagram, flag.
 // This rule operates on fullText, not a single AST node.
 // ---------------------------------------------------------------------------
-function L07_no_mermaid_mix(_ast, fullText) {
+export function L07_no_mermaid_mix(_ast: ASTNode | null, fullText: string): Issue[] {
   // _ast may be null when called for full-text check
   if (!fullText) return [];
 
@@ -444,7 +462,7 @@ function L07_no_mermaid_mix(_ast, fullText) {
 // L08 — Frame width discipline
 // All rows inside ┌─...─┐ frame have consistent display width
 // ---------------------------------------------------------------------------
-function L08_frame_width(ast) {
+export function L08_frame_width(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
 
   const content = ast.content;
@@ -452,11 +470,11 @@ function L08_frame_width(ast) {
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues = [];
+  const issues: Issue[] = [];
 
   let inFrame = false;
   let frameStartLine = 0;
-  let frameWidth = null;
+  let frameWidth: number | null = null;
 
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
@@ -509,16 +527,16 @@ function L08_frame_width(ast) {
 // For each frame, the closing │ on every inner row and the bottom ┘ MUST land
 // at the same VISUAL column as the top ┐. ANSI escapes, combining marks, and
 // zero-width joiners are stripped before column comparison; CJK wide chars
-// count as 2 cols (shared with L08 via lib/lint/width.js).
+// count as 2 cols (shared with L08 via lib/lint/width.ts).
 // ---------------------------------------------------------------------------
-function L09_right_edge_alignment(ast) {
+export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
   const content = ast.content;
   if (!content.includes('┌')) return [];
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues = [];
+  const issues: Issue[] = [];
 
   let li = 0;
   while (li < lines.length) {
@@ -591,10 +609,16 @@ function L09_right_edge_alignment(ast) {
 // are whitelisted. Operates on raw text, not AST — runs in addition to other
 // rules without disturbing them.
 
-const PKG_TOKENS = (() => {
+const PKG_TOKENS: Set<string> = (() => {
   try {
-    const pkg = require('../../package.json');
-    const tokens = new Set();
+    // Use createRequire to load JSON from ESM context
+    const require = createRequire(import.meta.url);
+    const pkg = require('../../package.json') as {
+      name?: string;
+      keywords?: string[];
+      bin?: Record<string, string>;
+    };
+    const tokens = new Set<string>();
     if (pkg.name) {
       tokens.add(pkg.name);
       tokens.add(pkg.name.replace(/^@[^/]+\//, ''));
@@ -603,23 +627,23 @@ const PKG_TOKENS = (() => {
     for (const k of Object.keys(pkg.bin || {})) tokens.add(k);
     return tokens;
   } catch (_) {
-    return new Set();
+    return new Set<string>();
   }
 })();
 
-function L10_mixed_script(textOrAst) {
+export function L10_mixed_script(textOrAst: string | ASTNode | null | undefined): Issue[] {
   // Accept both raw text and AST shapes — most callers in this file pass the
   // AST that the harness built; some pass plain text via fixtures harness.
   const text = typeof textOrAst === 'string'
     ? textOrAst
-    : (textOrAst && textOrAst.text) || '';
-  const issues = [];
+    : (textOrAst && (textOrAst as any).text) || '';
+  const issues: Issue[] = [];
   const lines = text.split('\n');
   // Word = run of letters/digits/_/-, including Cyrillic via \p{L}.
   const tokenRe = /[\p{L}\p{N}_-]+/gu;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    let m;
+    let m: RegExpExecArray | null;
     while ((m = tokenRe.exec(line)) !== null) {
       const token = m[0];
       if (PKG_TOKENS.has(token)) continue;
@@ -651,14 +675,14 @@ function L10_mixed_script(textOrAst) {
 // wastes ~50% on padding/borders. Whitelist: nested tree (├──/└──) or
 // embedded table column (≥3 │ chars on a single inner line) inside the frame.
 // ---------------------------------------------------------------------------
-function L11_overdecoration(ast) {
+export function L11_overdecoration(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
   const content = ast.content;
   if (!content.includes('┌')) return [];
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues = [];
+  const issues: Issue[] = [];
 
   let li = 0;
   while (li < lines.length) {
@@ -669,7 +693,7 @@ function L11_overdecoration(ast) {
 
     // Find closing └─+┘ at same indent. Inner lines must match /^\s*│.*│\s*$/.
     let closeLi = -1;
-    const inner = [];
+    const inner: string[] = [];
     for (let lj = li + 1; lj < lines.length; lj++) {
       const next = lines[lj];
       const botMatch = next.match(/^(\s*)└─+┘\s*$/);
@@ -717,14 +741,28 @@ function L11_overdecoration(ast) {
 // --explain CLI flag (Plan 09-05).
 // ---------------------------------------------------------------------------
 
+export interface FrameCost {
+  framing_chars: number;
+  content_chars: number;
+  border_chars: number;
+  padding_chars: number;
+  dotleader_equivalent: number;
+  saving: number;
+}
+
+export interface FrameNode {
+  top?: string;
+  bottom?: string;
+  inner?: string[];
+}
+
 /**
  * Estimate token-cost breakdown of a single frame block.
  * Used by L12 detection AND by the --explain CLI flag (Plan 09-05).
  * @param {{top:string, inner:string[], bottom:string}} node
- * @returns {{framing_chars:number, content_chars:number, border_chars:number,
- *   padding_chars:number, dotleader_equivalent:number, saving:number}}
+ * @returns {FrameCost}
  */
-function estimateFrameCost(node) {
+export function estimateFrameCost(node: FrameNode): FrameCost {
   const top = node.top || '';
   const bottom = node.bottom || '';
   const inner = node.inner || [];
@@ -757,14 +795,14 @@ function estimateFrameCost(node) {
   };
 }
 
-function L12_token_budget(ast) {
+export function L12_token_budget(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
   const content = ast.content;
   if (!content.includes('┌')) return [];
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues = [];
+  const issues: Issue[] = [];
 
   let li = 0;
   while (li < lines.length) {
@@ -774,7 +812,7 @@ function L12_token_budget(ast) {
     const indent = topMatch[1];
 
     let closeLi = -1;
-    const inner = [];
+    const inner: string[] = [];
     for (let lj = li + 1; lj < lines.length; lj++) {
       const next = lines[lj];
       const botMatch = next.match(/^(\s*)└─+┘\s*$/);
@@ -806,7 +844,7 @@ function L12_token_budget(ast) {
 // Severity: warn. A tree's indentation already conveys hierarchy; wrapping
 // it in a frame adds zero information at full border cost.
 // ---------------------------------------------------------------------------
-function L13_double_wrap(ast) {
+export function L13_double_wrap(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
   const content = ast.content;
   if (!content.includes('┌')) return [];
@@ -814,7 +852,7 @@ function L13_double_wrap(ast) {
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues = [];
+  const issues: Issue[] = [];
 
   let li = 0;
   while (li < lines.length) {
@@ -844,23 +882,3 @@ function L13_double_wrap(ast) {
   }
   return issues;
 }
-
-// ---------------------------------------------------------------------------
-// Registry
-// ---------------------------------------------------------------------------
-module.exports = {
-  L01_box_closure,
-  L02_tree_chars,
-  L03_arrow_style,
-  L04_column_widths,
-  L05_flow_integrity,
-  L06_priority_scale,
-  L07_no_mermaid_mix,
-  L08_frame_width,
-  L09_right_edge_alignment,
-  L10_mixed_script,
-  L11_overdecoration,
-  L12_token_budget,
-  L13_double_wrap,
-  estimateFrameCost,
-};
