@@ -114,3 +114,57 @@ This becomes a falsifiable hypothesis for v0.4.1 measurement: a 3rd arm of the h
 ## Next
 
 Phase 11-followup: extend `rules/feynman-activate.md` with smallest-visual-first ladder per intensity. Estimated impact: token-economy improvement that L11/L12/L13 would normally catch post-hoc becomes baked into generation. To be implemented immediately after this report ships.
+
+---
+
+## 3rd arm result (v0.3.x + ladder) — 2026-05-11
+
+Run after the rule extension committed in `db30f41`.
+
+```
+arm                  total chars   Δ vs baseline   Δ vs v0.3.x
+v0.2.x baseline      6653          —               −23%
+v0.3.x current       8683          +31%            —
+v0.3.x + ladder      8375          +26%            −3.5%
+```
+
+**Hypothesis REFUTED.** Predicted −15-25% vs v0.3.x; actual −3.5%.
+
+### Why it didn't work as predicted
+
+14 of 15 prompts were already at the minimum-viable visual on v0.3.x — there was no lighter form for the ladder to drop to:
+
+- sequence → inline arrow flow (already minimum)
+- hierarchy → ASCII tree (already minimum)
+- comparison → markdown table (already minimum)
+- branching → ASCII decision tree (already minimum)
+- state-machine → states+arrows diagram (already minimum)
+- mapping → pairs table (already minimum)
+- `none` class → prose (already minimum, the suppress contract works)
+
+Only ONE prompt benefited: `status-small` (4 items). Baseline produced a frame block (267 chars); with ladder, dot-leader (137 chars) — **−49%** on that single prompt. This is exactly the L11 detection case made redundant at generation time.
+
+### Real root cause of the +31% gap (hypothesis revised)
+
+The verbosity is NOT primarily about over-heavy visuals. Likely sources for the v0.2.x → v0.3.x increase:
+
+1. **More elaborate captions and inline labels** around each visual (e.g. row content `"[Client] → [API Gateway] → [Service]"` in v0.3.x vs `"клиент-API-сервис"` in v0.2.x).
+2. **Classify-first chain-of-thought** introduced in v0.3.0 makes the model add a reasoning preamble before drawing.
+3. **General prose around the diagram** — explanations of WHY a particular visual was chosen, which the v0.3.x rules subtly encourage.
+
+The +31% gap requires a different intervention than smallest-visual-first. Candidates for v0.4.1 or v0.5.0:
+- Inline-CoT suppression (don't narrate the visual choice)
+- Caption brevity rule
+- Total response-length budget per structure class
+
+### What the ladder DID achieve
+
+- **No regression**: −3.5% is a small but real reduction, never a loss
+- **L11 generation-time prevention**: the one frame-for-4-items case got dot-leader'd before L11 would have warned about it — the rule moves from post-hoc detection to pre-emptive avoidance
+- **Clean falsifiable measurement**: we now know what the ladder can and cannot do; future rule design starts from data, not hope
+
+### Updated recommendation
+
+Keep the ladder shipped in v0.4.0 — it's not harmful and it pre-empts L11/L12/L13 firings on the specific case where it bites. But do NOT claim "v0.3.x → v0.4.0 fixes verbosity" in release notes. The 31% gap remains for v0.5.0 research.
+
+Falsified hypotheses logged as research. Phase 11 closes on the data, not the prediction.
