@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const pkg = require(path.join(ROOT, 'package.json')) as { version: string; name: string };
-const NPM_CACHE: string = process.env.FEYNMAN_NPM_CACHE || path.join(os.tmpdir(), 'npm-cache-feynman');
+const NPM_CACHE: string = process.env['FEYNMAN_NPM_CACHE'] || path.join(os.tmpdir(), 'npm-cache-feynman');
 
 interface RunOpts {
   cwd?: string;
@@ -56,7 +56,7 @@ function runtimeHome(homeDir: string, target: string): string {
 }
 
 function findHookCommand(config: Record<string, unknown>, eventName: string, scriptName: string): string {
-  const hooks = config.hooks as Record<string, unknown[]> | undefined;
+  const hooks = config['hooks'] as Record<string, unknown[]> | undefined;
   const groups = (hooks && hooks[eventName]) || [];
   for (const group of groups as Array<{ hooks?: Array<{ command?: string }> }>) {
     for (const hook of group.hooks || []) {
@@ -131,7 +131,7 @@ function verifyInstalledHooks(homeDir: string, target: string): void {
   }
 
   const state = readJson(path.join(expectedHome, '.feynman', 'state.json'));
-  if (state.injections !== 1) {
+  if (state['injections'] !== 1) {
     throw new Error(`${target} prompt hook did not increment injections once`);
   }
 }

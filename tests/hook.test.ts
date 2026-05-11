@@ -265,7 +265,7 @@ describe('feynman-activate hook', () => {
     });
 
     it('increments state.injections', () => {
-      assert.equal(stateAfter.injections, 3, 'injections should increment from 2 to 3');
+      assert.equal(stateAfter['injections'], 3, 'injections should increment from 2 to 3');
     });
 
     it('injects rules as additionalContext', () => {
@@ -460,24 +460,9 @@ describe('feynman-activate hook', () => {
   // -------------------------------------------------------------------------
   describe('Path 6b: outer catch (malformed JSON stdin)', () => {
     let tmpHome: string;
-    let result: HookResult;
 
     before(() => {
       tmpHome = makeTempHome();
-      result = {
-        ...spawnSync('node', [HOOK_PATH], {
-          input: 'not json at all !!!',
-          encoding: 'utf8',
-          env: { ...process.env, HOME: tmpHome },
-          timeout: 10000,
-        }),
-        status: spawnSync('node', [HOOK_PATH], {
-          input: 'not json at all !!!',
-          encoding: 'utf8',
-          env: { ...process.env, HOME: tmpHome },
-          timeout: 10000,
-        }).status ?? 0,
-      };
     });
 
     after(() => rmrf(tmpHome));
@@ -520,10 +505,10 @@ describe('feynman-activate hook', () => {
     let tmpHome: string;
     let result: HookResult;
 
-    before(function() {
+    before(function(this: unknown) {
       // Skip on environments where we can't test file permissions (e.g. root)
       if (process.getuid && process.getuid() === 0) {
-        (this as unknown as { skip: () => void }).skip();
+        (this as { skip: () => void }).skip();
         return;
       }
       tmpHome = makeTempHome();
@@ -608,7 +593,7 @@ describe('feynman-activate hook', () => {
     it('<contract> content contains classify, channel, amplify, suppress', () => {
       const contractMatch = rulesContent.match(/<contract>([\s\S]*?)<\/contract>/i);
       assert.ok(contractMatch, 'no <contract>…</contract> block found');
-      const body = contractMatch[1].toLowerCase();
+      const body = contractMatch![1]!.toLowerCase();
       for (const word of ['classify', 'channel', 'amplify', 'suppress']) {
         assert.ok(body.includes(word), `<contract> missing word: ${word}`);
       }
@@ -649,13 +634,13 @@ describe('feynman-activate hook', () => {
       for (const [name, re] of Object.entries(xmlMatchers)) {
         const m = re.exec(rulesContent);
         assert.ok(m, `hook regex could not extract <intensity name="${name}"> block`);
-        const content = m[1].trim();
+        const content = m![1]!.trim();
         assert.ok(content.length > 0, `extracted ${name} content is empty`);
         extracted[name] = content;
       }
-      assert.notEqual(extracted.lite, extracted.full,  'lite and full must be distinct');
-      assert.notEqual(extracted.full, extracted.ultra, 'full and ultra must be distinct');
-      assert.notEqual(extracted.lite, extracted.ultra, 'lite and ultra must be distinct');
+      assert.notEqual(extracted['lite'], extracted['full'],  'lite and full must be distinct');
+      assert.notEqual(extracted['full'], extracted['ultra'], 'full and ultra must be distinct');
+      assert.notEqual(extracted['lite'], extracted['ultra'], 'lite and ultra must be distinct');
     });
   });
 
@@ -695,7 +680,7 @@ describe('feynman-activate hook', () => {
      * Runs a patched copy of the hook with RULES_PATH pointing at a synthetic
      * rules file written by the test. Mirrors Path 6 helper pattern.
      */
-    function runHookWithRules(tmpHome: string, rulesContent: string, intensity: string): SpawnSyncReturns<string> {
+    function runHookWithRules(tmpHome: string, rulesContent: string, _intensity: string): SpawnSyncReturns<string> {
       const hookSrc = fs.readFileSync(HOOK_PATH, 'utf8');
       const rulesFilePath = path.join(tmpHome, 'synthetic-rules.md');
       fs.writeFileSync(rulesFilePath, rulesContent);
@@ -889,7 +874,7 @@ describe('hook output_style suffix injection (Phase 10)', () => {
     const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
     fs.mkdirSync(feynmanDir, { recursive: true });
     fs.writeFileSync(path.join(feynmanDir, 'state.json'), JSON.stringify(state, null, 2));
-    fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), (state.intensity as string) || 'full');
+    fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), (state['intensity'] as string) || 'full');
   }
 
   it('output_style=full → no suffix added (default behaviour)', () => {

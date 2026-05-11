@@ -152,7 +152,7 @@ describe('L02 tree chars — unit tests', () => {
     const result = lint(md);
     const l02 = result.issues.filter(i => i.rule === 'L02');
     assert.ok(l02.length >= 1);
-    assert.ok(l02[0].message.includes('└──'), 'message should reference └──');
+    assert.ok(l02[0]!.message.includes('└──'), 'message should reference └──');
   });
 
   it('sibling at shallower indent level — exercises shallower-branch in L02', () => {
@@ -200,7 +200,7 @@ describe('L03 arrow style — unit tests', () => {
     const l03 = result.issues.filter(i => i.rule === 'L03');
     assert.ok(l03.length >= 1);
     // Message should name the conflicting styles
-    assert.ok(l03[0].message.includes('-->' ) || l03[0].message.includes('→'));
+    assert.ok(l03[0]!.message.includes('-->' ) || l03[0]!.message.includes('→'));
   });
 });
 
@@ -225,7 +225,7 @@ describe('L04 column widths — unit tests', () => {
     const result = lint(md);
     const l04 = result.issues.filter(i => i.rule === 'L04');
     assert.ok(l04.length >= 1);
-    assert.ok(/column/i.test(l04[0].message));
+    assert.ok(/column/i.test(l04[0]!.message));
   });
 });
 
@@ -275,7 +275,7 @@ describe('L06 priority scale — unit tests', () => {
     const result = lint(md);
     const l06 = result.issues.filter(i => i.rule === 'L06');
     assert.ok(l06.length >= 1);
-    assert.equal(l06[0].severity, 'warn');
+    assert.equal(l06[0]!.severity, 'warn');
   });
 
   it('▼ without ▲ flagged as warn', () => {
@@ -283,7 +283,7 @@ describe('L06 priority scale — unit tests', () => {
     const result = lint(md);
     const l06 = result.issues.filter(i => i.rule === 'L06');
     assert.ok(l06.length >= 1);
-    assert.equal(l06[0].severity, 'warn');
+    assert.equal(l06[0]!.severity, 'warn');
   });
 
   it('neither ▲ nor ▼ passes', () => {
@@ -355,7 +355,7 @@ describe('L08 frame width — unit tests', () => {
     const result = lint(md);
     const l08 = result.issues.filter(i => i.rule === 'L08');
     assert.ok(l08.length >= 1);
-    assert.ok(/width/i.test(l08[0].message));
+    assert.ok(/width/i.test(l08[0]!.message));
   });
 
   it('multibyte box-drawing chars: width computed as 1 per char', () => {
@@ -394,9 +394,9 @@ describe('L11 overdecoration — unit tests', () => {
     const result = lint(md);
     const l11 = result.issues.filter(i => i.rule === 'L11');
     assert.ok(l11.length >= 1, 'should detect overdecoration');
-    assert.equal(l11[0].severity, 'warn');
-    assert.match(l11[0].message, /5 items/);
-    assert.match(l11[0].message, /saves ~\d+ chars/);
+    assert.equal(l11[0]!.severity, 'warn');
+    assert.match(l11[0]!.message, /5 items/);
+    assert.match(l11[0]!.message, /saves ~\d+ chars/);
   });
 
   it('frame with 6 inner lines NOT flagged (boundary)', () => {
@@ -422,7 +422,7 @@ describe('L11 overdecoration — unit tests', () => {
     const result = lint(md);
     const l11 = result.issues.filter(i => i.rule === 'L11');
     assert.equal(l11.length, 1);
-    assert.match(l11[0].message, /1 items/);
+    assert.match(l11[0]!.message, /1 items/);
   });
 
   it('no frame, no L11 fire', () => {
@@ -456,7 +456,7 @@ describe('L12 token-budget — unit tests', () => {
     const result = lint(md);
     const l12 = result.issues.filter(i => i.rule === 'L12');
     assert.ok(l12.length >= 1);
-    assert.equal(l12[0].severity, 'warn');
+    assert.equal(l12[0]!.severity, 'warn');
   });
 
   it('content-dominated frame NOT flagged', () => {
@@ -482,7 +482,7 @@ describe('L13 double-wrap — unit tests', () => {
     const result = lint(md);
     const l13 = result.issues.filter(i => i.rule === 'L13');
     assert.ok(l13.length >= 1);
-    assert.equal(l13[0].severity, 'warn');
+    assert.equal(l13[0]!.severity, 'warn');
   });
 
   it('bare tree (no frame) NOT flagged', () => {

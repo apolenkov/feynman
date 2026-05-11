@@ -14,7 +14,7 @@ interface FeynmanState {
 }
 
 const HOME        = os.homedir();
-const CLIENT_HOME = process.env.FEYNMAN_HOME || path.join(HOME, '.claude');
+const CLIENT_HOME = process.env['FEYNMAN_HOME'] || path.join(HOME, '.claude');
 const FEYNMAN_DIR = path.join(CLIENT_HOME, '.feynman');
 const STATE_PATH  = path.join(FEYNMAN_DIR, 'state.json');
 const FLAG_PATH   = path.join(CLIENT_HOME, '.feynman-active');
@@ -43,8 +43,8 @@ function readRules(intensity: string): string {
     full:  /<intensity\s+name\s*=\s*["']full["'][^>]*>([\s\S]*?)<\/intensity>/i,
     ultra: /<intensity\s+name\s*=\s*["']ultra["'][^>]*>([\s\S]*?)<\/intensity>/i,
   };
-  const xmlMatch = xmlMatchers[selected].exec(rulesContent);
-  if (xmlMatch) return xmlMatch[1].trim();
+  const xmlMatch = xmlMatchers[selected]!.exec(rulesContent);
+  if (xmlMatch) return xmlMatch[1]!.trim();
 
   // Legacy HTML-comment fallback
   const openMarker  = '<!-- ' + selected + ' -->';

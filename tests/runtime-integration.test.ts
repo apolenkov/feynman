@@ -53,7 +53,8 @@ function runtimeHome(tmpHome: string, target: string): string {
 }
 
 function findHookCommand(config: Record<string, unknown>, eventName: string, scriptName: string): string {
-  const groups = ((config.hooks as Record<string, { hooks: { command: string }[] }[]>) && (config.hooks as Record<string, { hooks: { command: string }[] }[]>)[eventName]) || [];
+  const hooksMap = config['hooks'] as Record<string, { hooks: { command: string }[] }[]> | undefined;
+  const groups = (hooksMap && hooksMap[eventName]) || [];
   for (const group of groups) {
     for (const hook of group.hooks || []) {
       if (hook.command && hook.command.includes(scriptName)) {
@@ -141,9 +142,9 @@ describe('installed Feynman hook command integration', () => {
         );
 
         const state = readJson(path.join(runtimeHome(tmpHome, target), '.feynman', 'state.json'));
-        assert.equal(state.enabled, true);
-        assert.equal(state.intensity, 'full');
-        assert.equal(state.injections, 1, `${target} prompt hook should increment injections once`);
+        assert.equal(state['enabled'], true);
+        assert.equal(state['intensity'], 'full');
+        assert.equal(state['injections'], 1, `${target} prompt hook should increment injections once`);
       }
     } finally {
       rmrf(tmpHome);
@@ -184,8 +185,8 @@ describe('installed Feynman hook command integration', () => {
       assert.equal(prompt.stderr, '');
 
       const state = readJson(path.join(codexHome, '.feynman', 'state.json'));
-      assert.equal(state.enabled, false);
-      assert.equal(state.injections, 7);
+      assert.equal(state['enabled'], false);
+      assert.equal(state['injections'], 7);
       assert.equal(fs.existsSync(path.join(codexHome, '.feynman-active')), false);
     } finally {
       rmrf(tmpHome);
