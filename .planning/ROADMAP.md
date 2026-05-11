@@ -2,7 +2,7 @@
 
 ## Overview
 
-feynman is an open-source Claude Code and Codex plugin that injects ASCII diagram rules on every prompt. Four milestones shipped (v0.1, v0.2.0, v0.3.0, v0.4.0); next milestone TBD.
+feynman is an open-source Claude Code and Codex plugin that injects ASCII diagram rules on every prompt. Four milestones shipped (v0.1, v0.2.0, v0.3.0, v0.4.0); current milestone v0.5.0 «Verbosity Economy».
 
 ## Milestones
 
@@ -10,6 +10,7 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 - ✅ **v0.2.0 — Production-Ready** — Phases 2-7 (shipped 2026-05-07) — see [milestones/v0.2.0-ROADMAP.md](./milestones/v0.2.0-ROADMAP.md)
 - ✅ **v0.3.0 — Prompt Architecture** — Phases 8 + 8.5 (shipped 2026-05-10) — see [milestones/v0.3.0-ROADMAP.md](./milestones/v0.3.0-ROADMAP.md)
 - ✅ **v0.4.0 — Visual Economy** — Phases 9-13 (shipped 2026-05-11) — see [milestones/v0.4.0-ROADMAP.md](./milestones/v0.4.0-ROADMAP.md)
+- 🔄 **v0.5.0 — Verbosity Economy** — Phases 14-18 (in progress)
 
 ## Phase Numbering
 
@@ -17,23 +18,71 @@ feynman is an open-source Claude Code and Codex plugin that injects ASCII diagra
 - Decimal phases (6.5, 8.5, …): insertions / parallel tracks
 - Numbering continues across milestones
 
-## Current Milestone
+## Phases
 
-None — v0.4.0 closed 2026-05-11. Start the next milestone with `/gsd-new-milestone`.
+- [ ] **Phase 14: Corpus + Harness Setup** — Expand prompt corpus to 50, build aggregate.js, smoke-run baselines
+- [ ] **Phase 15: Budget Compaction** — Free ≥333 bytes in rules/feynman-activate.md; all tests green
+- [ ] **Phase 16: Candidate Rule Sets** — Create 4 candidate rule files (A/B/C/ABC) in eval/
+- [ ] **Phase 17: Two-Wave Measurement** — Wave 1 baselines → sanity gate → Wave 2 candidates → REPORT.md
+- [ ] **Phase 18: Apply Winner + Release** — Apply winner (if threshold met) or close as research-only
 
-## Backlog (candidate themes for v0.5.0+)
+## Phase Details
 
-From `.planning/PROJECT.md` Future and from Phase 11 findings:
+### Phase 14: Corpus + Harness Setup
+**Goal**: Evaluation infrastructure is ready to run 7-arm measurement on 50 balanced prompts
+**Depends on**: Phase 13 (v0.4.0 closed)
+**Requirements**: CORP-01, CORP-02, CORP-03, CORP-04
+**Success Criteria** (what must be TRUE):
+  1. `jq '.prompts | length' eval/v0.5.0-compliance/prompts.json` returns `50`
+  2. Class distribution verified: `jq '[.prompts[].shape] | group_by(.) | map({key:.[0],count:length})' eval/v0.5.0-compliance/prompts.json` shows 9 classes with counts matching spec (sequence×6, hierarchy×6, comparison×6, status×6, priority×4, branching×4, state-machine×4, mapping×4, none×10)
+  3. `node eval/v0.5.0-compliance/aggregate.js` exits 0 (or with "no result files yet" — not a crash)
+  4. `ls eval/v0.5.0-compliance/results-v02-smoke-*.json | wc -l` returns ≥ 1 (smoke-run variance file present)
+**Plans**: TBD
 
-- **Pixel/raster logo to replace README pencil emoji** — user wants a real drawing (crab, on-brand with `@albinocrabs` scope) instead of Apple's pencil PNG. ASCII-crab variant rejected ("неаскитукраб"); pixel art via image-gen API or commissioned art. Deferred 2026-05-11.
-- **Verbosity reduction beyond ladder** — Phase 11 3-arm measurement showed the smallest-visual-first ladder closes only -3.5% of the +31% v0.2.x→v0.3.x gap. Real causes (caption brevity, classify-first CoT preamble, prose-around-visual) untouched. Highest-impact research target.
-- **Domain packs** — separate rule sets for arch / db / devops use cases
-- **feynman.config.yaml** — team-level customization without hot-patching state.json
-- **Per-project intensity / style override** — override global state.json from project-local file
-- **Marketplace submission** — Claude Code + Codex stores (submission process undocumented)
-- **Self-improvement loop** — design spec exists in `docs/self-improvement.md`, never implemented
-- **Windows install.ps1** — DIST-V3-01
-- **3rd compliance harness arm: real live API** — current harness uses subagent simulation; live-API arm would cost $5-15 but validate methodology
+### Phase 15: Budget Compaction
+**Goal**: rules/feynman-activate.md has ≥333 bytes free for ABC interventions without vocabulary loss
+**Depends on**: Phase 14
+**Requirements**: COMP-01, COMP-02, COMP-03
+**Success Criteria** (what must be TRUE):
+  1. `wc -c < rules/feynman-activate.md` returns ≤ 4147 (4480 − 333 = ≤ 4147 bytes used)
+  2. `npm test` exits 0 — all tests pass (hook.test.js:541-629 structural invariants green)
+  3. `grep -oE 'classify|channel|amplify|suppress' rules/feynman-activate.md | sort -u | wc -l` returns `4` (all 4 vocabulary tokens preserved)
+**Plans**: TBD
+
+### Phase 16: Candidate Rule Sets
+**Goal**: Four candidate rule files exist in eval/, each ≤4480 bytes, each with exactly one verbosity intervention over the compacted base
+**Depends on**: Phase 15
+**Requirements**: CAND-01, CAND-02, CAND-03, CAND-04
+**Success Criteria** (what must be TRUE):
+  1. `ls eval/v0.5.0-compliance/rules-v05-{A,B,C,ABC}.md | wc -l` returns `4`
+  2. `for f in eval/v0.5.0-compliance/rules-v05-*.md; do wc -c < "$f"; done` — every value ≤ 4480
+  3. rules-v05-C.md contains prose excluding code-fenced and ASCII blocks from the word-count rule (verifiable via `grep -c 'code-fenced\|ASCII blocks' eval/v0.5.0-compliance/rules-v05-C.md` ≥ 1)
+  4. Each candidate file (A, B, C) contains a positive-example formulation, not a pure prohibition (`for f in eval/v0.5.0-compliance/rules-v05-{A,B,C}.md; do grep -cE 'example|prefer|instead' "$f"; done` — each returns ≥ 1)
+**Plans**: TBD
+
+### Phase 17: Two-Wave Measurement
+**Goal**: All 7 arms measured on 50-prompt corpus; sanity gate passed; REPORT.md contains explicit winner statement or «refuted»
+**Depends on**: Phase 16
+**Requirements**: MEAS-01, MEAS-02, MEAS-03, MEAS-04
+**Success Criteria** (what must be TRUE):
+  1. Wave 1 complete: `ls eval/v0.5.0-compliance/results-v02-50p.json eval/v0.5.0-compliance/results-v03-50p.json eval/v0.5.0-compliance/results-v03-ladder-50p.json` exits 0 (all 3 files present)
+  2. Sanity gate passed and documented: REPORT.md contains a line matching `sanity gate: delta.*[0-9]%.*< 10%` (Wave 1 delta vs Phase 11 baseline < 10%; gate-fail path: stop-note documented in REPORT.md and Phase 14 corpus rebalance triggered before retry — gate-fail is NOT a complete phase)
+  3. Wave 2 complete: `ls eval/v0.5.0-compliance/results-v05-{A,B,C,ABC}-50p.json | wc -l` returns `4`
+  4. `jq '.per_prompt | length' eval/v0.5.0-compliance/results-v05-A-50p.json` returns `50` (50-prompt coverage per arm)
+  5. `grep -cE 'winner:|refuted:' eval/v0.5.0-compliance/REPORT.md` ≥ 1 — REPORT.md contains explicit winner statement
+**Plans**: TBD
+
+### Phase 18: Apply Winner + Release
+**Goal**: Milestone closed — either winner applied to production rules and v0.5.0 published, or all-refuted findings documented and milestone closed as research-only
+**Depends on**: Phase 17 REPORT.md winner statement
+**Requirements**: REL-01, REL-02, REL-03, REL-04, REL-05
+**Success Criteria** (what must be TRUE — both paths are valid completion):
+  1. **Winner path**: `grep '"version"' package.json` returns `"version": "0.5.0"` AND `npm test` exits 0 AND `wc -c < rules/feynman-activate.md` ≤ 4480
+  2. **Winner path**: `npm view @albinocrabs/feynman version` returns `0.5.0` (published to npm)
+  3. **Refuted path**: `grep -c 'refuted' eval/v0.5.0-compliance/REPORT.md` ≥ 1 AND `grep -c 'research-only' eval/v0.5.0-compliance/REPORT.md` ≥ 1
+  4. Either path: `grep -c '0.5.0' CHANGELOG.md` ≥ 1 — CHANGELOG.md updated with v0.5.0 section
+  5. Either path: `npm test` exits 0 — no regressions from winner application (or no change if refuted)
+**Plans**: TBD
 
 ## Progress
 
@@ -43,3 +92,8 @@ From `.planning/PROJECT.md` Future and from Phase 11 findings:
 | 2-7 | v0.2.0 | done | Complete | 2026-05-07 |
 | 8 + 8.5 | v0.3.0 | 8/8 | Complete | 2026-05-10 |
 | 9-13 | v0.4.0 | 18/18 | Complete | 2026-05-11 |
+| 14. Corpus + Harness | v0.5.0 | 0/? | Not started | — |
+| 15. Budget Compaction | v0.5.0 | 0/? | Not started | — |
+| 16. Candidate Rule Sets | v0.5.0 | 0/? | Not started | — |
+| 17. Two-Wave Measurement | v0.5.0 | 0/? | Not started | — |
+| 18. Apply Winner + Release | v0.5.0 | 0/? | Not started | — |
