@@ -136,15 +136,19 @@ function verifyInstalledHooks(homeDir: string, target: string): void {
   }
 }
 
+// Expect a pre-built tarball in dist/ (produced by `npm run build`).
+// Running npm pack here would pack raw .ts sources, which fail in node_modules.
+const DIST = path.join(ROOT, 'dist');
+const expectedTarball = path.join(DIST, `albinocrabs-feynman-${pkg.version}.tgz`);
+if (!fs.existsSync(expectedTarball)) {
+  process.stderr.write(`pre-built tarball not found: ${expectedTarball}\nRun 'npm run build' first.\n`);
+  process.exit(1);
+}
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-release-smoke-'));
 
 try {
-  const packOut = run('npm', ['pack', '--pack-destination', tmp, '--json']);
-  const packed = JSON.parse(packOut)[0] as { filename: string };
-  const tarball = path.join(tmp, packed.filename);
-  if (!fs.existsSync(tarball)) {
-    throw new Error(`tarball missing after npm pack: ${tarball}`);
-  }
+  const tarball = expectedTarball;
 
   const projectDir = path.join(tmp, 'project');
   const homeDir = path.join(tmp, 'home');
@@ -177,7 +181,7 @@ try {
     throw new Error('feynman-lint smoke expected zero issues');
   }
 
-  console.log(`release smoke OK (${packed.filename})`);
+  console.log(`release smoke OK (${path.basename(tarball)})`);
 } catch (error) {
   process.stderr.write(`${(error as Error).message}\n`);
   process.exit(1);

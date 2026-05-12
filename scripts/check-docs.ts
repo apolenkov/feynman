@@ -6,7 +6,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const LINT = path.join(ROOT, 'bin', 'feynman-lint.js');
+const _ext = fs.existsSync(path.join(ROOT, 'bin', 'feynman-lint.ts')) ? '.ts' : '.js';
+const LINT = path.join(ROOT, 'bin', `feynman-lint${_ext}`);
 
 function listMarkdown(dir: string): string[] {
   const abs = path.join(ROOT, dir);
@@ -41,7 +42,7 @@ for (const file of files) {
 
 const publicText: string = [
   fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8'),
-  fs.readFileSync(path.join(ROOT, 'bin', 'feynman.js'), 'utf8'),
+  fs.readFileSync(path.join(ROOT, 'bin', `feynman${_ext}`), 'utf8'),
 ].join('\n');
 
 if (publicText.includes('npx feynman ')) {
