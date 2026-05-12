@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## 0.6.0 - 2026-05-12
+
+Changes since v0.5.0.
+
 ### Features
 
 - TypeScript + ESM migration (Node.js v26 native strip-types, no build step)
