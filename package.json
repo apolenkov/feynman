@@ -1,6 +1,6 @@
 {
   "name": "@albinocrabs/feynman",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Claude Code and Codex plugin that auto-injects ASCII diagram rules into every AI request via UserPromptSubmit hook",
   "license": "MIT",
   "author": "apolenkov",
@@ -61,8 +61,9 @@
     "test:published": "node scripts/verify-published-package.ts",
     "build": "node scripts/build-package.ts",
     "changelog": "node scripts/generate-changelog.ts",
-    "ci": "npm run audit && npm run typecheck && npm run coverage && npm run test:docs && npm run test:release && npm run build",
-    "prepublishOnly": "npm run ci"
+    "ci": "npm run audit && npm run typecheck && npm run coverage && npm run test:docs && npm run build && npm run test:release",
+    "prepublishOnly": "npm run audit && npm run typecheck && npm run coverage && npm run test:docs",
+    "release": "npm run ci && npm publish \"dist/albinocrabs-feynman-$(node -e 'process.stdout.write(require(\"./package.json\").version)').tgz\" --access public"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

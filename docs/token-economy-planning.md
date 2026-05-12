@@ -90,7 +90,7 @@ Prose echo (restates what the visual already shows):
   → drop the prose
 
 Over-decorated single item (use a dot-leader instead):
-· A full `┌─────────────┐` frame for one status bullet
+· A full ASCII frame (`┌ … ┐`) for one status bullet
   → `· status: ready` is enough
 
 ## Checklist for plan writers

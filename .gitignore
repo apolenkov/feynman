@@ -5,6 +5,7 @@ node_modules/
 .claude/settings.local.json
 coverage/
 dist/
+.build/
 .nyc_output/
 *.lcov
 *.tgz
