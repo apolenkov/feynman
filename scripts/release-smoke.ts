@@ -97,12 +97,17 @@ function runHookCommand(command: string, homeDir: string, stdin: HookStdin): str
 
 function verifyInstalledHooks(homeDir: string, target: string): void {
   const cfg = readJson(runtimeConfigPath(homeDir, target));
-  const sessionCommand = findHookCommand(cfg, 'SessionStart', 'feynman-session-start.js');
-  const promptCommand = findHookCommand(cfg, 'UserPromptSubmit', 'feynman-activate.js');
 
+  // v0.7.0: only SessionStart hook, no UserPromptSubmit
+  const hooks = cfg['hooks'] as Record<string, unknown[]> | undefined;
+  if (hooks?.['UserPromptSubmit'] !== undefined) {
+    throw new Error(`${target} must not have UserPromptSubmit registered (v0.7.0+)`);
+  }
+
+  const sessionCommand = findHookCommand(cfg, 'SessionStart', 'feynman-session-start.js');
   const expectedHome = runtimeHome(homeDir, target);
-  if (!sessionCommand.includes(expectedHome) || !promptCommand.includes(expectedHome)) {
-    throw new Error(`${target} hook command missing expected FEYNMAN_HOME`);
+  if (!sessionCommand.includes(expectedHome)) {
+    throw new Error(`${target} SessionStart command missing expected FEYNMAN_HOME`);
   }
 
   const sessionOut = runHookCommand(sessionCommand, homeDir, {
@@ -111,28 +116,6 @@ function verifyInstalledHooks(homeDir: string, target: string): void {
   });
   if (!/<triggers>|<contract>|→|├──/.test(sessionOut)) {
     throw new Error(`${target} SessionStart did not emit rule-file diagram tokens`);
-  }
-
-  const promptOut = runHookCommand(promptCommand, homeDir, {
-    session_id: `${target}-release-smoke`,
-    prompt: 'Explain deploy pipeline stages.',
-  });
-  if (promptOut.endsWith('\n')) {
-    throw new Error(`${target} UserPromptSubmit emitted trailing newline`);
-  }
-  const parsed = JSON.parse(promptOut) as {
-    hookSpecificOutput?: { hookEventName?: string; additionalContext?: string };
-  };
-  const ctx = parsed.hookSpecificOutput && parsed.hookSpecificOutput.additionalContext;
-  if (parsed.hookSpecificOutput?.hookEventName !== 'UserPromptSubmit' ||
-      typeof ctx !== 'string' ||
-      !/<triggers>|<contract>|→|├──/.test(ctx)) {
-    throw new Error(`${target} UserPromptSubmit did not emit valid additionalContext`);
-  }
-
-  const state = readJson(path.join(expectedHome, '.feynman', 'state.json'));
-  if (state['injections'] !== 1) {
-    throw new Error(`${target} prompt hook did not increment injections once`);
   }
 }
 

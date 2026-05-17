@@ -85,16 +85,8 @@ function runConfiguredHook(tmpHome: string, command: string, stdin: unknown): { 
   };
 }
 
-function parsePromptHookOutput(stdout: string): string {
-  const parsed = JSON.parse(stdout);
-  assert.ok(parsed.hookSpecificOutput, 'hookSpecificOutput missing');
-  assert.equal(parsed.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
-  assert.equal(typeof parsed.hookSpecificOutput.additionalContext, 'string');
-  return parsed.hookSpecificOutput.additionalContext;
-}
-
 describe('installed Feynman hook command integration', () => {
-  it('runs generated Claude Code and Codex hook commands end-to-end', () => {
+  it('runs generated Claude Code and Codex SessionStart hook commands end-to-end', () => {
     const tmpHome = makeTempHome();
     try {
       const install = runFeynman(tmpHome, ['install', '--target', 'both', '--force']);
@@ -102,19 +94,20 @@ describe('installed Feynman hook command integration', () => {
 
       for (const target of ['claude', 'codex']) {
         const config = readRuntimeConfig(tmpHome, target);
+
+        // v0.7.0: only SessionStart hook, no UserPromptSubmit
+        assert.equal(
+          (config['hooks'] as Record<string, unknown> | undefined)?.['UserPromptSubmit'],
+          undefined,
+          `${target} must not have UserPromptSubmit registered`
+        );
+
         const sessionCommand = findHookCommand(
           config,
           'SessionStart',
           'feynman-session-start.ts'
         );
-        const promptCommand = findHookCommand(
-          config,
-          'UserPromptSubmit',
-          'feynman-activate.ts'
-        );
-
         assert.ok(sessionCommand.includes(`FEYNMAN_HOME="${runtimeHome(tmpHome, target)}"`));
-        assert.ok(promptCommand.includes(`FEYNMAN_HOME="${runtimeHome(tmpHome, target)}"`));
 
         const session = runConfiguredHook(tmpHome, sessionCommand, {
           hook_event_name: 'SessionStart',
@@ -127,31 +120,16 @@ describe('installed Feynman hook command integration', () => {
           `${target} SessionStart should emit rule-file diagram tokens`
         );
 
-        const prompt = runConfiguredHook(tmpHome, promptCommand, {
-          session_id: `${target}-session`,
-          prompt: 'Explain deploy pipeline stages.',
-        });
-        assert.equal(prompt.status, 0, `${target} UserPromptSubmit exited non-zero`);
-        assert.equal(prompt.stderr, '', `${target} UserPromptSubmit stderr: ${prompt.stderr}`);
-        assert.equal(prompt.stdout.endsWith('\n'), false, `${target} prompt hook must avoid trailing newline`);
-
-        const context = parsePromptHookOutput(prompt.stdout);
-        assert.ok(
-          /<triggers>|<contract>|→|├──/.test(context),
-          `${target} additionalContext should contain rule-file diagram tokens`
-        );
-
         const state = readJson(path.join(runtimeHome(tmpHome, target), '.feynman', 'state.json'));
         assert.equal(state['enabled'], true);
         assert.equal(state['intensity'], 'full');
-        assert.equal(state['injections'], 1, `${target} prompt hook should increment injections once`);
       }
     } finally {
       rmrf(tmpHome);
     }
   });
 
-  it('runs installed Codex hooks silently when disabled', () => {
+  it('runs installed Codex SessionStart hook silently when disabled', () => {
     const tmpHome = makeTempHome();
     try {
       const install = runFeynman(tmpHome, ['install', '--target', 'codex', '--force']);
@@ -166,7 +144,6 @@ describe('installed Feynman hook command integration', () => {
 
       const config = readRuntimeConfig(tmpHome, 'codex');
       const sessionCommand = findHookCommand(config, 'SessionStart', 'feynman-session-start.ts');
-      const promptCommand = findHookCommand(config, 'UserPromptSubmit', 'feynman-activate.ts');
 
       const session = runConfiguredHook(tmpHome, sessionCommand, {
         hook_event_name: 'SessionStart',
@@ -175,14 +152,6 @@ describe('installed Feynman hook command integration', () => {
       assert.equal(session.status, 0);
       assert.equal(session.stdout, '');
       assert.equal(session.stderr, '');
-
-      const prompt = runConfiguredHook(tmpHome, promptCommand, {
-        session_id: 'disabled-session',
-        prompt: 'Explain deploy pipeline stages.',
-      });
-      assert.equal(prompt.status, 0);
-      assert.equal(prompt.stdout, '');
-      assert.equal(prompt.stderr, '');
 
       const state = readJson(path.join(codexHome, '.feynman', 'state.json'));
       assert.equal(state['enabled'], false);
