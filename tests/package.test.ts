@@ -43,32 +43,32 @@ describe('package metadata', () => {
     assert.ok((manifest['interface'] as { defaultPrompt: string[] }).defaultPrompt.length <= 3);
   });
 
-  it('Codex hooks.json registers SessionStart and UserPromptSubmit feynman hooks', () => {
+  it('Codex hooks.json registers only SessionStart hook (no UserPromptSubmit)', () => {
     const hooks = readJson('hooks.json');
-    const sessionEntries = (hooks['hooks'] as Record<string, unknown[]>)['SessionStart'];
-    const promptEntries = (hooks['hooks'] as Record<string, unknown[]>)['UserPromptSubmit'];
+    const hooksMap = hooks['hooks'] as Record<string, unknown[]>;
+    const sessionEntries = hooksMap['SessionStart'];
     assert.ok(Array.isArray(sessionEntries));
-    assert.ok(Array.isArray(promptEntries));
-    const sessionCommand = (((sessionEntries![0] as { hooks: { command: string }[] }).hooks)[0]!).command;
-    const promptCommand = (((promptEntries![0] as { hooks: { command: string }[] }).hooks)[0]!).command;
+    assert.equal(hooksMap['UserPromptSubmit'], undefined, 'UserPromptSubmit must not be registered (v0.7.0+)');
+    const sessionEntry = sessionEntries![0] as { matcher?: string; hooks: { command: string }[] };
+    assert.ok(sessionEntry.matcher?.includes('compact'), 'matcher must include compact');
+    assert.ok(sessionEntry.matcher?.includes('clear'), 'matcher must include clear');
+    const sessionCommand = sessionEntry.hooks[0]!.command;
     assert.ok(sessionCommand.includes('FEYNMAN_HOME="$HOME/.codex"'));
     assert.ok(sessionCommand.includes('feynman-session-start.ts'));
-    assert.ok(promptCommand.includes('FEYNMAN_HOME="$HOME/.codex"'));
-    assert.ok(promptCommand.includes('feynman-activate.ts'));
   });
 
-  it('Claude plugin hooks.json registers SessionStart and UserPromptSubmit feynman hooks', () => {
+  it('Claude plugin hooks.json registers only SessionStart hook (no UserPromptSubmit)', () => {
     const hooks = readJson('hooks/hooks.json');
-    const sessionEntries = (hooks['hooks'] as Record<string, unknown[]>)['SessionStart'];
-    const promptEntries = (hooks['hooks'] as Record<string, unknown[]>)['UserPromptSubmit'];
+    const hooksMap = hooks['hooks'] as Record<string, unknown[]>;
+    const sessionEntries = hooksMap['SessionStart'];
     assert.ok(Array.isArray(sessionEntries));
-    assert.ok(Array.isArray(promptEntries));
-    const sessionCommand = (((sessionEntries![0] as { hooks: { command: string }[] }).hooks)[0]!).command;
-    const promptCommand = (((promptEntries![0] as { hooks: { command: string }[] }).hooks)[0]!).command;
+    assert.equal(hooksMap['UserPromptSubmit'], undefined, 'UserPromptSubmit must not be registered (v0.7.0+)');
+    const sessionEntry = sessionEntries![0] as { matcher?: string; hooks: { command: string }[] };
+    assert.ok(sessionEntry.matcher?.includes('compact'), 'matcher must include compact');
+    assert.ok(sessionEntry.matcher?.includes('clear'), 'matcher must include clear');
+    const sessionCommand = sessionEntry.hooks[0]!.command;
     assert.ok(sessionCommand.includes('FEYNMAN_HOME="$HOME/.claude"'));
     assert.ok(sessionCommand.includes('${CLAUDE_PLUGIN_ROOT}/hooks/feynman-session-start.ts'));
-    assert.ok(promptCommand.includes('FEYNMAN_HOME="$HOME/.claude"'));
-    assert.ok(promptCommand.includes('${CLAUDE_PLUGIN_ROOT}/hooks/feynman-activate.ts'));
   });
 
   it('Feynman skill resolves Claude and Codex runtime homes', () => {

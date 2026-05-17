@@ -36,8 +36,8 @@
 ---
 
 A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex
-plugin that automatically injects ASCII diagram rules through `SessionStart`
-and `UserPromptSubmit` hooks.
+plugin that automatically injects ASCII diagram rules via the `SessionStart`
+hook (startup, resume, after `/compact`, after `/clear`).
 
 ```bash
 npx -y @albinocrabs/feynman@latest install --target all
@@ -55,13 +55,13 @@ structure is visible before you have to think about it.
 Conceptually, feynman is inspired by prompt-compression ideas from the Caveman
 agent style: smaller prompts, clearer intent, and explicit diagram-first thinking.
 
-### Why feynman uses UserPromptSubmit (not SessionStart)
+### How feynman survives context compaction
 
-Claude Code compacts the context window automatically as a conversation grows.
-Anything injected by a `SessionStart` hook is part of that early context and is
-lost the moment compaction runs. The `UserPromptSubmit` hook fires on every turn,
-so feynman re-injects its diagram rules after every compaction event — the rules
-survive the entire session, not just the opening turn.
+Claude Code's `SessionStart` hook fires not only at startup and resume, but also
+after `/compact` and `/clear` (matchers `compact` and `clear`). feynman
+registers all four matchers, so the diagram rules are re-injected automatically
+whenever the context window is reset — no per-turn overhead, no noise in every
+user message.
 
 ## Governance docs
 
@@ -206,22 +206,11 @@ Add to `~/.claude/settings.json` — use the absolute path, not `~/`
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume",
+        "matcher": "startup|resume|compact|clear",
         "hooks": [
           {
             "type": "command",
             "command": "node \"/absolute/path/to/feynman/hooks/feynman-session-start.js\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"/absolute/path/to/feynman/hooks/feynman-activate.js\"",
             "timeout": 5
           }
         ]
@@ -239,22 +228,11 @@ For Codex, add the same shape to `~/.codex/hooks.json` and set
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume",
+        "matcher": "startup|resume|compact|clear",
         "hooks": [
           {
             "type": "command",
             "command": "FEYNMAN_HOME=\"$HOME/.codex\" node \"/absolute/path/to/feynman/hooks/feynman-session-start.js\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "FEYNMAN_HOME=\"$HOME/.codex\" node \"/absolute/path/to/feynman/hooks/feynman-activate.js\"",
             "timeout": 5
           }
         ]
@@ -319,13 +297,11 @@ npx @albinocrabs/feynman doctor --target claude
 npx @albinocrabs/feynman doctor --target all
 ```
 
-A healthy target reports both hook events and both hook script files as `OK`:
+A healthy target reports the hook event and hook script file as `OK`:
 
 ```text
 [OK] hook registered (feynman-session-start.js in SessionStart)
-[OK] hook registered (feynman-activate.js in UserPromptSubmit)
 [OK] session hook script file exists and is readable
-[OK] prompt hook script file exists and is readable
 Status: OK
 ```
 
@@ -648,11 +624,11 @@ from day one.
 
 ## How it works
 
-The `SessionStart` hook primes fresh Claude Code or Codex sessions with the
-active rules, and the `UserPromptSubmit` hook reinforces them on every prompt.
-Both hooks read the target-local state file
-(`~/.claude/.feynman/state.json` or `~/.codex/.feynman/state.json`), extract
-the rules for the active intensity level, and inject them into model context.
+The `SessionStart` hook injects diagram rules at the start of each session and
+automatically re-injects them after `/compact` and `/clear` (matchers
+`startup|resume|compact|clear`). The hook reads the target-local state file
+(`~/.claude/.feynman/state.json` or `~/.codex/.feynman/state.json`), extracts
+the rules for the active intensity level, and injects them into model context.
 
 ```
 [your prompt]

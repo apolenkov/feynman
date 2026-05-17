@@ -218,7 +218,7 @@ class CodexAppServerClient {
 async function trustCodexHooks(client: CodexAppServerClient): Promise<{ command: string; trustStatus: string; eventName: string }> {
   const initial = await client.request('hooks/list', { cwd: REPO_DIR }) as { data: { hooks: { key: string; currentHash: string }[] }[] };
   const hooks = initial.data.flatMap((entry) => entry.hooks);
-  assert.ok(hooks.length >= 2, 'expected Feynman SessionStart and UserPromptSubmit hooks');
+  assert.ok(hooks.length >= 1, 'expected at least one Feynman hook (SessionStart)');
 
   const trustState: Record<string, { trusted_hash: string }> = {};
   for (const hook of hooks) {
@@ -236,15 +236,15 @@ async function trustCodexHooks(client: CodexAppServerClient): Promise<{ command:
 
   const verified = await client.request('hooks/list', { cwd: REPO_DIR }) as { data: { hooks: { command: string; trustStatus: string; eventName: string }[] }[] };
   const trustedHooks = verified.data.flatMap((entry) => entry.hooks);
-  const promptHook = trustedHooks.find((hook) => hook.eventName === 'userPromptSubmit');
-  assert.ok(promptHook, 'UserPromptSubmit hook should be listed');
-  assert.equal(promptHook.trustStatus, 'trusted');
-  return promptHook;
+  const sessionHook = trustedHooks.find((hook) => hook.eventName === 'sessionStart');
+  assert.ok(sessionHook, 'SessionStart hook should be listed');
+  assert.equal(sessionHook.trustStatus, 'trusted');
+  return sessionHook;
 }
 
 describe('Codex app-server hook visibility contract', () => {
   it(
-    'exposes Feynman UserPromptSubmit output as hook context entries',
+    'exposes Feynman SessionStart output as hook context entries',
     { skip: !codexAppServerAvailable() && 'codex app-server is not available' },
     async () => {
       const tmpHome = makeTempHome();
@@ -257,27 +257,20 @@ describe('Codex app-server hook visibility contract', () => {
 
         client.start();
         await client.initialize();
-        const promptHook = await trustCodexHooks(client);
-        assert.match(promptHook.command, /feynman-activate\.ts/);
+        const sessionHook = await trustCodexHooks(client);
+        assert.match(sessionHook.command, /feynman-session-start\.ts/);
 
-        const thread = await client.request('thread/start', {
+        const hookCompleted = client.waitForNotification(
+          'hook/completed',
+          (params) => (params as { run?: { eventName: string } }).run?.eventName === 'sessionStart'
+        );
+
+        await client.request('thread/start', {
           cwd: REPO_DIR,
           ephemeral: true,
           model: TEST_MODEL,
           approvalPolicy: 'never',
           sandbox: 'danger-full-access',
-        }) as { thread: { id: string } };
-
-        const hookCompleted = client.waitForNotification(
-          'hook/completed',
-          (params) => (params as { run?: { eventName: string } }).run?.eventName === 'userPromptSubmit'
-        );
-
-        await client.request('turn/start', {
-          threadId: thread.thread.id,
-          input: [{ type: 'text', text: 'Explain deploy pipeline stages.' }],
-          model: TEST_MODEL,
-          approvalPolicy: 'never',
         });
 
         const completed = await hookCompleted as {
@@ -293,7 +286,7 @@ describe('Codex app-server hook visibility contract', () => {
           completed.run.entries.some((entry) =>
             entry.kind === 'context' && /<triggers>|<contract>|→|├──/.test(entry.text)
           ),
-          'Codex should expose Feynman rule-file diagram tokens in hook/completed entries'
+          'Codex should expose Feynman rule-file diagram tokens in SessionStart hook/completed entries'
         );
       } finally {
         client.close();

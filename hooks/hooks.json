@@ -1,23 +1,13 @@
 {
-  "description": "Inject feynman ASCII diagram rules before each Claude Code prompt.",
+  "description": "Inject feynman ASCII diagram rules at session start (startup, resume, compact, clear).",
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "startup|resume|compact|clear",
         "hooks": [
           {
             "type": "command",
             "command": "FEYNMAN_HOME=\"$HOME/.claude\" node \"${CLAUDE_PLUGIN_ROOT}/hooks/feynman-session-start.ts\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "FEYNMAN_HOME=\"$HOME/.claude\" node \"${CLAUDE_PLUGIN_ROOT}/hooks/feynman-activate.ts\"",
             "timeout": 5
           }
         ]

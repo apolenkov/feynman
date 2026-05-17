@@ -3,7 +3,7 @@
 
 **feynman**
 
-feynman is an open-source Claude Code and Codex plugin that automatically injects ASCII diagram rules into every AI request via the `UserPromptSubmit` hook. When a response has structure — flow, hierarchy, comparison, status — feynman makes the assistant draw it as an ASCII diagram without the developer having to ask.
+feynman is an open-source Claude Code and Codex plugin that automatically injects ASCII diagram rules at session start (and after `/compact` and `/clear`) via the `SessionStart` hook. When a response has structure — flow, hierarchy, comparison, status — feynman makes the assistant draw it as an ASCII diagram without the developer having to ask.
 
 Tagline: "why explain in words when diagram do trick"
 
@@ -32,7 +32,7 @@ Tagline: "why explain in words when diagram do trick"
 | ESM (`import`/`export`) | Requires `"type": "module"` in package.json; zero-dep CJS is simpler |
 | `jq` for settings.json merge | Not universally installed; use `node -e` inline for portability |
 | npm dependencies | Zero-dep is a hard constraint; keeps install auditable and fast |
-| `SessionStart` hook instead of `UserPromptSubmit` | Only fires once — rules lost after context compaction |
+| `UserPromptSubmit` hook for rules injection | Per-turn injection is redundant once rules are in session history; use `SessionStart` with `compact\|clear` matcher instead |
 | `type: "prompt"` hook | LLM-interpreted, non-deterministic; rules injection must be exact text, not AI-summarized |
 | Mermaid / graphviz rendering | Out of scope per PROJECT.md; ASCII only |
 | Single flat `.clinerules` file | Cline deprecated flat file in favor of `.clinerules/` directory |
@@ -52,7 +52,7 @@ Tagline: "why explain in words when diagram do trick"
 | `.clinerules/` directory format (Cline) | HIGH | Multiple sources: everydev.ai analysis + Cline docs |
 | `.windsurf/rules/` format | MEDIUM | Single source (everydev.ai); Windsurf docs not directly verified |
 | `.cursor/rules/*.mdc` YAML frontmatter format | HIGH | Multiple sources: Cursor documentation + community reports |
-| `UserPromptSubmit` has no matcher support | HIGH | Official docs: "No matcher support — fires on every prompt submission" |
+| `SessionStart` matcher `startup\|resume\|compact\|clear` | HIGH | Verified via Context7 `code.claude.com/docs/en/hooks` 2026-05-17 |
 | Marketplace publish path | LOW | No public Anthropic documentation found for v1.0 marketplace submission |
 <!-- GSD:stack-end -->
 
@@ -68,7 +68,8 @@ Tagline: "why explain in words when diagram do trick"
 - Файлы рядом с хуком — через `__dirname`
 
 ### Вывод хука
-- Только `process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:'UserPromptSubmit',additionalContext:text}}))`
+- `feynman-activate.ts` (UserPromptSubmit, legacy): `process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:'UserPromptSubmit',additionalContext:text}}))`
+- `feynman-session-start.ts` (SessionStart, v0.7.0+): plain `process.stdout.write(rulesText)` — SessionStart принимает plain text
 - Без переноса строки в конце. Никогда `console.log` — добавляет `\n`, ломает JSON.
 
 ### Формат файла правил
@@ -99,18 +100,17 @@ Tagline: "why explain in words when diagram do trick"
 
 ```
 settings.json / hooks.json
-     │  срабатывает на каждый промт
+     │  SessionStart: startup | resume | compact | clear
      ▼
-feynman-activate.js
+feynman-session-start.ts
      │
      ├─ [1] защита session_id (path traversal)
      ├─ [2] флаг-файл ~/.claude/.feynman-active или ~/.codex/.feynman-active
-     │       нет флага + нет state  → bootstrap (первый запуск)
-     │       нет флага + state есть → exit 0 (отключён пользователем)
+     │       нет state → bootstrap (первый запуск)
+     │       state.enabled=false → exit 0 (отключён пользователем)
      ├─ [3] читать state.json → enabled? intensity?
      ├─ [4] читать rules/feynman-activate.md → извлечь секцию по intensity
-     ├─ [5] state.injections++
-     └─ [6] stdout: JSON additionalContext → инжектируется в каждый промт
+     └─ [5] stdout: plain-text rules → инжектируется в новый / resume / compact / clear контекст
                                                       │
                                                Claude Code / Codex / модель
 ```

@@ -4,6 +4,24 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## 0.7.0 - 2026-05-17
+
+### Changed
+
+- **Breaking behaviour:** rules now inject only at `SessionStart`
+  (`startup|resume|compact|clear`). The `UserPromptSubmit` hook is removed.
+  Token cost per session drops by ~1 100 tokens × number of user turns.
+  Rules survive `/compact` and `/clear` natively via the expanded matcher.
+- Motivation: per-turn injection was redundant once rules entered session
+  history. Cache-invalidation framing was investigated and rejected — the
+  verified cause of cache misses in long sessions is `/compact` summarisation
+  rewriting history, not feynman injection. The real gain is reduced context
+  noise and fewer tokens per turn.
+- Installer (`feynman install`) now registers only the `SessionStart` hook.
+  Legacy `UserPromptSubmit` feynman entries are removed during any install
+  (migration path for v0.6.x users).
+- `feynman doctor` no longer checks for a `UserPromptSubmit` hook entry.
+
 ## 0.6.1 - 2026-05-12
 
 ### Fixes
