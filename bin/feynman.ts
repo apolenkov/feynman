@@ -586,7 +586,7 @@ Claude creates:
   ~/.claude/.feynman-active        — presence flag
 
 Codex creates:
-  ~/.codex/hooks.json              — SessionStart + UserPromptSubmit hook registration
+  ~/.codex/hooks.json              — SessionStart hook registration (startup|resume|compact|clear)
   ~/.codex/.feynman/state.json     — feynman state (enabled, intensity, injections)
   ~/.codex/.feynman-active         — presence flag
 
@@ -612,7 +612,7 @@ ${c.bold('Usage:')}
 
 Checks:
   1. target hook config present
-  2. SessionStart and UserPromptSubmit hooks reference feynman scripts
+  2. SessionStart hook references feynman-session-start script
   3. Hook script files exist and are readable
   4. Rules file exists and is non-empty
   5. state.json valid JSON with enabled field
@@ -680,21 +680,13 @@ function isFeynmanHookCommand(command: string): boolean {
 
 function hasFeynmanHook(settings: Record<string, unknown>): boolean {
   const hooks = settings['hooks'] as Record<string, unknown[]> | undefined;
-  const promptHook = ((hooks?.['UserPromptSubmit'] ?? []) as Array<Record<string, unknown>>).some(g => {
-    const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
-    return hs?.some(h => typeof h['command'] === 'string' && (
-      (h['command'] as string).includes('feynman-activate.ts') ||
-      (h['command'] as string).includes('feynman-activate.js')
-    ));
-  });
-  const sessionHook = ((hooks?.['SessionStart'] ?? []) as Array<Record<string, unknown>>).some(g => {
+  return ((hooks?.['SessionStart'] ?? []) as Array<Record<string, unknown>>).some(g => {
     const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
     return hs?.some(h => typeof h['command'] === 'string' && (
       (h['command'] as string).includes('feynman-session-start.ts') ||
       (h['command'] as string).includes('feynman-session-start.js')
     ));
   });
-  return promptHook && sessionHook;
 }
 
 function hasAnyFeynmanHook(settings: Record<string, unknown>): boolean {
@@ -791,9 +783,8 @@ function installOne(target: string, opts: { force: boolean }): InstallResult {
   const cfg = readSettings(target) as Record<string, Record<string, unknown[]>>;
   cfg['hooks'] = cfg['hooks'] ?? {};
   cfg['hooks']['SessionStart'] = cfg['hooks']['SessionStart'] ?? [];
-  cfg['hooks']['UserPromptSubmit'] = cfg['hooks']['UserPromptSubmit'] ?? [];
 
-  // Idempotency check
+  // Idempotency check must happen BEFORE removeFeynmanHooks (v0.7.0+: SessionStart-only)
   const already = hasFeynmanHook(cfg as Record<string, unknown>);
 
   if (already && !force) {
@@ -802,38 +793,21 @@ function installOne(target: string, opts: { force: boolean }): InstallResult {
     return { target, already: true };
   }
 
-  // If force or partial legacy install, remove old feynman entries first.
-  if (already && force) {
-    removeFeynmanHooks(cfg as Record<string, unknown>);
-    cfg['hooks'] = cfg['hooks'] ?? {};
-    cfg['hooks']['SessionStart'] = cfg['hooks']['SessionStart'] ?? [];
-    cfg['hooks']['UserPromptSubmit'] = cfg['hooks']['UserPromptSubmit'] ?? [];
-  } else if (!already) {
-    removeFeynmanHooks(cfg as Record<string, unknown>);
-    cfg['hooks'] = cfg['hooks'] ?? {};
-    cfg['hooks']['SessionStart'] = cfg['hooks']['SessionStart'] ?? [];
-    cfg['hooks']['UserPromptSubmit'] = cfg['hooks']['UserPromptSubmit'] ?? [];
-  }
+  // Migration: clean up all legacy feynman hooks (UserPromptSubmit from v0.6.x and existing SessionStart)
+  removeFeynmanHooks(cfg as Record<string, unknown>);
+  cfg['hooks'] = cfg['hooks'] ?? {};
+  cfg['hooks']['SessionStart'] = cfg['hooks']['SessionStart'] ?? [];
 
-  // Append hook entries
+  // Append SessionStart hook entry (matcher fires on startup, resume, compact, and clear)
   const sessionEntry: Record<string, unknown> = {
+    matcher: 'startup|resume|compact|clear',
     hooks: [{
       type: 'command',
       command: hookCommandFor(target).replace(HOOK_PATH, SESSION_HOOK_PATH),
       timeout: 5,
     }]
   };
-  if (target === 'codex') {
-    sessionEntry['matcher'] = 'startup|resume';
-  }
   cfg['hooks']['SessionStart'].push(sessionEntry);
-  cfg['hooks']['UserPromptSubmit'].push({
-    hooks: [{
-      type: 'command',
-      command: hookCommandFor(target),
-      timeout: 5,
-    }]
-  });
 
   // Write settings
   writeSettings(target, cfg as Record<string, unknown>);
@@ -962,11 +936,9 @@ function cmdDoctor(opts: { target?: string; noExit?: boolean } = {}): void {
   const settingsExists = fs.existsSync(tc.settingsPath);
   check(`${tc.settingsPath.replace(HOME, '~')} present`, settingsExists);
 
-  // 2. SessionStart and UserPromptSubmit hooks reference feynman scripts
+  // 2. SessionStart hook references feynman-session-start script
   let sessionHookRegistered = false;
-  let hookRegistered = false;
   let sessionHookAbsPath: string | null = null;
-  let hookAbsPath: string | null = null;
   if (settingsExists) {
     const cfg = readSettings(target);
     const hooks = cfg['hooks'] as Record<string, Array<Record<string, unknown>>> | undefined;
@@ -991,33 +963,10 @@ function cmdDoctor(opts: { target?: string; noExit?: boolean } = {}): void {
           extractHookScriptPath(hookCmd, 'feynman-session-start.js');
       }
     }
-
-    const entries = hooks?.['UserPromptSubmit'] ?? [];
-    const feynmanEntry = entries.find(g => {
-      const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
-      return hs?.some(h => typeof h['command'] === 'string' && (
-        (h['command'] as string).includes('feynman-activate.ts') ||
-        (h['command'] as string).includes('feynman-activate.js')
-      ));
-    });
-    hookRegistered = !!feynmanEntry;
-    if (feynmanEntry) {
-      const hs = feynmanEntry['hooks'] as Array<Record<string, unknown>>;
-      const hookCmd = hs.find(h => typeof h['command'] === 'string' && (
-        (h['command'] as string).includes('feynman-activate.ts') ||
-        (h['command'] as string).includes('feynman-activate.js')
-      ))?. ['command'] as string | undefined;
-      if (hookCmd) {
-        hookAbsPath =
-          extractHookScriptPath(hookCmd, 'feynman-activate.ts') ??
-          extractHookScriptPath(hookCmd, 'feynman-activate.js');
-      }
-    }
   }
   check('hook registered (feynman-session-start in SessionStart)', sessionHookRegistered);
-  check('hook registered (feynman-activate in UserPromptSubmit)', hookRegistered);
 
-  // 3. Hook script files exist + readable
+  // 3. Hook script file exists + readable
   let sessionHookFileOk = false;
   if (sessionHookAbsPath) {
     try {
@@ -1026,15 +975,6 @@ function cmdDoctor(opts: { target?: string; noExit?: boolean } = {}): void {
     } catch (_) { /* intentionally empty */ }
   }
   check('session hook script file exists and is readable', sessionHookFileOk);
-
-  let hookFileOk = false;
-  if (hookAbsPath) {
-    try {
-      fs.accessSync(hookAbsPath, fs.constants.R_OK);
-      hookFileOk = true;
-    } catch (_) { /* intentionally empty */ }
-  }
-  check('prompt hook script file exists and is readable', hookFileOk);
 
   // 4. Rules file exists + non-empty
   let rulesOk = false;
