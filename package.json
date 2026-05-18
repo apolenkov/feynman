@@ -66,7 +66,7 @@
     "release": "npm run ci && npm publish \"dist/albinocrabs-feynman-$(node -e 'process.stdout.write(require(\"./package.json\").version)').tgz\" --access public"
   },
   "devDependencies": {
-    "@types/node": "^22.13.0",
+    "@types/node": "^25.9.0",
     "@typescript-eslint/eslint-plugin": "^8.22.0",
     "@typescript-eslint/parser": "^8.22.0",
     "eslint": "^8.57.1",
