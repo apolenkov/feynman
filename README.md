@@ -344,8 +344,8 @@ model's visuals can be (runtime hint).
 | Preset | Visuals allowed | Token cost vs. full | Use when |
 |--------|-----------------|---------------------|----------|
 | **short** | Inline glyphs + dot-leader only | ~−60% on status-heavy replies | Mobile, dense chat, voice input |
-| **middle** | + trees + markdown tables; frame ≥6 items | ~−25% | Balanced default |
-| **full** | + frame blocks + side-by-side + ASCII art | baseline (current default) | Spec docs, retros, design |
+| **middle** | + trees + markdown tables for ≥6 status items | ~−25% | Balanced default |
+| **full** | + side-by-side columns + ASCII art; frame only when lighter form loses information | baseline (current default) | Spec docs, retros, design |
 
 Toggle:
 
