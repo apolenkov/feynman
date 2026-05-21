@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## 1.0.1 - 2026-05-22
+
+### Fixes
+
+- Public docs (README pitch, docs/launch.md positioning, CHANGELOG summary)
+  no longer claim "status into frames" as the rules-emitted shape. The
+  smallest-visual-fits ladder still keeps frame as a last-resort fallback
+  when lighter forms lose information — docs now match that contract
+- Plan-writer checklist in docs/token-economy-planning.md updated from
+  "status frame" to "status list"
+
 ## 1.0.0 - 2026-05-22
 
 Stability marker after four breaking releases (0.4 IDE compat, 0.5 ABC ruleset,
