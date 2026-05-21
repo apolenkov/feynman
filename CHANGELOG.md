@@ -4,6 +4,45 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## 1.0.0 - 2026-05-22
+
+Stability marker after four breaking releases (0.4 IDE compat, 0.5 ABC ruleset,
+0.6 ESM, 0.7 SessionStart). Frame blocks are out — dot-leader and markdown table
+cover all status visuals.
+
+### Changed
+
+- **Breaking behaviour:** rules no longer recommend `frame block` for status
+  visuals. `<intensity name="lite|full|ultra">` triggers map `status` to
+  `dot-leader list` (default) or `markdown table` for ≥6 items. The
+  `<patterns selection="one-of">` block (status→frame, retro→frame,
+  handoff→frame, review→frame, incident→frame, release→frame,
+  decision→frame, verification→frame, roadmap→frame, phase→frame,
+  UAT→frame, risk-register→frame) is removed entirely
+- Motivation: frame blocks (`┌─...─┐`) wasted tokens on `─` and `│`
+  decoration without adding semantic separation in linear chat output.
+  Dot-leader lists and markdown tables convey the same status structure
+  with lower visual noise
+- Mutex semantics preserved: the `Mutex: at most one primary visual per
+  response.` rule moved from `<patterns>` into the `<contract>` block
+  of full intensity
+
+### Maintenance
+
+- CI matrix dropped Node 20 (incompatible with `engines.node >=22.6`
+  since v0.6.0)
+- Release workflow now pins Node 22
+- devDependencies bumped via dependabot (PR #3 `@types/node`, #4 eslint 10,
+  #5 typescript 6) — merged in this release
+
+### Migration
+
+- Existing installations: run `npx @albinocrabs/feynman install` to pick up
+  the new rules. `state.json` and `injections` counter are preserved
+- Plugin authors who depended on the `<patterns selection="one-of">` block
+  in feynman-activate.md must switch to the survived mutex rule in
+  `<contract>`
+
 ## 0.7.0 - 2026-05-17
 
 ### Changed
