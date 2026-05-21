@@ -17,7 +17,8 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
-    "skipLibCheck": false
+    "skipLibCheck": false,
+    "types": ["node"]
   },
   "include": [
     "hooks/**/*.ts",
