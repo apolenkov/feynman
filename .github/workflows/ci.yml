@@ -47,13 +47,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node == 22
         run: npm run test:docs
 
-      - name: Release smoke test
-        if: matrix.os == 'ubuntu-latest' && matrix.node == 22
-        run: npm run test:release
-
       - name: Build npm package
         if: matrix.os == 'ubuntu-latest' && matrix.node == 22
         run: npm run build
+
+      - name: Release smoke test
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 22
+        run: npm run test:release
 
       - name: Upload package artifact
         if: matrix.os == 'ubuntu-latest' && matrix.node == 22
