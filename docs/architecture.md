@@ -6,18 +6,16 @@ Three independent layers: hook lifecycle, lint pipeline, and state schema.
 
 ## Layer 1: Hook Lifecycle
 
-The `SessionStart` hook primes fresh Claude Code or Codex sessions with the
-active rules. The `UserPromptSubmit` hook fires before every prompt and
-reinforces the same rules as `additionalContext`.
+The `SessionStart` hook primes new sessions, resumed sessions, and sessions
+after `/compact` or `/clear`. `UserPromptSubmit` is not used — rules are
+injected once at session start and remain in context for the full session.
 
 ```
 ~/.claude/settings.json       ~/.codex/hooks.json
          │
-         ├─ hooks.SessionStart primes new sessions
-         │
-         └─ hooks.UserPromptSubmit reinforces every prompt
+         └─ hooks.SessionStart  startup | resume | compact | clear
          ▼
-hooks/feynman-session-start.js + hooks/feynman-activate.js
+hooks/feynman-session-start.js
          │
          ├─ [0] FEYNMAN_HOME selects client state root
          │        unset              → ~/.claude (backward compatible)
@@ -42,15 +40,14 @@ hooks/feynman-session-start.js + hooks/feynman-activate.js
          │
          ├─ [5] state.injections++  (write back)
          │
-         └─ [6] stdout: JSON additionalContext → injected into prompt
-                  {hookSpecificOutput: {hookEventName: 'UserPromptSubmit',
-                                        additionalContext: <rules text>}}
+         └─ [6] stdout: plain-text rules → injected into session context
+                  SessionStart hook accepts plain text (no JSON wrapper needed)
 ```
 
 **Key constraints:**
 
-- Output must be JSON with no trailing newline — plain stdout triggers
-  Claude Code's red error banner (bug #13912).
+- Output is plain text — `SessionStart` hooks emit rules text directly; no
+  JSON wrapper is needed or accepted.
 - Paths use `os.homedir()`, never tilde literals (bug #8810).
 - Production install writes user hook config directly:
   `~/.claude/settings.json` for Claude Code and `~/.codex/hooks.json` for
@@ -59,7 +56,7 @@ hooks/feynman-session-start.js + hooks/feynman-activate.js
 - Flag file checked before state file to detect intentional disabling
   vs. first run (bug #35713).
 
-**File:** `hooks/feynman-activate.js`
+**File:** `hooks/feynman-session-start.js`
 
 ---
 
