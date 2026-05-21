@@ -4,8 +4,9 @@
 
 feynman is a Claude Code and Codex plugin that makes structured answers
 visible by default. Flows become arrows, hierarchies become trees, comparisons
-become columns, priorities become scales, and status summaries become
-dot-leader lists or markdown tables.
+become columns, priorities become scales, and status summaries render at the
+smallest visual that fits — dot-leader by default, markdown table for larger
+sets, frame only when lighter forms lose information.
 
 ## One-liner
 

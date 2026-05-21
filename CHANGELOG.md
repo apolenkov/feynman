@@ -7,8 +7,9 @@ All notable changes to this project are documented here.
 ## 1.0.0 - 2026-05-22
 
 Stability marker after four breaking releases (0.4 IDE compat, 0.5 ABC ruleset,
-0.6 ESM, 0.7 SessionStart). Frame blocks are out — dot-leader and markdown table
-cover all status visuals.
+0.6 ESM, 0.7 SessionStart). Frame blocks are no longer the default for status
+visuals — dot-leader and markdown table take over; the smallest-visual-fits
+ladder still allows frame as a last resort when lighter forms lose information.
 
 ### Changed
 
