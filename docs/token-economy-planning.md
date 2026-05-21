@@ -11,7 +11,7 @@ diagram.
 
 ## How feynman flips this
 
-feynman injects diagram rules into every prompt via the `UserPromptSubmit` hook,
+feynman injects diagram rules at session start via the `SessionStart` hook,
 so the assistant draws structure instead of narrating it:
 
 ```
