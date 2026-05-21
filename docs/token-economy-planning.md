@@ -98,7 +98,7 @@ Over-decorated single item (use a dot-leader instead):
 - Does every sequence of steps have an `[A] → [B] → [C]` arrow diagram?
 - Does every branching decision have a yes/no tree instead of "if X then ... otherwise ..."?
 - Does every parallel track have a side-by-side block instead of a numbered list?
-- Does every table or status frame stand alone, with prose only for what the visual cannot express?
+- Does every table or status list stand alone, with prose only for what the visual cannot express?
 - Is there a preamble sentence that says what the diagram is about to show? Delete it.
 
 ## Beyond planning — delegation
