@@ -49,8 +49,9 @@ npx -y @albinocrabs/feynman@latest doctor --target codex
 Structured information explained in prose forces you to rebuild the structure
 in your head before you can reason about it. feynman intercepts every Claude
 Code or Codex prompt and injects rules that turn flows into arrows,
-hierarchies into trees, comparisons into columns, and status into frames. The
-structure is visible before you have to think about it.
+hierarchies into trees, comparisons into columns, and status into dot-leader
+lists or markdown tables. The structure is visible before you have to think
+about it.
 
 Conceptually, feynman is inspired by prompt-compression ideas from the Caveman
 agent style: smaller prompts, clearer intent, and explicit diagram-first thinking.
