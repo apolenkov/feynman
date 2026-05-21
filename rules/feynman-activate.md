@@ -7,8 +7,7 @@
 | hierarchy ≥3  | 2-space indent  |
 | branching     | ASCII tree      |
 | comparison    | markdown table  |
-| status ≤5     | dot-leader list |
-| status ≥6     | frame block     |
+| status        | dot-leader list |
 | priority      | ▲▼ scale        |
 | state-machine | states+arrows   |
 </triggers>
@@ -47,8 +46,7 @@ Smallest visual fits: prose<glyph<dot-leader<tree<table<frame.
 | hierarchy ≥3  | ASCII tree      |
 | branching     | ASCII tree      |
 | comparison    | markdown table  |
-| status ≤5     | dot-leader list |
-| status ≥6     | frame block     |
+| status        | dot-leader list |
 | priority      | ▲▼ scale        |
 | state-machine | states+arrows   |
 | mapping       | pairs grid      |
@@ -73,23 +71,15 @@ tests
 └── e2e
 ```
 </examples>
-<patterns selection="one-of">
-Mutex — at most one per response.
-status→frame:state/branch/commit/checks | retro→DONE/WORKED/FRAGILE/LEFT
-handoff→NOW/NEXT/FILES/COMMANDS/RISK | review→FINDINGS/QUESTIONS/SUMMARY
-incident→IMPACT/CAUSE/FIX/PREVENTION | release→CHANGED/VERIFIED/RISK/ROLLBACK
-decision→CONTEXT/OPTIONS/CHOICE/CONSEQUENCE | verification→command/result/evidence/gap
-roadmap→NOW/NEXT/LATER/BLOCKED | phase→GOAL/SCOPE/PLAN/VERIFY/EXIT
-UAT→SCENARIO/EXPECTED/ACTUAL/RESULT | risk-register→RISK/IMPACT/MITIGATION/OWNER
-</patterns>
 <contract>
 1. Classify shape: sequence, hierarchy, comparison, status, priority, branching,
    state-machine, mapping, or none.
 2. Channel / amplify / suppress per trigger table.
 3. Suppress: definition queries, recommendation queries, greeting, conversational
    question-back — answer stays in prose, no visual added.
-4. Smallest visual fits: prose<glyph<dot-leader<tree<table<frame. Climb only if lighter form loses information.
-5. Rules apply to .md plan files (plan.md, PLAN.md, .planning/**, goals/**).
+4. Mutex: at most one primary visual per response.
+5. Smallest visual fits: prose<glyph<dot-leader<tree<table<frame. Climb only if lighter form loses information.
+6. Rules apply to .md plan files (plan.md, PLAN.md, .planning/**, goals/**).
 **bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
@@ -102,7 +92,7 @@ UAT→SCENARIO/EXPECTED/ACTUAL/RESULT | risk-register→RISK/IMPACT/MITIGATION/O
 | hierarchy ≥2      | ASCII tree      |
 | branching         | ASCII tree      |
 | comparison        | markdown table  |
-| status            | frame block     |
+| status            | markdown table  |
 | priority          | ▲▼ scale        |
 | state-machine     | states+arrows   |
 | mapping           | pairs grid      |
