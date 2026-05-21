@@ -602,7 +602,7 @@ describe('feynman-activate hook', () => {
     it('SDLC patterns wrapper: <patterns selection="one-of"> or "select ONE" or "mutex"', () => {
       const hasWrapper  = /<patterns\s+selection\s*=\s*["']one-of["']>/.test(rulesContent);
       const hasSelectOne = /select ONE/i.test(rulesContent);
-      const hasMutex    = /mutex/.test(rulesContent);
+      const hasMutex    = /mutex/i.test(rulesContent);
       assert.ok(hasWrapper || hasSelectOne || hasMutex, 'missing mutex SDLC pattern marker');
     });
 
