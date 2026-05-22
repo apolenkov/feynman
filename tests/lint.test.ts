@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import { lint, format } from '../lib/lint/index.ts';
 import { parse } from '../lib/lint/parser.ts';
 import { estimateFrameCost } from '../lib/lint/rules.ts';
+import { lastVisualColumnOf, firstVisualColumnOf } from '../lib/lint/width.ts';
 
 const require = createRequire(import.meta.url);
 const cases = require(path.resolve(import.meta.dirname, 'lint-cases.json')) as Array<{
@@ -611,5 +612,26 @@ describe('format() output modes', () => {
   it('empty issues returns empty string in gcc mode', () => {
     const out = format([], 'gcc', 'test.md', false);
     assert.equal(out, '');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// width.ts — lastVisualColumnOf / firstVisualColumnOf ANSI + not-found branches
+// ---------------------------------------------------------------------------
+describe('width.ts — ANSI escape handling in column search', () => {
+  it('lastVisualColumnOf: ANSI escapes skipped, col counts visible chars only', () => {
+    // '\x1b[31m' (5 chars) skipped, then r(col=1) e(col=2) d(col=3), '\x1b[0m' skipped.
+    // Last 'd' lands at col 3.
+    assert.equal(lastVisualColumnOf('\x1b[31mred\x1b[0m', 'd'), 3);
+  });
+
+  it('firstVisualColumnOf: ANSI escapes skipped, returns col of first match', () => {
+    // '\x1b[31m' (5 chars) skipped, then r(col=1) is the first match.
+    assert.equal(firstVisualColumnOf('\x1b[31mred\x1b[0m', 'r'), 1);
+  });
+
+  it('firstVisualColumnOf: returns -1 when char is not found in string', () => {
+    // 'z' never appears in 'abc'; loop exhausts → return -1 (line 114)
+    assert.equal(firstVisualColumnOf('abc', 'z'), -1);
   });
 });
