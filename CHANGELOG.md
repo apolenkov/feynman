@@ -4,17 +4,46 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## 1.1.0 - 2026-05-22
+
+### Features
+
+- New lightweight diagram triggers in the injected rules, all using
+  token-frugal minimal notation (no heavy frames, no UML boilerplate):
+  - sequence messages: `A->>B: msg` (sync) / `A-->>B: ok` (return)
+  - activity flow: `[step] -> [decision?] -> [step]` arrow chains
+  - C4 context: `Person(x) --> WebApp: label` (no Boundary macros)
+  - 2-column comparison via a single `│` separator (not a markdown table)
+- Seven design principles baked into the `<contract>` blocks: explicit
+  smallest-visual-fits ladder, mutex (now in lite too), terse-label rule,
+  horizontal-flow default for ≤5 nodes, single-`│` 2-column compare, and
+  plan-then-render (enumerate entities before drawing) for >3 entities
+- New lint rule **L14 — blank-line separation**: warns when a fenced diagram
+  block is not separated from surrounding prose by a blank line
+
+### Documentation
+
+- New clean examples: sequence-messages, activity-flow, layout-columns,
+  mapping-pairs; C4 example realigned to the minimal arrow notation
+- README: honest "Prompt caching" section — the rule block sits below
+  Anthropic's cache token thresholds, so caching is a harness-level concern,
+  not a plugin feature; savings come from SessionStart-only injection +
+  concise output
+
 ### Internal
 
 - +12 characterization tests close the line-coverage gap; CI coverage gate
-  restored from temporary 94% back to 95% (all-files now 96.91%)
+  restored from temporary 94% back to 95% (all-files now 96.75%)
 - eslint flat config (`eslint.config.mjs`) added for eslint 10; `npm run
   eslint` (0 findings) is now a CI gate (ubuntu, Node 22)
 - `FEYNMAN_RULES_PATH` env override added as a test seam — lets the hook tests
   drive the real source instead of patched copies (feynman-activate.ts 87.83%
   → 98.41%). Production behaviour unchanged when the var is unset
-- codex-app-server test now skips gracefully when the server is unreachable
-  (was the sole failing test); suite is 385 pass / 0 fail / 1 skip
+- codex-app-server test now skips gracefully when the server is unreachable;
+  suite is 404 pass / 0 fail / 1 skip
+- token-heavy example frames (incident-response, activity-sequence, C4
+  delivery-readiness) converted to dot-leader lists, modelling the plugin's
+  own L11 guidance
 
 ## 1.0.1 - 2026-05-22
 
