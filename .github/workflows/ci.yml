@@ -47,6 +47,10 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node == 22
         run: npm run test:docs
 
+      - name: Run eslint
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 22
+        run: npm run eslint
+
       - name: Build npm package
         if: matrix.os == 'ubuntu-latest' && matrix.node == 22
         run: npm run build
