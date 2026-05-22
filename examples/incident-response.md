@@ -51,12 +51,10 @@ Triage and restore sequence:
 Live status summary:
 
 ```
-┌─ Incident Runbook ────────────────────┐
-  step-1        in-progress
-  step-2        pending
-  step-3        pending
-  external-comm on-call-channel
-└───────────────────────────────────────┘
+step-1        ......... in-progress
+step-2        ......... pending
+step-3        ......... pending
+external-comm ......... on-call-channel
 ```
 
 Priority gates:
