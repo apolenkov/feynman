@@ -475,5 +475,37 @@
     "expected": "fail",
     "input": "```\n┌────────────────────┐\n│ root               │\n│ ├── a              │\n│ │   ├── a-1       │\n│ │   └── a-2       │\n│ └── b              │\n└────────────────────┘\n```",
     "expected_issues": [{"rule": "L13"}]
+  },
+  {
+    "name": "L14 pass — diagram with blank lines on both sides",
+    "rule": "L14",
+    "expected": "pass",
+    "input": "prose before\n\n```\n[A] → [B] → [C]\n```\n\nprose after"
+  },
+  {
+    "name": "L14 pass — diagram at start of file (no before line)",
+    "rule": "L14",
+    "expected": "pass",
+    "input": "```\n[A] → [B]\n```\n\nprose after"
+  },
+  {
+    "name": "L14 pass — diagram at end of file (no after line)",
+    "rule": "L14",
+    "expected": "pass",
+    "input": "prose before\n\n```\n[A] → [B]\n```"
+  },
+  {
+    "name": "L14 fail — prose line directly before opening fence",
+    "rule": "L14",
+    "expected": "fail",
+    "input": "prose before\n```\n[A] → [B] → [C]\n```\n\nprose after",
+    "expected_issues": [{"rule": "L14"}]
+  },
+  {
+    "name": "L14 fail — prose line directly after closing fence",
+    "rule": "L14",
+    "expected": "fail",
+    "input": "prose before\n\n```\n[A] → [B] → [C]\n```\nprose after",
+    "expected_issues": [{"rule": "L14"}]
   }
 ]
