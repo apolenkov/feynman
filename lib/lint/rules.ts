@@ -202,13 +202,30 @@ export function L02_tree_chars(ast: ASTNode): Issue[] {
 // ---------------------------------------------------------------------------
 // L03 — Arrow style
 // Only ONE arrow style allowed per diagram.
-// Allowed styles: -->, →, ─→, ──>
+// Allowed styles: -->, →, ─→, ──>, and seq-msg family (->> / -->>)
+//
+// Sequence family: ->> (sync call) and -->> (return) are two variants of ONE
+// logical style. Both map to name 'seq-msg' so a normal sequence diagram that
+// uses both does NOT trigger L03 mixed-styles.
+//
+// Pattern order matters — longest / most-specific first so that -->> is
+// matched before --> (which would otherwise eat the first two dashes).
+//
+// Mixing seq-msg with flow arrows (e.g. -->) IS flagged as mixed styles;
+// the two families represent fundamentally different diagram idioms.
 // ---------------------------------------------------------------------------
 const ARROW_PATTERNS: Array<{name: string, re: RegExp}> = [
-  { name: '→',   re: /(?<![─-])→/ },
-  { name: '-->',  re: /-->/ },
-  { name: '─→',  re: /─→/ },
-  { name: '──>', re: /──>/ },
+  // seq-msg family: -->> first (return), then ->> (sync call, not tail of -->>)
+  { name: 'seq-msg', re: /-->>/ },
+  { name: 'seq-msg', re: /(?<!-)->>/ },     // ->> not preceded by - (so it isn't the tail of -->>)
+  // flow arrows — --> must exclude --> that is the head of -->> (handled by seq-msg above),
+  // but since seq-msg is checked first and found.set() guards duplicates, we only need to
+  // avoid counting -->> as --> which the seq-msg pattern already captures.
+  // The (?!>) lookahead ensures --> inside -->> isn't double-counted as a flow arrow.
+  { name: '-->',     re: /-->(?!>)/ },
+  { name: '→',       re: /(?<![─-])→/ },
+  { name: '─→',      re: /─→/ },
+  { name: '──>',     re: /──>/ },
 ];
 
 export function L03_arrow_style(ast: ASTNode): Issue[] {
@@ -331,7 +348,10 @@ export function L04_column_widths(ast: ASTNode): Issue[] {
 // Two [Box] tokens on same line require an arrow between them
 // ---------------------------------------------------------------------------
 const BOX_RE = /\[[^\]]+\]/g;
-const ARROW_RE = /-->|→|─→|──>/;
+// L05: longest-match-first so -->> is consumed before --> is tried.
+// ->> / -->> added for sequence-diagram lines that use [box] notation.
+// Bare -> intentionally excluded (rules promote → for activity flow).
+const ARROW_RE = /-->>|->>|-->|→|─→|──>/;
 
 export function L05_flow_integrity(ast: ASTNode): Issue[] {
   if (!ast || !ast.content) return [];
