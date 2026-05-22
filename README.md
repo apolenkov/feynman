@@ -673,6 +673,33 @@ rules explicitly suppress diagrams for one- or two-sentence direct answers.
 Use `/feynman lite` for lower overhead or `/feynman off` when token budget is
 more important than visual structure.
 
+## Prompt caching
+
+Anthropic's prompt caching works on a **prefix-match, byte-exact** basis: the
+leading portion of a request must be byte-for-byte identical across turns before
+the API will reuse a cached entry. There is also a minimum token threshold —
+roughly 1024 tokens for Sonnet 4/4.5, 2048 for Sonnet 4.6, and 4096 for Opus
+4.x / Haiku 4.5 (per Anthropic docs, 2026). A cached prefix also expires after
+about 5 minutes of inactivity.
+
+The feynman rule block is 317–532 tokens depending on intensity — **below every
+threshold**. It cannot form its own cache entry.
+
+What feynman does control, and gets right: the injected text is fully static.
+No timestamps, no session IDs, no per-turn values. That means the block is a
+stable byte sequence, so it does not *break* any larger cache entry it sits
+inside.
+
+What feynman does not control: whether the surrounding context — system prompt,
+tool definitions, and other harness-injected content — is large enough and
+stable enough to cross a caching threshold. That is the client harness's
+concern, not the plugin's.
+
+**Net:** feynman's token economics come from two things it directly controls —
+injecting rules once at `SessionStart` (not per-turn) and encouraging concise
+diagram output instead of verbose prose. Prompt caching, if it fires at all, is
+a harness-level bonus outside the plugin's scope.
+
 ## Release process
 
 Every push runs tests on Node 18 and 20 across Ubuntu and macOS. The release
