@@ -507,5 +507,30 @@
     "expected": "fail",
     "input": "prose before\n\n```\n[A] → [B] → [C]\n```\nprose after",
     "expected_issues": [{"rule": "L14"}]
+  },
+  {
+    "name": "L03 pass — sequence diagram uses both ->> and -->> (same seq-msg family)",
+    "rule": "L03",
+    "expected": "pass",
+    "input": "```\nClient ->> API : POST /login\nAPI    ->> DB  : SELECT user\nDB   -->> API  : user row\nAPI -->> Client : 200 OK\n```"
+  },
+  {
+    "name": "L03 fail — mixing flow --> with seq ->> is mixed styles",
+    "rule": "L03",
+    "expected": "fail",
+    "input": "```\n[A] --> [B]\nClient ->> API : call\n```",
+    "expected_issues": [{"rule": "L03"}]
+  },
+  {
+    "name": "L05 pass — two boxes connected with ->> (seq arrow recognized)",
+    "rule": "L05",
+    "expected": "pass",
+    "input": "```\n[Client] ->> [API]\n```"
+  },
+  {
+    "name": "L05 pass — two boxes connected with -->> (return arrow recognized)",
+    "rule": "L05",
+    "expected": "pass",
+    "input": "```\n[API] -->> [Client]\n```"
   }
 ]

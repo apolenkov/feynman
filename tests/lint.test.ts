@@ -203,6 +203,33 @@ describe('L03 arrow style — unit tests', () => {
     // Message should name the conflicting styles
     assert.ok(l03[0]!.message.includes('-->' ) || l03[0]!.message.includes('→'));
   });
+
+  // --- seq-msg family ---
+  it('seq diagram with both ->> and -->> does NOT trigger L03 (same family)', () => {
+    const md = '```\nClient ->> API : POST /login\nDB   -->> API  : user row\nAPI -->> Client : 200 OK\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L03').length, 0,
+      'sync ->> and return -->> must not be flagged as mixed styles');
+  });
+
+  it('only ->> (no -->> in diagram) passes L03', () => {
+    const md = '```\nA ->> B : call\nB ->> C : forward\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L03').length, 0);
+  });
+
+  it('only -->> passes L03', () => {
+    const md = '```\nB -->> A : done\nC -->> B : ack\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L03').length, 0);
+  });
+
+  it('mixing flow --> with seq ->> IS flagged as mixed styles', () => {
+    const md = '```\n[A] --> [B]\nClient ->> API : call\n```';
+    const result = lint(md);
+    assert.ok(result.issues.filter(i => i.rule === 'L03').length >= 1,
+      'flow --> and seq ->> are different families and should be flagged');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -258,6 +285,20 @@ describe('L05 flow integrity — unit tests', () => {
     const result = lint(md);
     // Parallel layout uses 3+ spaces gap — should not be flagged
     assert.equal(result.issues.filter(i => i.rule === 'L05').length, 0);
+  });
+
+  it('[A] ->> [B] is not flagged (seq arrow recognized by L05)', () => {
+    const md = '```\n[Client] ->> [API]\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L05').length, 0,
+      '->> must count as an arrow between boxes');
+  });
+
+  it('[A] -->> [B] is not flagged (return seq arrow recognized by L05)', () => {
+    const md = '```\n[API] -->> [Client]\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L05').length, 0,
+      '-->> must count as an arrow between boxes');
   });
 });
 
