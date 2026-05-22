@@ -71,7 +71,7 @@ jobs:
           path: coverage/lcov.info
           retention-days: 7
 
-      - name: Check coverage threshold (≥94% lines)
+      - name: Check coverage threshold (≥95% lines)
         if: matrix.os == 'ubuntu-latest' && matrix.node == 22
         run: |
           # Extract line coverage percentage from native node coverage report
@@ -79,14 +79,12 @@ jobs:
           COVERAGE=$(npm run coverage 2>&1 | grep -i "all files" | head -1 | awk -F'|' '{gsub(/[^0-9.]/,"",$2); print $2}')
           echo "Line coverage: ${COVERAGE}%"
           # Use awk for float comparison (bash can't do floats)
-          # Threshold 94% accommodates flap around the 95% boundary; tighten
-          # back once a stable test gap is identified and closed.
           awk -v cov="${COVERAGE}" 'BEGIN {
-            if (cov+0 < 94) {
-              print "FAIL: Coverage " cov "% is below 94% threshold"
+            if (cov+0 < 95) {
+              print "FAIL: Coverage " cov "% is below 95% threshold"
               exit 1
             } else {
-              print "PASS: Coverage " cov "% meets >=94% threshold"
+              print "PASS: Coverage " cov "% meets >=95% threshold"
               exit 0
             }
           }'
