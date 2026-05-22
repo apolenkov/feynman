@@ -72,7 +72,7 @@ describe('Golden cases (lint-cases.json)', () => {
 // Rule coverage check: each L01-L08 exercised by ≥2 cases (1 pass + 1 fail)
 // ---------------------------------------------------------------------------
 describe('Rule coverage: each rule has ≥1 pass and ≥1 fail case', () => {
-  const ruleIds = ['L01', 'L02', 'L03', 'L04', 'L05', 'L06', 'L07', 'L08', 'L09', 'L10', 'L11', 'L12', 'L13'];
+  const ruleIds = ['L01', 'L02', 'L03', 'L04', 'L05', 'L06', 'L07', 'L08', 'L09', 'L10', 'L11', 'L12', 'L13', 'L14'];
 
   for (const ruleId of ruleIds) {
     it(`${ruleId} has at least one pass case`, () => {
@@ -633,5 +633,95 @@ describe('width.ts — ANSI escape handling in column search', () => {
   it('firstVisualColumnOf: returns -1 when char is not found in string', () => {
     // 'z' never appears in 'abc'; loop exhausts → return -1 (line 114)
     assert.equal(firstVisualColumnOf('abc', 'z'), -1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// L14 — Blank-line separation: unit tests
+// ---------------------------------------------------------------------------
+describe('L14 blank-line separation — unit tests', () => {
+  it('diagram with blank lines on both sides: no L14', () => {
+    const md = 'prose before\n\n```\n[A] → [B]\n```\n\nprose after';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L14').length, 0);
+  });
+
+  it('prose line directly before opening fence: L14 warn', () => {
+    const md = 'prose before\n```\n[A] → [B]\n```\n\nprose after';
+    const result = lint(md);
+    const l14 = result.issues.filter(i => i.rule === 'L14');
+    assert.ok(l14.length >= 1, 'should detect missing blank line before fence');
+    assert.equal(l14[0]!.severity, 'warn');
+    assert.ok(l14[0]!.message.includes('blank line'));
+  });
+
+  it('prose line directly after closing fence: L14 warn', () => {
+    const md = 'prose before\n\n```\n[A] → [B]\n```\nprose after';
+    const result = lint(md);
+    const l14 = result.issues.filter(i => i.rule === 'L14');
+    assert.ok(l14.length >= 1, 'should detect missing blank line after fence');
+    assert.equal(l14[0]!.severity, 'warn');
+  });
+
+  it('both sides missing blank line: two L14 warns', () => {
+    const md = 'prose before\n```\n[A] → [B]\n```\nprose after';
+    const result = lint(md);
+    const l14 = result.issues.filter(i => i.rule === 'L14');
+    assert.equal(l14.length, 2, `expected 2 L14 issues, got ${l14.length}`);
+  });
+
+  it('block at start of file (no "before"): no false positive', () => {
+    const md = '```\n[A] → [B]\n```\n\nprose after';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L14').length, 0);
+  });
+
+  it('block at end of file (no "after"): no false positive', () => {
+    const md = 'prose before\n\n```\n[A] → [B]\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L14').length, 0);
+  });
+
+  it('block is first and last in file: no false positive', () => {
+    const md = '```\n[A] → [B]\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L14').length, 0);
+  });
+
+  it('consecutive code blocks (fence directly follows fence): no L14 between them', () => {
+    // closing ``` of block 1 directly before opening ``` of block 2 — lenient
+    const md = 'prose\n\n```\n[A] → [B]\n```\n```\n[C] → [D]\n```\n\nprose';
+    const result = lint(md);
+    // The second block has a fence line (```) directly before it — must not warn.
+    const l14 = result.issues.filter(i => i.rule === 'L14');
+    assert.equal(l14.length, 0, `expected no L14, got ${JSON.stringify(l14)}`);
+  });
+
+  it('heading directly before fence: no L14 (heading is structural, not prose)', () => {
+    const md = '## Section\n```\n[A] → [B]\n```\n\nprose';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L14').length, 0);
+  });
+
+  it('standalone diagram (no fences): no L14', () => {
+    // Standalone blocks are not fenced — L14 does not apply.
+    const md = 'prose before\n[A] → [B]\nprose after';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L14').length, 0);
+  });
+
+  it('diagram with no diagram chars: no L14', () => {
+    // A fenced block without box-drawing / arrows / tree chars should not fire.
+    const md = 'prose\n```\njust text without diagram chars\n```\nprose';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L14').length, 0);
+  });
+
+  it('suggestion references the fence direction', () => {
+    const md = 'prose before\n```\n[A] → [B]\n```\n\nprose after';
+    const result = lint(md);
+    const l14 = result.issues.filter(i => i.rule === 'L14');
+    assert.ok(l14.length >= 1);
+    assert.ok(l14[0]!.suggestion !== undefined && l14[0]!.suggestion!.length > 0);
   });
 });
