@@ -7,9 +7,14 @@ All notable changes to this project are documented here.
 ### Internal
 
 - +12 characterization tests close the line-coverage gap; CI coverage gate
-  restored from temporary 94% back to 95% (all-files now 95.98%)
+  restored from temporary 94% back to 95% (all-files now 96.91%)
 - eslint flat config (`eslint.config.mjs`) added for eslint 10; `npm run
-  eslint` works again (0 findings). Standalone dev command, not yet a CI gate
+  eslint` (0 findings) is now a CI gate (ubuntu, Node 22)
+- `FEYNMAN_RULES_PATH` env override added as a test seam — lets the hook tests
+  drive the real source instead of patched copies (feynman-activate.ts 87.83%
+  → 98.41%). Production behaviour unchanged when the var is unset
+- codex-app-server test now skips gracefully when the server is unreachable
+  (was the sole failing test); suite is 385 pass / 0 fail / 1 skip
 
 ## 1.0.1 - 2026-05-22
 
