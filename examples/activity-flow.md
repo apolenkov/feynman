@@ -28,7 +28,7 @@ is redirected to the confirmation page.
       v
 [check for duplicate]
       |
-  found? --yes-> [409 Conflict response]
+  found? --yes--> [409 Conflict response]
       |
       no
       |
