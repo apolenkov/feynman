@@ -17,96 +17,85 @@ text mode so the user is not blocked.
 
 ## With feynman
 
-### C4 context
+### C4 context (who uses what)
 
 ```
-feynman-system
-├── actors
-│   ├── [Document Author]
-│   ├── [Reviewer]
-│   └── [Operator]
-├── containers
-│   ├── [Web Client]
-│   ├── [Prompt Gateway API]
-│   ├── [Rule Service]
-│   ├── [Diagram Renderer]
-│   └── [Quality Service]
-└── external systems
-    ├── [SSO]
-    ├── [Template Storage]
-    ├── [Model Provider]
-    └── [Observability]
+Person(Author)    --> WebApp: writes docs
+Person(Reviewer)  --> WebApp: reviews output
+Person(Operator)  --> WebApp: monitors system
+WebApp            --> PromptGateway: HTTPS
+PromptGateway     --> SSO: auth
+PromptGateway     --> ModelProvider: inference
+PromptGateway     --> Observability: metrics
 ```
 
-### C4 container run
+### C4 containers (runtime boundaries)
 
 ```
-[Document Author] --> [Web Client]
-                      |
-                      v
-[Reviewer]       --> [Prompt Gateway API]
-                      |
-                      v
-                      [Auth + Rate Limit]
-                              |
-                              +-- unauthorized --> [403 / 401]
-                              |
-                              +-- authorized
-                                    |
-                                    v
-                               [Rule Service]
-                                    |
-                                    +-- rule set miss --> [Text fallback]
-                                    |
-                                    +-- rule set hit
-                                          |
-                                          v
-                                     [Diagram Renderer]
-                                          |
-                                          v
-                                       [Quality Service]
-                                          |
-                                          +-- blocked --> [Recovery Plan]
-                                          |
-                                          +-- pass --> [JSON response]
-                                          |
-                                          v
-                                  [Observability publish]
-                                          |
-                                          v
-                                   [Document Author/Reviewer]
+Person(Author) --> Container(WebApp): HTTPS
+Container(WebApp) --> Container(PromptGateway): REST
+Container(PromptGateway) --> Container(RuleService): gRPC
+Container(PromptGateway) --> Container(QualityService): gRPC
+Container(RuleService) --> ExternalSystem(TemplateStorage): S3
+Container(QualityService) --> ExternalSystem(Observability): metrics
 ```
 
-### Architecture split
+### C4 request flow (happy path + fallback)
 
 ```
-criterion      | Context (C1)        | Containers (C2)      | Components (C3)
----------------|---------------------|----------------------|----------------------
-Main question  | Who talks to what   | Who owns boundary    | Who owns behavior
-Primary risk   | Missing actor path   | Wrong trust boundary  | Rule fallback bug
-Owner now      | Product + Ops       | Backend + Security    | Runtime rule authors
+[Author request]
+      |
+      v
+[PromptGateway: auth + rate-limit]
+      |
+  unauthorized --> [401 / 403]
+      |
+  authorized
+      |
+      v
+[RuleService: load rule set]
+      |
+  miss --> [text fallback mode]
+      |
+  hit
+      |
+      v
+[DiagramRenderer]
+      |
+      v
+[QualityService: validate]
+      |
+  blocked --> [RecoveryPlan]
+      |
+  pass
+      |
+      v
+[JSON response to Author]
 ```
 
-### Why this helps
+### Architecture decision lens
 
 ```
-┌─ Delivery readiness ────────────┐
-  context map     done
-  container flow   done
-  component split done
-  risk hotspots   identified
-└─────────────────────────────────┘
+criterion      | C1 Context       | C2 Containers     | C3 Components
+---------------|------------------|-------------------|-------------------
+Main question  | who talks to what| who owns boundary | who owns behavior
+Primary risk   | missing actor    | wrong trust zone  | rule fallback bug
+Owner          | Product + Ops    | Backend + Security| Rule authors
+```
+
+### Delivery readiness
+
+```
+context map    ......... done
+container flow ......... done
+component split ........ done
+risk hotspots  ......... identified
 ```
 
 ## Why this works
 
 Without explicit structure, the explanation is a dense paragraph. With the C4
-perspective, Feynman converts it into:
-- actor/system decomposition,
-- runtime sequence,
-- boundary+fallback behavior,
-- and explicit risk visibility.
-
-The result is understandable quickly and can be reviewed or extended as a
-single architecture baseline.
-
+perspective, feynman converts it into actor/system decomposition, runtime
+sequence, boundary and fallback behavior, and explicit risk visibility.
+`Type(name) --> Type(name): label` is the minimal C4 arrow notation — readable
+cold without a legend.
