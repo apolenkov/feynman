@@ -25,7 +25,7 @@ const CLIENT_HOME = process.env['FEYNMAN_HOME'] || path.join(HOME, '.claude');
 const FEYNMAN_DIR = path.join(CLIENT_HOME, '.feynman');
 const STATE_PATH  = path.join(FEYNMAN_DIR, 'state.json');
 const FLAG_PATH   = path.join(CLIENT_HOME, '.feynman-active');
-const RULES_PATH  = path.join(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
+const RULES_PATH  = process.env['FEYNMAN_RULES_PATH'] || path.join(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
 
 const DEFAULT_STATE: FeynmanState = { enabled: true, intensity: 'full', output_style: 'full', injections: 0 };
 

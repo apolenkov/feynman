@@ -53,6 +53,24 @@ function runHook(tmpHome: string, stdinData: unknown): HookResult {
   };
 }
 
+function runHookWithRulesPath(tmpHome: string, rulesPath: string, stdinData: unknown): HookResult {
+  const result = spawnSync('node', [HOOK_PATH], {
+    input: JSON.stringify(stdinData),
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      HOME: tmpHome,
+      FEYNMAN_RULES_PATH: rulesPath,
+    },
+    timeout: 10000,
+  });
+  return {
+    status: result.status ?? 0,
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
+  };
+}
+
 function runHookWithFeynmanHome(tmpHome: string, feynmanHome: string, stdinData: unknown): HookResult {
   const result = spawnSync('node', [HOOK_PATH], {
     input: JSON.stringify(stdinData),
@@ -586,30 +604,9 @@ describe('feynman-activate hook', () => {
   // -------------------------------------------------------------------------
   // Path 9: Lines 115-124 — malformed rules file (assertTagPairs returns false)
   // Hook sets state.malformed_rules=true, writes state, injects MALFORMED_FALLBACK.
+  // Uses FEYNMAN_RULES_PATH env override so the REAL hook source is covered.
   // -------------------------------------------------------------------------
   describe('Path 9: malformed rules file — assertTagPairs fails (lines 115-124)', () => {
-    // Reuse the runHookWithRules patched-hook pattern from the XML extraction block.
-    function runHookWithRulesLocal(tmpHome: string, rulesContent: string): HookResult {
-      const hookSrc = fs.readFileSync(HOOK_PATH, 'utf8');
-      const rulesFilePath = path.join(tmpHome, 'synthetic-rules.md');
-      fs.writeFileSync(rulesFilePath, rulesContent);
-      const escapedPath = rulesFilePath.replace(/\\/g, '\\\\');
-      const patchedSrc = hookSrc.replace(
-        /const RULES_PATH\s*=.*$/m,
-        `const RULES_PATH = '${escapedPath}';`
-      );
-      const patchedHookPath = path.join(tmpHome, 'feynman-activate-malformed-test.ts');
-      fs.writeFileSync(patchedHookPath, patchedSrc);
-
-      const r = spawnSync('node', [patchedHookPath], {
-        input: JSON.stringify({ prompt: 'test' }),
-        encoding: 'utf8',
-        env: { ...process.env, HOME: tmpHome },
-        timeout: 10000,
-      });
-      return { status: r.status ?? 0, stdout: r.stdout || '', stderr: r.stderr || '' };
-    }
-
     let tmpHome: string;
     let result: HookResult;
     let stateAfter: Record<string, unknown>;
@@ -631,7 +628,10 @@ describe('feynman-activate hook', () => {
         '<intensity name="full">Full content without a closing tag',
       ].join('\n');
 
-      result = runHookWithRulesLocal(tmpHome, malformedRules);
+      const rulesFilePath = path.join(tmpHome, 'synthetic-rules-malformed.md');
+      fs.writeFileSync(rulesFilePath, malformedRules);
+
+      result = runHookWithRulesPath(tmpHome, rulesFilePath, { prompt: 'test' });
       stateAfter = JSON.parse(fs.readFileSync(statePath, 'utf8'));
     });
 
@@ -657,29 +657,9 @@ describe('feynman-activate hook', () => {
   // -------------------------------------------------------------------------
   // Path 10: Lines 126-128 — malformed_rules flag cleared after recovery
   // State had malformed_rules=true; rules file is now well-formed → flag deleted.
+  // Uses FEYNMAN_RULES_PATH env override so the REAL hook source is covered.
   // -------------------------------------------------------------------------
   describe('Path 10: malformed_rules cleared after recovery (lines 126-128)', () => {
-    function runHookWithRulesLocal(tmpHome: string, rulesContent: string): HookResult {
-      const hookSrc = fs.readFileSync(HOOK_PATH, 'utf8');
-      const rulesFilePath = path.join(tmpHome, 'synthetic-rules.md');
-      fs.writeFileSync(rulesFilePath, rulesContent);
-      const escapedPath = rulesFilePath.replace(/\\/g, '\\\\');
-      const patchedSrc = hookSrc.replace(
-        /const RULES_PATH\s*=.*$/m,
-        `const RULES_PATH = '${escapedPath}';`
-      );
-      const patchedHookPath = path.join(tmpHome, 'feynman-activate-recovery-test.ts');
-      fs.writeFileSync(patchedHookPath, patchedSrc);
-
-      const r = spawnSync('node', [patchedHookPath], {
-        input: JSON.stringify({ prompt: 'test' }),
-        encoding: 'utf8',
-        env: { ...process.env, HOME: tmpHome },
-        timeout: 10000,
-      });
-      return { status: r.status ?? 0, stdout: r.stdout || '', stderr: r.stderr || '' };
-    }
-
     let tmpHome: string;
     let result: HookResult;
     let stateAfter: Record<string, unknown>;
@@ -703,7 +683,10 @@ describe('feynman-activate hook', () => {
         '<intensity name="ultra">Ultra content here.</intensity>',
       ].join('\n');
 
-      result = runHookWithRulesLocal(tmpHome, wellFormedRules);
+      const rulesFilePath = path.join(tmpHome, 'synthetic-rules-wellformed.md');
+      fs.writeFileSync(rulesFilePath, wellFormedRules);
+
+      result = runHookWithRulesPath(tmpHome, rulesFilePath, { prompt: 'test' });
       stateAfter = JSON.parse(fs.readFileSync(statePath, 'utf8'));
     });
 
@@ -730,29 +713,9 @@ describe('feynman-activate hook', () => {
   // Path 11: Lines 140-147 — HTML-comment legacy fallback
   // Rules file has ONLY HTML-comment markers (no <intensity> XML tags).
   // assertTagPairs returns true (0===0), XML matcher fails, fallback activates.
+  // Uses FEYNMAN_RULES_PATH env override so the REAL hook source is covered.
   // -------------------------------------------------------------------------
   describe('Path 11: HTML-comment legacy fallback (lines 140-147)', () => {
-    function runHookWithRulesLocal(tmpHome: string, rulesContent: string): HookResult {
-      const hookSrc = fs.readFileSync(HOOK_PATH, 'utf8');
-      const rulesFilePath = path.join(tmpHome, 'synthetic-rules.md');
-      fs.writeFileSync(rulesFilePath, rulesContent);
-      const escapedPath = rulesFilePath.replace(/\\/g, '\\\\');
-      const patchedSrc = hookSrc.replace(
-        /const RULES_PATH\s*=.*$/m,
-        `const RULES_PATH = '${escapedPath}';`
-      );
-      const patchedHookPath = path.join(tmpHome, 'feynman-activate-htmlcomment-test.ts');
-      fs.writeFileSync(patchedHookPath, patchedSrc);
-
-      const r = spawnSync('node', [patchedHookPath], {
-        input: JSON.stringify({ prompt: 'test' }),
-        encoding: 'utf8',
-        env: { ...process.env, HOME: tmpHome },
-        timeout: 10000,
-      });
-      return { status: r.status ?? 0, stdout: r.stdout || '', stderr: r.stderr || '' };
-    }
-
     let tmpHome: string;
     let result: HookResult;
 
@@ -775,7 +738,10 @@ describe('feynman-activate hook', () => {
         '<!-- /full -->',
       ].join('\n');
 
-      result = runHookWithRulesLocal(tmpHome, htmlCommentRules);
+      const rulesFilePath = path.join(tmpHome, 'synthetic-rules-htmlcomment.md');
+      fs.writeFileSync(rulesFilePath, htmlCommentRules);
+
+      result = runHookWithRulesPath(tmpHome, rulesFilePath, { prompt: 'test' });
     });
 
     after(() => rmrf(tmpHome));
