@@ -882,3 +882,84 @@ export function L13_double_wrap(ast: ASTNode): Issue[] {
   }
   return issues;
 }
+
+// ---------------------------------------------------------------------------
+// L14 — Blank-line separation
+// Severity: warn. A fenced ASCII/diagram block should have a blank line before
+// and after it (monospace equivalent of vertical margin; improves scannability).
+// Only applies to fenced blocks (opening ``` is at startLine-1 in 1-based terms).
+// Conservative: only warn on a clear prose-line directly touching the fence.
+// Skips: indented/list-adjacent blocks, blocks at file boundaries.
+// ---------------------------------------------------------------------------
+
+// Regex: at least one box-drawing, arrow, or tree char in the content.
+const DIAGRAM_CHAR_RE = /[┌┐└┘│─├┤┬┴┼]|-->|→|[├└]──/;
+
+export function L14_blank_line_separation(ast: ASTNode, fullText: string): Issue[] {
+  if (!ast || !ast.content) return [];
+
+  // Only fire on diagram blocks with actual diagram chars.
+  if (!DIAGRAM_CHAR_RE.test(ast.content)) return [];
+
+  // Indented / list-adjacent blocks: be lenient.
+  if (ast.indent > 0) return [];
+
+  const lines = fullText.split('\n');
+
+  // Determine whether this is a fenced block.
+  // Parser: startLine = 1-based first content line; opening ``` is at (startLine-1) 1-based
+  // = (startLine-2) 0-indexed.
+  const openFenceLi = ast.startLine - 2; // 0-indexed
+  if (openFenceLi < 0) return []; // startLine <= 1 — can't be a fenced block
+  const openFenceLine = lines[openFenceLi]?.trim() ?? '';
+  if (openFenceLine !== '```') return []; // not a fenced block — standalone
+
+  // Closing fence is at endLine (1-based) = (endLine-1) 0-indexed.
+  // For fenced blocks the parser sets endLine to the line index of the closing ```.
+  const closeFenceLi = ast.endLine - 1; // 0-indexed
+
+  const issues: Issue[] = [];
+
+  // --- Check the line BEFORE the opening fence ---
+  const beforeLi = openFenceLi - 1; // 0-indexed
+  if (beforeLi >= 0) {
+    const beforeLine = lines[beforeLi] ?? '';
+    const beforeTrimmed = beforeLine.trim();
+    // Skip if blank, another fence, or a list marker (lenient for list-adjacent).
+    const isBlank = beforeTrimmed === '';
+    const isFence = beforeTrimmed === '```' || beforeTrimmed.startsWith('```');
+    const isListMarker = /^\s*(?:[-*+]|\d+\.)\s/.test(beforeLine);
+    const isHeading = beforeTrimmed.startsWith('#');
+    if (!isBlank && !isFence && !isListMarker && !isHeading) {
+      issues.push(issue(
+        'L14', 'warn',
+        openFenceLi + 1, // 1-based line of opening fence
+        1,
+        'diagram block should be separated from surrounding text by a blank line',
+        'add a blank line before the opening ``` fence'
+      ));
+    }
+  }
+
+  // --- Check the line AFTER the closing fence ---
+  const afterLi = closeFenceLi + 1; // 0-indexed
+  if (afterLi < lines.length) {
+    const afterLine = lines[afterLi] ?? '';
+    const afterTrimmed = afterLine.trim();
+    const isBlank = afterTrimmed === '';
+    const isFence = afterTrimmed === '```' || afterTrimmed.startsWith('```');
+    const isListMarker = /^\s*(?:[-*+]|\d+\.)\s/.test(afterLine);
+    const isHeading = afterTrimmed.startsWith('#');
+    if (!isBlank && !isFence && !isListMarker && !isHeading) {
+      issues.push(issue(
+        'L14', 'warn',
+        closeFenceLi + 1, // 1-based line of closing fence
+        1,
+        'diagram block should be separated from surrounding text by a blank line',
+        'add a blank line after the closing ``` fence'
+      ));
+    }
+  }
+
+  return issues;
+}
