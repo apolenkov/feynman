@@ -31,6 +31,32 @@ function codexAppServerAvailable(): boolean {
   return result.status === 0;
 }
 
+/**
+ * Probe whether a codex app-server process can actually start and respond to
+ * an `initialize` RPC within `timeoutMs`.  Returns true only when a live
+ * server is reachable — binary presence alone is not sufficient.
+ */
+async function codexAppServerReachable(timeoutMs = 800): Promise<boolean> {
+  if (!codexAppServerAvailable()) return false;
+  const tmpHome = makeTempHome();
+  const client = new CodexAppServerClient(tmpHome);
+  try {
+    client.start();
+    await Promise.race([
+      client.initialize(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('probe timeout')), timeoutMs)
+      ),
+    ]);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    client.close();
+    rmrf(tmpHome);
+  }
+}
+
 function runFeynman(tmpHome: string, args: string[]): { status: number; stdout: string; stderr: string } {
   const result = spawnSync(process.execPath, [FEYNMAN_JS, ...args], {
     cwd: REPO_DIR,
@@ -245,8 +271,11 @@ async function trustCodexHooks(client: CodexAppServerClient): Promise<{ command:
 describe('Codex app-server hook visibility contract', () => {
   it(
     'exposes Feynman SessionStart output as hook context entries',
-    { skip: !codexAppServerAvailable() && 'codex app-server is not available' },
-    async () => {
+    async (t) => {
+      if (!(await codexAppServerReachable())) {
+        t.skip('codex app-server did not respond within probe timeout — server unavailable');
+        return;
+      }
       const tmpHome = makeTempHome();
       const codexHome = path.join(tmpHome, '.codex');
       const client = new CodexAppServerClient(tmpHome);
