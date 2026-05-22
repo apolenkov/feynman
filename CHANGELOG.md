@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## 1.1.1 - 2026-05-22
+
+### Fixes
+
+- Lint engine now understands the sequence-message arrows shipped in 1.1.0.
+  L03 recognizes `->>` (sync) and `-->>` (return) as a single `seq-msg` family,
+  so a sequence diagram using both does not falsely trip the mixed-arrow-styles
+  rule; L05 counts them as connectors so bare-token sequence lines are not
+  flagged "no arrow". Mixing flow (`-->`) and sequence (`->>`) arrows in one
+  diagram is still flagged (intended — different idioms)
+- examples/activity-flow.md: normalized a single-dash `--yes->` straggler to
+  `--yes-->` for consistent arrow style
+
 ## 1.1.0 - 2026-05-22
 
 ### Features
