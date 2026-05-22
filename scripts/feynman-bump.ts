@@ -36,7 +36,7 @@ function readManifest(rel: string): { version: string; [key: string]: unknown } 
 function bumpSemver(current: string, kind: string): string {
   const m = current.match(/^(\d+)\.(\d+)\.(\d+)$/);
   if (!m) throw new Error(`unparseable version: ${current}`);
-  let x = m[1];
+  const x = m[1];
   let y = Number(m[2]);
   let z = Number(m[3]);
   if (kind === 'patch') z += 1;

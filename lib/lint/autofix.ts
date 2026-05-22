@@ -72,7 +72,7 @@ export function autofixFrameToDotLeader(node: FrameNodeFull): string {
     const state = stateMatch[0].trim();
     const stateIdx = content.lastIndexOf(state);
     // Label = everything before state, with trailing dots/whitespace stripped.
-    let label = content.slice(0, stateIdx).replace(/[\s.]+$/, '');
+    const label = content.slice(0, stateIdx).replace(/[\s.]+$/, '');
     if (!label) return { kind: 'bullet' as const, content };
     return { kind: 'pattern' as const, label, state };
   });

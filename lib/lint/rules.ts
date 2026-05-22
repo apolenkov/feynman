@@ -636,13 +636,13 @@ export function L10_mixed_script(textOrAst: string | ASTNode | null | undefined)
   // AST that the harness built; some pass plain text via fixtures harness.
   const text = typeof textOrAst === 'string'
     ? textOrAst
-    : (textOrAst && (textOrAst as any).text) || '';
+    : ((textOrAst as { text?: string } | null | undefined)?.text ?? '');
   const issues: Issue[] = [];
   const lines = text.split('\n');
   // Word = run of letters/digits/_/-, including Cyrillic via \p{L}.
   const tokenRe = /[\p{L}\p{N}_-]+/gu;
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const line = lines[i] ?? '';
     let m: RegExpExecArray | null;
     while ((m = tokenRe.exec(line)) !== null) {
       const token = m[0];
