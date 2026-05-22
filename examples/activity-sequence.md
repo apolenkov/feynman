@@ -52,14 +52,12 @@ Operational sequence:
 State board (what changed inside the incident):
 
 ```
-┌─ Incident Action Board ───────────────────────┐
-│ triage              : done                    │
-│ command setup       : done                    │
-│ mitigation active   : in-flight               │
-│ rollback            : ready                   │
-│ customer comms      : live                    │
-│ root-cause evidence : collecting              │
-└───────────────────────────────────────────────┘
+triage              ........ done
+command setup       ........ done
+mitigation active   ........ in-flight
+rollback            ........ ready
+customer comms      ........ live
+root-cause evidence ........ collecting
 ```
 
 Critical path decomposition:
