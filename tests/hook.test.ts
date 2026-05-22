@@ -550,6 +550,258 @@ describe('feynman-activate hook', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Path 8: Lines 84-85 — flag absent + state.json exists but is corrupt JSON
+  // (distinct from Path 5 which has the flag present → hits the step-3 catch instead)
+  // -------------------------------------------------------------------------
+  describe('Path 8: flag absent + corrupt state.json (lines 84-85)', () => {
+    let tmpHome: string;
+    let result: HookResult;
+
+    before(() => {
+      tmpHome = makeTempHome();
+      const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+      fs.mkdirSync(feynmanDir, { recursive: true });
+      // Write unparseable JSON — no flag file created.
+      fs.writeFileSync(path.join(feynmanDir, 'state.json'), '{ this is not valid json !!!');
+      // Deliberately do NOT create .feynman-active flag.
+
+      result = runHook(tmpHome, { prompt: 'any prompt' });
+    });
+
+    after(() => rmrf(tmpHome));
+
+    it('exits 0 (catch block in !flagExists+stateExists branch)', () => {
+      assert.equal(result.status, 0);
+    });
+
+    it('emits no stdout', () => {
+      assert.equal(result.stdout.trim(), '');
+    });
+
+    it('emits no stderr', () => {
+      assert.equal(result.stderr.trim(), '');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Path 9: Lines 115-124 — malformed rules file (assertTagPairs returns false)
+  // Hook sets state.malformed_rules=true, writes state, injects MALFORMED_FALLBACK.
+  // -------------------------------------------------------------------------
+  describe('Path 9: malformed rules file — assertTagPairs fails (lines 115-124)', () => {
+    // Reuse the runHookWithRules patched-hook pattern from the XML extraction block.
+    function runHookWithRulesLocal(tmpHome: string, rulesContent: string): HookResult {
+      const hookSrc = fs.readFileSync(HOOK_PATH, 'utf8');
+      const rulesFilePath = path.join(tmpHome, 'synthetic-rules.md');
+      fs.writeFileSync(rulesFilePath, rulesContent);
+      const escapedPath = rulesFilePath.replace(/\\/g, '\\\\');
+      const patchedSrc = hookSrc.replace(
+        /const RULES_PATH\s*=.*$/m,
+        `const RULES_PATH = '${escapedPath}';`
+      );
+      const patchedHookPath = path.join(tmpHome, 'feynman-activate-malformed-test.ts');
+      fs.writeFileSync(patchedHookPath, patchedSrc);
+
+      const r = spawnSync('node', [patchedHookPath], {
+        input: JSON.stringify({ prompt: 'test' }),
+        encoding: 'utf8',
+        env: { ...process.env, HOME: tmpHome },
+        timeout: 10000,
+      });
+      return { status: r.status ?? 0, stdout: r.stdout || '', stderr: r.stderr || '' };
+    }
+
+    let tmpHome: string;
+    let result: HookResult;
+    let stateAfter: Record<string, unknown>;
+
+    before(() => {
+      tmpHome = makeTempHome();
+      const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+      fs.mkdirSync(feynmanDir, { recursive: true });
+      const statePath = path.join(feynmanDir, 'state.json');
+      fs.writeFileSync(
+        statePath,
+        JSON.stringify({ enabled: true, intensity: 'full', injections: 0 })
+      );
+      fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), 'full');
+
+      // Unbalanced tags: 2 opening <intensity name=...> but only 1 closing </intensity>
+      const malformedRules = [
+        '<intensity name="lite">Lite content.</intensity>',
+        '<intensity name="full">Full content without a closing tag',
+      ].join('\n');
+
+      result = runHookWithRulesLocal(tmpHome, malformedRules);
+      stateAfter = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    });
+
+    after(() => rmrf(tmpHome));
+
+    it('exits 0', () => {
+      assert.equal(result.status, 0);
+    });
+
+    it('injects MALFORMED_FALLBACK as additionalContext', () => {
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.ok(
+        ctx.includes('Classify structure'),
+        `expected MALFORMED_FALLBACK in additionalContext, got: ${ctx}`
+      );
+    });
+
+    it('sets state.malformed_rules=true', () => {
+      assert.equal(stateAfter['malformed_rules'], true, 'malformed_rules flag must be set in state');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Path 10: Lines 126-128 — malformed_rules flag cleared after recovery
+  // State had malformed_rules=true; rules file is now well-formed → flag deleted.
+  // -------------------------------------------------------------------------
+  describe('Path 10: malformed_rules cleared after recovery (lines 126-128)', () => {
+    function runHookWithRulesLocal(tmpHome: string, rulesContent: string): HookResult {
+      const hookSrc = fs.readFileSync(HOOK_PATH, 'utf8');
+      const rulesFilePath = path.join(tmpHome, 'synthetic-rules.md');
+      fs.writeFileSync(rulesFilePath, rulesContent);
+      const escapedPath = rulesFilePath.replace(/\\/g, '\\\\');
+      const patchedSrc = hookSrc.replace(
+        /const RULES_PATH\s*=.*$/m,
+        `const RULES_PATH = '${escapedPath}';`
+      );
+      const patchedHookPath = path.join(tmpHome, 'feynman-activate-recovery-test.ts');
+      fs.writeFileSync(patchedHookPath, patchedSrc);
+
+      const r = spawnSync('node', [patchedHookPath], {
+        input: JSON.stringify({ prompt: 'test' }),
+        encoding: 'utf8',
+        env: { ...process.env, HOME: tmpHome },
+        timeout: 10000,
+      });
+      return { status: r.status ?? 0, stdout: r.stdout || '', stderr: r.stderr || '' };
+    }
+
+    let tmpHome: string;
+    let result: HookResult;
+    let stateAfter: Record<string, unknown>;
+
+    before(() => {
+      tmpHome = makeTempHome();
+      const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+      fs.mkdirSync(feynmanDir, { recursive: true });
+      const statePath = path.join(feynmanDir, 'state.json');
+      // Seed state with malformed_rules=true to simulate a previous bad run.
+      fs.writeFileSync(
+        statePath,
+        JSON.stringify({ enabled: true, intensity: 'full', injections: 0, malformed_rules: true })
+      );
+      fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), 'full');
+
+      // Provide a well-formed rules file — balanced tag pairs.
+      const wellFormedRules = [
+        '<intensity name="lite">Lite content.</intensity>',
+        '<intensity name="full">Full content here.</intensity>',
+        '<intensity name="ultra">Ultra content here.</intensity>',
+      ].join('\n');
+
+      result = runHookWithRulesLocal(tmpHome, wellFormedRules);
+      stateAfter = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    });
+
+    after(() => rmrf(tmpHome));
+
+    it('exits 0', () => {
+      assert.equal(result.status, 0);
+    });
+
+    it('clears malformed_rules flag from state', () => {
+      assert.ok(
+        !('malformed_rules' in stateAfter),
+        `malformed_rules key must be deleted from state after recovery, got: ${JSON.stringify(stateAfter)}`
+      );
+    });
+
+    it('still injects rules content (not MALFORMED_FALLBACK)', () => {
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.ok(ctx.includes('Full content here.'), `expected normal rules injection, got: ${ctx}`);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Path 11: Lines 140-147 — HTML-comment legacy fallback
+  // Rules file has ONLY HTML-comment markers (no <intensity> XML tags).
+  // assertTagPairs returns true (0===0), XML matcher fails, fallback activates.
+  // -------------------------------------------------------------------------
+  describe('Path 11: HTML-comment legacy fallback (lines 140-147)', () => {
+    function runHookWithRulesLocal(tmpHome: string, rulesContent: string): HookResult {
+      const hookSrc = fs.readFileSync(HOOK_PATH, 'utf8');
+      const rulesFilePath = path.join(tmpHome, 'synthetic-rules.md');
+      fs.writeFileSync(rulesFilePath, rulesContent);
+      const escapedPath = rulesFilePath.replace(/\\/g, '\\\\');
+      const patchedSrc = hookSrc.replace(
+        /const RULES_PATH\s*=.*$/m,
+        `const RULES_PATH = '${escapedPath}';`
+      );
+      const patchedHookPath = path.join(tmpHome, 'feynman-activate-htmlcomment-test.ts');
+      fs.writeFileSync(patchedHookPath, patchedSrc);
+
+      const r = spawnSync('node', [patchedHookPath], {
+        input: JSON.stringify({ prompt: 'test' }),
+        encoding: 'utf8',
+        env: { ...process.env, HOME: tmpHome },
+        timeout: 10000,
+      });
+      return { status: r.status ?? 0, stdout: r.stdout || '', stderr: r.stderr || '' };
+    }
+
+    let tmpHome: string;
+    let result: HookResult;
+
+    before(() => {
+      tmpHome = makeTempHome();
+      const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+      fs.mkdirSync(feynmanDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(feynmanDir, 'state.json'),
+        JSON.stringify({ enabled: true, intensity: 'full', injections: 0 })
+      );
+      fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), 'full');
+
+      // Rules file with ONLY HTML-comment markers — no <intensity> XML tags at all.
+      // assertTagPairs sees 0 opens and 0 closes → returns true (balanced).
+      // XML matcher fails → legacy fallback activates.
+      const htmlCommentRules = [
+        '<!-- full -->',
+        'Legacy full rules content via HTML-comment markers.',
+        '<!-- /full -->',
+      ].join('\n');
+
+      result = runHookWithRulesLocal(tmpHome, htmlCommentRules);
+    });
+
+    after(() => rmrf(tmpHome));
+
+    it('exits 0', () => {
+      assert.equal(result.status, 0);
+    });
+
+    it('injects content via HTML-comment fallback', () => {
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.ok(
+        ctx.includes('Legacy full rules content via HTML-comment markers.'),
+        `expected HTML-comment fallback content in additionalContext, got: ${ctx}`
+      );
+    });
+
+    it('does not inject MALFORMED_FALLBACK', () => {
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.ok(
+        !ctx.includes('Classify structure'),
+        'MALFORMED_FALLBACK must not appear when HTML-comment fallback succeeds'
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // rules-file integrity (production rules) — asserts live rules/feynman-activate.md
   // These tests read the production artifact directly. They FAIL on the old HTML-comment
   // format (red phase) and PASS once Task 2 rewrites the file to XML contract.
