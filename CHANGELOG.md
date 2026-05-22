@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Internal
+
+- +12 characterization tests close the line-coverage gap; CI coverage gate
+  restored from temporary 94% back to 95% (all-files now 95.98%)
+- eslint flat config (`eslint.config.mjs`) added for eslint 10; `npm run
+  eslint` works again (0 findings). Standalone dev command, not yet a CI gate
+
 ## 1.0.1 - 2026-05-22
 
 ### Fixes
