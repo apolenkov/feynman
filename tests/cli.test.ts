@@ -1056,6 +1056,50 @@ describe('feynman-lint --explain flag', () => {
   });
 });
 
+// ─── feynman-lint CLI error branches (coverage hardening) ───────────────────
+
+describe('feynman-lint CLI error branches', () => {
+  const BIN = path.resolve(REPO_DIR, 'bin', 'feynman-lint.ts');
+
+  function runLint(args: string[], stdin?: string): { status: number | null; stdout: string; stderr: string } {
+    return spawnSync(process.execPath, [BIN, ...args], {
+      input: stdin,
+      encoding: 'utf8',
+    });
+  }
+
+  it('exits 2 and prints error for unknown flag', () => {
+    const r = runLint(['--bogus-flag']);
+    assert.equal(r.status, 2, `expected exit 2, got ${r.status}: ${r.stderr}`);
+    assert.match(r.stderr, /unknown flag/, `expected "unknown flag" in stderr: ${r.stderr}`);
+  });
+
+  it('exits 2 and prints error for too many file arguments', () => {
+    const r = runLint(['a.md', 'b.md']);
+    assert.equal(r.status, 2, `expected exit 2, got ${r.status}: ${r.stderr}`);
+    assert.match(r.stderr, /too many file arguments/, `expected "too many file arguments" in stderr: ${r.stderr}`);
+  });
+
+  it('exits 2 with usage when no file and no stdin', () => {
+    const r = runLint([]);
+    assert.equal(r.status, 2, `expected exit 2, got ${r.status}: ${r.stderr}`);
+    // stderr contains USAGE block which includes the binary name
+    assert.match(r.stderr, /feynman-lint/, `expected usage in stderr: ${r.stderr}`);
+  });
+
+  it('exits 2 for --fix with stdin (-)', () => {
+    const r = runLint(['--fix', '-'], 'some markdown content\n');
+    assert.equal(r.status, 2, `expected exit 2, got ${r.status}: ${r.stderr}`);
+    assert.match(r.stderr, /--fix requires a file path/, `expected --fix error in stderr: ${r.stderr}`);
+  });
+
+  it('exits 2 for file-not-found in normal mode', () => {
+    const r = runLint(['/nonexistent/path/file-does-not-exist.md']);
+    assert.equal(r.status, 2, `expected exit 2, got ${r.status}: ${r.stderr}`);
+    assert.match(r.stderr, /file not found/, `expected "file not found" in stderr: ${r.stderr}`);
+  });
+});
+
 // ─── feynman install --target cline|cursor|windsurf (Phase 12 IDE compat) ────
 
 describe('feynman install --target <ide>', () => {
