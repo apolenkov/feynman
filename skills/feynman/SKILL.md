@@ -104,6 +104,14 @@ console.log(JSON.stringify({target: path.basename(root), ...st}));
 " "$ARGUMENTS"
 ```
 
+2b. Re-sync OpenCode `rules.md` if the OpenCode target is installed (the file only exists
+for opencode — absent for claude/codex, so this step is a no-op for those targets):
+
+```bash
+[ -f "$HOME/.config/opencode/.feynman/rules.md" ] && \
+  feynman install --target opencode > /dev/null 2>&1 || true
+```
+
 3. Report result:
 
 ```
