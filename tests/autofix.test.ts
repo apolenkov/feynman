@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { createRequire } from 'node:module';
 
-import { autofixFrame, autofix, autofixFrameToDotLeader } from '../lib/lint/autofix.ts';
+import { autofixFrame, autofix, autofixFrameToDotLeader, autofixFrameToPlain } from '../lib/lint/autofix.ts';
 import type { FrameNodeFull } from '../lib/lint/autofix.ts';
 
 const require = createRequire(import.meta.url);
@@ -737,5 +737,71 @@ describe('feynman-lint --fix CLI for L11 dot-leader conversion', () => {
     } finally {
       try { fs.unlinkSync(tmp); } catch (_) {}
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pattern L15 — homogeneous frame → plain format
+// ---------------------------------------------------------------------------
+describe('Pattern L15 — homogeneous frame to plain', () => {
+  it('converts kv frame to plain key:value lines (fixture)', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'homogeneous-kv-before.md'), 'utf8');
+    const after  = fs.readFileSync(path.join(fixturesDir, 'homogeneous-kv-after.md'),  'utf8');
+    assert.equal(autofix(before, { convertL15: true }), after);
+  });
+
+  it('converts bullet frame to plain - item lines (fixture)', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'homogeneous-bullet-before.md'), 'utf8');
+    const after  = fs.readFileSync(path.join(fixturesDir, 'homogeneous-bullet-after.md'),  'utf8');
+    assert.equal(autofix(before, { convertL15: true }), after);
+  });
+
+  it('converts prose frame to plain lines (fixture)', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'homogeneous-prose-before.md'), 'utf8');
+    const after  = fs.readFileSync(path.join(fixturesDir, 'homogeneous-prose-after.md'),  'utf8');
+    assert.equal(autofix(before, { convertL15: true }), after);
+  });
+
+  it('preserves titled-top title as plain header', () => {
+    const node: FrameNodeFull = {
+      top: '┌─ Config ─┐',
+      inner: ['│ host: localhost │', '│ port: 3000      │'],
+      bottom: '└───────────┘',
+      indent: '',
+    };
+    const result = autofixFrameToPlain(node);
+    assert.ok(result.startsWith('Config\n'), 'title should appear as first line');
+    assert.ok(result.includes('host: localhost'), 'kv lines should be present');
+  });
+
+  it('does not convert complex frame (has tree chars)', () => {
+    const input = '┌─────────┐\n│ ├── foo │\n│ └── bar │\n└─────────┘\n';
+    const result = autofix(input, { convertL15: true });
+    assert.ok(result.includes('┌'), 'complex frame must be kept as frame');
+  });
+
+  it('does not convert status frame (state markers — left to L11)', () => {
+    const input = '┌────────────┐\n│ a ... ok   │\n│ b ... wait │\n└────────────┘\n';
+    const result = autofix(input, { convertL15: true });
+    assert.ok(result.includes('┌'), 'status frame must not be touched by L15');
+  });
+
+  it('does not convert single-inner-line frame (below minimum)', () => {
+    const input = '┌─────────────────┐\n│ host: localhost │\n└─────────────────┘\n';
+    const result = autofix(input, { convertL15: true });
+    assert.ok(result.includes('┌'), 'single-line frame must be kept (L15 requires ≥2 inner lines)');
+  });
+
+  it('is idempotent: double pass produces identical output', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'homogeneous-kv-before.md'), 'utf8');
+    const once  = autofix(before, { convertL15: true });
+    const twice = autofix(once,   { convertL15: true });
+    assert.equal(twice, once, 'L15 autofix must be idempotent');
+  });
+
+  it('opts.convertL15=false leaves frame unchanged', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'homogeneous-kv-before.md'), 'utf8');
+    const result = autofix(before);
+    assert.ok(result.includes('┌'), 'frame must be kept when convertL15 is off');
   });
 });
