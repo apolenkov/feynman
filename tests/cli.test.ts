@@ -1232,3 +1232,164 @@ describe('feynman install --target <ide>', () => {
     }
   });
 });
+
+// ─── OpenCode adapter tests ───────────────────────────────────────────────────
+
+describe('feynman install --target opencode', () => {
+  function readOpenCodeSettings(tmpHome: string): Record<string, unknown> {
+    const p = path.join(tmpHome, '.config', 'opencode', 'opencode.json');
+    return JSON.parse(fs.readFileSync(p, 'utf8')) as Record<string, unknown>;
+  }
+
+  it('creates opencode.json with our path in instructions[]', () => {
+    const tmp = makeTempHome();
+    try {
+      const r = runFeynman(['install', '--target', 'opencode'], tmp);
+      assert.equal(r.status, 0, `install failed: ${r.stderr}`);
+      const settings = readOpenCodeSettings(tmp);
+      const instructions = settings['instructions'] as string[];
+      assert.ok(Array.isArray(instructions), 'instructions must be an array');
+      const hasFeynman = instructions.some(p => p.includes('.feynman/rules.md'));
+      assert.ok(hasFeynman, 'instructions must contain feynman rules.md path');
+    } finally {
+      rmrf(tmp);
+    }
+  });
+
+  it('creates rules.md with substantive content', () => {
+    const tmp = makeTempHome();
+    try {
+      runFeynman(['install', '--target', 'opencode'], tmp);
+      const rulesPath = path.join(tmp, '.config', 'opencode', '.feynman', 'rules.md');
+      assert.ok(fs.existsSync(rulesPath), 'rules.md must exist');
+      const content = fs.readFileSync(rulesPath, 'utf8');
+      assert.ok(content.length > 200, 'rules.md must have substantive content');
+    } finally {
+      rmrf(tmp);
+    }
+  });
+
+  it('creates state.json and .feynman-active flag', () => {
+    const tmp = makeTempHome();
+    try {
+      runFeynman(['install', '--target', 'opencode'], tmp);
+      const statePath = path.join(tmp, '.config', 'opencode', '.feynman', 'state.json');
+      const flagPath = path.join(tmp, '.config', 'opencode', '.feynman-active');
+      assert.ok(fs.existsSync(statePath), 'state.json must exist');
+      assert.ok(fs.existsSync(flagPath), '.feynman-active flag must exist');
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>;
+      assert.ok('enabled' in state, 'state.json must have enabled field');
+    } finally {
+      rmrf(tmp);
+    }
+  });
+
+  it('is idempotent: double install adds path only once', () => {
+    const tmp = makeTempHome();
+    try {
+      runFeynman(['install', '--target', 'opencode'], tmp);
+      runFeynman(['install', '--target', 'opencode'], tmp);
+      const settings = readOpenCodeSettings(tmp);
+      const instructions = settings['instructions'] as string[];
+      const feynmanPaths = instructions.filter(p => p.includes('.feynman/rules.md'));
+      assert.equal(feynmanPaths.length, 1, 'must have exactly one feynman path after double install');
+    } finally {
+      rmrf(tmp);
+    }
+  });
+
+  it('preserves foreign instructions on install', () => {
+    const tmp = makeTempHome();
+    try {
+      const opencodeCfgDir = path.join(tmp, '.config', 'opencode');
+      fs.mkdirSync(opencodeCfgDir, { recursive: true });
+      const existing = { instructions: ['/some/other/rules.md'] };
+      fs.writeFileSync(path.join(opencodeCfgDir, 'opencode.json'), JSON.stringify(existing, null, 2));
+
+      runFeynman(['install', '--target', 'opencode'], tmp);
+      const settings = readOpenCodeSettings(tmp);
+      const instructions = settings['instructions'] as string[];
+      assert.ok(instructions.includes('/some/other/rules.md'), 'foreign path must be preserved');
+    } finally {
+      rmrf(tmp);
+    }
+  });
+
+  it('uninstall removes rules.md and flag, preserves state.json', () => {
+    const tmp = makeTempHome();
+    try {
+      runFeynman(['install', '--target', 'opencode'], tmp);
+      const r = runFeynman(['uninstall', '--target', 'opencode'], tmp);
+      assert.equal(r.status, 0, `uninstall failed: ${r.stderr}`);
+
+      const rulesPath = path.join(tmp, '.config', 'opencode', '.feynman', 'rules.md');
+      const flagPath = path.join(tmp, '.config', 'opencode', '.feynman-active');
+      const statePath = path.join(tmp, '.config', 'opencode', '.feynman', 'state.json');
+      assert.ok(!fs.existsSync(rulesPath), 'rules.md must be removed by uninstall');
+      assert.ok(!fs.existsSync(flagPath), '.feynman-active must be removed by uninstall');
+      assert.ok(fs.existsSync(statePath), 'state.json must be preserved after uninstall');
+    } finally {
+      rmrf(tmp);
+    }
+  });
+
+  it('uninstall removes our path from instructions[] but leaves others', () => {
+    const tmp = makeTempHome();
+    try {
+      const opencodeCfgDir = path.join(tmp, '.config', 'opencode');
+      fs.mkdirSync(opencodeCfgDir, { recursive: true });
+      const existing = { instructions: ['/some/other/rules.md'] };
+      fs.writeFileSync(path.join(opencodeCfgDir, 'opencode.json'), JSON.stringify(existing, null, 2));
+
+      runFeynman(['install', '--target', 'opencode'], tmp);
+      runFeynman(['uninstall', '--target', 'opencode'], tmp);
+
+      const settings = readOpenCodeSettings(tmp);
+      const instructions = settings['instructions'] as string[];
+      assert.ok(instructions.includes('/some/other/rules.md'), 'foreign path must survive uninstall');
+      const feynmanPaths = instructions.filter(p => p.includes('.feynman/rules.md'));
+      assert.equal(feynmanPaths.length, 0, 'feynman path must be removed from instructions[]');
+    } finally {
+      rmrf(tmp);
+    }
+  });
+
+  it('doctor exits 0 after install', () => {
+    const tmp = makeTempHome();
+    try {
+      runFeynman(['install', '--target', 'opencode'], tmp);
+      const r = runFeynman(['doctor', '--target', 'opencode'], tmp);
+      assert.equal(r.status, 0, `doctor failed: ${r.stderr}`);
+      assert.match(r.stdout, /Status: OK/, 'doctor must report Status: OK');
+    } finally {
+      rmrf(tmp);
+    }
+  });
+
+  it('--target all installs claude + codex + opencode', () => {
+    const tmp = makeTempHome();
+    try {
+      const r = runFeynman(['install', '--target', 'all'], tmp);
+      assert.equal(r.status, 0, `install --target all failed: ${r.stderr}`);
+
+      // claude and codex hooks
+      const claudeCfg = readSettings(tmp);
+      const codexCfg = readCodexHooks(tmp);
+      const claudeHooks = claudeCfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
+      const codexHooks = codexCfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
+      assert.ok(claudeHooks['SessionStart']?.some(g =>
+        g.hooks?.some(h => h.command?.includes('feynman-session-start'))
+      ), 'claude SessionStart hook must be registered');
+      assert.ok(codexHooks['SessionStart']?.some(g =>
+        g.hooks?.some(h => h.command?.includes('feynman-session-start'))
+      ), 'codex SessionStart hook must be registered');
+
+      // opencode instructions
+      const openSettings = readOpenCodeSettings(tmp);
+      const instructions = openSettings['instructions'] as string[];
+      assert.ok(instructions?.some(p => p.includes('.feynman/rules.md')), 'opencode instructions must include feynman rules.md');
+    } finally {
+      rmrf(tmp);
+    }
+  });
+});

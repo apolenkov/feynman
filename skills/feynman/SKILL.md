@@ -49,6 +49,7 @@ node -e "
 const fs = require('fs'), os = require('os'), path = require('path');
 function clientHome() {
   if (process.env.FEYNMAN_HOME) return process.env.FEYNMAN_HOME;
+  if (process.env.FEYNMAN_TARGET === 'opencode') return path.join(os.homedir(), '.config', 'opencode');
   if (process.env.FEYNMAN_TARGET === 'codex') return path.join(os.homedir(), '.codex');
   if (process.env.FEYNMAN_TARGET === 'claude') return path.join(os.homedir(), '.claude');
   if (process.env.CODEX_HOME) return process.env.CODEX_HOME;
@@ -73,6 +74,7 @@ node -e "
 const fs = require('fs'), os = require('os'), path = require('path');
 function clientHome() {
   if (process.env.FEYNMAN_HOME) return process.env.FEYNMAN_HOME;
+  if (process.env.FEYNMAN_TARGET === 'opencode') return path.join(os.homedir(), '.config', 'opencode');
   if (process.env.FEYNMAN_TARGET === 'codex') return path.join(os.homedir(), '.codex');
   if (process.env.FEYNMAN_TARGET === 'claude') return path.join(os.homedir(), '.claude');
   if (process.env.CODEX_HOME) return process.env.CODEX_HOME;
@@ -105,7 +107,7 @@ console.log(JSON.stringify({target: path.basename(root), ...st}));
 3. Report result:
 
 ```
-target       claude / codex
+target       claude / codex / opencode
 status       on / off
 intensity    lite / full / ultra      (controls rules-file size)
 output_style short / middle / full    (controls visual verbosity, orthogonal)
