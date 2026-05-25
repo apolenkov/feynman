@@ -391,27 +391,32 @@ npx @albinocrabs/feynman lint --explain response.md  # annotate frames with toke
 are conservative-first (≥2 consecutive lines required, ±3 column guard) and
 idempotent — a second pass on an already-fixed file is a no-op.
 
-**Autofix capabilities** (v1.3.0+):
+**Autofix capabilities** (`--fix`):
 
 | Pattern | What it fixes | Trigger |
 |---------|--------------|---------|
-| D — Frame alignment | Right edge of ASCII frame blocks, including titled tops | Any misaligned frame |
-| A — Arrow column | Arrow symbols in a run of ≥2 lines (`->`, `-->`, `==>`) | Arrows within ±3 cols of each other |
+| D — Frame alignment | Right edge of frame blocks, including titled tops | Any misaligned frame |
+| A — Arrow column | Arrow symbols in a run of ≥2 lines | Arrows within ±3 cols of each other |
 | B — Junction fan | Junction connectors in ≥2 adjacent lines | Connectors within ±3 cols |
 | C — Separator length | Pure-dash separator lines across the document | ≥2 separators of unequal length |
+| L11 — Dot-leader | Status frames with ≤5 inner lines and state markers | L11-eligible frames |
+| L15 — Homogeneous plain | k:v, bullet, or prose frames with no structural chars | All inner lines same type, ≥2 lines |
+
+L15 converts a k:v frame to plain `key: value` lines, a bullet frame to `- item`
+lines, and a prose frame to plain paragraphs. Titled tops (`┌─ Config ─┐`)
+become a plain heading line. Complex frames (nested trees, arrows, embedded tables)
+and status frames are left unchanged.
 
 Frame alignment: ANSI escapes, combining marks, zero-width joiners are
 stripped, CJK wide chars count as 2 cols. Titled tops preserve the title
-text when rebuilding the border. L11-eligible frames (≤5 inner lines,
-no nested trees or embedded table columns) optionally convert to dot-leader
-lists — invoke with `--fix` (also converts L11). Indentation preserved.
+text when rebuilding the border. Indentation preserved on all patterns.
 
 `--explain` is read-only — it emits a per-frame breakdown showing
 `framing: ~N chars (border: B, padding: P, content: C)`,
 `equivalent dot-leader: ~M chars`, and the saving. Use it to understand
 why L11 or L12 fired and how many chars a lighter visual would save.
 
-See [docs/lint-rules.md](docs/lint-rules.md) for the full L01-L13 reference.
+See [docs/lint-rules.md](docs/lint-rules.md) for the full L01-L15 reference.
 
 ### Quick hard-disable / re-enable (testing and emergency)
 
