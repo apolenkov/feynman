@@ -147,7 +147,7 @@ if (!fs.existsSync(tarballTxt)) {
   process.stderr.write(`TARBALL.txt not found in dist/ — run 'npm run build' first.\n`);
   process.exit(1);
 }
-const expectedTarball = path.join(DIST, fs.readFileSync(tarballTxt, 'utf8').trim());
+const expectedTarball = path.join(ROOT, fs.readFileSync(tarballTxt, 'utf8').trim());
 if (!fs.existsSync(expectedTarball)) {
   process.stderr.write(`pre-built tarball not found: ${expectedTarball}\nRun 'npm run build' first.\n`);
   process.exit(1);

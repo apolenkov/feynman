@@ -64,7 +64,7 @@
     "changelog": "node scripts/generate-changelog.ts",
     "ci": "npm run audit && npm run typecheck && npm run coverage && npm run test:docs && npm run build && npm run test:release",
     "prepublishOnly": "npm run audit && npm run typecheck && npm run coverage && npm run test:docs",
-    "release": "npm run ci && npm publish \"dist/$(cat dist/TARBALL.txt)\" --access public"
+    "release": "npm run ci && npm publish \"$(cat dist/TARBALL.txt)\" --access public"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
