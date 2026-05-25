@@ -921,17 +921,19 @@ function installOpenCodeTarget(opts: { force: boolean }): InstallResult {
 
   bootstrapState('opencode');
 
-  // Read intensity from state.json
+  // Read enabled and intensity from state.json
   let intensity = DEFAULT_STATE.intensity;
+  let enabled = DEFAULT_STATE.enabled;
   try {
     const state = JSON.parse(fs.readFileSync(tc.statePath, 'utf8')) as Partial<FeynmanState>;
     intensity = state.intensity ?? intensity;
-  } catch (_) { /* use default */ }
+    enabled = state.enabled ?? enabled;
+  } catch (_) { /* use defaults */ }
 
-  // Write rules.md at the configured intensity
-  const rulesContent = readIntensityRules(intensity);
+  // Write rules.md: empty if disabled, intensity content if enabled
+  const rulesContent = enabled ? readIntensityRules(intensity) : '';
   const rulesDestPath = path.join(tc.feynmanDir, 'rules.md');
-  fs.writeFileSync(rulesDestPath, rulesContent + '\n');
+  fs.writeFileSync(rulesDestPath, rulesContent ? rulesContent + '\n' : '');
 
   // Read opencode.json (create {} if absent)
   const settings = readOpenCodeSettings(tc.settingsPath);
