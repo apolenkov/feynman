@@ -49,6 +49,11 @@ interface UninstallResult { target: string; missing: boolean; hadHook?: boolean;
 interface IdeInstallResult { target: string; already: boolean; rulesPath: string; }
 interface DoctorResult { target: string; ok: boolean; reason?: string; rulesPath?: string; bytes?: number; }
 
+interface TargetAdapter {
+  install(opts: { force: boolean }): InstallResult;
+  uninstall(): UninstallResult;
+}
+
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 
 const NO_COLOR = !!process.env['NO_COLOR'];
@@ -776,7 +781,7 @@ function installClaudeCommand(): void {
 
 // ─── Install ──────────────────────────────────────────────────────────────────
 
-function installOne(target: string, opts: { force: boolean }): InstallResult {
+function installHookTarget(target: string, opts: { force: boolean }): InstallResult {
   const force = opts.force ?? false;
 
   // Read or create settings
@@ -861,9 +866,7 @@ function cmdInstall(opts: { force: boolean; target: string }): void {
   process.exit(0);
 }
 
-// ─── Uninstall ────────────────────────────────────────────────────────────────
-
-function uninstallOne(target: string): UninstallResult {
+function uninstallHookTarget(target: string): UninstallResult {
   const tc = targetConfig(target);
   if (!fs.existsSync(tc.settingsPath)) {
     if (fs.existsSync(tc.flagPath)) fs.unlinkSync(tc.flagPath);
@@ -882,6 +885,34 @@ function uninstallOne(target: string): UninstallResult {
 
   return { target, missing: false, hadHook };
 }
+
+// ─── Target adapters ──────────────────────────────────────────────────────────
+
+function createHookAdapter(name: 'claude' | 'codex'): TargetAdapter {
+  return {
+    install: (opts) => installHookTarget(name, opts),
+    uninstall: () => uninstallHookTarget(name),
+  };
+}
+
+const adapters: Record<string, TargetAdapter> = {
+  claude: createHookAdapter('claude'),
+  codex:  createHookAdapter('codex'),
+};
+
+function installOne(target: string, opts: { force: boolean }): InstallResult {
+  const adapter = adapters[target];
+  if (!adapter) throw new Error(`feynman: no adapter for target '${target}'`);
+  return adapter.install(opts);
+}
+
+function uninstallOne(target: string): UninstallResult {
+  const adapter = adapters[target];
+  if (!adapter) throw new Error(`feynman: no adapter for target '${target}'`);
+  return adapter.uninstall();
+}
+
+// ─── Uninstall ────────────────────────────────────────────────────────────────
 
 function cmdUninstall(opts: { target: string }): void {
   const results = targetNames(opts.target).map(uninstallOne);
