@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const pkg = require(path.join(ROOT, 'package.json')) as { version: string; name: string };
+const pkg = require(path.join(ROOT, 'package.json')) as { version: string; name: string; files?: string[] };
 const NPM_CACHE: string = process.env['FEYNMAN_NPM_CACHE'] || path.join(os.tmpdir(), 'npm-cache-feynman');
 
 interface RunOpts {
@@ -119,6 +119,26 @@ function verifyInstalledHooks(homeDir: string, target: string): void {
   }
 }
 
+function verifyTarballManifest(tarball: string, filesField: string[]): void {
+  const result = spawnSync('tar', ['-tzf', tarball], { encoding: 'utf8' });
+  if (result.status !== 0) throw new Error('failed to list tarball contents');
+  const entries = new Set(
+    result.stdout.split('\n').map(e => e.replace(/^package\//, '').replace(/\/$/, '')),
+  );
+  for (const entry of filesField) {
+    const name = entry.replace(/\/$/, '');
+    if (entry.endsWith('/')) {
+      if (![...entries].some(e => e === name || e.startsWith(name + '/'))) {
+        throw new Error(`tarball missing files[] directory: ${entry}`);
+      }
+    } else {
+      if (!entries.has(name)) {
+        throw new Error(`tarball missing files[] entry: ${entry}`);
+      }
+    }
+  }
+}
+
 // Expect a pre-built tarball in dist/ (produced by `npm run build`).
 // Running npm pack here would pack raw .ts sources, which fail in node_modules.
 const DIST = path.join(ROOT, 'dist');
@@ -127,6 +147,9 @@ if (!fs.existsSync(expectedTarball)) {
   process.stderr.write(`pre-built tarball not found: ${expectedTarball}\nRun 'npm run build' first.\n`);
   process.exit(1);
 }
+
+verifyTarballManifest(expectedTarball, pkg.files ?? []);
+console.log(`tarball manifest OK (${(pkg.files ?? []).length} files[] entries present)`);
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-release-smoke-'));
 
