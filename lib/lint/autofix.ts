@@ -133,6 +133,63 @@ function isL11Eligible(inner: string[]): boolean {
 export interface AutofixOptions {
   processFenced?: boolean;
   convertL11?: boolean;
+  convertL15?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Pattern L15 — homogeneous frame → plain format
+// Detects frames where ALL inner lines are the same content type and the frame
+// adds no structural value. Converts to the lightest pretty format:
+//   kv      → key: value lines
+//   bullet  → - item lines
+//   prose   → plain text lines
+// Status frames (state markers) → handled by L11 (dot-leader). Complex frames
+// (nested tree, embedded table, arrows) → kept as-is.
+// ---------------------------------------------------------------------------
+
+type FrameContentType = 'kv' | 'bullet' | 'prose' | 'status' | 'complex';
+
+function detectFrameContentType(stripped: string[]): FrameContentType {
+  if (stripped.length === 0) return 'complex';
+  // Complex guards first
+  if (stripped.some(l => /[├└]──/.test(l))) return 'complex';
+  if (stripped.some(l => (l.match(/│/g) || []).length >= 2)) return 'complex';
+  if (stripped.some(l => /─→|→|──>|-->/.test(l))) return 'complex';
+  // Status markers (let L11 handle)
+  const stateRe = new RegExp(STATE_MARKER_RE.source, STATE_MARKER_RE.flags);
+  if (stripped.every(l => stateRe.test(l))) return 'status';
+  // Bullet: every line starts with a bullet char after trim
+  if (stripped.every(l => /^[-•*◦▸▹·]/.test(l))) return 'bullet';
+  // K:V: every line has `word(s): value` or `word(s) — value` pattern
+  if (stripped.every(l => /^[^:\n]+:\s+\S/.test(l) || /^[^—\n]+—\s+\S/.test(l))) return 'kv';
+  // Prose: at least 2 chars, no special ASCII-diagram syntax
+  if (stripped.every(l => l.length >= 2 && !/[├└┬┴┼]/.test(l))) return 'prose';
+  return 'complex';
+}
+
+export function autofixFrameToPlain(node: FrameNodeFull): string {
+  const indent = node.indent || '';
+  const stripped = node.inner.map(l => unwrapInner(l, indent).trim());
+  // Require ≥2 inner lines — single-item frames are too ambiguous to convert.
+  if (stripped.length < 2) return autofixFrame(node);
+  const type = detectFrameContentType(stripped);
+  if (type === 'complex' || type === 'status') return autofixFrame(node);
+
+  const topInner = node.top.slice(node.top.indexOf('┌') + 1, node.top.lastIndexOf('┐'));
+  const titleMatch = topInner.match(/^─+\s+(.+?)\s+─+$/);
+  const title = titleMatch ? titleMatch[1] : null;
+
+  const out: string[] = [];
+  if (title) out.push(indent + title);
+  for (const line of stripped) {
+    if (type === 'bullet') {
+      const content = line.replace(/^[-•*◦▸▹·]\s*/, '');
+      out.push(indent + '- ' + content);
+    } else {
+      out.push(indent + line);
+    }
+  }
+  return out.join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -314,6 +371,7 @@ function detectAndFixSeparators(text: string, processFenced: boolean): string {
 export function autofix(text: string, opts?: AutofixOptions): string {
   const processFenced = !!(opts && opts.processFenced);
   const convertL11    = !!(opts && opts.convertL11);
+  const convertL15    = !!(opts && opts.convertL15);
   if (!text) return text;
   const hasFrames    = text.indexOf('┌') !== -1;
   const hasArrows    = ARROW_RE.test(text);
@@ -379,8 +437,19 @@ export function autofix(text: string, opts?: AutofixOptions): string {
       bottom: lines[j]!,
       indent,
     };
-    // Dispatch: L11-eligible AND opts.convertL11 → dot-leader; else → alignment.
-    if (convertL11 && isL11Eligible(inner)) {
+    // Dispatch priority: L15 (plain) > L11 (dot-leader) > alignment.
+    // If L15 declines (complex/status/single — result still contains ┌),
+    // fall through to L11 so status frames still get dot-leader conversion.
+    if (convertL15) {
+      const l15 = autofixFrameToPlain(node);
+      if (!l15.includes('┌')) {
+        out.push(l15);
+      } else if (convertL11 && isL11Eligible(inner)) {
+        out.push(autofixFrameToDotLeader(node));
+      } else {
+        out.push(l15);
+      }
+    } else if (convertL11 && isL11Eligible(inner)) {
       out.push(autofixFrameToDotLeader(node));
     } else {
       out.push(autofixFrame(node));
