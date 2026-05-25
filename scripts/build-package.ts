@@ -122,4 +122,5 @@ if (!fs.existsSync(tarball)) {
   process.exit(1);
 }
 
+fs.writeFileSync(path.join(DIST, 'TARBALL.txt'), packed.filename + '\n');
 console.log(`built ${path.relative(ROOT, tarball)} (${packed.size} bytes, ${packed.entryCount} files)`);
