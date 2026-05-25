@@ -4,6 +4,41 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## 1.2.1 - 2026-05-25
+
+### Fixes
+
+- OpenCode `rules.md` is now correctly emptied when feynman is disabled
+  (`/feynman off`), and re-written at the correct intensity after
+  `/feynman lite|full|ultra`. Previously `installOpenCodeTarget` ignored
+  the `enabled` field in `state.json`, leaving stale rules in the file
+  OpenCode reads at startup.
+- `feynman` skill (SKILL.md) gains step 2b: after any state change, calls
+  `feynman install --target opencode` to propagate the new state into
+  `rules.md`. This step is a no-op for claude/codex targets (the file
+  only exists for opencode).
+
+## 1.2.0 - 2026-05-25
+
+### Features
+
+- **OpenCode target**: `feynman install --target opencode` injects the
+  ASCII-diagram rules via OpenCode's native `instructions[]` array in
+  `~/.config/opencode/opencode.json`. No hook required — OpenCode reads
+  the rules file at startup.
+- `--target all` (or `--target *`) installs all three targets: claude,
+  codex, and opencode. `--target both` retains its legacy meaning
+  (claude + codex only).
+- `feynman doctor --target opencode` performs a 5-point diagnostic.
+- `feynman uninstall --target opencode` removes the rules path from
+  `instructions[]` and cleans up the `.feynman/` directory.
+
+### Internal
+
+- `TargetAdapter` interface introduced — `install`, `uninstall`, and
+  `doctor` are now dispatched through a typed adapter map. Eliminates the
+  if/else ternary per target in the CLI.
+
 ## 1.1.1 - 2026-05-22
 
 ### Fixes
