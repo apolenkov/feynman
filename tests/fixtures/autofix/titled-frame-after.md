@@ -1,0 +1,4 @@
+┌─ Status ─────────┐
+│ ok               │
+│ long content here│
+└──────────────────┘
