@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## 1.4.0 - 2026-05-25
+
+### Features
+
+- **L15 — homogeneous frame → plain format** (`--fix` + lint warn):
+  Frames whose inner lines are ALL the same content type (key:value pairs,
+  bullet list, or plain prose) are automatically converted to lightweight
+  plain text. The frame structure adds no information when content is
+  homogeneous — removing it saves border/padding characters.
+  - k:v frames → `key: value` lines
+  - bullet frames → `- item` lines (bullet chars normalized to `-`)
+  - prose frames → plain lines; titled top (`┌─ Title ─┐`) becomes a heading
+  - Excluded: complex frames (nested trees, arrows, embedded tables),
+    status frames (state markers `←` / `✓`/`✗` — handled by L11),
+    and frames with a single inner line (too ambiguous).
+  - Idempotent: double-pass produces identical output.
+  - Conservative: `convertL15` is opt-in. `--fix` enables it; stop-hook does
+    not (consistent with L11 conservative-first policy).
+  - L11 and L15 coexist: when both flags are on, L15 converts non-status
+    frames to plain; L11 still converts status frames to dot-leader.
+
+### Upgrade notes
+
+No breaking changes. `feynman-lint --fix` now enables L15 in addition to
+L11 and the four 1.3.0 patterns. Stop-hook remains conservative (does not
+enable L15). If you call `autofix()` programmatically, pass
+`{ convertL15: true }` to opt in.
+
 ## 1.3.0 - 2026-05-25
 
 ### Features
