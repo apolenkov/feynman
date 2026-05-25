@@ -4,6 +4,34 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## 1.3.0 - 2026-05-25
+
+### Features
+
+- **`--fix` expanded to 4 autofix patterns** (conservative-first heuristics,
+  idempotent, ±3 column guard on all positional patterns):
+  - **Pattern D** — frame alignment now handles titled tops (`┌─ Title ─┐`).
+    Width is computed from the full visual width of the top bar (including the
+    title) instead of a dash count. Bottom bar is always plain `└─…─┘`.
+  - **Pattern A** — arrow column alignment: consecutive lines each containing
+    exactly one `→` / `-->` / `──>` are padded so all arrows start at the
+    same visual column.
+  - **Pattern B** — junction fan alignment: consecutive lines each containing
+    exactly one `──┐` / `──┤` / `──┘` connector are padded so all connectors
+    start at the same column.
+  - **Pattern C** — separator length normalization: all `─`-only lines (≥3
+    chars) in the document are normalized to the document-maximum length when
+    ≥2 such lines are present.
+- All patterns skip fenced code blocks (unless `--processFenced` is set) and
+  frame border/inner lines to prevent cross-pattern interference.
+
+### Upgrade notes
+
+No breaking changes. Stop-hook (`feynman-session-start`) calls `autofix()`
+with conservative defaults (`processFenced: false`, `convertL11: false`) — all
+four patterns fire automatically at session-start. The ±3 column guard and ≥2
+consecutive-lines requirement prevent false positives on unrelated prose.
+
 ## 1.2.1 - 2026-05-25
 
 ### Fixes
