@@ -25,13 +25,23 @@ export interface FrameNodeFull {
 export function autofixFrame(node: FrameNodeFull): string {
   const indent = node.indent || '';
   const inner = node.inner.map(line => unwrapInner(line, indent));
-  // Compute target inner width. Floor on the top border's dash count so a
-  // deliberately-wide clean frame stays idempotent (we don't squeeze it down
-  // to the smallest content width). Min 1 to avoid degenerate ┌┐.
-  const topDashes = (node.top && node.top.match(/─/g) || []).length;
-  const W = Math.max(1, topDashes, ...inner.map(visualWidth));
+  // Compute target inner width using full topInner visual width so titled tops
+  // like `┌─ Title ─┐` don't collapse to a dash-count that ignores the title.
+  const topInner = node.top.slice(node.top.indexOf('┌') + 1, node.top.lastIndexOf('┐'));
+  const topWidth = visualWidth(topInner);
+  const W = Math.max(1, topWidth, ...inner.map(visualWidth));
   const dash = '─'.repeat(W);
-  const top = indent + '┌' + dash + '┐';
+  // Rebuild top bar: preserve title when present (Pattern D — titled top).
+  const titleMatch = topInner.match(/^─+\s+(.+?)\s+─+$/);
+  const title = titleMatch ? titleMatch[1] : null;
+  let top: string;
+  if (title) {
+    const titleSegment = `─ ${title} `;
+    const remainingDashes = '─'.repeat(Math.max(1, W - visualWidth(titleSegment)));
+    top = indent + '┌' + titleSegment + remainingDashes + '┐';
+  } else {
+    top = indent + '┌' + dash + '┐';
+  }
   const bot = indent + '└' + dash + '┘';
   const fixed = inner.map(content => {
     const pad = ' '.repeat(Math.max(0, W - visualWidth(content)));
@@ -165,7 +175,7 @@ export function autofix(text: string, opts?: AutofixOptions): string {
       i++;
       continue;
     }
-    const topMatch = line.match(/^(\s*)┌─*┐\s*$/);
+    const topMatch = line.match(/^(\s*)┌─[^┌\n]*┐\s*$/);
     if (!topMatch) {
       out.push(line);
       i++;

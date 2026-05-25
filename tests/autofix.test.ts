@@ -365,6 +365,94 @@ describe('autofixFrameToDotLeader — L11 conversion', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Pattern D — titled top frame (`┌─ Title ─┐`)
+// ---------------------------------------------------------------------------
+describe('Pattern D — titled top frame', () => {
+  const fixturesDir = path.resolve(import.meta.dirname, 'fixtures', 'autofix');
+
+  it('autofixFrame: preserves title and expands width to widest inner line', () => {
+    const node = frameNode(
+      '┌─ Status ─┐',
+      ['│ ok       │', '│ long content here │'],
+      '└──────────┘'
+    );
+    const out = autofixFrame(node);
+    const lines = out.split('\n');
+    // Title preserved in top bar.
+    assert.match(lines[0]!, /^┌─ Status /);
+    assert.ok(lines[0]!.endsWith('┐'), `top must end with ┐: ${lines[0]}`);
+    // All lines same width.
+    const w = [...lines[0]!].length;
+    for (const l of lines) assert.equal([...l].length, w, `misaligned: ${l}`);
+    // Wider inner content forces expansion.
+    assert.ok(w > '┌─ Status ─┐'.length, 'frame must expand to fit content');
+  });
+
+  it('autofixFrame: plain frame (no title) still works correctly', () => {
+    const node = frameNode(
+      '┌──────────┐',
+      ['│ short  │', '│ wider content │'],
+      '└──────────┘'
+    );
+    const out = autofixFrame(node);
+    const lines = out.split('\n');
+    assert.match(lines[0]!, /^┌─+┐$/);
+    const w = [...lines[0]!].length;
+    for (const l of lines) assert.equal([...l].length, w);
+  });
+
+  it('autofixFrame: titled frame is idempotent', () => {
+    // After fix, apply again — must produce the same output.
+    const node = frameNode(
+      '┌─ Status ─┐',
+      ['│ ok       │', '│ long content here │'],
+      '└──────────┘'
+    );
+    const once = autofixFrame(node);
+    const onceLines = once.split('\n');
+    const node2 = frameNode(onceLines[0]!, onceLines.slice(1, -1), onceLines[onceLines.length - 1]!);
+    const twice = autofixFrame(node2);
+    assert.equal(twice, once, 'titled frame fix must be idempotent');
+  });
+
+  it('autofix(text): repairs titled top via fixture file', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'titled-frame-before.md'), 'utf8').trim();
+    const expected = fs.readFileSync(path.join(fixturesDir, 'titled-frame-after.md'), 'utf8').trim();
+    const actual = autofix(before).trim();
+    assert.equal(actual, expected, `titled frame autofix mismatch\nactual:\n${actual}\nexpected:\n${expected}`);
+  });
+
+  it('autofix(text): titled frame idempotency via fixture', () => {
+    const after = fs.readFileSync(path.join(fixturesDir, 'titled-frame-after.md'), 'utf8').trim();
+    const twice = autofix(after).trim();
+    assert.equal(twice, after, 'already-fixed titled frame must be a no-op');
+  });
+
+  it('autofix(text): top bar regex catches titled tops inside full document', () => {
+    const doc = [
+      '# heading',
+      '',
+      '┌─ Gate ─┐',
+      '│ tests pass │',
+      '│ lint clean  │',
+      '└─────────┘',
+      '',
+      'prose after',
+    ].join('\n');
+    const out = autofix(doc);
+    // Title preserved.
+    assert.match(out, /┌─ Gate /);
+    // Prose untouched.
+    assert.match(out, /^# heading$/m);
+    assert.match(out, /^prose after$/m);
+    // All frame lines same width.
+    const frameLines = out.split('\n').filter(l => /[┌│└]/.test(l));
+    const w = [...frameLines[0]!].length;
+    for (const l of frameLines) assert.equal([...l].length, w, `misaligned frame line: ${l}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // autofix end-to-end via lint-cases.json fixtures (shape-based)
 // ---------------------------------------------------------------------------
 describe('autofix end-to-end via lint-cases.json fixtures (shape-based)', () => {
