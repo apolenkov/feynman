@@ -516,6 +516,109 @@ describe('Pattern A — arrow column alignment', () => {
 });
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Pattern B — junction fan alignment (`──┐` / `──┤` / `──┘`)
+// ---------------------------------------------------------------------------
+describe('Pattern B — junction fan alignment', () => {
+  it('aligns junction connectors in a 3-line group', () => {
+    const before = [
+      '[A] ──┐',
+      '[BB] ──┤─→ [merge]',
+      '[CCC]──┘',
+    ].join('\n');
+    const after = [
+      '[A]   ──┐',
+      '[BB]  ──┤─→ [merge]',
+      '[CCC] ──┘',
+    ].join('\n');
+    assert.equal(autofix(before), after);
+  });
+
+  it('does not touch a single junction line', () => {
+    const s = '[A] ──┐';
+    assert.equal(autofix(s), s);
+  });
+
+  it('does not touch junctions more than ±3 cols apart', () => {
+    const s = [
+      '[A] ──┐',
+      '[very long label here] ──┤',
+    ].join('\n');
+    assert.equal(autofix(s), s);
+  });
+
+  it('uses before/after fixtures', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'junction-fan-before.md'), 'utf8').trimEnd();
+    const after  = fs.readFileSync(path.join(fixturesDir, 'junction-fan-after.md'),  'utf8').trimEnd();
+    assert.equal(autofix(before), after);
+  });
+
+  it('is idempotent — double pass equals single pass', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'junction-fan-before.md'), 'utf8').trimEnd();
+    const once   = autofix(before);
+    const twice  = autofix(once);
+    assert.equal(twice, once, 'second autofix pass should be a no-op');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pattern C — separator length normalization
+// ---------------------------------------------------------------------------
+describe('Pattern C — separator length normalization', () => {
+  it('normalizes all document-wide separators to the maximum', () => {
+    const before = [
+      'header one',
+      '──────────',
+      'text A',
+      '',
+      'header two',
+      '─────────────────',
+      'text B',
+    ].join('\n');
+    const after = [
+      'header one',
+      '─────────────────',
+      'text A',
+      '',
+      'header two',
+      '─────────────────',
+      'text B',
+    ].join('\n');
+    assert.equal(autofix(before), after);
+  });
+
+  it('normalizes two separators on adjacent lines', () => {
+    const before = [
+      '──────────',
+      '─────────────────',
+    ].join('\n');
+    const after = [
+      '─────────────────',
+      '─────────────────',
+    ].join('\n');
+    assert.equal(autofix(before), after);
+  });
+
+  it('does not touch a single separator line (needs ≥2 to trigger)', () => {
+    const s = '──────────';
+    assert.equal(autofix(s), s);
+  });
+
+  it('uses before/after fixtures', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'separator-length-before.md'), 'utf8').trimEnd();
+    const after  = fs.readFileSync(path.join(fixturesDir, 'separator-length-after.md'),  'utf8').trimEnd();
+    assert.equal(autofix(before), after);
+  });
+
+  it('is idempotent — double pass equals single pass', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'separator-length-before.md'), 'utf8').trimEnd();
+    const once   = autofix(before);
+    const twice  = autofix(once);
+    assert.equal(twice, once, 'second autofix pass should be a no-op');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // autofix end-to-end via lint-cases.json fixtures (shape-based)
 // ---------------------------------------------------------------------------
 describe('autofix end-to-end via lint-cases.json fixtures (shape-based)', () => {
