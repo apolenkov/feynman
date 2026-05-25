@@ -38,6 +38,7 @@
     "rules/",
     "skills/",
     "hooks.json",
+    ".claude-plugin/",
     ".codex-plugin/",
     "docs/",
     "examples/",

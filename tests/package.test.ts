@@ -26,6 +26,11 @@ describe('package metadata', () => {
     assert.ok((pkg['files'] as string[]).includes('hooks.json'));
   });
 
+  it('ships Claude plugin manifest in npm package file list', () => {
+    const pkg = readJson('package.json');
+    assert.ok((pkg['files'] as string[]).includes('.claude-plugin/'), '.claude-plugin/ must be in files');
+  });
+
   it('ships public open-source docs in npm package file list', () => {
     const pkg = readJson('package.json');
     for (const file of ['docs/', 'examples/', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md']) {
