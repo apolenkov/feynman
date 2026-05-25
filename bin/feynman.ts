@@ -80,11 +80,8 @@ const SESSION_HOOK_PATH = path.resolve(import.meta.dirname, '..', 'hooks', `feyn
 const RULES_PATH        = path.resolve(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
 
 const DEFAULT_STATE: FeynmanState = { enabled: true, intensity: 'full', injections: 0 };
-const TARGET_ALIASES: Record<string, string> = {
-  all: 'both',
-  '*': 'both',
-};
-const VALID_TARGETS = ['claude', 'codex', 'both', 'all', '*', 'cline', 'cursor', 'windsurf'];
+const TARGET_ALIASES: Record<string, string> = {};
+const VALID_TARGETS = ['claude', 'codex', 'opencode', 'both', 'all', '*', 'cline', 'cursor', 'windsurf'];
 
 // IDE targets are project-local (write to CWD), unlike claude/codex which are
 // user-global (write to HOME). They install a rules file, not a hook.
@@ -129,6 +126,19 @@ function ideTargetConfig(name: string): IdeTargetConfig | null {
 }
 
 function targetConfig(name: string): TargetConfig {
+  if (name === 'opencode') {
+    const rootDir = path.join(HOME, '.config', 'opencode');
+    return {
+      name: 'opencode',
+      label: 'OpenCode',
+      rootDir,
+      settingsPath: path.join(rootDir, 'opencode.json'),
+      feynmanDir: path.join(rootDir, '.feynman'),
+      statePath: path.join(rootDir, '.feynman', 'state.json'),
+      flagPath: path.join(rootDir, '.feynman-active'),
+      commandsDir: null,
+    };
+  }
   const dirName = name === 'codex' ? '.codex' : '.claude';
   const rootDir = path.join(HOME, dirName);
   return {
@@ -144,7 +154,9 @@ function targetConfig(name: string): TargetConfig {
 }
 
 function targetNames(target: string): string[] {
-  return target === 'both' ? ['claude', 'codex'] : [target];
+  if (target === 'both') return ['claude', 'codex'];
+  if (target === 'all' || target === '*') return ['claude', 'codex', 'opencode'];
+  return [target];
 }
 
 function parseTarget(args: string[], fallback = 'codex'): { target: string; args: string[] } {
@@ -161,7 +173,7 @@ function parseTarget(args: string[], fallback = 'codex'): { target: string; args
     }
   }
   if (!VALID_TARGETS.includes(target)) {
-    console.error(`feynman: invalid --target '${target}' (expected claude, codex, both, all, *, cline, cursor, or windsurf)`);
+    console.error(`feynman: invalid --target '${target}' (expected claude, codex, opencode, both, all, *, cline, cursor, or windsurf)`);
     process.exit(2);
   }
   target = TARGET_ALIASES[target] ?? target;
@@ -187,23 +199,30 @@ function renderFrontmatter(obj: Record<string, string | boolean> | null): string
   return lines.join('\n');
 }
 
+// Read rules content at a given intensity level from feynman-activate.md.
+// Supports XML format (<intensity name="X">…</intensity>) and legacy HTML-comment format.
+function readIntensityRules(intensity: string): string {
+  const rulesPath = path.resolve(ROOT_DIR, 'rules', 'feynman-activate.md');
+  const content = fs.readFileSync(rulesPath, 'utf8');
+  const xmlPattern = new RegExp(`<intensity\\s+name\\s*=\\s*["']${intensity}["'][^>]*>([\\s\\S]*?)<\\/intensity>`, 'i');
+  const xml = content.match(xmlPattern);
+  if (xml) return (xml[1] ?? '').trim();
+  // Legacy HTML-comment fallback.
+  const open = `<!-- ${intensity} -->`;
+  const close = `<!-- /${intensity} -->`;
+  const i1 = content.indexOf(open);
+  const i2 = content.indexOf(close, i1);
+  if (i1 !== -1 && i2 !== -1) return content.slice(i1 + open.length, i2).trim();
+  return content;
+}
+
 // Build the rules content for IDE installs. Uses the same rules file the
 // runtime hook reads, but always emits the `full` intensity (IDEs are
 // developer tools, default to richest variant). The full intensity content
 // is extracted from rules/feynman-activate.md by the same XML matcher used
 // in hooks/feynman-activate.ts.
 function readFullIntensityRules(): string {
-  const rulesPath = path.resolve(ROOT_DIR, 'rules', 'feynman-activate.md');
-  const content = fs.readFileSync(rulesPath, 'utf8');
-  const xml = /<intensity\s+name\s*=\s*["']full["'][^>]*>([\s\S]*?)<\/intensity>/i.exec(content);
-  if (xml) return (xml[1] ?? '').trim();
-  // Legacy fallback (matches hook).
-  const open = '<!-- full -->';
-  const close = '<!-- /full -->';
-  const i1 = content.indexOf(open);
-  const i2 = content.indexOf(close, i1);
-  if (i1 === -1 || i2 === -1) return content; // raw fallback
-  return content.slice(i1 + open.length, i2).trim();
+  return readIntensityRules('full');
 }
 
 function installIde(target: string): IdeInstallResult {
@@ -260,7 +279,7 @@ ${c.bold('Commands:')}
 
 ${c.bold('Options:')}
   --help, -h   Show help for a command
-  --target     claude | codex | both | all | *
+  --target     claude | codex | opencode | both | all | *
   --force      (install) Re-register even if already installed
 
 ${c.bold('Examples:')}
@@ -580,7 +599,7 @@ function cmdBootstrap(args: string[]): void {
 const INSTALL_HELP = `${c.bold('feynman install')} — register feynman hook
 
 ${c.bold('Usage:')}
-  feynman install [--target claude|codex|both|all|*] [--force]
+  feynman install [--target claude|codex|opencode|both|all|*] [--force]
 
 ${c.bold('Options:')}
   --target  Install into Claude Code, Codex, both, all, or * (default: codex)
@@ -601,7 +620,7 @@ Idempotent by default: skips if feynman hook entries already exist.
 const UNINSTALL_HELP = `${c.bold('feynman uninstall')} — remove feynman hook
 
 ${c.bold('Usage:')}
-  feynman uninstall [--target claude|codex|both|all|*]
+  feynman uninstall [--target claude|codex|opencode|both|all|*]
 
 Removes feynman hook entries from target config.
 Preserves .feynman/state.json (user data).
@@ -613,7 +632,7 @@ Idempotent: safe to run multiple times.
 const DOCTOR_HELP = `${c.bold('feynman doctor')} — check feynman installation health
 
 ${c.bold('Usage:')}
-  feynman doctor [--target claude|codex|both|all|*]
+  feynman doctor [--target claude|codex|opencode|both|all|*]
 
 Checks:
   1. target hook config present
@@ -861,7 +880,7 @@ function cmdInstall(opts: { force: boolean; target: string }): void {
   }
   console.log('└──────────────────────────────────────────────────────────────┘');
   console.log('');
-  console.log('Restart Claude Code or Codex to activate feynman full mode.');
+  console.log('Restart Claude Code, Codex, or OpenCode to activate feynman full mode.');
 
   process.exit(0);
 }
@@ -886,6 +905,154 @@ function uninstallHookTarget(target: string): UninstallResult {
   return { target, missing: false, hadHook };
 }
 
+// ─── OpenCode adapter ─────────────────────────────────────────────────────────
+
+function readOpenCodeSettings(settingsPath: string): Record<string, unknown> {
+  if (!fs.existsSync(settingsPath)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as Record<string, unknown>;
+  } catch (_) {
+    return {};
+  }
+}
+
+function installOpenCodeTarget(opts: { force: boolean }): InstallResult {
+  const tc = targetConfig('opencode');
+
+  bootstrapState('opencode');
+
+  // Read intensity from state.json
+  let intensity = DEFAULT_STATE.intensity;
+  try {
+    const state = JSON.parse(fs.readFileSync(tc.statePath, 'utf8')) as Partial<FeynmanState>;
+    intensity = state.intensity ?? intensity;
+  } catch (_) { /* use default */ }
+
+  // Write rules.md at the configured intensity
+  const rulesContent = readIntensityRules(intensity);
+  const rulesDestPath = path.join(tc.feynmanDir, 'rules.md');
+  fs.writeFileSync(rulesDestPath, rulesContent + '\n');
+
+  // Read opencode.json (create {} if absent)
+  const settings = readOpenCodeSettings(tc.settingsPath);
+  const instructions = (settings['instructions'] as string[] | undefined) ?? [];
+
+  // Check-before-append: add absolute path only if not already present
+  const already = instructions.includes(rulesDestPath);
+  if (!already || opts.force) {
+    if (!already) {
+      instructions.push(rulesDestPath);
+    }
+    settings['instructions'] = instructions;
+    ensureDir(path.dirname(tc.settingsPath));
+    fs.writeFileSync(tc.settingsPath, JSON.stringify(settings, null, 2) + '\n');
+  }
+
+  return { target: 'opencode', already, tc };
+}
+
+function uninstallOpenCodeTarget(): UninstallResult {
+  const tc = targetConfig('opencode');
+  const rulesDestPath = path.join(tc.feynmanDir, 'rules.md');
+
+  if (!fs.existsSync(tc.settingsPath) && !fs.existsSync(tc.flagPath)) {
+    return { target: 'opencode', missing: true };
+  }
+
+  // Remove our path from instructions[] in opencode.json
+  let hadHook = false;
+  if (fs.existsSync(tc.settingsPath)) {
+    const settings = readOpenCodeSettings(tc.settingsPath);
+    const instructions = (settings['instructions'] as string[] | undefined) ?? [];
+    const filtered = instructions.filter(p => p !== rulesDestPath);
+    hadHook = filtered.length < instructions.length;
+    if (hadHook) {
+      settings['instructions'] = filtered.length > 0 ? filtered : undefined;
+      if (settings['instructions'] === undefined) delete settings['instructions'];
+      fs.writeFileSync(tc.settingsPath, JSON.stringify(settings, null, 2) + '\n');
+    }
+  }
+
+  // Delete rules.md
+  if (fs.existsSync(rulesDestPath)) fs.unlinkSync(rulesDestPath);
+
+  // Delete flag file (NOT state.json — preserved per D-11)
+  if (fs.existsSync(tc.flagPath)) fs.unlinkSync(tc.flagPath);
+
+  return { target: 'opencode', missing: false, hadHook };
+}
+
+function cmdDoctorOpenCode(): void {
+  const tc = targetConfig('opencode');
+  const rulesDestPath = path.join(tc.feynmanDir, 'rules.md');
+  const checks: string[] = [];
+  let failCount = 0;
+
+  function check(label: string, pass: boolean): void {
+    const marker = pass ? '[OK]  ' : '[FAIL]';
+    const colorFn = pass ? c.green : c.red;
+    checks.push(colorFn(`${marker} ${label}`));
+    if (!pass) failCount++;
+  }
+
+  // 1. opencode.json exists
+  const settingsExists = fs.existsSync(tc.settingsPath);
+  check(`${tc.settingsPath.replace(HOME, '~')} present`, settingsExists);
+
+  // 2. our path in instructions[]
+  let pathInInstructions = false;
+  if (settingsExists) {
+    const settings = readOpenCodeSettings(tc.settingsPath);
+    const instructions = (settings['instructions'] as string[] | undefined) ?? [];
+    pathInInstructions = instructions.includes(rulesDestPath);
+  }
+  check(`rules path in instructions[] (${rulesDestPath.replace(HOME, '~')})`, pathInInstructions);
+
+  // 3. rules.md exists and non-empty
+  let rulesOk = false;
+  try {
+    const stat = fs.statSync(rulesDestPath);
+    rulesOk = stat.size > 0;
+  } catch (_) { /* intentionally empty */ }
+  check('rules.md exists and non-empty', rulesOk);
+
+  // 4. state.json valid
+  let stateOk = false;
+  let stateEnabled = false;
+  try {
+    const state = JSON.parse(fs.readFileSync(tc.statePath, 'utf8')) as Record<string, unknown>;
+    stateOk = 'enabled' in state;
+    stateEnabled = state['enabled'] === true;
+  } catch (_) { /* intentionally empty */ }
+  check('state.json valid (has enabled field)', stateOk);
+
+  // 5. flag matches state
+  const flagPresent = fs.existsSync(tc.flagPath);
+  check(
+    stateEnabled ? '.feynman-active flag present when enabled' : '.feynman-active flag absent when disabled',
+    stateEnabled ? flagPresent : !flagPresent
+  );
+
+  const strippedLines = checks.map(l => l.replace(/\x1b\[[0-9;]*m/g, ''));
+  const maxLen = Math.max(...strippedLines.map(l => l.length));
+  const innerW = Math.max(maxLen + 2, 48);
+  const titlePart = 'feynman doctor opencode ';
+  const border = '─'.repeat(innerW);
+  const topDashes = '─'.repeat(innerW - titlePart.length - 1);
+  console.log(`┌─ ${titlePart}${topDashes}┐`);
+  for (let i = 0; i < checks.length; i++) {
+    const stripped = strippedLines[i] ?? '';
+    const pad = innerW - 1 - stripped.length;
+    console.log(`│ ${checks[i] ?? ''}${' '.repeat(Math.max(0, pad))}│`);
+  }
+  console.log(`└${border}┘`);
+
+  const status = failCount === 0
+    ? c.green('Status: OK')
+    : c.red(`Status: ISSUES (${failCount})`);
+  console.log(status);
+}
+
 // ─── Target adapters ──────────────────────────────────────────────────────────
 
 function createHookAdapter(name: 'claude' | 'codex'): TargetAdapter {
@@ -895,9 +1062,17 @@ function createHookAdapter(name: 'claude' | 'codex'): TargetAdapter {
   };
 }
 
+function createOpenCodeAdapter(): TargetAdapter {
+  return {
+    install: (opts) => installOpenCodeTarget(opts),
+    uninstall: () => uninstallOpenCodeTarget(),
+  };
+}
+
 const adapters: Record<string, TargetAdapter> = {
-  claude: createHookAdapter('claude'),
-  codex:  createHookAdapter('codex'),
+  claude:    createHookAdapter('claude'),
+  codex:     createHookAdapter('codex'),
+  opencode:  createOpenCodeAdapter(),
 };
 
 function installOne(target: string, opts: { force: boolean }): InstallResult {
@@ -948,7 +1123,12 @@ function cmdDoctor(opts: { target?: string; noExit?: boolean } = {}): void {
     }
   }
 
-  if (target === 'both') {
+  if (target === 'opencode') {
+    cmdDoctorOpenCode();
+    process.exit(0);
+  }
+
+  if (target === 'both' || target === 'all' || target === '*') {
     targetNames(target).forEach(t => cmdDoctor({ target: t, noExit: true }));
     process.exit(0);
   }
