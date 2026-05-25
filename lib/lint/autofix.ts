@@ -205,6 +205,94 @@ function detectAndFixArrows(text: string, processFenced: boolean): string {
   return result.join('\n');
 }
 
+// ---------------------------------------------------------------------------
+// Pattern B — junction fan alignment
+// Detects regions of ≥2 consecutive lines each having the form
+//   [label] ──┐ / ──┤ / ──┘  (the label may be any non-empty string)
+// within ±3 visual columns of each other, then pads label text so the
+// `──` connector starts at the same column on every line.
+// ---------------------------------------------------------------------------
+
+const JUNCTION_RE = /──[┐┤┘]/;
+
+function hasExactlyOneJunction(line: string): boolean {
+  return (line.match(/──[┐┤┘]/g) || []).length === 1;
+}
+
+function junctionColPos(line: string): number {
+  const m = line.match(/──[┐┤┘]/);
+  return m && m.index !== undefined ? visualWidth(line.slice(0, m.index)) : -1;
+}
+
+function detectAndFixJunctions(text: string, processFenced: boolean): string {
+  if (!JUNCTION_RE.test(text)) return text;
+  const lines = text.split('\n');
+  const n = lines.length;
+  const skip = buildSkipSet(lines, processFenced);
+  const result = [...lines];
+  let i = 0;
+  while (i < n) {
+    if (skip.has(i) || !hasExactlyOneJunction(lines[i]!)) { i++; continue; }
+    let j = i + 1;
+    while (j < n && !skip.has(j) && hasExactlyOneJunction(lines[j]!)) j++;
+    const regionEnd = j - 1;
+    if (regionEnd - i >= 1) {
+      const regionLines = lines.slice(i, regionEnd + 1);
+      const positions = regionLines.map(junctionColPos);
+      const minPos = Math.min(...positions);
+      const maxPos = Math.max(...positions);
+      if (maxPos - minPos <= 3) {
+        const parts = regionLines.map(l => {
+          const m = l.match(/──[┐┤┘]/);
+          if (!m || m.index === undefined) return { left: l, rest: '' };
+          return { left: l.slice(0, m.index).trimEnd(), rest: l.slice(m.index) };
+        });
+        const maxLeft = Math.max(...parts.map(p => visualWidth(p.left)));
+        for (let k = 0; k < parts.length; k++) {
+          const { left, rest } = parts[k]!;
+          const pad = ' '.repeat(maxLeft - visualWidth(left));
+          result[i + k] = left + pad + ' ' + rest;
+        }
+      }
+      i = regionEnd + 1;
+    } else {
+      i++;
+    }
+  }
+  return result.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Pattern C — separator length normalization
+// Collects all `─`-only lines (≥3 chars) in the document (global pass).
+// Requires ≥2 such lines; normalizes all to the document-maximum length.
+// Guards: skips fenced blocks and frame border lines.
+// ---------------------------------------------------------------------------
+
+const SEP_RE = /^─{3,}$/;
+
+function isSeparatorLine(line: string): boolean {
+  return SEP_RE.test(line.trim()) && line.trim().length >= 3;
+}
+
+function detectAndFixSeparators(text: string, processFenced: boolean): string {
+  if (text.indexOf('─') === -1) return text;
+  const lines = text.split('\n');
+  const skip = buildSkipSet(lines, processFenced);
+  const sepIndices: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!skip.has(i) && isSeparatorLine(lines[i]!)) sepIndices.push(i);
+  }
+  if (sepIndices.length < 2) return text;
+  const maxLen = Math.max(...sepIndices.map(i => visualWidth(lines[i]!.trim())));
+  const result = [...lines];
+  for (const i of sepIndices) {
+    const indent = (lines[i]!.match(/^(\s*)/) || ['', ''])[1]!;
+    result[i] = indent + '─'.repeat(maxLen);
+  }
+  return result.join('\n');
+}
+
 // Walk text, locate frame regions (sequence of lines starting with ┌ … ending
 // with └), build node objects, and rewrite each region in place.
 //
@@ -227,9 +315,11 @@ export function autofix(text: string, opts?: AutofixOptions): string {
   const processFenced = !!(opts && opts.processFenced);
   const convertL11    = !!(opts && opts.convertL11);
   if (!text) return text;
-  const hasFrames = text.indexOf('┌') !== -1;
-  const hasArrows = ARROW_RE.test(text);
-  if (!hasFrames && !hasArrows) return text;
+  const hasFrames    = text.indexOf('┌') !== -1;
+  const hasArrows    = ARROW_RE.test(text);
+  const hasJunctions = JUNCTION_RE.test(text);
+  const hasSeps      = text.indexOf('─') !== -1;
+  if (!hasFrames && !hasArrows && !hasJunctions && !hasSeps) return text;
   const lines = text.split('\n');
   const out: string[] = [];
   let i = 0;
@@ -297,7 +387,10 @@ export function autofix(text: string, opts?: AutofixOptions): string {
     }
     i = j + 1;
   }
-  return detectAndFixArrows(out.join('\n'), processFenced);
+  let result = detectAndFixArrows(out.join('\n'), processFenced);
+  result = detectAndFixJunctions(result, processFenced);
+  result = detectAndFixSeparators(result, processFenced);
+  return result;
 }
 
 // Re-export visualWidth for backward compatibility (autofix.js exported it)
