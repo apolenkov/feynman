@@ -1,21 +1,22 @@
 # Lint Rules Reference
 
 feynman includes a linter for ASCII diagrams in markdown files.
-Thirteen rules (L01-L13) enforce structural correctness and token economy.
+Fifteen rules (L01-L15) enforce structural correctness and token economy.
 
 Rules L01-L09 enforce structural correctness (boxes close, trees end with `└──`,
 arrows are consistent, etc.). Rule L10 catches Cyrillic/Latin script mixing.
-Rules L11-L13 enforce token economy: don't use a frame for what a dot-leader
+Rules L11-L15 enforce token economy: don't use a frame for what a dot-leader
 can express; don't pad more than you fill; don't wrap a tree that already
-groups itself.
+groups itself; don't wrap homogeneous plain content in a frame.
 
 Run: `npx @albinocrabs/feynman lint <file.md>` or `feynman lint <file.md>`
 
-Add `--fix` to repair misaligned frame borders OR convert L11-overdecorated
-frames to dot-leader:
+Add `--fix` to repair misaligned frame borders, convert L11-overdecorated
+frames to dot-leader, or convert L15 homogeneous frames to plain text:
 `feynman lint --fix <file.md>` — see [L08](#l08-frame-width-discipline-severity-error),
 [L09](#l09-right-edge-alignment-severity-error),
-and [L11](#l11-overdecoration-severity-warn).
+[L11](#l11-overdecoration-severity-warn),
+and [L15](#l15-homogeneous-frame-severity-warn).
 
 Add `--explain` to annotate each frame with a token-cost breakdown:
 `feynman lint --explain <file.md>` — emits per-frame
@@ -590,4 +591,114 @@ opposite stance: even with grouping, the cost-benefit is negative. Both
 rules fire on the same tree-in-frame input, but communicate different
 fixes — L11 silent (whitelisted), L13 fires. A unit test
 (`L11 and L13 are complementary on tree-in-frame`) pins the contract.
+
+---
+
+## L14: Blank-Line Separation (severity: warn)
+
+**What:** A fenced code block or frame block that is not preceded by a blank
+line. Every structural visual element must be separated from the surrounding
+prose by at least one blank line.
+
+**Why:** Markdown parsers and terminal renderers depend on blank-line
+boundaries to detect block-level elements. A code fence or frame that
+immediately follows prose without a blank line can be swallowed into the
+paragraph, losing its monospace rendering and breaking copy-paste fidelity.
+
+**Whitelist:** the very first line of the file; code fences that follow
+another closing fence or another blank line; frames that start the file.
+
+**Source:** [`lib/lint/rules.ts#L14_blank_line_separation`](../lib/lint/rules.ts)
+
+### Valid (blank line before the block)
+
+```text
+Here is the result of the build step.
+
+(blank line above)
+npm run build — exit 0
+```
+
+### Invalid (code fence immediately after prose)
+
+```text
+Here is the result of the build step.
+(no blank line)
+npm run build — exit 0
+```
+
+Output:
+```text
+file:2:1: L14 warn fenced block not preceded by blank line
+```
+
+---
+
+## L15: Homogeneous Frame (severity: warn)
+
+**What:** A frame block (`┌─...─┐ ... └─...─┘`) whose inner lines are all
+the same content type: k:v pairs, bullet items, or plain prose. Frames
+that homogeneously contain one type of plain content add no visual
+information — the box borders and padding are pure token waste.
+
+**Why:** A frame implies internal structure or heterogeneous content. When
+every inner line is `key: value`, or every line is `- item`, the box is
+redundant decoration. Converting to plain text saves ~30-60% of the token
+cost at zero loss of meaning.
+
+**Minimum threshold:** ≥2 inner lines required. A single-item frame is
+too ambiguous to auto-convert.
+
+**Whitelist (frame is kept as-is):**
+- Inner lines contain tree connectors (`├──` / `└──`) — structural frame.
+- Any line contains `│` twice or more — embedded table columns.
+- Any line contains right-pointing flow arrows — treated as a flow diagram.
+- All inner lines match state markers (`← готов`, `✓ done`, etc.) — status
+  frame; L11 handles the conversion path for those.
+
+**Source:** [`lib/lint/rules.ts#L15_homogeneous_frame`](../lib/lint/rules.ts)
+
+### Valid — heterogeneous content stays framed
+
+```text
+┌─ Deploy status ──────────┐
+│ step 1    ← готов        │
+│ step 2    ← в работе     │
+│ step 3    ← заморожено   │
+└──────────────────────────┘
+```
+
+### Invalid — homogeneous k:v content inside frame
+
+```text
+┌──────────────────────────┐
+│ host:    api.example.com │
+│ port:    8080            │
+│ timeout: 30s             │
+└──────────────────────────┘
+```
+
+Output:
+```text
+file:1:1: L15 warn frame wraps homogeneous kv content; consider plain format (saves ~80 chars)
+         Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15
+```
+
+### After `--fix`
+
+```text
+host:    api.example.com
+port:    8080
+timeout: 30s
+```
+
+**Autofix:** `feynman lint --fix <file>` converts qualifying frames to
+plain text. Bullet frames normalise to `- item` style. Title lines
+(`┌─ Title ─┐`) are preserved as a leading plain line above the content.
+Idempotent — running `--fix` twice produces zero further diff.
+
+**Conservative-first:** the stop-hook (`feynman-session-start`) does **not**
+enable L15 conversion by default. Only `feynman lint --fix` opt-in triggers
+it. This preserves frames that an author drew intentionally, even if feynman
+cannot detect the intent.
 
