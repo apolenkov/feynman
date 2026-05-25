@@ -35,20 +35,20 @@
 
 ---
 
-A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex
-plugin that automatically injects ASCII diagram rules via the `SessionStart`
-hook (startup, resume, after `/compact`, after `/clear`).
+A [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Codex, and
+[OpenCode](https://opencode.ai) plugin that automatically injects ASCII diagram
+rules at session start.
 
 ```bash
 npx -y @albinocrabs/feynman@latest install --target all
-npx -y @albinocrabs/feynman@latest doctor --target codex
+npx -y @albinocrabs/feynman@latest doctor --target opencode
 ```
 
 ## Why feynman
 
 Structured information explained in prose forces you to rebuild the structure
 in your head before you can reason about it. feynman intercepts every Claude
-Code or Codex prompt and injects rules that turn flows into arrows,
+Code, Codex, or OpenCode prompt and injects rules that turn flows into arrows,
 hierarchies into trees, comparisons into columns, and status into the
 smallest fitting visual — dot-leader by default, markdown table for larger
 sets, frame only when lighter forms lose information. The structure is
@@ -172,14 +172,28 @@ npx @albinocrabs/feynman install
 npx @albinocrabs/feynman install --target codex
 ```
 
-**Both clients:**
+**OpenCode via npx:**
+
+```bash
+npx @albinocrabs/feynman install --target opencode
+```
+
+OpenCode has no stdout hook API, so feynman injects rules by writing
+`~/.config/opencode/.feynman/rules.md` and registering its absolute path in the
+`instructions[]` array of `~/.config/opencode/opencode.json`. OpenCode reads
+`instructions` entries as additive system context at startup — the same mechanism
+as a custom system prompt file. Run `/clear` inside an OpenCode session after
+changing intensity so the new rules take effect.
+
+**All three clients:**
 
 ```bash
 npx @albinocrabs/feynman install --target all
 ```
 
 The install command is idempotent: running it again updates the existing
-feynman hook instead of adding duplicates.
+feynman hook instead of adding duplicates. For OpenCode, a second install is a
+no-op if the path is already in `instructions[]`.
 
 **Claude Code via bash one-liner:**
 
@@ -187,10 +201,10 @@ feynman hook instead of adding duplicates.
 git clone https://github.com/apolenkov/feynman && bash feynman/install.sh
 ```
 
-Restart Claude Code or Codex after install so a fresh `SessionStart` hook can
-prime the session.
+Restart Claude Code, Codex, or OpenCode after install so a fresh session can
+prime the rules.
 
-**Uninstall:** `npx @albinocrabs/feynman uninstall --target claude|codex|both|all|*`
+**Uninstall:** `npx @albinocrabs/feynman uninstall --target claude|codex|opencode|both|all|*`
 
 **Plugin manifests:** this repo also ships `.claude-plugin/plugin.json`,
 `hooks/hooks.json`, `.codex-plugin/plugin.json`, and `hooks.json` for direct

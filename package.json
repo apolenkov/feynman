@@ -1,7 +1,7 @@
 {
   "name": "@albinocrabs/feynman",
-  "version": "1.1.1",
-  "description": "Claude Code and Codex plugin that auto-injects ASCII diagram rules via SessionStart hook (startup, resume, compact, clear)",
+  "version": "1.2.0",
+  "description": "Claude Code, Codex, and OpenCode plugin that auto-injects ASCII diagram rules via SessionStart hook (startup, resume, compact, clear)",
   "license": "MIT",
   "author": "apolenkov",
   "keywords": [
