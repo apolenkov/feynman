@@ -43,7 +43,7 @@ for (const dir of ['hooks', 'bin', 'lib']) {
 
 // --- Step 4: copy static package files ---
 const staticItems = [
-  'rules', 'skills', 'docs', 'examples', '.codex-plugin',
+  'rules', 'skills', 'docs', 'examples', '.claude-plugin', '.codex-plugin',
   'LICENSE', 'README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md',
 ];
 for (const item of staticItems) {
