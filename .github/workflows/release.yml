@@ -163,7 +163,7 @@ jobs:
         if: (github.event_name == 'release' || inputs.dry_run == false) && steps.npm_version.outputs.published != 'true' && steps.npm_token.outputs.present == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance --ignore-scripts
+        run: npm publish "dist/$(cat dist/TARBALL.txt)" --access public --provenance --ignore-scripts
 
       - name: Verify npm publish result
         if: (github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)) && steps.npm_token.outputs.present == 'true'
@@ -198,4 +198,4 @@ jobs:
 
       - name: Dry-run publish
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true
-        run: npm publish --access public --dry-run --ignore-scripts
+        run: npm publish "dist/$(cat dist/TARBALL.txt)" --access public --dry-run --ignore-scripts
