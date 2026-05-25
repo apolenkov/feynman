@@ -395,10 +395,10 @@ idempotent — a second pass on an already-fixed file is a no-op.
 
 | Pattern | What it fixes | Trigger |
 |---------|--------------|---------|
-| D — Frame alignment | Right edge of `┌─…─┐ … └─┘` blocks, including titled tops `┌─ Title ─┐` | Any misaligned frame |
-| A — Arrow column | `→` / `-->` / `──>` in a run of ≥2 lines | Arrows within ±3 cols of each other |
-| B — Junction fan | `──┐` / `──┤` / `──┘` connectors in ≥2 adjacent lines | Connectors within ±3 cols |
-| C — Separator length | `─`-only lines (≥3 chars) across the document | ≥2 separators of unequal length |
+| D — Frame alignment | Right edge of ASCII frame blocks, including titled tops | Any misaligned frame |
+| A — Arrow column | Arrow symbols in a run of ≥2 lines (`->`, `-->`, `==>`) | Arrows within ±3 cols of each other |
+| B — Junction fan | Junction connectors in ≥2 adjacent lines | Connectors within ±3 cols |
+| C — Separator length | Pure-dash separator lines across the document | ≥2 separators of unequal length |
 
 Frame alignment: ANSI escapes, combining marks, zero-width joiners are
 stripped, CJK wide chars count as 2 cols. Titled tops preserve the title
