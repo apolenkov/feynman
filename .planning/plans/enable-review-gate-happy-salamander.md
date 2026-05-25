@@ -1,450 +1,396 @@
-# Plan: Add OpenCode as third target (с TargetAdapter refactor)
+# Plan: Smart ASCII autofix expansion (v1.3.0)
 
-> Имя файла исторически связано с прошлой задачей (`enable-review-gate`).
-> Актуальный контент — добавление поддержки OpenCode runtime в плагин
-> `@albinocrabs/feynman` через мини-рефактор `TargetAdapter`.
-
----
-
-## 0. Сейчас
-
-```
-ветка   : main (= origin/main)
-dirty   : .planning/plans/   (untracked — этот файл)
-tag     : v1.1.1 (последний релиз)
-recent  : 9f1923b chore(release): v1.1.1
-          cfde037 fix(lint): recognize sequence-message arrows
-          84e7b30 chore(release): v1.1.0
-          288f47f docs(readme): honest prompt-caching section
-          6724528 docs(examples): de-frame heavy examples
-```
-
-Здесь нет `.planning/STATE.md` / `ROADMAP.md` — `feynman` не использует
-полный GSD-аппарат core-principles. План пишется одиночным артефактом в
-`.planning/plans/`, а закрытие = `chore(release): v1.2.0`.
+> Имя файла историческое (`enable-review-gate-happy-salamander`).
+> Актуальный контент — расширение `feynman-lint --fix` до 4-х паттернов
+> выравнивания. Спек: `.planning/specs/2026-05-25-smart-ascii-autofix-design.md`.
 
 ---
 
-## 1. TL;DR (визуально)
+## Context
+
+`feynman-lint --fix` уже существует и выравнивает фреймы + переводит L11 в
+dot-leader. Но он промахивается на трёх классах ASCII-структур, которые сам
+feynman продвигает как «обязательные визуалы»: arrow-flow, parallel-fan,
+длина разделителей. Плюс есть один gap в существующем frame-autofix — regex
+не ловит фреймы с titled top (`┌─ Title ─┐`), из-за чего L09 видит ошибку,
+но autofix её не чинит.
+
+Цель v1.3.0 — закрыть gap (Pattern D) и добавить 3 новых паттерна
+выравнивания (A/B/C). Архитектурно — без split-а файла, inline в
+`lib/lint/autofix.ts` (по выбору пользователя). Split откладываем до v1.3.x
+если файл реально разрастётся.
+
+---
+
+## 1. TL;DR
 
 ### Было
 
 ```
-┌─ supported targets ──────────────────────────────────┐
-│                                                       │
-│   claude  ──► SessionStart hook ──► stdout JSON       │
-│   codex   ──► SessionStart hook ──► stdout JSON       │
-│                                                       │
-│   код:    if (name === 'codex' ? '.codex' : '.claude')│
-│           if (claude) { … } else if (codex) { … }     │
-│                                                       │
-└───────────────────────────────────────────────────────┘
-```
+lib/lint/autofix.ts (~220 LoC)
+  autofix(text, opts)
+    └── только frame alignment + опц. L11→dot-leader
 
-### Проблема
-
-```
-[2 target ternary]                    [N=3+ target будет]
-       │                                       │
-       ▼                                       ▼
- if/else x N мест                       тройные тернарии
-       │                                       │
-       ▼                                       ▼
- OpenCode без stdout hook  ───►  «отсутствие hook» нельзя
-                                  оформить как ещё одна ветка
-                                  if/else — нужен другой
-                                  механизм инъекции
-       │                                       │
-       └──────────► рост поверхности багов, drift между
-                    тремя копиями hooks.json, дубль
-                    `clientHome()` в SKILL.md
+регекс top bar: /^(\s*)┌─*┐\s*$/
+                 ↑ НЕ ловит titled top
 ```
 
 ### Станет
 
 ```
-┌─ TargetAdapter contract ─────────────────────────────────┐
-│                                                           │
-│   interface TargetAdapter { paths, install, uninstall,    │
-│                              doctor }                     │
-│                                                           │
-│   claude   = createClaudeAdapter()    ── SessionStart hook│
-│   codex    = createCodexAdapter()     ── SessionStart hook│
-│   opencode = createOpenCodeAdapter()  ── instructions[]   │
-│                                          в opencode.json  │
-│                                                           │
-│   installOne(t)   = adapters[t].install()                 │
-│   cmdDoctor(t)    = adapters[t].doctor()                  │
-│   cmdUninstall(t) = adapters[t].uninstall()               │
-│                                                           │
-│   lib/client-home.ts  — shared helper, дубль убран        │
-└───────────────────────────────────────────────────────────┘
+lib/lint/autofix.ts (~500 LoC, inline)
+  autofix(text, opts)
+    ├── detectAndFixFrames()       Pattern D (включает titled top)
+    ├── detectAndFixJunctions()    Pattern B (NEW)
+    ├── detectAndFixArrows()       Pattern A (NEW)
+    └── detectAndFixSeparators()   Pattern C (NEW)
+
+регекс top bar: /^(\s*)┌─.*─┐\s*$/
+                 ↑ ловит и `┌────┐`, и `┌─ Title ─┐`
 ```
 
-Одна строка пайплайна фаз:
+### Execution flow
 
 ```
-[A: refactor] ── [B: opencode] ── [C: tests+docs] ── [Review Gate] ── [ship 1.2.0]
-   ↑ green        ↑ instructions   ↑ skill+README     ↑ self-review    ↑ tag+npm
+[wave 0: Haiku разведка]
+  ├── A: grep autofix call-sites + idempotency proof
+  └── B: fixture skeleton template
+
+         ↓ (parallel, single message)
+
+[wave 1: Sonnet impl, sequentially — общий файл]
+  ├── C: Pattern D (titled top + W расчёт)        commit
+  ├── D: Pattern A (arrow column)                 commit
+  ├── E: Pattern B (junction fan)                 commit
+  └── F: Pattern C (separator length)             commit
+
+         ↓
+
+[wave 2: Sonnet docs+release]
+  ├── G: tests + fixtures + README + CHANGELOG    commit
+  └── H: version 1.3.0 + tag + npm publish        commit
+```
+
+### От человека одной строкой
+
+Ничего обязательного. Опционально — глянуть `npm run release` dry-run output
+перед `npm publish` если хочешь подстраховаться. Остальное — Я делаю сам.
+
+---
+
+## 2. Architecture context
+
+```
+bin/feynman-lint.ts --fix <file>
+  └── reads file
+      └── autofix(text, { processFenced, convertL11 })   ← lib/lint/autofix.ts
+            ├── split → lines + fenced detection
+            ├── для каждого блока:
+            │     ├── detect frames → fix (Pattern D + старые)
+            │     ├── detect junctions → fix (Pattern B)         ← NEW
+            │     ├── detect arrows → fix (Pattern A)            ← NEW
+            │     └── detect separators → fix (Pattern C)        ← NEW
+            └── reassemble → возврат
+      └── writes file (если изменилось)
+
+hooks/feynman-session-start.ts (Stop-hook smoke)
+  └── вызывает autofix() с conservative defaults (без processFenced, без convertL11)
+      └── те же 4 паттерна автоматически включены под conservative-first
+```
+
+Non-overlap invariant: регион типа X не пересекается с регионом типа Y.
+При конфликте побеждает более структурный (frame > junction > arrow > separator).
+
+---
+
+## 3. Стратегия выполнения
+
+### Cheap-first delegation
+
+- **Haiku** (parallel wave 0): разведка call-sites через grep, идемпотентность
+  proof через двойной прогон, скелет fixture файлов.
+- **Sonnet** (sequential wave 1): 4 паттерна по одному коммиту — общий файл
+  `autofix.ts`, параллелить нельзя из-за конфликта правок.
+- **Sonnet** (wave 2): тесты + docs + release в одной волне.
+- **Opus**: только если в wave 1 застрянет — fallback на synthesis.
+
+### Parallel waves
+
+- Wave 0: 2 Haiku-агента одним сообщением (call-site разведка + fixture-skeleton).
+- Wave 1: 4 Sonnet-агента последовательно (общий файл `autofix.ts`, race
+  невозможен).
+- Wave 2: tests/docs/release sequentially.
+
+### Subagent split
+
+| stage | agent        | model  | scope                                                                    | r/w   | output                       |
+| ----- | ------------ | ------ | ------------------------------------------------------------------------ | ----- | ---------------------------- |
+| S0    | orchestrator | Sonnet | live repo truth + координация фаз                                       | r/w   | merged 1.3.0                 |
+| S1    | call-scout   | Haiku  | grep всех `import.*autofix` + `autofix(` использований                   | read  | `/tmp/autofix-callers.md`    |
+| S2    | fixture-tpl  | Haiku  | скелет fixture файлов (before/after MD)                                  | write | `/tmp/fixture-template.md`   |
+| S3    | impl-D       | Sonnet | Pattern D: titled top regex + W calc + title preserve                    | write | commit                       |
+| S4    | impl-A       | Sonnet | Pattern A: arrow column detection + fix                                  | write | commit                       |
+| S5    | impl-B       | Sonnet | Pattern B: junction fan detection + fix                                  | write | commit                       |
+| S6    | impl-C       | Sonnet | Pattern C: separator length detection + fix                              | write | commit                       |
+| S7    | docs-test    | Sonnet | fixtures + tests + README + CHANGELOG                                    | write | commit                       |
+| S8    | release      | Sonnet | version bump + tag + npm publish                                         | write | tagged + published           |
+| S9    | reviewer     | Sonnet | read-only review между S6 и S7                                           | read  | PASS / BLOCK                 |
+
+S1+S2 параллельно (single message, 2 tool calls). S3→S4→S5→S6 строго
+последовательно. S9 после S6, до S7. S7→S8 sequentially.
+
+---
+
+## 4. Boundaries
+
+```
+in-scope                            │  out-of-scope
+────────────────────────────────────┼────────────────────────────────────
+lib/lint/autofix.ts                 │  lint warnings для A/B/C (только autofix)
+tests/autofix.test.ts               │  CLI flags `--no-arrows` etc.
+tests/fixtures/autofix/*.md (new)   │  ASCII boxes (`+--+|--+`)
+README.md (Autofix capabilities)    │  titled bottom (`└─ Closeout ─┘`)
+CHANGELOG.md                        │  split autofix.ts в module (отложено)
+package.json (version)              │  performance optimization
+                                    │  изменения hook input/output API
 ```
 
 ---
 
-## 2. Recovered intent
+## 5. Locked decisions
 
-Из текущей сессии:
-
-| источник                              | что говорит                                            |
-| ------------------------------------- | ------------------------------------------------------ |
-| user message: «нужно добавить поддержку OpenCode» | новая фича: третий target                              |
-| user answer #1                        | inject method = **native файл + `instructions: [...]`**|
-| user answer #2                        | **сначала мини-рефактор TargetAdapter**, потом opencode|
-| memory `project_v110_shipped`         | base = v1.1.x, добавляем как minor 1.2.0               |
-| memory `feedback_npm_publish_2fa`     | релиз требует granular token + `npm publish dist/*.tgz`|
-
-Ничего «обязательного» от человека сверх этого. Архитектурные решения
-закрыты двумя ответами; всё остальное расписываю автономно.
+| #  | решение                                                                       | источник           |
+| -- | ----------------------------------------------------------------------------- | ------------------ |
+| D1 | Inline в `autofix.ts`, без split на module                                    | user answer        |
+| D2 | Idempotency `autofix(autofix(x)) === autofix(x)` — мандатный test fixture     | self-decide        |
+| D3 | Pattern A anchor — позиция первого char стрелки (`→` / `-` / `─`)             | self-decide        |
+| D4 | Frame > junction > arrow > separator при конфликте регионов                   | spec §architecture |
+| D5 | Pattern D bottom bar — всегда без title (упрощение v1)                        | spec §Pattern D    |
+| D6 | Pattern C tolerance — ≥2 `─`-only линий, обе ≥3 символа                       | spec §Pattern C    |
+| D7 | Conservative ±3 columns guard для A/B                                         | spec §Pattern A/B  |
+| D8 | 5 коммитов вместо 6 (без отдельного refactor)                                 | user answer        |
 
 ---
 
-## 3. Skill routing
+## 6. Files to modify
 
-| skill / source                | зачем                                          | что вернёт                          |
-| ----------------------------- | ---------------------------------------------- | ----------------------------------- |
-| `dtp-plan` (plan mode)        | стандартизация плана                           | этот файл                           |
-| `dtp-plan review` (Phase D)   | 14-доменный read-only ревью перед commit       | PASS / BLOCK по доменам             |
-| `Context7` (Phase B inline)   | подтвердить формат `instructions: [...]` opencode.json | актуальный SDK doc-фрагмент |
-| `WebSearch` (Phase B inline)  | реальное поведение opencode при abs/relative path | эмпирический факт                |
-| `graphify` (Phase A pre-edit) | граф вызовов `installOne` / `targetConfig`     | список call-sites                   |
-| `npm test` / `tsc` / eslint   | gate перед review                              | PASS / FAIL                         |
-
-**Пропущено сознательно:**
-
-- `dtp-session-scan` — сессия в скоупе, intake не нужен
-- `dtp-jira` — у репо нет Jira-привязки
-- Plannotator rich mode — терминальный ASCII достаточен
-- `make audit` — у `feynman` нет catalog→runtime pipeline, это
-  одна managed npm-пакет-точка
-
----
-
-## 4. Boundaries (что трогаем, что нет)
-
-```
-┌─ in-scope ──────────────────────────────┐  ┌─ out-of-scope ────────────────┐
-│ bin/feynman.ts                           │  │ ~/.config/opencode/* —        │
-│ lib/target-adapter.ts (new)              │  │   runtime файлы НЕ patch-им   │
-│ lib/client-home.ts (new)                 │  │   напрямую кроме как через    │
-│ skills/feynman/SKILL.md                  │  │   `feynman install`           │
-│ tests/cli.test.ts                        │  │                               │
-│ tests/install.test.ts                    │  │ hooks/feynman-session-start.ts│
-│ README.md                                │  │   (уже target-agnostic через  │
-│ package.json (version + files если надо) │  │    FEYNMAN_HOME env var)      │
-│                                          │  │                               │
-│                                          │  │ .opencode-plugin/ — НЕ        │
-│                                          │  │   создаём (D-5)               │
-│                                          │  │                               │
-│                                          │  │ rules файлы (formats, lint    │
-│                                          │  │   правила, intensity содерж.) │
-└──────────────────────────────────────────┘  └───────────────────────────────┘
-```
+- **`lib/lint/autofix.ts`** — основные правки:
+  - Line 168: regex `/^(\s*)┌─*┐\s*$/` → `/^(\s*)┌─.*─┐\s*$/`
+  - В `autofixFrame()`: парсинг titleSegment, расчёт W через `visualWidth(topInner)`
+  - Новые функции: `detectAndFixArrows()`, `detectAndFixJunctions()`,
+    `detectAndFixSeparators()`
+  - В `autofix()` dispatcher: добавить вызовы новых детекторов после frame fix
+  - Idempotency: каждая detect-функция возвращает unchanged если region уже
+    выровнен (важно для двойного прогона в stop-hook)
+- **`tests/autofix.test.ts`** — добавить блоки:
+  - `describe('Pattern D — titled frame')`
+  - `describe('Pattern A — arrow column')`
+  - `describe('Pattern B — junction fan')`
+  - `describe('Pattern C — separator length')`
+  - `describe('idempotency')` — двойной прогон не меняет вывод
+  - `describe('false-positive corpus')` — `should-not-touch.md`
+- **`tests/fixtures/autofix/`** — новые файлы:
+  - `titled-frame-before.md` + `-after.md`
+  - `arrow-basic-before.md` + `-after.md`
+  - `junction-fan-before.md` + `-after.md`
+  - `separator-length-before.md` + `-after.md`
+  - `should-not-touch.md` (false-positive corpus)
+- **`README.md`** — раздел «Autofix capabilities» с before/after блоками по
+  каждому из 4-х паттернов
+- **`CHANGELOG.md`** — запись v1.3.0 с upgrade notes (conservative-first,
+  никакого breaking)
+- **`package.json`** — version `1.2.1` → `1.3.0`
+- **`MEMORY.md` (после ship)** — pointer на `project_v130_shipped.md`
 
 ---
 
-## 5. Locked architecture decisions
-
-| #  | решение                                                                    | источник            |
-| -- | -------------------------------------------------------------------------- | ------------------- |
-| D1 | inject method для opencode = native `instructions: [абс. путь]`            | user answer #1      |
-| D2 | мини-рефактор `TargetAdapter` ДО добавления opencode                       | user answer #2      |
-| D3 | state в `~/.config/opencode/.feynman/` (симметрия с claude/codex)          | self-decide         |
-| D4 | rules.md = `~/.config/opencode/.feynman/rules.md`, абс. путь в instructions| self-decide         |
-| D5 | `.opencode-plugin/` НЕ создаём (npm-пакет сам по себе достаточен)          | self-decide         |
-| D6 | `both` = claude+codex (legacy); `all`/`*` = claude+codex+opencode          | self-decide         |
-| D7 | смена intensity → CLI перезапись rules.md → пользователь делает `/clear`   | self-decide         |
-| D8 | idempotency для opencode.json: check-before-append, чужие пути не трогаем  | self-decide         |
-
----
-
-## 6. Subagent roadmap
-
-| stage | агент       | model tier      | scope                                | r/w  | выход                          |
-| ----- | ----------- | --------------- | ------------------------------------ | ---- | ------------------------------ |
-| S0    | Orchestrator | Sonnet         | live repo truth, координация фаз     | r/w  | merged 1.2.0                   |
-| S1    | grep-scout  | Haiku           | grep всех `target ===` тернариев     | read | line list, /tmp/ternaries.md   |
-| S2    | dup-scout   | Haiku           | `clientHome()` дубль в SKILL.md      | read | 2 ranges + diff                |
-| S3    | doc-scout   | Haiku           | формат `instructions: []`, abs paths | read | /tmp/oc-instructions.md        |
-| S4    | impl-A      | Sonnet          | Phase A: TargetAdapter refactor      | write | commit `refactor(cli): …`     |
-| S5    | impl-B      | Sonnet          | Phase B: opencode adapter            | write | commit `feat(cli): …`         |
-| S6    | impl-C      | Sonnet          | Phase C: tests + docs + skill        | write | commit `test/docs: …`         |
-| S7    | reviewer    | Sonnet (cheap) | 14-domain read-only review           | read | PASS / BLOCK report            |
-| S8    | deep-fix    | Opus (cond)     | conflict resolution (only if BLOCK)  | read | resolution patch suggestions   |
-
-**Параллелизм:** S1 + S2 + S3 одной волной (single message, 3 tool calls)
-перед Phase A. S4 → S5 → S6 строго последовательно (общий файл
-`bin/feynman.ts`). S7 после S6 commit. S8 conditional, только при BLOCK.
-
-**Запуск:** background где можно, foreground для commit-точек (S0 владеет
-final result).
-
----
-
-## 7. Token economy
-
-| work type                              | model        | writes? | comment                                       |
-| -------------------------------------- | ------------ | ------- | --------------------------------------------- |
-| grep / classify / line-find            | Haiku        | no      | S1, S2                                        |
-| ext docs lookup (Context7 + WebSearch) | Haiku        | no      | S3                                            |
-| TargetAdapter refactor                 | Sonnet       | yes     | scoped: только `bin/feynman.ts` + `lib/`      |
-| opencode adapter                       | Sonnet       | yes     | scoped: новый файл + 1 import                 |
-| tests + docs                           | Sonnet       | yes     | 2 test files + SKILL.md + README              |
-| 14-domain review                       | Sonnet       | no      | dispatch через `/dtp-plan review`             |
-| conflict resolution (if BLOCK)         | Opus         | no      | только при verified conflict                  |
-
-Правила:
-
-- Не открываем raw sessions / огромные блоки исходников целиком — точечный read
-- Deep model (Opus) не запускается без проверенного риска из ревью
-- Между S4-S5-S6 не даём агентам собственный «full repo scan» — каждому
-  передаётся список файлов + контракт output
-
----
-
-## 8. Phases (детали)
-
-### Phase A — TargetAdapter contract (bit-for-bit compat)
-
-Цель: ввести контракт, мигрировать claude/codex, **поведение не меняется**.
-
-Файлы:
-
-- `bin/feynman.ts` — diff минимальный, диспатч через `adapters[name]`
-- `lib/target-adapter.ts` (new) — типы + общие хелперы (если разрастётся)
-
-Шаги:
-
-- A.1 определить `TargetAdapter`, `InstallOpts`, `UninstallOpts`,
-  `DoctorResult` (top-of-file или новый `lib/target-adapter.ts` — решит
-  размер при импле)
-- A.2 переписать `installOne()` → `adapters[target].install(opts)`
-- A.3 то же для `cmdDoctor()` и `cmdUninstall()`
-- A.4 прогнать `tests/cli.test.ts` + `tests/install.test.ts` — должны
-  быть зелёными БЕЗ правок (если красные → откат, рефактор сломал)
-- A.5 commit: `refactor(cli): introduce TargetAdapter contract for claude/codex`
-
-### Phase B — OpenCode adapter
-
-Файлы:
-
-- `bin/feynman.ts` — регистрация `opencode` адаптера, `VALID_TARGETS`,
-  `TARGET_ALIASES`, `targetNames`
-- `lib/opencode-adapter.ts` (или inline в bin/) — реализация контракта
-
-Содержимое `createOpenCodeAdapter()`:
-
-```
-paths.home     = ~/.config/opencode
-paths.state    = ~/.config/opencode/.feynman/state.json
-paths.flag     = ~/.config/opencode/.feynman-active
-paths.settings = ~/.config/opencode/opencode.json
-
-install():
-  1. bootstrapState(target='opencode')           ← reuse existing fn
-  2. render rules.md из state.intensity → .feynman/rules.md
-  3. read opencode.json (create {} if absent)
-  4. ensure absolute path of rules.md в instructions[]
-     (check-before-append, no dedup чужих)
-  5. write back, indent=2
-
-uninstall():
-  1. remove наш путь из instructions[]
-  2. delete rules.md, .feynman/, .feynman-active
-  3. state.json НЕ удаляем (симметрия с claude/codex)
-
-doctor():
-  - opencode.json существует?
-  - наш путь в instructions[]?
-  - rules.md существует и непустой?
-  - state.json валидный?
-  - .feynman-active flag статус
-  - (НЕТ проверки hooks.json — opencode без hook by design)
-```
-
-Шаги:
-
-- B.1 написать adapter
-- B.2 `VALID_TARGETS += 'opencode'`, `all`/`*` → 3 targets, `both` остаётся 2
-- B.3 эмпирически проверить absolute-path-в-instructions через OpenCode
-  CLI (один прогон вручную) — fallback на relative от `~/.config/opencode/`
-  если abs не работает
-- B.4 commit: `feat(cli): add opencode target (native instructions injection)`
-
-### Phase C — Tests + skill + docs
-
-Файлы:
-
-- `tests/cli.test.ts` — новые блоки + update `all`/`*` assertions
-- `tests/install.test.ts` — параметризовать через адаптер если ассертит
-  `.codex/hooks.json` напрямую
-- `lib/client-home.ts` (new) — вынесенный helper
-- `skills/feynman/SKILL.md` — ветка opencode + чтение helper-а
-- `README.md` — install one-liner + intensity caveat + compatibility table
-- `package.json` — version 1.2.0
-
-Шаги:
-
-- C.1 тестовые сценарии (см. Verification ниже) → `tests/cli.test.ts`
-- C.2 вынести `clientHome()` из SKILL.md в `lib/client-home.ts`,
-  добавить ветку opencode (`FEYNMAN_TARGET=opencode` → `~/.config/opencode`)
-- C.3 README — opencode install + intensity caveat (`/clear` для перечитывания)
-- C.4 commit-pair:
-  - `test(cli): cover opencode target paths and idempotency`
-  - `docs(readme): add opencode install + intensity caveat`
-- C.5 version bump → 1.2.0 (отдельным commit после approval review-gate)
-
-### Phase D — Review Gate (отдельная фаза)
-
-После Phase C commits, **до** version bump:
-
-- D.1 `npm test --silent 2>&1 | tail -10` → PASS
-- D.2 `npm run typecheck` → PASS
-- D.3 `npm run lint` → PASS
-- D.4 `npm run lint:md` → PASS
-- D.5 read-only 14-доменный review (S7) → PASS / BLOCK
-  - typescript: типизация `TargetAdapter` без `any`
-  - architecture: нет if-target-ternary где можно через adapter
-  - security: не пишем за пределы `~/.config/opencode/.feynman/` + наш ключ
-    в instructions[]
-  - tests: idempotency покрыта, uninstall purge покрыт
-  - docs: README отражает реальное поведение
-- D.6 если BLOCK → S8 (Opus conflict) или ручная правка → loop в D.5
-- D.7 если PASS → переходим к Phase E
-
-### Phase E — Ship
-
-- E.1 `npm run release` → собирает `dist/*.tgz`
-- E.2 `npm publish dist/<pkg>.tgz` с granular token (2FA bypass)
-- E.3 `git tag v1.2.0` + `git push --tags`
-- E.4 update `MEMORY.md` записью «v1.2.0 — opencode target via instructions»
-- E.5 (опционально) CHANGELOG.md entry
-
----
-
-## 9. Verification
+## 7. Verification
 
 ```bash
-# 1. Unit tests + lint
+# 1. Unit + integration
 npm test --silent 2>&1 | tail -10
 npm run typecheck
 npm run lint
 npm run lint:md
 
-# 2. Install opencode на чистый env
-rm -rf ~/.config/opencode/.feynman ~/.config/opencode/.feynman-active
-node bin/feynman.ts install --target opencode
+# 2. Coverage gate (≥95%, существующий)
+npm run test:coverage 2>&1 | tail -5
 
-# 3. Проверки файлов
-test -f ~/.config/opencode/.feynman/state.json   && echo "state OK"
-test -f ~/.config/opencode/.feynman/rules.md     && echo "rules OK"
-test -f ~/.config/opencode/.feynman-active       && echo "flag OK"
-grep -q "$HOME/.config/opencode/.feynman/rules.md" \
-  ~/.config/opencode/opencode.json               && echo "instructions OK"
+# 3. CI bundle
+npm run ci
 
-# 4. Idempotency
-node bin/feynman.ts install --target opencode
-# instructions[] не должен содержать дубликата нашего пути
+# 4. Manual fixture check (4 паттерна)
+node bin/feynman-lint.ts --fix tests/fixtures/autofix/titled-frame-before.md
+diff tests/fixtures/autofix/titled-frame-before.md \
+     tests/fixtures/autofix/titled-frame-after.md
+# повторить для arrow, junction, separator
 
-# 5. Doctor
-node bin/feynman.ts doctor --target opencode
-# все строки → OK
+# 5. Idempotency proof
+cp tests/fixtures/autofix/arrow-basic-before.md /tmp/idem.md
+node bin/feynman-lint.ts --fix /tmp/idem.md
+md5sum /tmp/idem.md > /tmp/idem.md5
+node bin/feynman-lint.ts --fix /tmp/idem.md
+md5sum -c /tmp/idem.md5   # должно совпасть
 
-# 6. All-target install
-node bin/feynman.ts install --target all
-# должно поставить claude + codex + opencode
+# 6. False-positive corpus
+cp tests/fixtures/autofix/should-not-touch.md /tmp/fp.md
+node bin/feynman-lint.ts --fix /tmp/fp.md
+diff tests/fixtures/autofix/should-not-touch.md /tmp/fp.md
+# diff пустой = autofix не тронул
 
-# 7. Uninstall
-node bin/feynman.ts uninstall --target opencode
-test ! -f ~/.config/opencode/.feynman/rules.md   && echo "rules removed"
-test ! -f ~/.config/opencode/.feynman-active     && echo "flag removed"
-test -f ~/.config/opencode/.feynman/state.json   && echo "state preserved"
-grep -q "feynman" ~/.config/opencode/opencode.json \
-  && echo "FAIL: instructions cleanup" \
-  || echo "instructions cleaned"
+# 7. Release smoke
+npm run release   # dry-run проверки внутри build-package + release-smoke
+# затем npm publish с granular token
 
-# 8. Реальная OpenCode-сессия (ручная, единственный шаг где смотрит человек)
-opencode
-# проверить визуально: ASCII-стиль подхватился в первом ответе
+# 8. Установка на чистый env
+npm install -g @albinocrabs/feynman@1.3.0
+feynman doctor
+echo "test ┌─ Title ─┐
+text content" | feynman lint --fix /dev/stdin
 ```
 
 Ожидаемый итог:
 
 ```
-┌─ ship gate ─────────────────────────────────┐
-│ unit tests           PASS                    │
-│ typecheck            PASS                    │
-│ lint + lint:md       PASS                    │
-│ install claude       ok (existing)           │
-│ install codex        ok (existing)           │
-│ install opencode     ok (new)                │
-│ install all          3 targets               │
-│ doctor opencode      OK                      │
-│ uninstall opencode   clean                   │
-│ OpenCode session     rules visible (human)   │
-└──────────────────────────────────────────────┘
+unit tests           PASS  (включая 4 новых describe-блока)
+typecheck            PASS
+lint + lint:md       PASS
+coverage             ≥95%
+ci bundle            PASS
+4 manual fixtures    align как expected
+idempotency          double-pass = no-op
+false-positive       no-op на should-not-touch.md
+release smoke        PASS
+npm install global   v1.3.0 работает
 ```
 
 ---
 
-## 10. Agent does / Human does
+## 8. Phases
+
+### Phase A — Pattern D (titled top fix)
+
+- A.1 заменить regex на line 168
+- A.2 пересчитать W через `visualWidth(topInner)` вместо `match(/─/g)`
+- A.3 распарсить title, перерисовать top через `titleSegment + remainingDashes`
+- A.4 fixture `titled-frame-before/-after.md`
+- A.5 test block `Pattern D — titled frame`
+- A.6 verify: existing frame tests должны быть зелёными БЕЗ правок
+- commit: `fix(autofix): handle titled top in frames (Pattern D)`
+
+### Phase B — Pattern A (arrow column)
+
+- B.1 функция `detectArrowRegions(lines)` — возвращает `[{start, end, arrows: [{line, pos}]}]`
+- B.2 функция `fixArrowRegion(lines, region)` — pad left side до maxLeft
+- B.3 интеграция в dispatcher после frame fix, с не-пересечением
+- B.4 fixture + test block
+- commit: `feat(autofix): align arrow columns (Pattern A)`
+
+### Phase C — Pattern B (junction fan)
+
+- C.1 функция `detectJunctionRegions(lines)`
+- C.2 функция `fixJunctionRegion(lines, region)` — pad после `]` до maxBoxEnd
+- C.3 интеграция (приоритет выше arrow при пересечении)
+- C.4 fixture + test
+- commit: `feat(autofix): align junction fans (Pattern B)`
+
+### Phase D — Pattern C (separator length)
+
+- D.1 функция `detectSeparatorRegions(lines, fenceState)`
+- D.2 функция `fixSeparatorRegion(lines, region)` — `─`.repeat(maxLen)
+- D.3 guard: не трогать `─` внутри frame regions
+- D.4 fixture + test
+- commit: `feat(autofix): normalize separator lengths (Pattern C)`
+
+### Phase E — Tests + docs
+
+- E.1 false-positive corpus `should-not-touch.md`
+- E.2 idempotency test block
+- E.3 README раздел «Autofix capabilities»
+- E.4 CHANGELOG entry с upgrade notes
+- E.5 reviewer agent gate (S9) — read-only review всех 4 паттернов
+- commit: `test(autofix): expand coverage for patterns A/B/C/D + idempotency`
+- commit: `docs(readme,changelog): document v1.3.0 autofix patterns`
+
+### Phase F — Ship
+
+- F.1 `package.json` version → 1.3.0
+- F.2 `npm run ci` — финальная gate
+- F.3 `npm run release` → собирает `dist/<pkg>.tgz`
+- F.4 `npm publish $(cat dist/TARBALL.txt) --access public` (granular token)
+- F.5 `git tag v1.3.0 && git push --tags`
+- F.6 MEMORY.md entry `project_v130_shipped.md`
+- commit: `chore(release): v1.3.0`
+
+---
+
+## 9. Token economy
+
+| work type                              | model        | writes? | comment                                       |
+| -------------------------------------- | ------------ | ------- | --------------------------------------------- |
+| grep call-sites + idempotency proof    | Haiku        | no      | S1                                            |
+| fixture skeleton template              | Haiku        | yes     | S2 — простые stub-файлы                       |
+| Pattern D impl                         | Sonnet       | yes     | S3 — точечная правка regex + W                |
+| Pattern A/B/C impl                     | Sonnet       | yes     | S4-S6 — новые функции, sequential             |
+| read-only review (4 паттерна)          | Sonnet       | no      | S9 — между S6 и S7                            |
+| docs + fixtures + CHANGELOG            | Sonnet       | yes     | S7 — низкий риск                              |
+| release                                | Sonnet       | yes     | S8 — механическая последовательность          |
+| conflict resolution (if BLOCK)         | Opus         | no      | conditional, только при verified conflict     |
+
+---
+
+## 10. Я делаю сам vs ▲ От тебя
 
 ### ✓ Я делаю сам
 
-- мини-рефактор `TargetAdapter` (Phase A) — Sonnet
-- адаптер opencode + работа с `opencode.json` (Phase B) — Sonnet
-- тесты + docs + skill update (Phase C) — Sonnet
-- параллельная разведка S1/S2/S3 через Haiku
-- gate run + 14-домен review (Phase D)
-- release & tag (Phase E) — после approval review-gate
-- update MEMORY.md
+- разведка call-sites + idempotency proof (Haiku × 2 parallel)
+- impl Pattern D (regex fix + W recalculation)
+- impl Patterns A/B/C (4 sequential Sonnet коммита)
+- fixtures + false-positive corpus + idempotency test
+- README + CHANGELOG обновление
+- version bump → 1.3.0 + ci gate + release + npm publish + git tag
+- обновление MEMORY.md
 
 ### ▲ От тебя
 
 - ничего обязательного во время реализации
-- (опционально, после ship) один прогон `opencode` сессии и визуальная
-  проверка ASCII-шапки в первом ответе
+- (опционально) глянуть `npm run release` dry-run output перед публикацией
+- (опционально) после ship — прогнать `feynman-lint --fix` на одном из своих
+  файлов с frame-block, проверить визуально
 
 ---
 
-## 11. Open questions (с defaults)
+## 11. Open questions
 
-| #  | вопрос                                                                    | default                                                                                                                | когда спросить                       |
-| -- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| Q1 | OpenCode понимает абсолютные пути в `instructions: [...]`?                | пишу absolute. Если в реальном прогоне (Phase B.3) не подхватилось — fallback на relative от `~/.config/opencode/`     | если оба варианта не работают        |
-| Q2 | `opencode.json` иногда содержит JSONC (комментарии / trailing commas)?    | сначала `JSON.parse`. На fail — минимальный regex strip-comments (без npm-deps)                                        | если в реальном env встретится JSONC |
-| Q3 | Есть ли env var `OPENCODE_CONFIG_DIR` для нестандартного пути?            | пока нет такой переменной по разведке — использую жёсткий `~/.config/opencode`. Если позже появится — env probe        | если пользователь явно использует    |
-| Q4 | `lib/target-adapter.ts` отдельным файлом или inline в `bin/feynman.ts`?   | inline пока fits в ~150 LoC; вынести в `lib/` если перевалит за 200                                                     | автономно по факту в Phase A         |
-
-Все четыре — нон-блокирующие, default действует, в чате спрашиваю
-только если Q1 окажется реальным блокером.
+| #  | вопрос                                                                  | как решу автономно                                                                                                          | когда эскалирую                              |
+| -- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Q1 | Что делать с Pattern A где у строк разнотипные стрелки (`→` + `-->`)?   | anchor = позиция ПЕРВОГО char стрелки. Сохраняет колонку начала arrow.                                                       | если фикстура с разнотипными сломается       |
+| Q2 | Что считать «одним блоком» для Pattern C?                                | блок = область между двумя fence-маркерами ИЛИ между двумя blank-линиями. Стандарт для всех 4-х паттернов.                   | если эмпирически появятся false positives    |
+| Q3 | Pattern B — что если junction есть, но `[...]` бокса нет (нет prefix)?  | skip — Pattern B требует `[box]` префикса. Чистые junction без бокса — рарный паттерн, не покрываем в v1.3.0.                | никогда (out of scope)                       |
+| Q4 | Что если в frame regions есть arrow inside?                              | frame побеждает по priority. Arrow внутри inner-области фрейма не выравнивается этим passом (frame фиксит inner-padding сам). | если визуально сломается — отдельный fix     |
+| Q5 | Stop-hook idempotency — нужны ли отдельные тесты?                        | да, `tests/lint-hook.test.ts` уже покрывает stop-hook прогон. Добавлю проверку double-run = no-op для всех 4-х паттернов.    | никогда                                      |
 
 ---
 
 ## 12. Не трогать
 
-- остальные ветки / forks
-- runtime файлы `~/.claude/*` и `~/.codex/*` без `feynman` команды
-- `.opencode-plugin/` folder (D-5)
-- `hooks/feynman-session-start.ts` — уже target-agnostic через `FEYNMAN_HOME`
-- содержимое самих rules / lint правил / intensity formats — не наша задача
+- `bin/feynman-lint.ts` — `--fix` уже вызывает `autofix()`, изменений не нужно
+- `hooks/feynman-session-start.ts` — autofix вызывается с conservative
+  defaults, новые паттерны включаются автоматически
+- `lib/lint/rules.ts` — L09 (right_edge_alignment) уже детектит проблему,
+  отдельных правил для A/B/C не добавляем (по решению — autofix-only)
+- API hook input/output — без изменений
+- `lib/lint/width.ts` — используется как есть
 
 ---
 
 ## 13. Iteration reserve
 
-- 10–20% контекста фазы держу под self-review + plan-hardening
-- если в Phase B выяснится, что absolute path не работает — итерация Q1
-  fallback БЕЗ остановки на approval
-- если в Phase D ревью даст BLOCK → fix-loop в Sonnet (S6), а не сразу Opus
+- 10-15% контекста фазы держу под self-review + plan-hardening
+- если в Phase B/C/D выяснится, что conservative ±3 columns слишком жёсткий
+  или слишком мягкий — итерация tolerance в той же фазе без остановки
+- если reviewer agent (S9) даст BLOCK — fix-loop в Sonnet (S3-S6), а не
+  сразу Opus
 - iteration reserve покрывает: 1 правку плана по feedback, 1 self-review
   pass, 1 verification refresh перед commit
 
@@ -452,23 +398,22 @@ opencode
 
 ## 14. Rollback
 
-Phase A — чистый рефактор без изменения поведения; rollback = revert одного
-commit.
+Каждый из 5-ти feature/fix коммитов самостоятелен и обратимо реверится:
 
-Phase B — единственное место, где плагин трогает чужой конфиг
-(`opencode.json`) — `uninstall` чистит это полностью (шаг 7 verification).
+- Pattern D fix (commit 1) — точечная правка regex, revert восстанавливает
+  старый behavior, frame tests продолжат проходить
+- Pattern A/B/C (commits 2-4) — новые функции, revert удаляет их вызовы из
+  dispatcher и сами функции, остальные паттерны работают
+- Tests + docs (commit 5) — независим от impl коммитов
+- Release commit (chore) — revert + новый release с правильным fix
 
-Аварийный rollback вручную (если CLI uninstall сломан):
+Аварийный rollback публикации:
 
 ```bash
-node -e '
-  const f = process.env.HOME + "/.config/opencode/opencode.json";
-  const j = require(f);
-  j.instructions = (j.instructions || [])
-    .filter(p => !p.includes(".feynman/rules.md"));
-  require("fs").writeFileSync(f, JSON.stringify(j, null, 2));
-'
-rm -rf ~/.config/opencode/.feynman ~/.config/opencode/.feynman-active
+# Если v1.3.0 на npm оказался сломан:
+npm deprecate @albinocrabs/feynman@1.3.0 \
+  "broken: use 1.2.1 or wait for 1.3.1"
+# затем fix-forward в 1.3.1, не revert опубликованной версии
 ```
 
 ---
@@ -476,31 +421,31 @@ rm -rf ~/.config/opencode/.feynman ~/.config/opencode/.feynman-active
 ## 15. Self-check (pillars gate перед ExitPlanMode)
 
 ```
-┌─ pillar gate ────────────────────────────────────────┐
-│ Workflow         ✓ DTP-plan формат применён           │
-│ Git/TTT          ✓ ветка main, нет dirty в core       │
-│ Source of truth  ✓ правится bin/lib/skills, не runtime│
-│ Tests            ✓ команды + критерии PASS прописаны  │
-│ Skills/docs      ✓ markdown lint + skill update в C   │
-│ Token economy    ✓ Haiku scan, Sonnet impl, Opus cond │
-│ Visual quality   ✓ ASCII frames + flow + table        │
-│ Iteration        ✓ reserve + Phase D = отдельная фаза │
-│ Boundaries       ✓ in/out scope разнесены             │
-│ Open questions   ✓ все с default, Q1 — единственный   │
-│                    потенциальный escalation           │
-└──────────────────────────────────────────────────────┘
+pillar gate
+  workflow        ✓ DTP-plan формат применён
+  git/ttt         ✓ ветка main, dist/* в .gitignore
+  source of truth ✓ правится lib/lint/, без runtime-патчинга
+  tests           ✓ idempotency + false-positive corpus + 4 паттерна
+  skills/docs     ✓ README раздел + CHANGELOG entry
+  token economy   ✓ Haiku scan, Sonnet impl, Opus только conditional
+  visual quality  ✓ ASCII trees + arrows вместо тяжёлых frames
+  iteration       ✓ reserve + reviewer gate (S9) между S6 и S7
+  boundaries      ✓ in/out scope разнесены
+  open questions  ✓ все 5 с default, Q1 — единственный риск escalation
+  surgical        ✓ inline в autofix.ts, без split на module (per user)
 ```
 
 ---
 
 ## 16. Closeout
 
-После Phase E:
+После Phase F:
 
-- commit pair: refactor / feat / test+docs / release
-- `git tag v1.2.0` + `git push --tags`
-- `npm publish dist/<pkg>.tgz` (granular token, 2FA bypass)
-- MEMORY.md entry: «v1.2.0 — opencode target via native instructions,
-  TargetAdapter contract introduced»
-- (опционально) README badge / compatibility table обновление
-- (опционально) CHANGELOG.md о breaking-compat-aware расширении `all`/`*`
+- 5 feature/fix коммитов + 1 release коммит на `main`
+- `git tag v1.3.0` + `git push --tags`
+- `npm publish $(cat dist/TARBALL.txt) --access public` (granular token)
+- MEMORY.md entry: «v1.3.0 — smart ASCII autofix expanded to 4 patterns
+  (titled frames, arrow columns, junction fans, separator lengths);
+  conservative-first heuristics; idempotent for stop-hook double-run»
+- (опционально) README badge на новую версию
+- (опционально) краткий tweet/issue update про новые возможности `--fix`
