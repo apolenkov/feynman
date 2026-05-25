@@ -365,10 +365,15 @@ describe('autofixFrameToDotLeader — L11 conversion', () => {
 });
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Shared fixture directory for Pattern D/A/B/C tests
+// ---------------------------------------------------------------------------
+const fixturesDir = path.resolve(import.meta.dirname, 'fixtures', 'autofix');
+
+// ---------------------------------------------------------------------------
 // Pattern D — titled top frame (`┌─ Title ─┐`)
 // ---------------------------------------------------------------------------
 describe('Pattern D — titled top frame', () => {
-  const fixturesDir = path.resolve(import.meta.dirname, 'fixtures', 'autofix');
 
   it('autofixFrame: preserves title and expands width to widest inner line', () => {
     const node = frameNode(
@@ -449,6 +454,64 @@ describe('Pattern D — titled top frame', () => {
     const frameLines = out.split('\n').filter(l => /[┌│└]/.test(l));
     const w = [...frameLines[0]!].length;
     for (const l of frameLines) assert.equal([...l].length, w, `misaligned frame line: ${l}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pattern A — arrow column alignment (`→` / `-->` / `──>`)
+// ---------------------------------------------------------------------------
+describe('Pattern A — arrow column alignment', () => {
+  it('aligns arrows in a 3-line group', () => {
+    const before = [
+      'service A → db',
+      'service BB → cache',
+      'service CCC → queue',
+    ].join('\n');
+    const after = [
+      'service A   → db',
+      'service BB  → cache',
+      'service CCC → queue',
+    ].join('\n');
+    assert.equal(autofix(before), after);
+  });
+
+  it('does not touch a single-line arrow (no group)', () => {
+    const s = 'service A → db';
+    assert.equal(autofix(s), s);
+  });
+
+  it('does not touch arrows more than ±3 cols apart', () => {
+    const s = [
+      'a → x',
+      'very long label here → y',
+    ].join('\n');
+    assert.equal(autofix(s), s);
+  });
+
+  it('does not touch arrows inside frame inner lines', () => {
+    const s = [
+      '┌─────────────────────────┐',
+      '│ service A → db          │',
+      '│ service BB → cache      │',
+      '│ service CCC → queue     │',
+      '└─────────────────────────┘',
+    ].join('\n');
+    // autofix runs frame alignment pass first, arrow pass skips frame lines
+    const result = autofix(s);
+    assert.ok(!result.includes('service A  '), 'should not double-pad inside frame');
+  });
+
+  it('uses before/after fixtures', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'arrow-basic-before.md'), 'utf8').trimEnd();
+    const after  = fs.readFileSync(path.join(fixturesDir, 'arrow-basic-after.md'),  'utf8').trimEnd();
+    assert.equal(autofix(before), after);
+  });
+
+  it('is idempotent — double pass equals single pass', () => {
+    const before = fs.readFileSync(path.join(fixturesDir, 'arrow-basic-before.md'), 'utf8').trimEnd();
+    const once   = autofix(before);
+    const twice  = autofix(once);
+    assert.equal(twice, once, 'second autofix pass should be a no-op');
   });
 });
 
