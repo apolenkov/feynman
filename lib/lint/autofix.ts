@@ -135,6 +135,76 @@ export interface AutofixOptions {
   convertL11?: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Pattern A — arrow column alignment
+// Detects regions of ≥2 consecutive lines each containing exactly one arrow
+// symbol (→ / --> / ──> / ─→) within ±3 visual columns of each other, then
+// pads left-side text so all arrows line up in one column.
+// ---------------------------------------------------------------------------
+
+const ARROW_RE = /─→|→|──>|-->/;
+
+function hasExactlyOneArrow(line: string): boolean {
+  return (line.match(/─→|→|──>|-->/g) || []).length === 1;
+}
+
+function arrowColPos(line: string): number {
+  const m = line.match(/─→|→|──>|-->/);
+  return m && m.index !== undefined ? visualWidth(line.slice(0, m.index)) : -1;
+}
+
+// Build a set of line indices that should be skipped for new-pattern fixes:
+// fenced-block lines (when processFenced=false) and frame border/inner lines.
+function buildSkipSet(lines: string[], processFenced: boolean): Set<number> {
+  const skip = new Set<number>();
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]!;
+    if (/^\s*```/.test(l)) { inFence = !inFence; skip.add(i); continue; }
+    if (inFence && !processFenced) { skip.add(i); continue; }
+    if (/^\s*[┌└│]/.test(l)) skip.add(i); // frame lines
+  }
+  return skip;
+}
+
+function detectAndFixArrows(text: string, processFenced: boolean): string {
+  if (!ARROW_RE.test(text)) return text;
+  const lines = text.split('\n');
+  const n = lines.length;
+  const skip = buildSkipSet(lines, processFenced);
+  const result = [...lines];
+  let i = 0;
+  while (i < n) {
+    if (skip.has(i) || !hasExactlyOneArrow(lines[i]!)) { i++; continue; }
+    let j = i + 1;
+    while (j < n && !skip.has(j) && hasExactlyOneArrow(lines[j]!)) j++;
+    const regionEnd = j - 1;
+    if (regionEnd - i >= 1) {
+      const regionLines = lines.slice(i, regionEnd + 1);
+      const positions = regionLines.map(arrowColPos);
+      const minPos = Math.min(...positions);
+      const maxPos = Math.max(...positions);
+      if (maxPos - minPos <= 3) {
+        const parts = regionLines.map(l => {
+          const m = l.match(/─→|→|──>|-->/);
+          if (!m || m.index === undefined) return { left: l, rest: '' };
+          return { left: l.slice(0, m.index).trimEnd(), rest: l.slice(m.index) };
+        });
+        const maxLeft = Math.max(...parts.map(p => visualWidth(p.left)));
+        for (let k = 0; k < parts.length; k++) {
+          const { left, rest } = parts[k]!;
+          const pad = ' '.repeat(maxLeft - visualWidth(left));
+          result[i + k] = left + pad + ' ' + rest;
+        }
+      }
+      i = regionEnd + 1;
+    } else {
+      i++;
+    }
+  }
+  return result.join('\n');
+}
+
 // Walk text, locate frame regions (sequence of lines starting with ┌ … ending
 // with └), build node objects, and rewrite each region in place.
 //
@@ -156,7 +226,10 @@ export interface AutofixOptions {
 export function autofix(text: string, opts?: AutofixOptions): string {
   const processFenced = !!(opts && opts.processFenced);
   const convertL11    = !!(opts && opts.convertL11);
-  if (!text || text.indexOf('┌') === -1) return text;
+  if (!text) return text;
+  const hasFrames = text.indexOf('┌') !== -1;
+  const hasArrows = ARROW_RE.test(text);
+  if (!hasFrames && !hasArrows) return text;
   const lines = text.split('\n');
   const out: string[] = [];
   let i = 0;
@@ -224,7 +297,7 @@ export function autofix(text: string, opts?: AutofixOptions): string {
     }
     i = j + 1;
   }
-  return out.join('\n');
+  return detectAndFixArrows(out.join('\n'), processFenced);
 }
 
 // Re-export visualWidth for backward compatibility (autofix.js exported it)
