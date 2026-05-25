@@ -53,6 +53,7 @@ export function lint(markdown: string, options?: LintOptions): LintResult {
     { id: 'L12', fn: rules.L12_token_budget },
     { id: 'L13', fn: rules.L13_double_wrap },
     { id: 'L14', fn: rules.L14_blank_line_separation },
+    { id: 'L15', fn: rules.L15_homogeneous_frame },
   ];
 
   for (const node of ast) {

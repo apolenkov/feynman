@@ -915,6 +915,84 @@ export function L13_double_wrap(ast: ASTNode): Issue[] {
 // Regex: at least one box-drawing, arrow, or tree char in the content.
 const DIAGRAM_CHAR_RE = /[┌┐└┘│─├┤┬┴┼]|-->|→|[├└]──/;
 
+// ---------------------------------------------------------------------------
+// L15 — Homogeneous frame → plain format
+// Severity: warn. A frame whose inner lines are ALL the same content type
+// (k:v pairs, bullet list, or plain prose) adds visual weight without
+// structural value. autofix --fix can convert to plain text.
+// Whitelist: complex frames (nested trees ├──, arrows →/-->, embedded tables
+//            with ≥2 inner │ chars) and status frames (← / ✓/✗ markers)
+//            which are handled by L11.
+// Requires ≥2 inner lines to avoid false-positives on single-item wraps.
+// ---------------------------------------------------------------------------
+export function L15_homogeneous_frame(ast: ASTNode): Issue[] {
+  if (!ast || !ast.content) return [];
+  if (!ast.content.includes('┌')) return [];
+
+  const lines = ast.content.split('\n');
+  const baseLineNum = ast.startLine;
+  const issues: Issue[] = [];
+  const stateMarkerRe = /(← (?:готов|решение|заморожено|в работе|блок:[^│\n]+))|((?:✓|✗|◐|⌛|→) \S+)|\b(done|pending|wip|ok|fail|wait)\b\s*$/i;
+
+  let li = 0;
+  while (li < lines.length) {
+    const top = lines[li]!;
+    const topMatch = top.match(/^(\s*)┌─[^┌\n]*┐\s*$/);
+    if (!topMatch) { li++; continue; }
+    const indent = topMatch[1]!;
+
+    let closeLi = -1;
+    const inner: string[] = [];
+    for (let lj = li + 1; lj < lines.length; lj++) {
+      const next = lines[lj]!;
+      const botMatch = next.match(/^(\s*)└─*┘\s*$/);
+      if (botMatch && botMatch[1] === indent) { closeLi = lj; break; }
+      if (next.startsWith(indent + '│')) inner.push(next);
+    }
+    if (closeLi === -1) { li++; continue; }
+    if (inner.length < 2) { li = closeLi + 1; continue; }
+
+    // Strip inner lines to bare content for type detection.
+    const stripped = inner.map(l => {
+      let s = l;
+      if (indent && s.startsWith(indent)) s = s.slice(indent.length);
+      s = s.replace(/^│/, '').replace(/\s*│\s*$/, '');
+      return s.trim();
+    });
+
+    // Complex guards — skip (structural frames stay as frames).
+    if (stripped.some(l => /[├└]──/.test(l))) { li = closeLi + 1; continue; }
+    if (stripped.some(l => (l.match(/│/g) || []).length >= 2)) { li = closeLi + 1; continue; }
+    if (stripped.some(l => /─→|→|──>|-->/.test(l))) { li = closeLi + 1; continue; }
+    // Status frames — let L11 handle.
+    if (stripped.every(l => stateMarkerRe.test(l))) { li = closeLi + 1; continue; }
+
+    // Detect homogeneous content type.
+    let type: string | null = null;
+    if (stripped.every(l => /^[-•*◦▸▹·]/.test(l))) type = 'bullet';
+    else if (stripped.every(l => /^[^:\n]+:\s+\S/.test(l) || /^[^—\n]+—\s+\S/.test(l))) type = 'kv';
+    else if (stripped.every(l => l.length >= 2 && !/[├└┬┴┼]/.test(l))) type = 'prose';
+
+    if (!type) { li = closeLi + 1; continue; }
+
+    // Savings estimate: frame chars vs plain content chars.
+    const frameChars =
+      visualWidth(top) +
+      visualWidth(lines[closeLi]!) +
+      inner.reduce((acc, l) => acc + visualWidth(l), 0);
+    const plainChars = stripped.reduce((acc, l) => acc + l.length, 0);
+    const saving = Math.max(0, frameChars - plainChars);
+
+    issues.push(issue(
+      'L15', 'warn', baseLineNum + li, indent.length + 1,
+      `frame wraps homogeneous ${type} content; consider plain format (saves ~${saving} chars)`,
+      'Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15'
+    ));
+    li = closeLi + 1;
+  }
+  return issues;
+}
+
 export function L14_blank_line_separation(ast: ASTNode, fullText: string): Issue[] {
   if (!ast || !ast.content) return [];
 

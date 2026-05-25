@@ -85,7 +85,7 @@ if (useFix) {
     process.stderr.write(`feynman-lint: cannot read ${filePath}: ${(e as NodeJS.ErrnoException).message}\n`);
     process.exit(2);
   }
-  const after = autofix(before, { processFenced: true, convertL11: true });
+  const after = autofix(before, { processFenced: true, convertL11: true, convertL15: true });
   if (after !== before) {
     fs.writeFileSync(filePath, after);
   }
