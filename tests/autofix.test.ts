@@ -685,6 +685,37 @@ describe('autofix end-to-end via lint-cases.json fixtures (shape-based)', () => 
 });
 
 // ---------------------------------------------------------------------------
+// False-positive corpus — should-not-touch.md must remain unchanged
+// ---------------------------------------------------------------------------
+describe('false-positive corpus — autofix must not touch unrelated content', () => {
+  it('does not modify should-not-touch.md', () => {
+    const text = fs.readFileSync(path.join(fixturesDir, 'should-not-touch.md'), 'utf8').trimEnd();
+    assert.equal(autofix(text), text, 'should-not-touch.md was modified by autofix');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Idempotency — all 4 patterns combined: autofix(autofix(x)) === autofix(x)
+// ---------------------------------------------------------------------------
+describe('idempotency — double-pass is a no-op for all patterns', () => {
+  const fixtures = [
+    'titled-frame-before.md',
+    'arrow-basic-before.md',
+    'junction-fan-before.md',
+    'separator-length-before.md',
+    'should-not-touch.md',
+  ];
+  for (const fixture of fixtures) {
+    it(`${fixture}: double-pass equals single-pass`, () => {
+      const text  = fs.readFileSync(path.join(fixturesDir, fixture), 'utf8').trimEnd();
+      const once  = autofix(text);
+      const twice = autofix(once);
+      assert.equal(twice, once, `second autofix pass changed output for ${fixture}`);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // feynman-lint --fix CLI for L11 dot-leader conversion (smoke)
 // ---------------------------------------------------------------------------
 describe('feynman-lint --fix CLI for L11 dot-leader conversion', () => {
