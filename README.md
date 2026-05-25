@@ -387,13 +387,24 @@ npx @albinocrabs/feynman lint --fix response.md      # detect + repair frames in
 npx @albinocrabs/feynman lint --explain response.md  # annotate frames with token cost
 ```
 
-`--fix` rebuilds the top/bottom borders and pads inner rows of every frame
-block (`┌─...─┐ ... └─...─┘`) so the right edge aligns by visual column —
-ANSI escapes, combining marks, zero-width joiners are stripped, CJK wide
-chars count as 2 cols. Additionally, L11-overdecorated frames (≤5 inner
-lines without nested trees or embedded table columns) convert to dot-leader
-lists (`label ........ state`) — Unicode markers preserved, indentation
-preserved. Idempotent on already-clean files.
+`--fix` repairs four classes of ASCII misalignment automatically. All fixes
+are conservative-first (≥2 consecutive lines required, ±3 column guard) and
+idempotent — a second pass on an already-fixed file is a no-op.
+
+**Autofix capabilities** (v1.3.0+):
+
+| Pattern | What it fixes | Trigger |
+|---------|--------------|---------|
+| D — Frame alignment | Right edge of `┌─…─┐ … └─┘` blocks, including titled tops `┌─ Title ─┐` | Any misaligned frame |
+| A — Arrow column | `→` / `-->` / `──>` in a run of ≥2 lines | Arrows within ±3 cols of each other |
+| B — Junction fan | `──┐` / `──┤` / `──┘` connectors in ≥2 adjacent lines | Connectors within ±3 cols |
+| C — Separator length | `─`-only lines (≥3 chars) across the document | ≥2 separators of unequal length |
+
+Frame alignment: ANSI escapes, combining marks, zero-width joiners are
+stripped, CJK wide chars count as 2 cols. Titled tops preserve the title
+text when rebuilding the border. L11-eligible frames (≤5 inner lines,
+no nested trees or embedded table columns) optionally convert to dot-leader
+lists — invoke with `--fix` (also converts L11). Indentation preserved.
 
 `--explain` is read-only — it emits a per-frame breakdown showing
 `framing: ~N chars (border: B, padding: P, content: C)`,
