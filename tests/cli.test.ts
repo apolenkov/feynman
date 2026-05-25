@@ -1354,6 +1354,28 @@ describe('feynman install --target opencode', () => {
     }
   });
 
+  it('respects pre-existing disabled state: writes empty rules.md', () => {
+    const tmp = makeTempHome();
+    try {
+      // First install (enabled by default)
+      runFeynman(['install', '--target', 'opencode'], tmp);
+      // Simulate /feynman off: write state.json with enabled=false and remove flag
+      const statePath = path.join(tmp, '.config', 'opencode', '.feynman', 'state.json');
+      const flagPath = path.join(tmp, '.config', 'opencode', '.feynman-active');
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>;
+      state['enabled'] = false;
+      fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+      if (fs.existsSync(flagPath)) fs.unlinkSync(flagPath);
+      // Re-install (mimics SKILL.md step 2b calling feynman install after /feynman off)
+      runFeynman(['install', '--target', 'opencode'], tmp);
+      const rulesPath = path.join(tmp, '.config', 'opencode', '.feynman', 'rules.md');
+      const content = fs.readFileSync(rulesPath, 'utf8');
+      assert.equal(content, '', 'rules.md must be empty when enabled=false');
+    } finally {
+      rmrf(tmp);
+    }
+  });
+
   it('doctor exits 0 after install', () => {
     const tmp = makeTempHome();
     try {
