@@ -23,7 +23,6 @@ auto-fixed before writing this report.
 | Finding | Status | Reason |
 |---------|--------|--------|
 | NPX-03 / REL-03 npm publish | Deferred to Phase 7 | Requires npm credentials and publish workflow |
-| Graphify build | Skipped | `.planning/config.json` does not enable `graphify.enabled` |
 | UI review | Not applicable | Project has no frontend UI surfaces |
 
 ## Verification
