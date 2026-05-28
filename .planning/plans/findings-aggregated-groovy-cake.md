@@ -343,7 +343,7 @@ wave 2: Opus orchestrator (sequential — coverage gate + atomic commits)
 - `eslint.config.mjs` — НОВЫЙ файл, flat config: parser `@typescript-eslint/parser`,
   plugin `@typescript-eslint/eslint-plugin`, globs из tsconfig include
   (hooks/lib/bin/tests/scripts **/*.ts), ignores (node_modules/dist/coverage/
-  .build/feynman-rules-workspace/graphify-out/eval/evals).
+  .build/feynman-rules-workspace/eval/evals).
 - `.github/workflows/ci.yml` — вернуть порог 94→95 (после verify локального ≥95).
 
 ## Verification
