@@ -16,7 +16,6 @@ export default [
       'coverage/**',
       '.build/**',
       'feynman-rules-workspace/**',
-      'graphify-out/**',
       'eval/**',
       'evals/**',
     ],
