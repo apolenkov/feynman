@@ -12,3 +12,6 @@ dist/
 .planning/session-retros/
 .planning/memory/
 .sisyphus/
+
+# CodeGraph local index (machine-specific, not part of repo)
+.codegraph/
