@@ -67,8 +67,8 @@ user message.
 
 ## Governance docs
 
-- `AGENTS.md` — project execution contract for Codex-aware tooling.
-- `CLAUDE.md` — canonical project memory, stack, and architecture constraints.
+- `AGENTS.md` — the single entry point read by all AI tools (Claude Code, Codex, …); thin by design. `CLAUDE.md` just imports it (`@AGENTS.md`).
+- Canonical sources: `CONTEXT.md` (domain language), `docs/architecture.md` (architecture), `docs/adr/` (decisions — start at ADR 0001).
 - Global instructions are loaded from user-level runtime configuration before repo-specific overrides.
 
 ## Before / After

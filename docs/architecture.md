@@ -2,6 +2,11 @@
 
 Three independent layers: hook lifecycle, lint pipeline, and state schema.
 
+> **Source vs. published artifact:** file paths below name the repo **source**
+> (`.ts`). The published npm package ships the compiled `.js` equivalents —
+> `scripts/build-package.ts` rewrites every `.ts` reference to `.js` at pack
+> time. See [ADR 0001](adr/0001-typescript-source-with-packaging-build.md).
+
 ---
 
 ## Layer 1: Hook Lifecycle
@@ -15,7 +20,7 @@ injected once at session start and remain in context for the full session.
          │
          └─ hooks.SessionStart  startup | resume | compact | clear
          ▼
-hooks/feynman-session-start.js
+hooks/feynman-session-start.ts
          │
          ├─ [0] FEYNMAN_HOME selects client state root
          │        unset              → ~/.claude (backward compatible)
@@ -56,7 +61,7 @@ hooks/feynman-session-start.js
 - Flag file checked before state file to detect intentional disabling
   vs. first run (bug #35713).
 
-**File:** `hooks/feynman-session-start.js`
+**File:** `hooks/feynman-session-start.ts`
 
 ---
 
@@ -69,13 +74,13 @@ It runs as a CLI tool and as an optional `Stop` hook.
 <file.md> or stdin
          │
          ▼
-lib/lint/parser.js
+lib/lint/parser.ts
          │  parseMarkdown(text) → ASTNode[]
          │  each node: {type, content, startLine, endLine}
          │  types: fenced_code, ascii_art (freestanding)
          │
          ▼
-lib/lint/rules.js
+lib/lint/rules.ts
          │  runs each rule against each AST node:
          │
          ├─ L01_box_closure(ast)
@@ -93,7 +98,7 @@ lib/lint/rules.js
          ▼
 reporter (inline in CLI + Stop hook)
          │
-         ├─ bin/feynman-lint.js   ← standalone CLI
+         ├─ bin/feynman-lint.ts   ← standalone CLI
          │     feynman lint <file>
          │     exit 0: no errors
          │     exit 1: errors found
@@ -101,14 +106,14 @@ reporter (inline in CLI + Stop hook)
          │     --json: machine-readable output
          │     --strict: warnings treated as errors
          │
-         └─ hooks/feynman-lint.js ← Stop hook (optional)
+         └─ hooks/feynman-lint.ts ← Stop hook (optional)
                fires after Claude's response
                if issues found: injects correction context
                into next UserPromptSubmit cycle
 ```
 
-**File:** `lib/lint/parser.js`, `lib/lint/rules.js`, `bin/feynman-lint.js`,
-`hooks/feynman-lint.js`
+**File:** `lib/lint/parser.ts`, `lib/lint/rules.ts`, `bin/feynman-lint.ts`,
+`hooks/feynman-lint.ts`
 
 ---
 
@@ -187,11 +192,11 @@ default; `ultra + full` is the maximum-visual configuration.
 hook reads `state.output_style || 'full'` so missing field is identical
 to `"full"`. No migration needed.
 
-**Schema is frozen** — field names are used by `hooks/feynman-activate.js`,
-`bin/feynman.js`, and `skills/feynman/SKILL.md`. Any rename requires
+**Schema is frozen** — field names are used by `hooks/feynman-activate.ts`,
+`bin/feynman.ts`, and `skills/feynman/SKILL.md`. Any rename requires
 coordinated update across all three files.
 
-**File:** read/written by `hooks/feynman-activate.js` and `bin/feynman.js`;
+**File:** read/written by `hooks/feynman-activate.ts` and `bin/feynman.ts`;
 managed by skill commands in `skills/feynman/SKILL.md`.
 
 ---
@@ -199,11 +204,11 @@ managed by skill commands in `skills/feynman/SKILL.md`.
 ## CLI Subcommand Map
 
 ```
-   bin/feynman.js
+   bin/feynman.ts
    ├── install    → writes target hook config + state.json + flag
    ├── uninstall  → removes target hook entries + flag (keeps state)
    ├── doctor     → checks target health criteria, prints frame
-   ├── lint       → delegates to bin/feynman-lint.js
+   ├── lint       → delegates to bin/feynman-lint.ts
    ├── examples   → list and render built-in ASCII examples
    ├── help       → this help/usage block
    ├── bootstrap  → exports examples + manifests + skill into local package folder
@@ -222,4 +227,4 @@ codex  → ~/.codex/hooks.json     + ~/.codex/.feynman/
 both, all, * → runs claude and codex installers/uninstallers idempotently
 ```
 
-**File:** `bin/feynman.js`
+**File:** `bin/feynman.ts`

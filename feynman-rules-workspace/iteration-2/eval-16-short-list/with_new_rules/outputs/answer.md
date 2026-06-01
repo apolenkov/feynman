@@ -1,1 +1,0 @@
-Ubuntu, Fedora, Debian.
