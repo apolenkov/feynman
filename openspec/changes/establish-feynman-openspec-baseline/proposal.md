@@ -17,8 +17,8 @@ It also banks the scaffolding produced alongside the migration: the `/CONTEXT.md
   smallest-first ladder). This is documenting already-shipped behavior as a contract.
 - Establish the remaining baseline capabilities as follow-up tasks (rules-injection lifecycle,
   diagram-lint L01–L14, plugin-install CLI) so the full surface is recorded.
-- Record key already-made decisions as ADRs (GSD→OpenSpec migration; zero-dep CommonJS contract;
-  SessionStart over UserPromptSubmit for injection).
+- Record key already-made decisions as ADRs (GSD→OpenSpec migration; toolchain contract — TS +
+  packaging build, zero runtime deps, ADR 0001; SessionStart over UserPromptSubmit for injection).
 
 ## Non-goals
 

@@ -14,13 +14,14 @@
 - [ ] 2.2 `diagram-lint` — the product linter L01–L14 (box closure, tree chars, arrow style, column
       widths, flow integrity, priority scale, …). Ground in `lib/lint/rules.ts`, `bin/feynman-lint.ts`.
 - [ ] 2.3 `plugin-install` — `feynman install|doctor|uninstall` for targets `claude|codex|both` plus
-      IDE compat (`.clinerules/`, `.cursor/rules/*.mdc`); zero-dep CommonJS, settings.json merge via
+      IDE compat (`.clinerules/`, `.cursor/rules/*.mdc`); zero runtime deps (ESM/TS — ADR 0001), settings.json merge via
       `node -e`. Ground in `bin/feynman.ts`, `install.sh`.
 
 ## 3. Record decisions as ADRs
 
 - [ ] 3.1 ADR: retire GSD `.planning/`, adopt OpenSpec as the planning system (2026-06-01).
-- [ ] 3.2 ADR: zero-dependency CommonJS-only hook contract (no build step) and why.
+- [x] 3.2 ADR: toolchain contract — TypeScript source + packaging build, zero runtime deps
+      (ADR 0001; supersedes the earlier "CommonJS-only / no build step" framing).
 - [ ] 3.3 ADR: SessionStart over UserPromptSubmit for rule injection (per-turn injection redundant;
       bug-driven trade-offs #8810/#13912/#17804/#35713/#10225).
 

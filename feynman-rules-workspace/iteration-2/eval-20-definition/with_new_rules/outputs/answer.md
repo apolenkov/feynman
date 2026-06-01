@@ -1,1 +1,0 @@
-An idempotent HTTP method produces the same server state whether called once or many times. GET, PUT, DELETE are idempotent; POST is not (calling it twice creates two resources). Practical implication: idempotent requests are safe to auto-retry on timeout; retrying POST risks duplicates.

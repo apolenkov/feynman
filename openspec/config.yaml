@@ -6,13 +6,16 @@ context: |
   session start (and after /compact and /clear) via the SessionStart hook, so the assistant draws a
   diagram whenever a response has Structure, without the developer having to ask.
 
-  Hard contract: pure Node.js (>= 18), CommonJS only, zero runtime dependencies, no build step for
-  the hook. Claude Code and Codex are both first-class targets; IDE compat covers Cline/Windsurf
-  (.clinerules/) and Cursor (.cursor/rules/*.mdc). Tests run on node --test.
+  Single source of truth — do NOT duplicate facts here; point to the canonical file:
+    - Entry point & conventions  → AGENTS.md
+    - Domain terms (Structure, Trigger, Visual, Intensity), use exactly  → /CONTEXT.md
+    - Architecture (hook lifecycle, lint pipeline, state schema)  → docs/architecture.md
+    - Decisions & the toolchain / zero-runtime-deps contract  → docs/adr/ (ADR 0001)
 
-  Domain terms are defined in /CONTEXT.md — use them exactly (Structure, Trigger, Visual, Intensity).
-  Architectural decisions live in docs/adr/. The product diagram linter is `npm run lint`
-  (bin/feynman-lint, rules L01–L14); the code linter is `npm run eslint` — do not confuse them.
+  Linters: `npm run lint` is feynman's product diagram linter (bin/feynman-lint, L01–L14);
+  `npm run eslint` is the code linter — do not confuse them. Tests run on node --test.
+  Claude Code and Codex are both first-class targets; IDE compat covers Cline/Windsurf
+  (.clinerules/) and Cursor (.cursor/rules/*.mdc).
 
   Conventions: conventional commits. Planning is OpenSpec (this directory); the legacy GSD
   `.planning/` system was retired 2026-06-01.

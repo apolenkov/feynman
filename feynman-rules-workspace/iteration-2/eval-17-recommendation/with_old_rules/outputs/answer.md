@@ -1,1 +1,0 @@
-Use spaces. PEP 8 mandates 4-space indentation, and Python 3 raises a TabError if tabs and spaces are mixed. All major Python tools (flake8, ruff, pylint, Black) default to spaces. Tabs are nonstandard in the Python ecosystem and create friction in shared codebases and CI pipelines.
