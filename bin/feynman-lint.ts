@@ -6,7 +6,7 @@
 //        feynman-lint --strict <file>
 //        feynman-lint --help
 // Exit codes: 0 = pass, 1 = lint failure, 2 = usage error
-// ESM + TypeScript (Node.js v22.6+ strip-types, no build step).
+// ESM + TypeScript (Node.js v22.6+ strip-types — runs .ts directly).
 
 import fs from 'node:fs';
 import path from 'node:path';

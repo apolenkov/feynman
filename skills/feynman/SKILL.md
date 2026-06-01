@@ -156,9 +156,10 @@ confirm nothing breaks. Use `--dry-run` to preview, `--revert` to remove.
 
 ```bash
 ls -1d feynman-rules-workspace/iteration-* 2>/dev/null | tail -3
-ls -1 .planning/notes/eval-iteration-*-findings-*.md 2>/dev/null | tail -3
+ls -1 feynman-rules-workspace/iteration-*/findings*.md 2>/dev/null | tail -3
 ```
 
-Report locations and let the user decide whether to launch a new run via the
-GSD orchestrator (`/gsd-execute-phase` or `/gsd-quick`) — this skill does not
+Eval runs are local-only: `feynman-rules-workspace/` is gitignored, so iteration
+history lives on the contributor's machine, not in the repo. Report the locations
+above and let the user decide whether to launch a new run — this skill does not
 spawn subagents on its own.

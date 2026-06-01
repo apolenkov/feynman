@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // feynman — UserPromptSubmit hook — injects ASCII diagram rules on every prompt
-// Zero dependencies. ESM + TypeScript (Node.js v22.6+ strip-types, no build step).
+// Zero dependencies. ESM + TypeScript (Node.js v22.6+ strip-types — runs .ts directly).
 // Bug workarounds: #13912 (JSON stdout), #35713 (flag file), #8810 (os.homedir), #10225 (no hooks in plugin.json)
 
 import fs from 'fs';
