@@ -13,7 +13,7 @@ Run `npm run typecheck`, `npm run eslint`, and `npm test` — all green.
 
 ## Two linters — don't confuse them
 
-- `npm run lint` → feynman's **product** diagram linter (`bin/feynman-lint`, rules L01–L14)
+- `npm run lint` → feynman's **product** diagram linter (`bin/feynman-lint`, rules L01–L15)
 - `npm run eslint` → the **code** linter (`eslint .`)
 
 ## Canonical sources — each fact has exactly one home
