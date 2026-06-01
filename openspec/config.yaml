@@ -1,20 +1,30 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+# Project context — shown to AI when creating artifacts.
+context: |
+  Project: feynman — an open-source Claude Code / Codex plugin that injects ASCII-diagram rules at
+  session start (and after /compact and /clear) via the SessionStart hook, so the assistant draws a
+  diagram whenever a response has Structure, without the developer having to ask.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Hard contract: pure Node.js (>= 18), CommonJS only, zero runtime dependencies, no build step for
+  the hook. Claude Code and Codex are both first-class targets; IDE compat covers Cline/Windsurf
+  (.clinerules/) and Cursor (.cursor/rules/*.mdc). Tests run on node --test.
+
+  Domain terms are defined in /CONTEXT.md — use them exactly (Structure, Trigger, Visual, Intensity).
+  Architectural decisions live in docs/adr/. The product diagram linter is `npm run lint`
+  (bin/feynman-lint, rules L01–L14); the code linter is `npm run eslint` — do not confuse them.
+
+  Conventions: conventional commits. Planning is OpenSpec (this directory); the legacy GSD
+  `.planning/` system was retired 2026-06-01.
+
+# Per-artifact rules.
+rules:
+  proposal:
+    - State the user-facing problem and why it matters before proposing a solution.
+    - Always include a "Non-goals" section.
+  specs:
+    - Use domain terms exactly as defined in /CONTEXT.md; do not drift to synonyms.
+    - Every requirement is a testable "The system SHALL ..." statement with at least one scenario.
+  tasks:
+    - Break work into small, independently-committable steps that keep tests green.
+    - Each task names the files it touches.
