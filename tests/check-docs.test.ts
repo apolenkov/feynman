@@ -29,6 +29,8 @@ describe('isDriftExcluded', () => {
   it('excludes exact-file entries', () => {
     assert.equal(isDriftExcluded('CHANGELOG.md'), true);
     assert.equal(isDriftExcluded('scripts/check-docs.ts'), true);
+    // the guard's own spec, promoted to openspec/specs/ on archive
+    assert.equal(isDriftExcluded('openspec/specs/doc-drift-guard/spec.md'), true);
   });
 
   it('does not exclude live surfaces', () => {
@@ -57,6 +59,15 @@ describe('detectDrift', () => {
     const findings = detectDrift([
       { rel: 'docs/adr/0001-typescript-source-with-packaging-build.md', content: withPhrase },
       { rel: 'CHANGELOG.md', content: withPhrase },
+    ]);
+    assert.deepEqual(findings, []);
+  });
+
+  it("passes the guard's own capability spec promoted to openspec/specs", () => {
+    // On archive, doc-drift-guard/spec.md moves from openspec/changes/ (excluded
+    // by prefix) to openspec/specs/, where it documents the very phrases it forbids.
+    const findings = detectDrift([
+      { rel: 'openspec/specs/doc-drift-guard/spec.md', content: withPhrase },
     ]);
     assert.deepEqual(findings, []);
   });

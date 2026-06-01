@@ -24,12 +24,16 @@ export const FORBIDDEN_PHRASES: readonly string[] = [
 ];
 
 // Decision records legitimately quote the superseded phrases; the guard script
-// itself holds them as the constants above. Everything else is a live surface.
+// itself holds them as the constants above; and the guard's own capability spec
+// documents the phrases it forbids — on archive that spec is promoted from
+// openspec/changes/ (excluded) to openspec/specs/, so it must stay excluded too.
+// Everything else is a live surface.
 export const DRIFT_EXCLUDED_PATHS: readonly string[] = [
   'docs/adr/',
   'CHANGELOG.md',
   'openspec/changes/',
   'scripts/check-docs.ts',
+  'openspec/specs/doc-drift-guard/spec.md',
 ];
 
 export const isDriftExcluded = (rel: string): boolean =>
