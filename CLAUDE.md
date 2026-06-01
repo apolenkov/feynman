@@ -1,4 +1,3 @@
-<!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
 **feynman**
@@ -15,9 +14,7 @@ Tagline: "why explain in words when diagram do trick"
 - **Compatibility**: Must work with Claude Code and Codex hooks APIs
 - **Scope**: Open-source repo, public README, install one-liner
 - **Design**: Greenfield — repo is empty, start from scratch
-<!-- GSD:project-end -->
 
-<!-- GSD:stack-start source:research/STACK.md -->
 ## Technology Stack
 
 ## Recommended Stack
@@ -54,9 +51,7 @@ Tagline: "why explain in words when diagram do trick"
 | `.cursor/rules/*.mdc` YAML frontmatter format | HIGH | Multiple sources: Cursor documentation + community reports |
 | `SessionStart` matcher `startup\|resume\|compact\|clear` | HIGH | Verified via Context7 `code.claude.com/docs/en/hooks` 2026-05-17 |
 | Marketplace publish path | LOW | No public Anthropic documentation found for v1.0 marketplace submission |
-<!-- GSD:stack-end -->
 
-<!-- GSD:conventions-start source:CONVENTIONS.md -->
 ## Conventions
 
 ### Модульная система
@@ -93,9 +88,7 @@ Tagline: "why explain in words when diagram do trick"
 | #17804 | Императивные правила = защита от инъекций | Только декларативные фразы |
 | #35713 | Отключённый плагин всё равно инжектит | Проверка флаг-файла до чтения state |
 | #10225 | Хуки из пути плагина не срабатывают | Регистрировать только через `settings.json` |
-<!-- GSD:conventions-end -->
 
-<!-- GSD:architecture-start source:ARCHITECTURE.md -->
 ## Architecture
 
 ```
@@ -116,17 +109,26 @@ feynman-session-start.ts
 ```
 
 Скилл `/feynman` и CLI `feynman install|doctor|uninstall` читают и пишут тот же `state.json`.
-<!-- GSD:architecture-end -->
 
-<!-- GSD:skills-start source:skills/ -->
 ## Project Skills
 
 No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.
-<!-- GSD:skills-end -->
 
-<!-- GSD:profile-start -->
 ## Developer Profile
 
 > Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
 > This section is managed by `generate-claude-profile` -- do not edit manually.
-<!-- GSD:profile-end -->
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues (`apolenkov/feynman`) via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical roles with default strings (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

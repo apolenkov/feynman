@@ -101,7 +101,7 @@ Feature requests may be deferred to a milestone.
 
 - Single maintainer: [apolenkov](https://github.com/apolenkov)
 - License: MIT — see `LICENSE`
-- Public roadmap: `.planning/ROADMAP.md` (check before proposing big features)
+- Public roadmap: [GitHub milestones](https://github.com/apolenkov/feynman/milestones) (check before proposing big features)
 - No DCO or CLA sign-off required — low barrier to contribution is intentional
 
 ---

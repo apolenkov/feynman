@@ -26,5 +26,5 @@ What other approaches did you consider? Why do you prefer the proposed behavior?
 
 ---
 
-Before filing: check [`.planning/ROADMAP.md`](../../.planning/ROADMAP.md) to
-see if this is already planned for a future milestone.
+Before filing: check the [GitHub milestones](https://github.com/apolenkov/feynman/milestones)
+to see if this is already planned for a future milestone.
