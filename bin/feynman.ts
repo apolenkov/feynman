@@ -8,6 +8,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { type FeynmanState, DEFAULT_STATE, readRulesForIntensity } from '../lib/feynman-state.ts';
 
 const require = createRequire(import.meta.url);
 const PKG = require('../package.json') as { version: string; name: string };
@@ -26,13 +27,6 @@ interface TargetConfig {
   statePath: string;
   flagPath: string;
   commandsDir: string | null;
-}
-
-interface FeynmanState {
-  enabled: boolean;
-  intensity: string;
-  injections: number;
-  malformed_rules?: boolean;
 }
 
 interface InstallResult { target: string; already: boolean; tc?: TargetConfig; }
@@ -68,7 +62,6 @@ const HOOK_PATH         = path.resolve(import.meta.dirname, '..', 'hooks', `feyn
 const SESSION_HOOK_PATH = path.resolve(import.meta.dirname, '..', 'hooks', `feynman-session-start${_hookExt}`);
 const RULES_PATH        = path.resolve(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
 
-const DEFAULT_STATE: FeynmanState = { enabled: true, intensity: 'full', injections: 0 };
 const TARGET_ALIASES: Record<string, string> = {};
 const VALID_TARGETS = ['claude', 'codex', 'opencode', 'both', 'all', '*'];
 
@@ -128,20 +121,12 @@ function parseTarget(args: string[], fallback = 'codex'): { target: string; args
 }
 
 // Read rules content at a given intensity level from feynman-activate.md.
-// Supports XML format (<intensity name="X">…</intensity>) and legacy HTML-comment format.
+// Delegates to shared readRulesForIntensity; falls back to the whole file on miss.
 function readIntensityRules(intensity: string): string {
   const rulesPath = path.resolve(ROOT_DIR, 'rules', 'feynman-activate.md');
   const content = fs.readFileSync(rulesPath, 'utf8');
-  const xmlPattern = new RegExp(`<intensity\\s+name\\s*=\\s*["']${intensity}["'][^>]*>([\\s\\S]*?)<\\/intensity>`, 'i');
-  const xml = content.match(xmlPattern);
-  if (xml) return (xml[1] ?? '').trim();
-  // Legacy HTML-comment fallback.
-  const open = `<!-- ${intensity} -->`;
-  const close = `<!-- /${intensity} -->`;
-  const i1 = content.indexOf(open);
-  const i2 = content.indexOf(close, i1);
-  if (i1 !== -1 && i2 !== -1) return content.slice(i1 + open.length, i2).trim();
-  return content;
+  const block = readRulesForIntensity(content, intensity);
+  return block || content;
 }
 
 function hookCommandFor(target: string): string {
@@ -746,7 +731,7 @@ function cmdInstall(opts: { force: boolean; target: string }): void {
   // Print status frame
   console.log('');
   console.log('┌─ feynman installed ──────────────────────────────────────────┐');
-  console.log(`│ hook:     ${HOOK_PATH}`);
+  console.log(`│ hook:     ${SESSION_HOOK_PATH}`);
   for (const result of results) {
     const tc = targetConfig(result.target);
     console.log(`│ target:   ${tc.label}${result.already ? ' (already installed)' : ''}`);

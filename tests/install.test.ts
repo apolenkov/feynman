@@ -278,4 +278,33 @@ describe('install.sh', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // T05: Node version below 22.6 — install.sh must exit 1 with version message
+  // -------------------------------------------------------------------------
+  describe('node version check: below 22.6 exits 1 (T05)', () => {
+    it('exits 1 with ">=22.6 required" when node version is below 22.6', () => {
+      const tmpHome = makeTempHome();
+      const fakeBinDir = path.join(tmpHome, 'fake-bin');
+      fs.mkdirSync(fakeBinDir, { recursive: true });
+
+      // Write a fake 'node' that reports v20.0.0 — below the 22.6 threshold.
+      const fakeNodePath = path.join(fakeBinDir, 'node');
+      fs.writeFileSync(fakeNodePath, '#!/bin/sh\necho "v20.0.0"\n');
+      fs.chmodSync(fakeNodePath, 0o755);
+
+      try {
+        // Put fake-bin first on PATH so it shadows the real node binary.
+        // Keep /usr/bin:/bin so install.sh's POSIX utilities still resolve.
+        const result = runInstall(tmpHome, { PATH: `${fakeBinDir}:/usr/bin:/bin` });
+        assert.equal(result.status, 1, `expected exit 1, got ${result.status}; stderr: ${result.stderr}`);
+        assert.ok(
+          result.stderr.includes('>=22.6') || result.stderr.includes('22.6'),
+          `expected ">=22.6 required" in stderr, got: ${result.stderr}`
+        );
+      } finally {
+        rmrf(tmpHome);
+      }
+    });
+  });
+
 });
