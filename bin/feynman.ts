@@ -9,6 +9,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { type FeynmanState, DEFAULT_STATE, readRulesForIntensity, readState, writeState, statePaths, flagContent } from '../lib/feynman-state.ts';
+import type { TargetConfig, InstallResult, UninstallResult, TargetAdapter, ExampleEntry } from './cli/types.ts';
 
 const require = createRequire(import.meta.url);
 const PKG = require('../package.json') as { version: string; name: string };
@@ -17,25 +18,6 @@ const PKG = require('../package.json') as { version: string; name: string };
 
 interface Color { (s: string): string; }
 interface ColorMap { bold: Color; green: Color; red: Color; dim: Color; }
-
-interface TargetConfig {
-  name: string;
-  label: string;
-  rootDir: string;
-  settingsPath: string;
-  feynmanDir: string;
-  statePath: string;
-  flagPath: string;
-  commandsDir: string | null;
-}
-
-interface InstallResult { target: string; already: boolean; tc?: TargetConfig; }
-interface UninstallResult { target: string; missing: boolean; hadHook?: boolean; }
-
-interface TargetAdapter {
-  install(opts: { force: boolean }): InstallResult;
-  uninstall(): UninstallResult;
-}
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 
@@ -242,13 +224,6 @@ function copyMarkdownDir(src: string, dest: string): number {
     copied += 1;
   }
   return copied;
-}
-
-interface ExampleEntry {
-  name: string;
-  title: string;
-  question: string;
-  path: string;
 }
 
 function examplesIndex(): ExampleEntry[] {
