@@ -7,15 +7,13 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { pathToFileURL } from 'url';
-import { type FeynmanState, DEFAULT_STATE, OUTPUT_STYLE_SUFFIX, readRulesForIntensity } from '../lib/feynman-state.ts';
+import { OUTPUT_STYLE_SUFFIX, readRulesForIntensity, reconcileState, writeState } from '../lib/feynman-state.ts';
 
 // Path constants — use os.homedir(), never tilde strings (bug #8810).
 // FEYNMAN_HOME lets the same hook serve Claude Code (~/.claude) and Codex (~/.codex).
+// state.json / .feynman-active I/O now lives behind the store (ADR-0004), keyed by CLIENT_HOME.
 const HOME        = os.homedir();
 const CLIENT_HOME = process.env['FEYNMAN_HOME'] || path.join(HOME, '.claude');
-const FEYNMAN_DIR = path.join(CLIENT_HOME, '.feynman');
-const STATE_PATH  = path.join(FEYNMAN_DIR, 'state.json');
-const FLAG_PATH   = path.join(CLIENT_HOME, '.feynman-active');
 const RULES_PATH  = process.env['FEYNMAN_RULES_PATH'] || path.join(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
 
 // Sanity-check: opening and closing <intensity> tags must balance (WR-01/02/03).
@@ -46,42 +44,13 @@ process.stdin.on('end', () => {
     const sessionId: string = data.session_id || '';
     if (sessionId && /[/\\]|\.\./.test(sessionId)) process.exit(0);
 
-    // Step 2: flag file + first-run bootstrap (D-05, D-07, bug #35713)
-    // True first run: neither flag nor state exists -> bootstrap default full mode.
-    // Intentionally disabled: flag absent + state.enabled=false -> exit 0.
-    const flagExists  = fs.existsSync(FLAG_PATH);
-    const stateExists = fs.existsSync(STATE_PATH);
-    if (!flagExists) {
-      if (!stateExists) {
-        // First install: bootstrap and activate full mode.
-        fs.mkdirSync(FEYNMAN_DIR, { recursive: true });
-        fs.writeFileSync(STATE_PATH, JSON.stringify(DEFAULT_STATE, null, 2));
-        fs.writeFileSync(FLAG_PATH, DEFAULT_STATE.intensity);
-      } else {
-        let existingState: FeynmanState;
-        try {
-          existingState = { ...DEFAULT_STATE, ...JSON.parse(fs.readFileSync(STATE_PATH, 'utf8')) };
-        } catch (_) {
-          process.exit(0);
-        }
-        if (!existingState!.enabled) process.exit(0);
-        fs.writeFileSync(FLAG_PATH, existingState!.intensity || DEFAULT_STATE.intensity);
-      }
-    }
+    // Step 2: reconcile state + flag via the store (ADR-0004).
+    // Owns first-run bootstrap, flag/enabled reconcile (incl. #35713), and the
+    // corrupt-JSON fail-safe. active=false → not enabled / corrupt → exit silently.
+    const { state, active } = reconcileState(CLIENT_HOME);
+    if (!active) process.exit(0);
 
-    // Step 3: read state.json
-    let state: FeynmanState;
-    try {
-      state = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
-    } catch (e) {
-      // Corrupt state — fail safe per D-07
-      process.exit(0);
-    }
-
-    // Step 4: enabled check
-    if (!state!.enabled) process.exit(0);
-
-    // Step 5: read rules file and extract the correct intensity variant (D-01, D-02, HOOK-04)
+    // Step 3: read rules file and extract the correct intensity variant (D-01, D-02, HOOK-04)
     // Dual-format: tries XML <intensity name="..."> first, falls back to HTML comments.
     // Fallback kept until Plan 02 rule-file rewrite lands (CONTEXT.md Area G migration).
     let rulesText: string;
@@ -91,8 +60,8 @@ process.stdin.on('end', () => {
       // Sanity: <intensity> tag pairs must balance (WR-01/02/03).
       // On mismatch: mark state malformed, inject short fallback, continue (no silent disable).
       if (!assertTagPairs(rulesContent)) {
-        state!.malformed_rules = true;
-        try { fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2)); } catch (_) {}
+        state.malformed_rules = true;
+        try { writeState(CLIENT_HOME, state); } catch (_) {}
         process.stdout.write(JSON.stringify({
           hookSpecificOutput: {
             hookEventName: 'UserPromptSubmit',
@@ -102,12 +71,12 @@ process.stdin.on('end', () => {
         process.exit(0);
       }
       // Rules file is well-formed — clear any previous malformed_rules flag.
-      if (state!.malformed_rules) {
-        delete state!.malformed_rules;
+      if (state.malformed_rules) {
+        delete state.malformed_rules;
       }
 
       // Delegate intensity-block extraction to shared core (lib/feynman-state.ts).
-      rulesText = readRulesForIntensity(rulesContent, state!.intensity);
+      rulesText = readRulesForIntensity(rulesContent, state.intensity);
       // Empty means the block was not found (no XML or legacy marker) — exit silently.
       if (!rulesText) process.exit(0);
     } catch (e) {
@@ -115,27 +84,26 @@ process.stdin.on('end', () => {
       process.exit(0);
     }
 
-    // Step 5.5: append output_style suffix (Phase 10 STYLE-03)
+    // Step 4: append output_style suffix (Phase 10 STYLE-03)
     // Orthogonal axis to intensity: intensity controls rules-file SIZE,
     // output_style controls visual verbosity in the model's response.
     // Invalid values fall back to 'full' (no suffix) for safety.
-    const styleValue = (typeof state!.output_style === 'string') ? state!.output_style : 'full';
+    const styleValue = (typeof state.output_style === 'string') ? state.output_style : 'full';
     const styleSuffix = OUTPUT_STYLE_SUFFIX[styleValue]; // undefined for 'full' or invalid
     if (styleSuffix) {
       rulesText = rulesText + styleSuffix;
     }
 
-    // Step 6: increment injection counter and write state back (HOOK-05)
-    // Backward-compat: read legacy count field on first migration cycle
-    state!.injections = (state!.injections ?? state!.count ?? 0) + 1;
-    delete state!.count;
+    // Step 5: increment injection counter and write state back (HOOK-05).
+    // The legacy count→injections migration already happened in reconcileState.
+    state.injections = state.injections + 1;
     try {
-      fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
+      writeState(CLIENT_HOME, state);
     } catch (e) {
       // Counter write failure is non-fatal — still inject rules
     }
 
-    // Step 7: output rules as additionalContext (bug #13912 — JSON only, no trailing newline)
+    // Step 6: output rules as additionalContext (bug #13912 — JSON only, no trailing newline)
     // Plain text stdout triggers "UserPromptSubmit hook error" red banner in Claude Code UI
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: {

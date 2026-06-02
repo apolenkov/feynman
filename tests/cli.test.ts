@@ -693,6 +693,27 @@ describe('bin/feynman.js', () => {
       }
     });
 
+    it('does not crash when state.json holds a bare JSON primitive', () => {
+      // Regression (ADR-0004): readState used to return the raw primitive (e.g. 42),
+      // and `'enabled' in 42` threw an uncaught TypeError in the doctor path.
+      const tmp = makeTempHome();
+      try {
+        runFeynman(['install', '--target', 'codex'], tmp);
+        const statePath = path.join(tmp, '.codex', '.feynman', 'state.json');
+        fs.writeFileSync(statePath, '42');
+
+        const result = runFeynman(['doctor', '--target', 'codex'], tmp);
+        assert.equal(result.status, 0, `doctor must exit 0, not crash: ${result.stderr}`);
+        assert.equal(result.stderr.trim(), '', `no uncaught error expected: ${result.stderr}`);
+        assert.ok(
+          result.stdout.includes('[FAIL] state.json valid (has enabled field)'),
+          `primitive state.json must fail the enabled-field check: ${result.stdout}`
+        );
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
     it('fails script-file checks when registered command path cannot be parsed', () => {
       const tmp = makeTempHome();
       try {

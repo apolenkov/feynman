@@ -611,6 +611,131 @@ describe('feynman-activate hook', () => {
   });
 
   // -------------------------------------------------------------------------
+  // ADR-0004: canonical flag reconcile on the activate (UserPromptSubmit) path.
+  // reconcileState enforces one rule for both hooks: not active + flag present
+  // → unlink the flag. This CHANGES the legacy activate hook in two cases where
+  // it previously left a present flag dangling (corrupt JSON; valid enabled=false),
+  // and PRESERVES #35713 (flag absent + disabled → flag is not recreated).
+  // -------------------------------------------------------------------------
+  describe('ADR-0004: activate canonical flag reconcile', () => {
+    // Behaviour change 1 — corrupt state.json + flag present → flag unlinked.
+    // (Path 5 already asserts exit-0; this pins the new self-heal of the flag.)
+    describe('corrupt state.json + flag present → flag unlinked', () => {
+      let tmpHome: string;
+      let result: HookResult;
+      let flagAfter: boolean;
+
+      before(() => {
+        tmpHome = makeTempHome();
+        const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+        fs.mkdirSync(feynmanDir, { recursive: true });
+        fs.writeFileSync(path.join(feynmanDir, 'state.json'), '{ this is not valid json !!!');
+        fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), 'full');
+
+        result = runHook(tmpHome, { prompt: 'any' });
+        flagAfter = fs.existsSync(path.join(tmpHome, '.claude', '.feynman-active'));
+      });
+
+      after(() => rmrf(tmpHome));
+
+      it('exits 0 (graceful recovery)', () => assert.equal(result.status, 0));
+      it('emits no stdout (no injection)', () => assert.equal(result.stdout.trim(), ''));
+      it('unlinks the dangling flag', () => {
+        assert.equal(flagAfter, false, 'corrupt state + present flag must self-heal the flag');
+      });
+    });
+
+    // Behaviour change 2 — valid state, enabled=false, flag present → flag unlinked.
+    describe('valid enabled=false + flag present → flag unlinked', () => {
+      let tmpHome: string;
+      let result: HookResult;
+      let flagAfter: boolean;
+
+      before(() => {
+        tmpHome = makeTempHome();
+        const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+        fs.mkdirSync(feynmanDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(feynmanDir, 'state.json'),
+          JSON.stringify({ enabled: false, intensity: 'full', injections: 0 })
+        );
+        fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), 'full');
+
+        result = runHook(tmpHome, { prompt: 'any' });
+        flagAfter = fs.existsSync(path.join(tmpHome, '.claude', '.feynman-active'));
+      });
+
+      after(() => rmrf(tmpHome));
+
+      it('exits 0 silently', () => assert.equal(result.status, 0));
+      it('emits no stdout (no injection)', () => assert.equal(result.stdout.trim(), ''));
+      it('unlinks the dangling flag', () => {
+        assert.equal(flagAfter, false, 'disabled state + present flag must unlink the flag');
+      });
+    });
+
+    // Unchanged (#35713) — flag absent + enabled=false → flag NOT recreated.
+    // Both hooks already agreed here; this guards against regression.
+    describe('#35713: flag absent + enabled=false → flag not recreated', () => {
+      let tmpHome: string;
+      let result: HookResult;
+      let flagAfter: boolean;
+
+      before(() => {
+        tmpHome = makeTempHome();
+        const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+        fs.mkdirSync(feynmanDir, { recursive: true });
+        fs.writeFileSync(
+          path.join(feynmanDir, 'state.json'),
+          JSON.stringify({ enabled: false, intensity: 'full', injections: 0 })
+        );
+        // Deliberately do NOT create the flag.
+
+        result = runHook(tmpHome, { prompt: 'any' });
+        flagAfter = fs.existsSync(path.join(tmpHome, '.claude', '.feynman-active'));
+      });
+
+      after(() => rmrf(tmpHome));
+
+      it('exits 0 silently', () => assert.equal(result.status, 0));
+      it('does not recreate the flag', () => {
+        assert.equal(flagAfter, false, 'disabled state must never recreate an absent flag (#35713)');
+      });
+    });
+
+    // Behaviour change 3 — state.json ABSENT + flag present → bootstrap + inject.
+    // The legacy activate hook gated bootstrap on the flag, so with the flag
+    // present it skipped bootstrap and exited 0 (no state, no injection). The
+    // store converges it onto session-start's first-run self-heal (ADR-0004).
+    describe('state.json absent + flag present → bootstrap + inject (converges to session-start)', () => {
+      let tmpHome: string;
+      let result: HookResult;
+      let stateAfter: boolean;
+
+      before(() => {
+        tmpHome = makeTempHome();
+        // Flag present but NO state.json and NO .feynman dir.
+        fs.mkdirSync(path.join(tmpHome, '.claude'), { recursive: true });
+        fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), 'full');
+
+        result = runHook(tmpHome, { prompt: 'any' });
+        stateAfter = fs.existsSync(path.join(tmpHome, '.claude', '.feynman', 'state.json'));
+      });
+
+      after(() => rmrf(tmpHome));
+
+      it('exits 0', () => assert.equal(result.status, 0));
+      it('bootstraps state.json', () => {
+        assert.equal(stateAfter, true, 'missing state.json must be bootstrapped even when the flag is present');
+      });
+      it('injects rules (additionalContext present)', () => {
+        const ctx = parseAdditionalContext(result.stdout);
+        assert.ok(ctx.length > 0, 'first-run self-heal must inject rules');
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Path 9: Lines 115-124 — malformed rules file (assertTagPairs returns false)
   // Hook sets state.malformed_rules=true, writes state, injects MALFORMED_FALLBACK.
   // Uses FEYNMAN_RULES_PATH env override so the REAL hook source is covered.
