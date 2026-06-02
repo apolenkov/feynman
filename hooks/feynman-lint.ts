@@ -6,7 +6,7 @@
 // ALWAYS exits 0 — never block Claude (best practice)
 // Zero deps. ESM + TypeScript (Node.js v22.6+ strip-types — runs .ts directly).
 
-import { lint } from '../lib/lint/index.ts';
+import { lint, RULE_DESCRIPTIONS } from '../lib/lint/index.ts';
 import { autofix } from '../lib/lint/autofix.ts';
 
 interface LintIssue {
@@ -20,18 +20,6 @@ interface LintResult {
   passed: boolean;
   issues: LintIssue[];
 }
-
-// Rule descriptions for actionable feedback
-const RULE_DESCRIPTIONS: Record<string, string> = {
-  L01: 'Box closure: every ┌─...─┐ opening must have a matching └─...─┘ at the same column',
-  L02: 'Tree chars: last child must use └── not ├──',
-  L03: 'Arrow style: use only one arrow style per diagram (-->, →, ─→, or ──>)',
-  L04: 'Column widths: all table rows must have the same number of columns',
-  L05: 'Flow integrity: two [Box] tokens on the same line must have an arrow between them',
-  L06: 'Priority scale: if ▲ appears, ▼ must also appear (and vice versa)',
-  L07: 'Mermaid+ASCII mix: use either Mermaid or ASCII diagrams, not both in the same response',
-  L08: 'Frame width: all rows inside a ┌─ frame must have the same display width',
-};
 
 /**
  * Build a concise additionalContext message from lint issues

@@ -1,10 +1,11 @@
-// lib/lint/rules.ts — 8 lint rules for ASCII diagrams
+// lib/lint/rules.ts — lint rules for ASCII diagrams
 // Each rule: (ast: ASTNode, fullText: string) => Issue[]
 // Issue: {rule, severity, line, column, message, suggestion?}
 // Zero deps. ESM only.
 
 import { visualWidth, firstVisualColumnOf, lastVisualColumnOf } from './width.ts';
 import { createRequire } from 'node:module';
+import { nextFrame } from './frames.ts';
 
 export interface Issue {
   rule: string;
@@ -706,21 +707,13 @@ export function L11_overdecoration(ast: ASTNode): Issue[] {
 
   let li = 0;
   while (li < lines.length) {
-    const top = lines[li]!;
-    const topMatch = top.match(/^(\s*)┌─+┐\s*$/);
-    if (!topMatch) { li++; continue; }
-    const indent = topMatch[1]!;
+    const frame = nextFrame(lines, li);
+    if (!frame) break;
 
-    // Find closing └─+┘ at same indent. Inner lines must match /^\s*│.*│\s*$/.
-    let closeLi = -1;
-    const inner: string[] = [];
-    for (let lj = li + 1; lj < lines.length; lj++) {
-      const next = lines[lj]!;
-      const botMatch = next.match(/^(\s*)└─+┘\s*$/);
-      if (botMatch && botMatch[1] === indent) { closeLi = lj; break; }
-      if (/^\s*│.*│\s*$/.test(next)) inner.push(next);
-    }
-    if (closeLi === -1) { li++; continue; }
+    const { topLi, closeLi, indent, inner } = frame;
+    const top = lines[topLi]!;
+
+    if (closeLi === -1) { li = topLi + 1; continue; }
 
     const innerCount = inner.length;
     if (innerCount >= 1 && innerCount <= 5) {
@@ -743,7 +736,7 @@ export function L11_overdecoration(ast: ASTNode): Issue[] {
         const saving = Math.max(0, frameChars - dotLeaderChars);
 
         issues.push(issue(
-          'L11', 'warn', baseLineNum + li, indent.length + 1,
+          'L11', 'warn', baseLineNum + topLi, indent.length + 1,
           `frame used for ${innerCount} items; consider dot-leader list (saves ~${saving} chars)`,
           `Replace frame with dot-leader list — see docs/lint-rules.md#l11`
         ));
@@ -826,20 +819,13 @@ export function L12_token_budget(ast: ASTNode): Issue[] {
 
   let li = 0;
   while (li < lines.length) {
-    const top = lines[li]!;
-    const topMatch = top.match(/^(\s*)┌─+┐\s*$/);
-    if (!topMatch) { li++; continue; }
-    const indent = topMatch[1]!;
+    const frame = nextFrame(lines, li);
+    if (!frame) break;
 
-    let closeLi = -1;
-    const inner: string[] = [];
-    for (let lj = li + 1; lj < lines.length; lj++) {
-      const next = lines[lj]!;
-      const botMatch = next.match(/^(\s*)└─+┘\s*$/);
-      if (botMatch && botMatch[1] === indent) { closeLi = lj; break; }
-      if (/^\s*│.*│\s*$/.test(next)) inner.push(next);
-    }
-    if (closeLi === -1) { li++; continue; }
+    const { topLi, closeLi, indent, inner } = frame;
+    const top = lines[topLi]!;
+
+    if (closeLi === -1) { li = topLi + 1; continue; }
 
     // Whitelist: tree composition inside frame (consistent with L11)
     if (inner.some(l => /[├└]──/.test(l))) { li = closeLi + 1; continue; }
@@ -849,7 +835,7 @@ export function L12_token_budget(ast: ASTNode): Issue[] {
 
     if (cost.padding_chars > cost.content_chars) {
       issues.push(issue(
-        'L12', 'warn', baseLineNum + li, indent.length + 1,
+        'L12', 'warn', baseLineNum + topLi, indent.length + 1,
         `frame is padding-dominated (padding=${cost.padding_chars} > content=${cost.content_chars}); consider lighter visual`,
         `Use --explain for full cost breakdown; consider dot-leader or trimmed frame`
       ));
@@ -876,24 +862,23 @@ export function L13_double_wrap(ast: ASTNode): Issue[] {
 
   let li = 0;
   while (li < lines.length) {
-    const top = lines[li]!;
-    const topMatch = top.match(/^(\s*)┌─+┐\s*$/);
-    if (!topMatch) { li++; continue; }
-    const indent = topMatch[1]!;
+    const frame = nextFrame(lines, li);
+    if (!frame) break;
 
-    let closeLi = -1;
+    const { topLi, closeLi, indent } = frame;
+
+    if (closeLi === -1) { li = topLi + 1; continue; }
+
+    // Check all between-lines (not just │-bearing ones) for tree chars,
+    // since L13 cares about any line between top and close.
     let hasTree = false;
-    for (let lj = li + 1; lj < lines.length; lj++) {
-      const next = lines[lj]!;
-      const botMatch = next.match(/^(\s*)└─+┘\s*$/);
-      if (botMatch && botMatch[1] === indent) { closeLi = lj; break; }
-      if (/[├└]──/.test(next)) hasTree = true;
+    for (let lj = topLi + 1; lj < closeLi; lj++) {
+      if (/[├└]──/.test(lines[lj]!)) { hasTree = true; break; }
     }
-    if (closeLi === -1) { li++; continue; }
 
     if (hasTree) {
       issues.push(issue(
-        'L13', 'warn', baseLineNum + li, indent.length + 1,
+        'L13', 'warn', baseLineNum + topLi, indent.length + 1,
         `tree inside frame block — the tree already conveys hierarchy; drop the frame`,
         `Remove the surrounding ┌─...─┐ / └─...─┘ borders; tree indentation suffices`
       ));
@@ -936,20 +921,21 @@ export function L15_homogeneous_frame(ast: ASTNode): Issue[] {
 
   let li = 0;
   while (li < lines.length) {
-    const top = lines[li]!;
-    const topMatch = top.match(/^(\s*)┌─[^┌\n]*┐\s*$/);
-    if (!topMatch) { li++; continue; }
-    const indent = topMatch[1]!;
+    const frame = nextFrame(lines, li);
+    if (!frame) break;
 
-    let closeLi = -1;
+    const { topLi, closeLi, indent } = frame;
+    const top = lines[topLi]!;
+
+    if (closeLi === -1) { li = topLi + 1; continue; }
+
+    // L15 uses startsWith(indent + '│') for inner collection (leading bar only).
     const inner: string[] = [];
-    for (let lj = li + 1; lj < lines.length; lj++) {
+    for (let lj = topLi + 1; lj < closeLi; lj++) {
       const next = lines[lj]!;
-      const botMatch = next.match(/^(\s*)└─*┘\s*$/);
-      if (botMatch && botMatch[1] === indent) { closeLi = lj; break; }
       if (next.startsWith(indent + '│')) inner.push(next);
     }
-    if (closeLi === -1) { li++; continue; }
+
     if (inner.length < 2) { li = closeLi + 1; continue; }
 
     // Strip inner lines to bare content for type detection.
@@ -984,7 +970,7 @@ export function L15_homogeneous_frame(ast: ASTNode): Issue[] {
     const saving = Math.max(0, frameChars - plainChars);
 
     issues.push(issue(
-      'L15', 'warn', baseLineNum + li, indent.length + 1,
+      'L15', 'warn', baseLineNum + topLi, indent.length + 1,
       `frame wraps homogeneous ${type} content; consider plain format (saves ~${saving} chars)`,
       'Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15'
     ));
