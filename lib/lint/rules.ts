@@ -304,8 +304,10 @@ export function L04_column_widths(ast: ASTNode): Issue[] {
 
   // Count columns per row by splitting on |
   function countCols(line: string): number {
-    // Split by |, trim outer empty strings
-    const parts = line.split('|');
+    // Split on unescaped pipes only: a `\|` inside a cell is GFM-escaped content,
+    // not a column boundary. Splitting on a bare `|` over-counts and flags valid
+    // tables as malformed.
+    const parts = line.split(/(?<!\\)\|/);
     // Remove leading/trailing empty strings from the outer pipes
     let start = 0;
     let end = parts.length;
