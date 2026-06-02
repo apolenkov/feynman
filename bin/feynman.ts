@@ -589,8 +589,7 @@ function writeSettings(target: string, settings: Record<string, unknown>): void 
 
 function isFeynmanHookCommand(command: string): boolean {
   return (
-    command.includes('feynman-session-start.ts') ||
-    command.includes('feynman-session-start.js') ||
+    isSessionStartHookCommand(command) ||
     command.includes('feynman-activate.ts') ||
     command.includes('feynman-activate.js') ||
     command.includes('feynman-lint.ts') ||
@@ -598,14 +597,20 @@ function isFeynmanHookCommand(command: string): boolean {
   );
 }
 
+// The SessionStart hook is the one doctor and install introspection look for.
+// Centralised so renaming the script touches one place, not five inline literals.
+function isSessionStartHookCommand(command: unknown): boolean {
+  return typeof command === 'string' && (
+    command.includes('feynman-session-start.ts') ||
+    command.includes('feynman-session-start.js')
+  );
+}
+
 function hasFeynmanHook(settings: Record<string, unknown>): boolean {
   const hooks = settings['hooks'] as Record<string, unknown[]> | undefined;
   return ((hooks?.['SessionStart'] ?? []) as Array<Record<string, unknown>>).some(g => {
     const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
-    return hs?.some(h => typeof h['command'] === 'string' && (
-      (h['command'] as string).includes('feynman-session-start.ts') ||
-      (h['command'] as string).includes('feynman-session-start.js')
-    ));
+    return hs?.some(h => isSessionStartHookCommand(h['command']));
   });
 }
 
@@ -1012,18 +1017,12 @@ function cmdDoctor(opts: { target?: string; noExit?: boolean } = {}): void {
     const sessionEntries = hooks?.['SessionStart'] ?? [];
     const feynmanSessionEntry = sessionEntries.find(g => {
       const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
-      return hs?.some(h => typeof h['command'] === 'string' && (
-        (h['command'] as string).includes('feynman-session-start.ts') ||
-        (h['command'] as string).includes('feynman-session-start.js')
-      ));
+      return hs?.some(h => isSessionStartHookCommand(h['command']));
     });
     sessionHookRegistered = !!feynmanSessionEntry;
     if (feynmanSessionEntry) {
       const hs = feynmanSessionEntry['hooks'] as Array<Record<string, unknown>>;
-      const hookCmd = hs.find(h => typeof h['command'] === 'string' && (
-        (h['command'] as string).includes('feynman-session-start.ts') ||
-        (h['command'] as string).includes('feynman-session-start.js')
-      ))?. ['command'] as string | undefined;
+      const hookCmd = hs.find(h => isSessionStartHookCommand(h['command']))?.['command'] as string | undefined;
       if (hookCmd) {
         sessionHookAbsPath =
           extractHookScriptPath(hookCmd, 'feynman-session-start.ts') ??
