@@ -863,3 +863,16 @@ describe('L14 blank-line separation — unit tests', () => {
     assert.ok(l14[0]!.suggestion !== undefined && l14[0]!.suggestion!.length > 0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// CRLF line endings must not change linting (parser normalises \r\n / \r → \n)
+// ---------------------------------------------------------------------------
+describe('CRLF normalization — parser', () => {
+  it('a CRLF document lints identically to the same LF document', () => {
+    const lf = '```\n┌──────┐\n│ hi   │\n└──────┘\n```';
+    const crlf = lf.replace(/\n/g, '\r\n');
+    const lfRules = lint(lf).issues.map(i => i.rule).sort();
+    const crlfRules = lint(crlf).issues.map(i => i.rule).sort();
+    assert.deepEqual(crlfRules, lfRules, 'a trailing \\r must not change the issue set');
+  });
+});

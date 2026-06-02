@@ -122,7 +122,10 @@ function getIndent(line: string): number {
  * @returns {Array<DiagramNode>}
  */
 export function parse(markdown: string): DiagramNode[] {
-  const lines = markdown.split('\n');
+  // Normalise CRLF/CR to LF first: a trailing \r left on each line inflates
+  // visualWidth, skewing the width-sensitive rules (L08/L11/L12). Splitting on
+  // the line-ending family keeps the same line count, so line numbers are intact.
+  const lines = markdown.split(/\r\n?|\n/);
   const nodes: DiagramNode[] = [];
 
   let i = 0;
