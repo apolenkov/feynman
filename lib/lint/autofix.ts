@@ -4,6 +4,7 @@
 
 import { visualWidth } from './width.ts';
 import { STATE_MARKER_RE } from './markers.ts';
+import { nextFrame } from './frames.ts';
 
 // Strip indent prefix and the outer │ chars from an inner line. Returns the
 // raw cell content without trailing space.
@@ -350,6 +351,16 @@ function detectAndFixSeparators(text: string, processFenced: boolean): string {
   return result.join('\n');
 }
 
+// Index of the next ``` fence line at or after `from`, or lines.length if none.
+// Used to bound frame detection to one fence-free segment so a frame can never
+// span a ``` boundary — fenced blocks are out of scope by default.
+function nextFenceLine(lines: string[], from: number): number {
+  for (let k = from; k < lines.length; k++) {
+    if (/^\s*```/.test(lines[k]!)) return k;
+  }
+  return lines.length;
+}
+
 // Walk text, locate frame regions (sequence of lines starting with ┌ … ending
 // with └), build node objects, and rewrite each region in place.
 //
@@ -402,39 +413,32 @@ export function autofix(text: string, opts?: AutofixOptions): string {
       i++;
       continue;
     }
-    const indent = topMatch[1]!;
-    let j = i + 1;
-    const inner: string[] = [];
-    let closed = false;
-    while (j < lines.length) {
-      const next = lines[j]!;
-      const botMatch = next.match(/^(\s*)└─*┘\s*$/);
-      if (botMatch && botMatch[1] === indent) {
-        closed = true;
-        break;
-      }
-      if (!next.startsWith(indent + '│')) {
-        break;
-      }
-      inner.push(next);
-      j++;
-    }
-    if (!closed) {
+    // Detect the frame with the canonical nextFrame helper so autofix and the
+    // lint rules (L08/L11/L12/L15) share ONE frame definition: the closer is the
+    // first └─…─┘ found scanning forward past any hole (blank line / stray
+    // prose), and inner is the fully-bordered │ … │ rows. The scan is bounded to
+    // the current non-fence segment (nextFenceLine) so a frame never spans a ```
+    // boundary, mirroring how the parser feeds the linter one fence-free block.
+    const segEnd = nextFenceLine(lines, i + 1);
+    const frame = nextFrame(lines.slice(i, segEnd), 0);
+    if (!frame || frame.closeLi === -1) {
       out.push(line);
       i++;
       continue;
     }
+    const { indent, inner } = frame;
+    const closeLi = i + frame.closeLi;
     if (inner.length === 0) {
       out.push(line);
-      out.push(lines[j]!);
-      i = j + 1;
+      out.push(lines[closeLi]!);
+      i = closeLi + 1;
       continue;
     }
     const node: FrameNodeFull = {
       kind: 'frame',
       top: line,
       inner,
-      bottom: lines[j]!,
+      bottom: lines[closeLi]!,
       indent,
     };
     // Dispatch priority: L15 (plain) > L11 (dot-leader) > alignment.
@@ -454,7 +458,7 @@ export function autofix(text: string, opts?: AutofixOptions): string {
     } else {
       out.push(autofixFrame(node));
     }
-    i = j + 1;
+    i = closeLi + 1;
   }
   let result = detectAndFixArrows(out.join('\n'), processFenced);
   result = detectAndFixJunctions(result, processFenced);

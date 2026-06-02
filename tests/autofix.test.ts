@@ -222,6 +222,64 @@ describe('autofix(text) — full document rewriting', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Shared frame definition with the linter (nextFrame consolidation)
+// ---------------------------------------------------------------------------
+// autofix detects frames using the SAME canonical nextFrame helper as the lint
+// rules (L08/L11/L12/L15): a frame's inner rows are the fully-bordered │ … │
+// lines between the opener and the first matching closer found scanning forward,
+// even past a hole (blank line or stray prose). These cases pin the resulting
+// behaviour change. See openspec change consolidate-autofix-frame-iteration.
+describe('autofix(text) — frame definition shared with the linter', () => {
+  // Scenario (a): a frame with a non-bordered inner line (here a blank line) is
+  // still one frame — the closer is found past the hole and the │ … │ rows are
+  // aligned. The hole line is collapsed away.
+  it('aligns a holed frame, collapsing the non-bordered inner line', () => {
+    const text = ['┌────┐', '│ alpha │', '', '│ b │', '└────┘'].join('\n');
+    const out = autofix(text);
+    assert.equal(out, ['┌──────┐', '│ alpha│', '│ b    │', '└──────┘'].join('\n'));
+  });
+
+  // Scenario (b): a runaway row (starts with │, no closing │) is NOT an inner
+  // row — matching the linter's frame detection. The frame's well-formed rows
+  // are aligned and the runaway line is collapsed with the rest of the hole.
+  it('does not treat a row missing its right border as an inner row', () => {
+    const text = [
+      '┌────┐',
+      '│ alpha │',
+      '│ runaway with no right border',
+      '│ b │',
+      '└────┘',
+    ].join('\n');
+    const out = autofix(text);
+    assert.equal(out, ['┌──────┐', '│ alpha│', '│ b    │', '└──────┘'].join('\n'));
+  });
+
+  // Guard: an opener OUTSIDE a fence must not let frame detection scan across the
+  // ``` boundary into fenced sample content. The scan is bounded to the current
+  // non-fence segment, so the opener stays unclosed and the block is untouched —
+  // preserving the fenced-samples contract.
+  it('does not scan a frame across a fence boundary', () => {
+    const text = ['┌──┐', '│ a │', '```', '│ b │', '└──┘', '```'].join('\n');
+    assert.equal(autofix(text), text);
+  });
+
+  // Scenario (c): a well-formed frame's aligned output is byte-identical to the
+  // pre-consolidation output.
+  it('leaves well-formed frame output unchanged', () => {
+    const text = ['┌───┐', '│ aaaa │', '│ b │', '└───┘'].join('\n');
+    assert.equal(autofix(text), ['┌─────┐', '│ aaaa│', '│ b   │', '└─────┘'].join('\n'));
+  });
+
+  // The new holed-frame behaviour must also be idempotent: a second pass sees an
+  // already well-formed frame and changes nothing.
+  it('is idempotent on a holed frame', () => {
+    const text = ['┌────┐', '│ alpha │', '', '│ b │', '└────┘'].join('\n');
+    const once = autofix(text);
+    assert.equal(autofix(once), once);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // autofixFrameToDotLeader — L11 conversion (Plan 09-04 / LINT-14)
 // ---------------------------------------------------------------------------
 describe('autofixFrameToDotLeader — L11 conversion', () => {
