@@ -3,6 +3,7 @@
 // Zero deps. ESM only. No I/O — text in, text out.
 
 import { visualWidth } from './width.ts';
+import { STATE_MARKER_RE } from './markers.ts';
 
 // Strip indent prefix and the outer │ chars from an inner line. Returns the
 // raw cell content without trailing space.
@@ -51,10 +52,9 @@ export function autofixFrame(node: FrameNodeFull): string {
 }
 
 // STATE-marker allowlist (per D-09-04-03 in PLAN frontmatter, see also
-// .planning/notes/autonomous-log-2026-05-11.md). A trailing token in an
-// inner line counts as a "state" if it matches one of these patterns.
-// Cyrillic literals + ASCII glyphs; case-insensitive for ASCII.
-const STATE_MARKER_RE = /(← (?:готов|решение|заморожено|в работе|блок:[^│\n]+))|((?:✓|✗|◐|⌛|→) \S+)|\b(done|pending|wip|ok|fail|wait)\b\s*$/i;
+// .planning/notes/autonomous-log-2026-05-11.md). A trailing token in an inner
+// line counts as a "state" if it matches STATE_MARKER_RE, shared with L15 via
+// ./markers.ts so the detector and the fixer can never drift.
 
 type RowKind =
   | { kind: 'pattern'; label: string; state: string }
