@@ -6,16 +6,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { DEFAULT_STATE, readState } from '../lib/feynman-state.ts';
 import type { InstallResult, UninstallResult, TargetAdapter } from './cli/types.ts';
 import { c } from './cli/ansi.ts';
-import { HELP, BOOTSTRAP_HELP, INSTALL_HELP, UNINSTALL_HELP, DOCTOR_HELP, LINT_HELP, VERSION_HELP, cmdHelp } from './cli/help.ts';
+import { HELP, BOOTSTRAP_HELP, INSTALL_HELP, UNINSTALL_HELP, DOCTOR_HELP, cmdHelp } from './cli/help.ts';
 import { ensureDir, copyFileIfExists, copyMarkdownDir } from './cli/fs-utils.ts';
 import { readJsonConfig, readSettings, writeSettings, isSessionStartHookCommand, hasFeynmanHook, hasAnyFeynmanHook, extractHookScriptPath, removeFeynmanHooks, bootstrapState, installClaudeCommand, targetConfig } from './cli/settings.ts';
 import { targetNames, parseTarget, hookCommandFor, readIntensityRules } from './cli/targets.ts';
 import { cmdExamples } from './commands/examples.ts';
+import { cmdVersion } from './commands/version.ts';
+import { cmdLint } from './commands/lint.ts';
 
 const require = createRequire(import.meta.url);
 const PKG = require('../package.json') as { version: string; name: string };
@@ -562,33 +563,6 @@ function cmdDoctor(opts: { target?: string; noExit?: boolean } = {}): void {
   renderDoctorReport(target, checks, failCount);
 
   if (!opts.noExit) process.exit(0);
-}
-
-// ─── Lint (delegate to feynman-lint.ts via spawnSync) ─────────────────────────
-
-function cmdLint(args: string[]): void {
-  const lintArgs = args.filter(a => a !== '--help');
-  if (args.includes('--help') || lintArgs.length === 0) {
-    console.log(LINT_HELP);
-    process.exit(0);
-  }
-
-  const lintBin = path.resolve(import.meta.dirname, `feynman-lint${_hookExt}`);
-  const result = spawnSync(process.execPath, [lintBin, ...lintArgs], {
-    stdio: 'inherit',
-  });
-  process.exit(result.status ?? 1);
-}
-
-// ─── Version ──────────────────────────────────────────────────────────────────
-
-function cmdVersion(args: string[]): void {
-  if (args.includes('--help')) {
-    console.log(VERSION_HELP);
-    process.exit(0);
-  }
-  console.log(VERSION);
-  process.exit(0);
 }
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
