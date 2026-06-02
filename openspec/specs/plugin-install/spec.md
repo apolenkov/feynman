@@ -101,16 +101,18 @@ Unlike `claude` and `codex`, opencode is driven by an `instructions[]` file path
 ### Requirement: supported install surface is the three CLI agent targets only
 
 feynman's supported install surface SHALL be the three CLI agent targets `claude`, `codex`, and
-`opencode` (the `all` / `*` aliases expand to exactly these three). The IDE adapters still present
-in `bin/feynman.ts` — `cline`, `cursor`, `windsurf` — SHALL be treated as deprecated and out of
-scope for this capability; their behavior is not contracted here and is slated for removal in a
-follow-up change.
+`opencode` (the `all` / `*` aliases expand to exactly these three). No IDE adapters are supported:
+`cline`, `cursor`, and `windsurf` SHALL be rejected as invalid targets (exit code 2).
 
 #### Scenario: all expands to the three supported targets
 
 - **WHEN** `feynman install --target all` (or `--target '*'`) runs
-- **THEN** the install is performed for `claude`, `codex`, and `opencode` in sequence, and no IDE
-  target is touched
+- **THEN** the install is performed for `claude`, `codex`, and `opencode` in sequence
+
+#### Scenario: a removed IDE target is rejected
+
+- **WHEN** `feynman install --target cline` (or `cursor`, or `windsurf`) runs
+- **THEN** the CLI prints an `invalid --target` error and exits with code 2
 
 ### Requirement: doctor for hook targets reports health and always exits 0
 
@@ -134,6 +136,23 @@ reported as `[INFO]` and SHALL never count toward failures or change the exit st
 
 - **WHEN** `feynman doctor` runs whether or not the optional lint hook is registered
 - **THEN** the lint-hook line is reported as `[INFO]`, never as `[FAIL]`, and does not affect the exit status
+
+### Requirement: doctor for the opencode target reports health and always exits 0
+
+The `doctor` subcommand for the `opencode` target SHALL check that `opencode.json` exists, the
+rules path is registered in `instructions[]`, `rules.md` exists and is non-empty, `state.json` is
+valid, and the `.feynman-active` flag matches the enabled state, then SHALL print a status report
+and SHALL exit 0 (advisory-only, never blocks).
+
+#### Scenario: opencode doctor on a healthy install
+
+- **WHEN** `feynman doctor --target opencode` runs after a successful install
+- **THEN** all checks pass, the report ends with "Status: OK", and the CLI exits 0
+
+#### Scenario: opencode doctor with a missing registration
+
+- **WHEN** `feynman doctor --target opencode` runs and the rules path is not in `instructions[]`
+- **THEN** that check shows `[FAIL]`, the report shows "Status: ISSUES", and the CLI still exits 0
 
 ### Requirement: uninstall removes hook entries and the flag file, preserving state.json
 
