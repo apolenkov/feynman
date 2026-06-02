@@ -714,6 +714,46 @@ describe('bin/feynman.js', () => {
       }
     });
 
+    it('surfaces a state.json.bak as a recovery info line (ADR-0005)', () => {
+      const tmp = makeTempHome();
+      try {
+        runFeynman(['install', '--target', 'claude'], tmp);
+        // A leftover .bak means a corrupt state.json was self-healed (ADR-0005).
+        const feynmanDir = path.join(tmp, '.claude', '.feynman');
+        fs.mkdirSync(feynmanDir, { recursive: true });
+        fs.writeFileSync(path.join(feynmanDir, 'state.json.bak'), '{ corrupt');
+
+        const result = runFeynman(['doctor', '--target', 'claude'], tmp);
+        assert.equal(result.status, 0, `doctor must exit 0: ${result.stderr}`);
+        assert.ok(
+          result.stdout.includes('[INFO] state.json recovered from corruption'),
+          `expected an INFO recovery line: ${result.stdout}`
+        );
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('opencode doctor surfaces a state.json.bak recovery line (ADR-0005)', () => {
+      const tmp = makeTempHome();
+      try {
+        runFeynman(['install', '--target', 'opencode'], tmp);
+        fs.writeFileSync(path.join(tmp, '.config', 'opencode', '.feynman', 'state.json.bak'), '{ corrupt');
+
+        const result = runFeynman(['doctor', '--target', 'opencode'], tmp);
+        assert.equal(result.status, 0, `doctor must exit 0: ${result.stderr}`);
+        // The opencode doctor's check() has no INFO arg, so the line renders as a
+        // passing [OK] rather than [INFO] — divergence left for the deferred
+        // doctor decomposition; the recovery text is the deliverable either way.
+        assert.ok(
+          result.stdout.includes('state.json recovered from corruption'),
+          `expected a recovery line: ${result.stdout}`
+        );
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
     it('fails script-file checks when registered command path cannot be parsed', () => {
       const tmp = makeTempHome();
       try {
