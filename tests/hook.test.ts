@@ -106,6 +106,24 @@ function runSessionHook(tmpHome: string, stdinData: unknown = { session_id: 'tes
   };
 }
 
+function runSessionHookWithRulesPath(tmpHome: string, rulesPath: string, stdinData: unknown = { session_id: 'test-session' }): HookResult {
+  const result = spawnSync('node', [SESSION_HOOK_PATH], {
+    input: JSON.stringify(stdinData),
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      HOME: tmpHome,
+      FEYNMAN_RULES_PATH: rulesPath,
+    },
+    timeout: 10000,
+  });
+  return {
+    status: result.status ?? 0,
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
+  };
+}
+
 /**
  * Parse additionalContext from hook stdout JSON.
  * Returns the additionalContext string or throws.
@@ -439,20 +457,11 @@ describe('feynman-activate hook', () => {
       );
       fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), 'full');
 
-      // Create a modified hook that points to a non-existent rules file
-      // so the catch(e) on RULES_PATH read fires
-      const hookSrc = fs.readFileSync(HOOK_PATH, 'utf8');
-      const patchedSrc = hookSrc.replace(
-        /const RULES_PATH\s*=.*$/m,
-        `const RULES_PATH = '/nonexistent/path/to/rules.md';`
-      );
-      const patchedHookPath = path.join(tmpHome, 'feynman-activate-test.ts');
-      fs.writeFileSync(patchedHookPath, patchedSrc);
-
-      result = spawnSync('node', [patchedHookPath], {
+      // Point FEYNMAN_RULES_PATH at a non-existent file so the catch on RULES_PATH read fires.
+      result = spawnSync('node', [HOOK_PATH], {
         input: JSON.stringify({ prompt: 'test' }),
         encoding: 'utf8',
-        env: { ...process.env, HOME: tmpHome },
+        env: { ...process.env, HOME: tmpHome, FEYNMAN_RULES_PATH: '/nonexistent/path/to/rules.md' },
         timeout: 10000,
       });
     });
@@ -895,25 +904,18 @@ describe('feynman-activate hook', () => {
   describe('XML intensity extraction', () => {
 
     /**
-     * Runs a patched copy of the hook with RULES_PATH pointing at a synthetic
-     * rules file written by the test. Mirrors Path 6 helper pattern.
+     * Runs the real hook with FEYNMAN_RULES_PATH pointing at a synthetic rules
+     * file written by the test. Uses env-override rather than source-patching so
+     * relative imports in the hook (lib/feynman-state.ts) resolve correctly.
      */
     function runHookWithRules(tmpHome: string, rulesContent: string, _intensity: string): SpawnSyncReturns<string> {
-      const hookSrc = fs.readFileSync(HOOK_PATH, 'utf8');
       const rulesFilePath = path.join(tmpHome, 'synthetic-rules.md');
       fs.writeFileSync(rulesFilePath, rulesContent);
-      const escapedPath = rulesFilePath.replace(/\\/g, '\\\\');
-      const patchedSrc = hookSrc.replace(
-        /const RULES_PATH\s*=.*$/m,
-        `const RULES_PATH = '${escapedPath}';`
-      );
-      const patchedHookPath = path.join(tmpHome, 'feynman-activate-xml-test.ts');
-      fs.writeFileSync(patchedHookPath, patchedSrc);
 
-      return spawnSync('node', [patchedHookPath], {
+      return spawnSync('node', [HOOK_PATH], {
         input: JSON.stringify({ prompt: 'test' }),
         encoding: 'utf8',
-        env: { ...process.env, HOME: tmpHome },
+        env: { ...process.env, HOME: tmpHome, FEYNMAN_RULES_PATH: rulesFilePath },
         timeout: 10000,
       });
     }
@@ -1179,6 +1181,81 @@ describe('hook output_style suffix injection (Phase 10)', () => {
       assert.equal(result.status, 0);
       const ctx = parseAdditionalContext(result.stdout);
       assert.doesNotMatch(ctx, /Output style:/, 'invalid value must fall back to full (no suffix)');
+    } finally {
+      rmrf(tmpHome);
+    }
+  });
+});
+
+// ─── A04: SessionStart output_style suffix (finding A04) ─────────────────────
+
+describe('session-start output_style suffix injection (A04)', () => {
+  function seedState(tmpHome: string, state: Record<string, unknown>): void {
+    const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+    fs.mkdirSync(feynmanDir, { recursive: true });
+    fs.writeFileSync(path.join(feynmanDir, 'state.json'), JSON.stringify(state, null, 2));
+    fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), (state['intensity'] as string) || 'full');
+  }
+
+  function makeRulesFile(tmpHome: string): string {
+    const rulesPath = path.join(tmpHome, 'test-rules.md');
+    fs.writeFileSync(rulesPath, [
+      '<intensity name="lite">Lite session rules.</intensity>',
+      '<intensity name="full">Full session rules.</intensity>',
+      '<intensity name="ultra">Ultra session rules.</intensity>',
+    ].join('\n'));
+    return rulesPath;
+  }
+
+  it('output_style=full → no suffix in session-start output (default)', () => {
+    const tmpHome = makeTempHome();
+    try {
+      seedState(tmpHome, { enabled: true, intensity: 'full', output_style: 'full', injections: 0 });
+      const rulesPath = makeRulesFile(tmpHome);
+      const result = runSessionHookWithRulesPath(tmpHome, rulesPath);
+      assert.equal(result.status, 0);
+      assert.ok(result.stdout.length > 0, 'session-start must emit rules');
+      assert.doesNotMatch(result.stdout, /Output style:/, 'no suffix for output_style=full in session-start');
+    } finally {
+      rmrf(tmpHome);
+    }
+  });
+
+  it('output_style=short → short suffix appears in session-start output', () => {
+    const tmpHome = makeTempHome();
+    try {
+      seedState(tmpHome, { enabled: true, intensity: 'full', output_style: 'short', injections: 0 });
+      const rulesPath = makeRulesFile(tmpHome);
+      const result = runSessionHookWithRulesPath(tmpHome, rulesPath);
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /Output style: short/, 'short suffix must appear in session-start output');
+      assert.match(result.stdout, /no frames/i, 'short suffix must forbid frames');
+    } finally {
+      rmrf(tmpHome);
+    }
+  });
+
+  it('output_style=middle → middle suffix appears in session-start output', () => {
+    const tmpHome = makeTempHome();
+    try {
+      seedState(tmpHome, { enabled: true, intensity: 'full', output_style: 'middle', injections: 0 });
+      const rulesPath = makeRulesFile(tmpHome);
+      const result = runSessionHookWithRulesPath(tmpHome, rulesPath);
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /Output style: middle/, 'middle suffix must appear in session-start output');
+    } finally {
+      rmrf(tmpHome);
+    }
+  });
+
+  it('output_style missing → no suffix in session-start output (back-compat)', () => {
+    const tmpHome = makeTempHome();
+    try {
+      seedState(tmpHome, { enabled: true, intensity: 'full', injections: 0 });
+      const rulesPath = makeRulesFile(tmpHome);
+      const result = runSessionHookWithRulesPath(tmpHome, rulesPath);
+      assert.equal(result.status, 0);
+      assert.doesNotMatch(result.stdout, /Output style:/, 'missing output_style must produce no suffix');
     } finally {
       rmrf(tmpHome);
     }

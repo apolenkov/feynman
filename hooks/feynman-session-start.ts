@@ -1,27 +1,19 @@
 #!/usr/bin/env node
 // feynman — SessionStart hook — injects active diagram rules at session start.
-// UserPromptSubmit still reinforces rules every turn; this primes fresh sessions.
+// This is the primary injection hook (ADR 0003); it primes fresh, resumed,
+// compacted, and cleared sessions.
 
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-
-interface FeynmanState {
-  enabled: boolean;
-  intensity: string;
-  output_style?: string;
-  injections: number;
-}
+import { type FeynmanState, DEFAULT_STATE, OUTPUT_STYLE_SUFFIX, readRulesForIntensity } from '../lib/feynman-state.ts';
 
 const HOME        = os.homedir();
 const CLIENT_HOME = process.env['FEYNMAN_HOME'] || path.join(HOME, '.claude');
 const FEYNMAN_DIR = path.join(CLIENT_HOME, '.feynman');
 const STATE_PATH  = path.join(FEYNMAN_DIR, 'state.json');
 const FLAG_PATH   = path.join(CLIENT_HOME, '.feynman-active');
-const RULES_PATH  = path.join(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
-
-const DEFAULT_STATE: FeynmanState = { enabled: true, intensity: 'full', injections: 0 };
-const VALID_INTENSITIES = ['lite', 'full', 'ultra'];
+const RULES_PATH  = process.env['FEYNMAN_RULES_PATH'] || path.join(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
 
 function writeState(state: FeynmanState): void {
   fs.mkdirSync(FEYNMAN_DIR, { recursive: true });
@@ -30,29 +22,13 @@ function writeState(state: FeynmanState): void {
 
 function readRules(intensity: string): string {
   const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
-  const selected = VALID_INTENSITIES.includes(intensity) ? intensity : 'full';
 
   // Sanity: opening/closing intensity tags must balance (WR-02 cross-block guard)
   const opens  = (rulesContent.match(/<intensity\b/gi) || []).length;
   const closes = (rulesContent.match(/<\/intensity>/gi) || []).length;
   if (opens === 0 || opens !== closes) return '';
 
-  // XML matcher map: tolerate trailing attributes (WR-01) and case (WR-03)
-  const xmlMatchers: Record<string, RegExp> = {
-    lite:  /<intensity\s+name\s*=\s*["']lite["'][^>]*>([\s\S]*?)<\/intensity>/i,
-    full:  /<intensity\s+name\s*=\s*["']full["'][^>]*>([\s\S]*?)<\/intensity>/i,
-    ultra: /<intensity\s+name\s*=\s*["']ultra["'][^>]*>([\s\S]*?)<\/intensity>/i,
-  };
-  const xmlMatch = xmlMatchers[selected]!.exec(rulesContent);
-  if (xmlMatch) return xmlMatch[1]!.trim();
-
-  // Legacy HTML-comment fallback
-  const openMarker  = '<!-- ' + selected + ' -->';
-  const closeMarker = '<!-- /' + selected + ' -->';
-  const i1 = rulesContent.indexOf(openMarker);
-  const i2 = rulesContent.indexOf(closeMarker, i1);
-  if (i1 === -1 || i2 === -1) return '';
-  return rulesContent.slice(i1 + openMarker.length, i2).trim();
+  return readRulesForIntensity(rulesContent, intensity);
 }
 
 let input = '';
@@ -89,8 +65,16 @@ process.stdin.on('end', () => {
       fs.writeFileSync(FLAG_PATH, state.intensity || DEFAULT_STATE.intensity);
     }
 
-    const rulesText = readRules(state.intensity);
+    let rulesText = readRules(state.intensity);
     if (!rulesText) process.exit(0);
+
+    // Apply output_style suffix (Phase 10 STYLE-03) — same axis as activate hook.
+    // Invalid values fall back to 'full' (no suffix) for safety.
+    const styleValue = (typeof state.output_style === 'string') ? state.output_style : 'full';
+    const styleSuffix = OUTPUT_STYLE_SUFFIX[styleValue];
+    if (styleSuffix) {
+      rulesText = rulesText + styleSuffix;
+    }
 
     // SessionStart accepts plain stdout as context, matching caveman's hook shape.
     process.stdout.write(rulesText);

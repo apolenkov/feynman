@@ -7,16 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { pathToFileURL } from 'url';
-
-interface FeynmanState {
-  enabled: boolean;
-  intensity: string;
-  output_style?: string;
-  injections: number;
-  malformed_rules?: boolean;
-  /** @deprecated legacy field, migrated to injections */
-  count?: number;
-}
+import { type FeynmanState, DEFAULT_STATE, OUTPUT_STYLE_SUFFIX, readRulesForIntensity } from '../lib/feynman-state.ts';
 
 // Path constants — use os.homedir(), never tilde strings (bug #8810).
 // FEYNMAN_HOME lets the same hook serve Claude Code (~/.claude) and Codex (~/.codex).
@@ -26,8 +17,6 @@ const FEYNMAN_DIR = path.join(CLIENT_HOME, '.feynman');
 const STATE_PATH  = path.join(FEYNMAN_DIR, 'state.json');
 const FLAG_PATH   = path.join(CLIENT_HOME, '.feynman-active');
 const RULES_PATH  = process.env['FEYNMAN_RULES_PATH'] || path.join(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
-
-const DEFAULT_STATE: FeynmanState = { enabled: true, intensity: 'full', output_style: 'full', injections: 0 };
 
 // Sanity-check: opening and closing <intensity> tags must balance (WR-01/02/03).
 // Called before block extraction to prevent lazy-quantifier cross-contamination.
@@ -41,14 +30,6 @@ export function assertTagPairs(content: string): boolean {
 // Fallback injected when rules file is malformed (WR-02).
 // Short enough to stay well under the 10 000-char additionalContext cap.
 export const MALFORMED_FALLBACK = 'Classify structure → choose smallest visual: prose<glyph<dot-leader<tree<table<frame.';
-
-// One-line suffix per output_style. `full` is the default ⇒ no suffix.
-// Suffix is appended to additionalContext after the rules text (Phase 10
-// STYLE-03). Keeps rules-file 4480-byte budget intact — pure runtime hint.
-const OUTPUT_STYLE_SUFFIX: Record<string, string> = {
-  short:  '\n\nOutput style: short — dot-leader and inline glyphs only; no frames, no ASCII art, no trees.',
-  middle: '\n\nOutput style: middle — frame blocks only for ≥6 items; prefer trees and markdown tables.',
-};
 
 // --- main script: stdin accumulator — buffer all input before processing ---
 // ESM equivalent of require.main === module (guards stdin so named imports don't hang tests)
@@ -106,8 +87,6 @@ process.stdin.on('end', () => {
     let rulesText: string;
     try {
       const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
-      const validIntensities = ['lite', 'full', 'ultra'];
-      const intensity = validIntensities.includes(state!.intensity) ? state!.intensity : 'full';
 
       // Sanity: <intensity> tag pairs must balance (WR-01/02/03).
       // On mismatch: mark state malformed, inject short fallback, continue (no silent disable).
@@ -127,30 +106,14 @@ process.stdin.on('end', () => {
         delete state!.malformed_rules;
       }
 
-      // XML matcher map: tolerate trailing attributes (WR-01) and case (WR-03)
-      const xmlMatchers: Record<string, RegExp> = {
-        lite:  /<intensity\s+name\s*=\s*["']lite["'][^>]*>([\s\S]*?)<\/intensity>/i,
-        full:  /<intensity\s+name\s*=\s*["']full["'][^>]*>([\s\S]*?)<\/intensity>/i,
-        ultra: /<intensity\s+name\s*=\s*["']ultra["'][^>]*>([\s\S]*?)<\/intensity>/i,
-      };
-      const xmlMatch = xmlMatchers[intensity]!.exec(rulesContent);
-      if (xmlMatch) {
-        rulesText = xmlMatch[1]!.trim();
-      } else {
-        // Legacy HTML-comment fallback (kept until Plan 02 rule rewrite lands)
-        const openMarker  = '<!-- ' + intensity + ' -->';
-        const closeMarker = '<!-- /' + intensity + ' -->';
-        const i1 = rulesContent.indexOf(openMarker);
-        const i2 = rulesContent.indexOf(closeMarker, i1);
-        if (i1 === -1 || i2 === -1) process.exit(0); // marker not found — malformed rules file
-        rulesText = rulesContent.slice(i1 + openMarker.length, i2).trim();
-      }
+      // Delegate intensity-block extraction to shared core (lib/feynman-state.ts).
+      rulesText = readRulesForIntensity(rulesContent, state!.intensity);
+      // Empty means the block was not found (no XML or legacy marker) — exit silently.
+      if (!rulesText) process.exit(0);
     } catch (e) {
       // Rules file missing — self-heal silently (pitfall 6 in RESEARCH.md)
       process.exit(0);
     }
-
-    if (!rulesText!) process.exit(0);
 
     // Step 5.5: append output_style suffix (Phase 10 STYLE-03)
     // Orthogonal axis to intensity: intensity controls rules-file SIZE,
