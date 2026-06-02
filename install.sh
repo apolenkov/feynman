@@ -11,7 +11,7 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 NODE_MAJOR=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f1)
 NODE_MINOR=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f2)
-if [ -z "$NODE_MAJOR" ] || [ "$NODE_MAJOR" -lt 22 ] 2>/dev/null || { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -lt 6 ]; } 2>/dev/null; then
+if [ -z "$NODE_MAJOR" ] || ! [[ "$NODE_MAJOR" =~ ^[0-9]+$ ]] || [ "$NODE_MAJOR" -lt 22 ] || { [ "$NODE_MAJOR" -eq 22 ] && { ! [[ "$NODE_MINOR" =~ ^[0-9]+$ ]] || [ "$NODE_MINOR" -lt 6 ]; }; }; then
   echo "Error: Node.js >=22.6 required (found $(node -v 2>/dev/null || echo 'unknown'))" >&2
   exit 1
 fi

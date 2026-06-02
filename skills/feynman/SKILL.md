@@ -156,7 +156,7 @@ confirm nothing breaks. Use `--dry-run` to preview, `--revert` to remove.
 
 ```bash
 ls -1d feynman-rules-workspace/iteration-* 2>/dev/null | tail -3
-ls -1 feynman-rules-workspace/iteration-*/findings*.md 2>/dev/null | tail -3
+ls -1 feynman-rules-workspace/iteration-*/eval-*/*/outputs/answer.md 2>/dev/null | tail -3
 ```
 
 Eval runs are local-only: `feynman-rules-workspace/` is gitignored, so iteration
