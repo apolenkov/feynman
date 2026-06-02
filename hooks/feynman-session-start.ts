@@ -6,19 +6,12 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { type FeynmanState, DEFAULT_STATE, OUTPUT_STYLE_SUFFIX, readRulesForIntensity } from '../lib/feynman-state.ts';
+import { OUTPUT_STYLE_SUFFIX, readRulesForIntensity, reconcileState } from '../lib/feynman-state.ts';
 
+// state.json / .feynman-active I/O now lives behind the store (ADR-0004), keyed by CLIENT_HOME.
 const HOME        = os.homedir();
 const CLIENT_HOME = process.env['FEYNMAN_HOME'] || path.join(HOME, '.claude');
-const FEYNMAN_DIR = path.join(CLIENT_HOME, '.feynman');
-const STATE_PATH  = path.join(FEYNMAN_DIR, 'state.json');
-const FLAG_PATH   = path.join(CLIENT_HOME, '.feynman-active');
 const RULES_PATH  = process.env['FEYNMAN_RULES_PATH'] || path.join(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
-
-function writeState(state: FeynmanState): void {
-  fs.mkdirSync(FEYNMAN_DIR, { recursive: true });
-  fs.writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
-}
 
 function readRules(intensity: string): string {
   const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
@@ -41,29 +34,10 @@ process.stdin.on('end', () => {
       if (sessionId && /[/\\]|\.\./.test(sessionId)) process.exit(0);
     }
 
-    const stateExists = fs.existsSync(STATE_PATH);
-    const flagExists = fs.existsSync(FLAG_PATH);
-    let state: FeynmanState = { ...DEFAULT_STATE };
-
-    if (stateExists) {
-      try {
-        state = { ...DEFAULT_STATE, ...JSON.parse(fs.readFileSync(STATE_PATH, 'utf8')) };
-      } catch (_) {
-        try { fs.unlinkSync(FLAG_PATH); } catch (_) {}
-        process.exit(0);
-      }
-    } else {
-      writeState(state);
-    }
-
-    if (!state.enabled) {
-      try { fs.unlinkSync(FLAG_PATH); } catch (_) {}
-      process.exit(0);
-    }
-
-    if (!flagExists) {
-      fs.writeFileSync(FLAG_PATH, state.intensity || DEFAULT_STATE.intensity);
-    }
+    // Reconcile state + flag via the store (ADR-0004): first-run bootstrap,
+    // flag/enabled reconcile, corrupt-JSON fail-safe (self-heals a dangling flag).
+    const { state, active } = reconcileState(CLIENT_HOME);
+    if (!active) process.exit(0);
 
     let rulesText = readRules(state.intensity);
     if (!rulesText) process.exit(0);

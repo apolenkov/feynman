@@ -8,7 +8,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { type FeynmanState, DEFAULT_STATE, readRulesForIntensity } from '../lib/feynman-state.ts';
+import { type FeynmanState, DEFAULT_STATE, readRulesForIntensity, readState, writeState, statePaths, flagContent } from '../lib/feynman-state.ts';
 
 const require = createRequire(import.meta.url);
 const PKG = require('../package.json') as { version: string; name: string };
@@ -73,9 +73,7 @@ function targetConfig(name: string): TargetConfig {
       label: 'OpenCode',
       rootDir,
       settingsPath: path.join(rootDir, 'opencode.json'),
-      feynmanDir: path.join(rootDir, '.feynman'),
-      statePath: path.join(rootDir, '.feynman', 'state.json'),
-      flagPath: path.join(rootDir, '.feynman-active'),
+      ...statePaths(rootDir),
       commandsDir: null,
     };
   }
@@ -86,9 +84,7 @@ function targetConfig(name: string): TargetConfig {
     label: name === 'codex' ? 'Codex' : 'Claude Code',
     rootDir,
     settingsPath: path.join(rootDir, name === 'codex' ? 'hooks.json' : 'settings.json'),
-    feynmanDir: path.join(rootDir, '.feynman'),
-    statePath: path.join(rootDir, '.feynman', 'state.json'),
-    flagPath: path.join(rootDir, '.feynman-active'),
+    ...statePaths(rootDir),
     commandsDir: name === 'claude' ? path.join(rootDir, 'commands') : null,
   };
 }
@@ -641,19 +637,16 @@ function removeFeynmanHooks(settings: Record<string, unknown>): Record<string, u
 
 function bootstrapState(target: string): void {
   const cfg = targetConfig(target);
-  fs.mkdirSync(cfg.feynmanDir, { recursive: true });
+  // Absent or corrupt state.json → (re)write default; otherwise merge with defaults.
+  const raw = readState(cfg.rootDir);
   let state: FeynmanState = { ...DEFAULT_STATE };
-  if (!fs.existsSync(cfg.statePath)) {
-    fs.writeFileSync(cfg.statePath, JSON.stringify(DEFAULT_STATE, null, 2) + '\n');
+  if (raw === null) {
+    writeState(cfg.rootDir, state);
   } else {
-    try {
-      state = { ...DEFAULT_STATE, ...(JSON.parse(fs.readFileSync(cfg.statePath, 'utf8')) as Partial<FeynmanState>) };
-    } catch (_) {
-      fs.writeFileSync(cfg.statePath, JSON.stringify(DEFAULT_STATE, null, 2) + '\n');
-    }
+    state = { ...DEFAULT_STATE, ...raw };
   }
   if (state.enabled) {
-    fs.writeFileSync(cfg.flagPath, state.intensity || DEFAULT_STATE.intensity);
+    fs.writeFileSync(cfg.flagPath, flagContent(state));
   } else if (fs.existsSync(cfg.flagPath)) {
     fs.unlinkSync(cfg.flagPath);
   }
@@ -785,11 +778,11 @@ function installOpenCodeTarget(opts: { force: boolean }): InstallResult {
   // Read enabled and intensity from state.json
   let intensity = DEFAULT_STATE.intensity;
   let enabled = DEFAULT_STATE.enabled;
-  try {
-    const state = JSON.parse(fs.readFileSync(tc.statePath, 'utf8')) as Partial<FeynmanState>;
+  const state = readState(tc.rootDir);
+  if (state) {
     intensity = state.intensity ?? intensity;
     enabled = state.enabled ?? enabled;
-  } catch (_) { /* use defaults */ }
+  }
 
   // Write rules.md: empty if disabled, intensity content if enabled
   const rulesContent = enabled ? readIntensityRules(intensity) : '';
@@ -880,13 +873,10 @@ function cmdDoctorOpenCode(): void {
   check('rules.md exists and non-empty', rulesOk);
 
   // 4. state.json valid
-  let stateOk = false;
-  let stateEnabled = false;
-  try {
-    const state = JSON.parse(fs.readFileSync(tc.statePath, 'utf8')) as Record<string, unknown>;
-    stateOk = 'enabled' in state;
-    stateEnabled = state['enabled'] === true;
-  } catch (_) { /* intentionally empty */ }
+  // Raw read (no DEFAULT merge) so a state.json missing `enabled` correctly fails.
+  const state = readState(tc.rootDir);
+  const stateOk = state !== null && 'enabled' in state;
+  const stateEnabled = state?.enabled === true;
   check('state.json valid (has enabled field)', stateOk);
 
   // 5. flag matches state
@@ -1041,13 +1031,10 @@ function cmdDoctor(opts: { target?: string; noExit?: boolean } = {}): void {
   check('rules/feynman-activate.md exists and non-empty', rulesOk);
 
   // 5. state.json valid JSON + has enabled field
-  let stateOk = false;
-  let stateEnabled = false;
-  try {
-    const state = JSON.parse(fs.readFileSync(tc.statePath, 'utf8')) as Record<string, unknown>;
-    stateOk = 'enabled' in state;
-    stateEnabled = state['enabled'] === true;
-  } catch (_) { /* intentionally empty */ }
+  // Raw read (no DEFAULT merge) so a state.json missing `enabled` correctly fails.
+  const state = readState(tc.rootDir);
+  const stateOk = state !== null && 'enabled' in state;
+  const stateEnabled = state?.enabled === true;
   check('state.json valid (has enabled field)', stateOk);
 
   // 6. .feynman-active flag matches state

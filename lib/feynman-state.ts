@@ -1,6 +1,10 @@
-// lib/feynman-state.ts — canonical FeynmanState interface, defaults, and style map.
+// lib/feynman-state.ts — canonical FeynmanState store: schema, defaults, style map,
+// and the single owner of state.json + .feynman-active flag I/O (ADR-0004).
 // Imported by hooks/feynman-activate.ts, hooks/feynman-session-start.ts, bin/feynman.ts.
-// Zero runtime dependencies. ESM + TypeScript (Node.js v22.6+ strip-types).
+// Zero runtime dependencies (node: builtins only). ESM + TypeScript (Node.js v22.6+ strip-types).
+
+import fs from 'node:fs';
+import path from 'node:path';
 
 export interface FeynmanState {
   enabled: boolean;
@@ -62,4 +66,122 @@ export function readRulesForIntensity(rulesContent: string, intensity: string): 
   if (i1 !== -1 && i2 !== -1) return rulesContent.slice(i1 + openMarker.length, i2).trim();
 
   return '';
+}
+
+// ─── State store (ADR-0004) ───────────────────────────────────────────────────
+// The single owner of state.json + .feynman-active flag I/O. All three callers
+// (both hooks via FEYNMAN_HOME, the CLI via targetConfig(t).rootDir) cross this
+// seam instead of open-coding JSON.parse(fs.readFileSync(statePath)).
+
+interface StatePaths {
+  feynmanDir: string;
+  statePath: string;
+  flagPath: string;
+}
+
+// Path layout is identical across hooks and CLI: <rootDir>/.feynman/state.json
+// for state, <rootDir>/.feynman-active for the presence flag. Exported so the CLI
+// (targetConfig) derives the same paths instead of re-hardcoding the literals.
+export function statePaths(rootDir: string): StatePaths {
+  const feynmanDir = path.join(rootDir, '.feynman');
+  return {
+    feynmanDir,
+    statePath: path.join(feynmanDir, 'state.json'),
+    flagPath: path.join(rootDir, '.feynman-active'),
+  };
+}
+
+function unlinkFlag(flagPath: string): void {
+  try { fs.unlinkSync(flagPath); } catch (_) { /* already absent — fine */ }
+}
+
+// The .feynman-active flag stores the active intensity; fall back to the default.
+export function flagContent(state: FeynmanState): string {
+  return state.intensity || DEFAULT_STATE.intensity;
+}
+
+/**
+ * Raw read of state.json — pure, no side effects, **no** DEFAULT_STATE merge.
+ * Returns `null` on a missing, corrupt, or non-object file (a bare JSON primitive
+ * like `42` is treated as corrupt — callers can safely `'enabled' in state`).
+ *
+ * Kept raw on purpose: `doctor` check #4 (`'enabled' in state`) must be able to
+ * see a state object that lacks `enabled`. A defaulted merge would always inject
+ * `enabled` and silently make that check always-pass. For doctor and install
+ * introspection only — hooks use reconcileState, which merges.
+ */
+export function readState(rootDir: string): FeynmanState | null {
+  const { statePath } = statePaths(rootDir);
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+    return parsed as FeynmanState;
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Write state.json (creating <rootDir>/.feynman if needed). Trailing newline (POSIX). */
+export function writeState(rootDir: string, state: FeynmanState): void {
+  const { feynmanDir, statePath } = statePaths(rootDir);
+  fs.mkdirSync(feynmanDir, { recursive: true });
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
+}
+
+/**
+ * The mutating policy shared by both injection hooks: bootstrap default state if
+ * absent, merge with DEFAULT_STATE, reconcile the flag with `enabled`, and
+ * fail-safe on corrupt JSON. The name signals the side effects (it writes and
+ * deletes files), unlike a plain `loadState`.
+ *
+ * One canonical rule for both hooks: **not active + flag present → unlink the
+ * flag**. This preserves #35713 (flag absent + enabled=false → flag not
+ * recreated, active=false) and self-heals the two cases the legacy activate hook
+ * used to leave dangling (corrupt JSON; valid enabled=false). It also converges
+ * the legacy activate hook onto session-start's first-run self-heal: a missing
+ * state.json now bootstraps and activates regardless of the flag (the legacy
+ * activate hook skipped bootstrap when the flag was present). See ADR-0004.
+ *
+ * Returns the merged state and whether the caller should inject (`active`). When
+ * `active` is false the returned `state` is not meant to be used.
+ */
+export function reconcileState(rootDir: string): { state: FeynmanState; active: boolean } {
+  const { statePath, flagPath } = statePaths(rootDir);
+  const stateExists = fs.existsSync(statePath);
+  const flagPresent = fs.existsSync(flagPath);
+
+  // First run: no state.json → bootstrap default full mode and activate.
+  if (!stateExists) {
+    const state = { ...DEFAULT_STATE };
+    writeState(rootDir, state);
+    if (!flagPresent) fs.writeFileSync(flagPath, flagContent(state));
+    return { state, active: true };
+  }
+
+  // State exists — raw read distinguishes corrupt (null) from present.
+  const raw = readState(rootDir);
+  if (raw === null) {
+    // Corrupt JSON → fail-safe: not active, unlink a dangling flag (canonical rule).
+    unlinkFlag(flagPath);
+    return { state: { ...DEFAULT_STATE }, active: false };
+  }
+
+  const state = { ...DEFAULT_STATE, ...raw };
+  // Preserve the legacy count→injections migration from the RAW value: the merge
+  // would otherwise default injections to 0 and hide an absent field, breaking
+  // the fallback. Read from raw so absence is still detectable.
+  state.injections = raw.injections ?? raw.count ?? DEFAULT_STATE.injections;
+  delete state.count;
+
+  // Disabled → canonical rule: not active + flag present → unlink. Not active.
+  if (!state.enabled) {
+    unlinkFlag(flagPath);
+    return { state, active: false };
+  }
+
+  // Enabled → ensure the flag is present, then active.
+  if (!flagPresent) {
+    fs.writeFileSync(flagPath, flagContent(state));
+  }
+  return { state, active: true };
 }
