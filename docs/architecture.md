@@ -90,7 +90,14 @@ lib/lint/rules.ts
          ├─ L05_flow_integrity(ast)
          ├─ L06_priority_scale(ast)
          ├─ L07_no_mermaid_mix(ast, fullText)
-         └─ L08_frame_width(ast)
+         ├─ L08_frame_width(ast)
+         ├─ L09_right_edge_alignment(ast)
+         ├─ L10_mixed_script(ast, fullText)
+         ├─ L11_overdecoration(ast)
+         ├─ L12_token_budget(ast)
+         ├─ L13_double_wrap(ast)
+         ├─ L14_blank_line_separation(ast)
+         └─ L15_homogeneous_frame(ast)
          │
          │  each rule returns Issue[]:
          │  {rule, severity, line, column, message, suggestion?}
