@@ -194,7 +194,7 @@ jobs:
           PACKAGE_NAME: ${{ steps.release_metadata.outputs.package_name }}
           PACKAGE_VERSION: ${{ steps.release_metadata.outputs.package_version }}
         run: |
-          node scripts/verify-published-package.js
+          npm run test:published
 
       - name: Dry-run publish
         if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true

@@ -22,7 +22,7 @@
   "interface": {
     "displayName": "feynman",
     "shortDescription": "Draw ASCII diagrams when structure appears.",
-    "longDescription": "feynman is a hook-based plugin that injects concise ASCII diagram rules on every prompt — flows, hierarchies, comparisons, priorities, and status summaries render as readable diagrams. Includes a built-in linter (13 rules) and autofix engine. Zero npm dependencies; pure CommonJS.",
+    "longDescription": "feynman is a hook-based plugin that injects concise ASCII diagram rules at session start — flows, hierarchies, comparisons, priorities, and status summaries render as readable diagrams. Includes a built-in linter (15 rules) and autofix engine. Zero npm dependencies; TypeScript source, compiled JS published.",
     "developerName": "apolenkov",
     "category": "Productivity",
     "capabilities": [

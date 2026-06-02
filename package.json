@@ -62,7 +62,7 @@
     "test:published": "node scripts/verify-published-package.ts",
     "build": "node scripts/build-package.ts",
     "changelog": "node scripts/generate-changelog.ts",
-    "ci": "npm run audit && npm run typecheck && npm run coverage && npm run test:docs && npm run build && npm run test:release",
+    "ci": "npm run audit && npm run typecheck && npm run eslint && npm run coverage && npm run test:docs && npm run build && npm run test:release",
     "prepublishOnly": "npm run audit && npm run typecheck && npm run coverage && npm run test:docs",
     "release": "npm run ci && npm publish \"$(cat dist/TARBALL.txt)\" --access public"
   },

@@ -20,7 +20,6 @@
 <p align="center">
   <a href="#why-feynman">Why</a> •
   <a href="#why-feynman-uses-userpromptsubmit-not-sessionstart">Compaction</a> •
-  <a href="docs/object-passport.md">Passport</a> •
   <a href="#before--after">Before/After</a> •
   <a href="#install">Install</a> •
   <a href="#verify-the-install">Verify</a> •
