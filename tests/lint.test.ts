@@ -255,6 +255,16 @@ describe('L04 column widths — unit tests', () => {
     assert.ok(l04.length >= 1);
     assert.ok(/column/i.test(l04[0]!.message));
   });
+
+  it('escaped pipe inside a cell is not a column boundary', () => {
+    // A valid GFM table where one cell contains a literal "|" written as "\|".
+    const md = '```\n| h1 | h2 |\n|----|----|\n| a \\| b | c |\n```';
+    const result = lint(md);
+    assert.equal(
+      result.issues.filter(i => i.rule === 'L04').length, 0,
+      'escaped pipe must count as cell content, not an extra column',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
