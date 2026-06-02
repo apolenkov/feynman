@@ -532,5 +532,31 @@
     "rule": "L05",
     "expected": "pass",
     "input": "```\n[API] -->> [Client]\n```"
+  },
+  {
+    "name": "L15 pass — frame with arrow inside (complex, not homogeneous)",
+    "rule": "L15",
+    "expected": "pass",
+    "input": "```\n┌───────────────────┐\n│ [A] → [B]         │\n│ request → process │\n└───────────────────┘\n```"
+  },
+  {
+    "name": "L15 pass — frame with only 1 inner line (below minimum threshold)",
+    "rule": "L15",
+    "expected": "pass",
+    "input": "```\n┌────────────────┐\n│ name: Alice    │\n└────────────────┘\n```"
+  },
+  {
+    "name": "L15 fail — frame wrapping homogeneous kv pairs",
+    "rule": "L15",
+    "expected": "fail",
+    "input": "```\n┌──────────────────┐\n│ name: Alice      │\n│ role: engineer   │\n│ team: backend    │\n└──────────────────┘\n```",
+    "expected_issues": [{"rule": "L15"}]
+  },
+  {
+    "name": "L15 fail — frame wrapping homogeneous bullet list",
+    "rule": "L15",
+    "expected": "fail",
+    "input": "```\n┌────────────────┐\n│ - alpha        │\n│ - beta         │\n│ - gamma        │\n└────────────────┘\n```",
+    "expected_issues": [{"rule": "L15"}]
   }
 ]

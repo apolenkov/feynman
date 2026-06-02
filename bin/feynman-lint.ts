@@ -13,6 +13,7 @@ import path from 'node:path';
 import { lint, format } from '../lib/lint/index.ts';
 import { autofix } from '../lib/lint/autofix.ts';
 import { estimateFrameCost, type FrameCost } from '../lib/lint/rules.ts';
+import { nextFrame } from '../lib/lint/frames.ts';
 
 const USAGE = `Usage: feynman-lint <file.md>
        feynman-lint -          (read from stdin)
@@ -98,26 +99,19 @@ function explainFrames(text: string): ExplainEntry[] {
   const out: ExplainEntry[] = [];
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i] ?? '';
-    const topMatch = line.match(/^(\s*)┌─+┐\s*$/);
-    if (!topMatch) { i++; continue; }
-    const indent = topMatch[1] ?? '';
-    let closeIdx = -1;
-    const inner: string[] = [];
-    for (let j = i + 1; j < lines.length; j++) {
-      const next = lines[j] ?? '';
-      const botMatch = next.match(/^(\s*)└─+┘\s*$/);
-      if (botMatch !== null && (botMatch[1] ?? '') === indent) { closeIdx = j; break; }
-      if (/^\s*│.*│\s*$/.test(next)) inner.push(next);
-    }
-    if (closeIdx === -1) { i++; continue; }
+    const frame = nextFrame(lines, i);
+    if (!frame) break;
+
+    const { topLi, closeLi, inner } = frame;
+    if (closeLi === -1) { i = topLi + 1; continue; }
+
     const cost = estimateFrameCost({
-      top: line,
+      top: lines[topLi] ?? '',
       inner,
-      bottom: lines[closeIdx] ?? '',
+      bottom: lines[closeLi] ?? '',
     });
-    out.push({ line: i + 1, cost });
-    i = closeIdx + 1;
+    out.push({ line: topLi + 1, cost });
+    i = closeLi + 1;
   }
   return out;
 }

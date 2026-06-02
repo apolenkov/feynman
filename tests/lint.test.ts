@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 
-import { lint, format } from '../lib/lint/index.ts';
+import { lint, format, RULE_IDS } from '../lib/lint/index.ts';
 import { parse } from '../lib/lint/parser.ts';
 import { estimateFrameCost } from '../lib/lint/rules.ts';
 import { lastVisualColumnOf, firstVisualColumnOf } from '../lib/lint/width.ts';
@@ -69,12 +69,12 @@ describe('Golden cases (lint-cases.json)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Rule coverage check: each L01-L08 exercised by ≥2 cases (1 pass + 1 fail)
+// Rule coverage check: every rule in the registry has ≥1 pass and ≥1 fail case.
+// The list is DERIVED from RULE_IDS — adding a rule to the registry automatically
+// requires a corresponding case in lint-cases.json (self-maintaining gate).
 // ---------------------------------------------------------------------------
 describe('Rule coverage: each rule has ≥1 pass and ≥1 fail case', () => {
-  const ruleIds = ['L01', 'L02', 'L03', 'L04', 'L05', 'L06', 'L07', 'L08', 'L09', 'L10', 'L11', 'L12', 'L13', 'L14'];
-
-  for (const ruleId of ruleIds) {
+  for (const ruleId of RULE_IDS) {
     it(`${ruleId} has at least one pass case`, () => {
       const passCases = cases.filter(c => c.rule === ruleId && c.expected === 'pass');
       assert.ok(
@@ -547,6 +547,83 @@ describe('L13 double-wrap — unit tests', () => {
     const l13 = result.issues.filter(i => i.rule === 'L13');
     assert.equal(l11.length, 0, 'L11 must whitelist tree-in-frame');
     assert.ok(l13.length >= 1, 'L13 must detect tree-in-frame');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A01 regression: titled frames (┌─ Title ─┐) must be caught by L11/L12/L13
+// Prior to the fix, L11/L12/L13 used /^(\s*)┌─+┐\s*$/ which missed titled openers.
+// ---------------------------------------------------------------------------
+describe('A01 regression — titled frames caught by L11/L12/L13', () => {
+  it('titled frame with tree inside is caught by L13 (not invisible)', () => {
+    const md = '```\n┌─ Section ─┐\n│ root      │\n│ ├── a     │\n│ └── b     │\n└───────────┘\n```';
+    const result = lint(md);
+    const l13 = result.issues.filter(i => i.rule === 'L13');
+    assert.ok(l13.length >= 1, 'titled frame with tree must be caught by L13');
+    assert.equal(l13[0]!.severity, 'warn');
+  });
+
+  it('titled frame with ≤5 items is caught by L11 (not invisible)', () => {
+    // Titled opener: ┌─ Status ─┐  (has non-dash text after ┌─)
+    const md = '```\n┌─ Status ─┐\n│ a ... ok │\n│ b ... ok │\n│ c ... ok │\n└──────────┘\n```';
+    const result = lint(md);
+    const l11 = result.issues.filter(i => i.rule === 'L11');
+    assert.ok(l11.length >= 1, 'titled frame with 3 items must be caught by L11');
+    assert.equal(l11[0]!.severity, 'warn');
+  });
+
+  it('titled frame with padding-dominated content is caught by L12 (not invisible)', () => {
+    const md = '```\n┌─ Wide frame ─────────────────────────┐\n│ a                                    │\n│ b                                    │\n│ c                                    │\n└──────────────────────────────────────┘\n```';
+    const result = lint(md);
+    const l12 = result.issues.filter(i => i.rule === 'L12');
+    assert.ok(l12.length >= 1, 'titled frame with wide padding must be caught by L12');
+    assert.equal(l12[0]!.severity, 'warn');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// L15 — Homogeneous frame: direct unit tests
+// ---------------------------------------------------------------------------
+describe('L15 homogeneous frame — unit tests', () => {
+  it('frame wrapping kv pairs flagged', () => {
+    const md = '```\n┌──────────────────┐\n│ name: Alice      │\n│ role: engineer   │\n│ team: backend    │\n└──────────────────┘\n```';
+    const result = lint(md);
+    const l15 = result.issues.filter(i => i.rule === 'L15');
+    assert.ok(l15.length >= 1, 'kv frame should be flagged by L15');
+    assert.equal(l15[0]!.severity, 'warn');
+    assert.ok(/kv/.test(l15[0]!.message));
+  });
+
+  it('frame wrapping bullets flagged', () => {
+    const md = '```\n┌────────────────┐\n│ - alpha        │\n│ - beta         │\n│ - gamma        │\n└────────────────┘\n```';
+    const result = lint(md);
+    const l15 = result.issues.filter(i => i.rule === 'L15');
+    assert.ok(l15.length >= 1, 'bullet frame should be flagged by L15');
+    assert.ok(/bullet/.test(l15[0]!.message));
+  });
+
+  it('frame with arrow-bearing content NOT flagged by L15 (complex guard)', () => {
+    // Arrow content triggers the complex guard (stripped.some(/─→|→|──>|-->/)
+    // so L15 skips this frame.
+    const md = '```\n┌────────────────────┐\n│ [A] → [B]          │\n│ step → next step   │\n└────────────────────┘\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L15').length, 0,
+      'frame with arrows should not be flagged by L15 (complex guard)');
+  });
+
+  it('frame with only 1 inner line NOT flagged by L15 (needs ≥2)', () => {
+    const md = '```\n┌────────────┐\n│ name: Alice │\n└────────────┘\n```';
+    const result = lint(md);
+    assert.equal(result.issues.filter(i => i.rule === 'L15').length, 0,
+      'single-line frame should not be flagged by L15');
+  });
+
+  it('titled frame wrapping prose flagged by L15', () => {
+    const md = '```\n┌─ Notes ──────────────────┐\n│ first observation here   │\n│ second observation here  │\n└──────────────────────────┘\n```';
+    const result = lint(md);
+    const l15 = result.issues.filter(i => i.rule === 'L15');
+    assert.ok(l15.length >= 1, 'titled frame wrapping prose should be flagged by L15');
+    assert.ok(/prose/.test(l15[0]!.message));
   });
 });
 
