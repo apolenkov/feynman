@@ -9,12 +9,13 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { DEFAULT_STATE, readState } from '../lib/feynman-state.ts';
-import type { InstallResult, UninstallResult, TargetAdapter, ExampleEntry } from './cli/types.ts';
+import type { InstallResult, UninstallResult, TargetAdapter } from './cli/types.ts';
 import { c } from './cli/ansi.ts';
-import { HELP, EXAMPLES_HELP, BOOTSTRAP_HELP, INSTALL_HELP, UNINSTALL_HELP, DOCTOR_HELP, LINT_HELP, VERSION_HELP, cmdHelp } from './cli/help.ts';
+import { HELP, BOOTSTRAP_HELP, INSTALL_HELP, UNINSTALL_HELP, DOCTOR_HELP, LINT_HELP, VERSION_HELP, cmdHelp } from './cli/help.ts';
 import { ensureDir, copyFileIfExists, copyMarkdownDir } from './cli/fs-utils.ts';
 import { readJsonConfig, readSettings, writeSettings, isSessionStartHookCommand, hasFeynmanHook, hasAnyFeynmanHook, extractHookScriptPath, removeFeynmanHooks, bootstrapState, installClaudeCommand, targetConfig } from './cli/settings.ts';
 import { targetNames, parseTarget, hookCommandFor, readIntensityRules } from './cli/targets.ts';
+import { cmdExamples } from './commands/examples.ts';
 
 const require = createRequire(import.meta.url);
 const PKG = require('../package.json') as { version: string; name: string };
@@ -46,119 +47,6 @@ const DEFAULT_BOOTSTRAP_DIR = 'feynman-package';
 const ACTIVATOR_JS   = HOOK_PATH;   // activate hook path (dev: .ts, package: .js)
 const CLI_JS         = path.resolve(ROOT_DIR, 'bin', `feynman${_hookExt}`);
 const PACKAGE_JSON   = path.resolve(ROOT_DIR, 'package.json');
-
-function examplesIndex(): ExampleEntry[] {
-  if (!fs.existsSync(EXAMPLES_DIR)) return [];
-
-  return fs.readdirSync(EXAMPLES_DIR)
-    .filter((name) => name.endsWith('.md'))
-    .sort()
-    .map((name) => {
-      const file = path.join(EXAMPLES_DIR, name);
-      const content = fs.readFileSync(file, 'utf8');
-      const title = (content.match(/^#\s*(.+)$/m) ?? [null, name])[1]?.trim() ?? name;
-      const question = (content.match(/^> (.*)$/m) ?? [null, ''])[1]?.trim() ?? '';
-      return {
-        name: name.replace(/\.md$/, ''),
-        title,
-        question,
-        path: file,
-      };
-    });
-}
-
-function cmdExamples(args: string[]): void {
-  if (args.includes('--help') || args.includes('-h')) {
-    console.log(EXAMPLES_HELP);
-    process.exit(0);
-  }
-
-  const entries = examplesIndex();
-  if (!entries.length) {
-    console.log('No examples found under examples/.');
-    process.exit(0);
-  }
-
-  let random = false;
-  let wantsName: string | null = null;
-  const unknown: string[] = [];
-
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i] ?? '';
-    if (arg === '--name' || arg === '-n') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('-')) {
-        console.error('feynman examples: --name requires a value');
-        process.exit(2);
-      }
-      if (wantsName !== null) {
-        console.error('feynman examples: duplicate --name');
-        process.exit(2);
-      }
-      wantsName = value;
-      i += 1;
-      continue;
-    }
-
-    if (arg === '--random' || arg === '-r') {
-      random = true;
-      continue;
-    }
-
-    if (arg.startsWith('-')) {
-      unknown.push(arg);
-      continue;
-    }
-
-    unknown.push(arg);
-  }
-
-  if (random && wantsName) {
-    console.error('feynman examples: use either --random or --name');
-    process.exit(2);
-  }
-
-  if (unknown.length > 0) {
-    console.error(`feynman examples: unexpected arguments "${unknown.join(' ')}"`);
-    console.error('Run `feynman examples --help` for usage.');
-    process.exit(2);
-  }
-
-  if (random) {
-    const entry = entries[Math.floor(Math.random() * entries.length)];
-    if (!entry) { process.exit(0); }
-    const content = fs.readFileSync(entry.path, 'utf8');
-    console.log(`\n[${entry.name}] ${entry.title}\n`);
-    console.log('Question:');
-    console.log(entry.question ? `> ${entry.question}` : '(no question marker found)');
-    console.log('\nPreview:\n');
-    const lines = content.split('\n').slice(0, 26);
-    console.log(lines.join('\n'));
-    process.exit(0);
-  }
-
-  if (wantsName) {
-    const entry = entries.find((item) => item.name === wantsName);
-    if (!entry) {
-      console.error(`feynman examples: unknown example '${wantsName}'`);
-      process.exit(2);
-    }
-    const content = fs.readFileSync(entry.path, 'utf8');
-    console.log(`\n[${entry.name}] ${entry.title}\n`);
-    console.log(content);
-    process.exit(0);
-  }
-
-  if (args.length === 0) {
-    console.log('Available examples:\n');
-    for (const entry of entries) {
-      const q = entry.question ? ` — ${entry.question}` : '';
-      console.log(`- ${entry.name}`);
-      console.log(`  ${entry.title}${q ? ` — ${q}` : ''}`);
-    }
-    process.exit(0);
-  }
-}
 
 function cmdBootstrap(args: string[]): void {
   if (args.includes('--help') || args.includes('-h')) {
