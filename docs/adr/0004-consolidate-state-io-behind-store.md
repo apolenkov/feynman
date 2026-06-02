@@ -4,6 +4,11 @@ status: accepted
 
 # Consolidate state I/O behind a feynman-state store
 
+> **Amended by [ADR-0005](0005-self-heal-corrupt-state.md):** the corrupt-JSON
+> fail-safe described below (not active, flag unlinked, file untouched) is
+> superseded. Corrupt `state.json` now self-heals — backup to `state.json.bak`,
+> bootstrap default, activate. The rest of this ADR stands.
+
 `lib/feynman-state.ts` grows from a schema-and-extraction module into the single
 owner of `state.json` + `.feynman-active` flag I/O. Before this change the module
 exported only the `FeynmanState` type, `DEFAULT_STATE`, and `readRulesForIntensity`;

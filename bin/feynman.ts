@@ -905,6 +905,13 @@ function cmdDoctorOpenCode(): void {
   const stateEnabled = state?.enabled === true;
   check('state.json valid (has enabled field)', stateOk);
 
+  // ADR-0005: a leftover .bak means a corrupt state.json was self-healed — surface
+  // it so the user knows their settings were reset to defaults. (This doctor's
+  // check() has no INFO arg; the line always passes.)
+  if (fs.existsSync(tc.statePath + '.bak')) {
+    check('state.json recovered from corruption (backup: state.json.bak)', true);
+  }
+
   // 5. flag matches state
   const flagPresent = fs.existsSync(tc.flagPath);
   check(
@@ -1056,6 +1063,12 @@ function cmdDoctor(opts: { target?: string; noExit?: boolean } = {}): void {
   const stateOk = state !== null && 'enabled' in state;
   const stateEnabled = state?.enabled === true;
   check('state.json valid (has enabled field)', stateOk);
+
+  // ADR-0005: a leftover .bak means a corrupt state.json was self-healed — surface
+  // it so the user knows their settings were reset to defaults.
+  if (fs.existsSync(tc.statePath + '.bak')) {
+    check('state.json recovered from corruption (backup: state.json.bak)', true, true);
+  }
 
   // 6. .feynman-active flag matches state
   const flagPresent = fs.existsSync(tc.flagPath);

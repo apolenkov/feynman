@@ -254,19 +254,38 @@ describe('feynman-activate hook', () => {
       }
     });
 
-    it('stays silent and removes flag when state is corrupt', () => {
+    // ADR-0005 (amends 0004): corrupt state.json self-heals instead of staying
+    // dead. The hook backs up the unreadable file, bootstraps default state, and
+    // injects — so the plugin recovers on the very next session rather than
+    // silently never working again.
+    it('self-heals when state is corrupt: backs up, bootstraps, emits rules', () => {
       const tmpHome = makeTempHome();
       try {
         const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
         fs.mkdirSync(feynmanDir, { recursive: true });
-        fs.writeFileSync(path.join(feynmanDir, 'state.json'), '{ not valid json');
-        fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), 'full');
+        const statePath = path.join(feynmanDir, 'state.json');
+        const flagPath = path.join(tmpHome, '.claude', '.feynman-active');
+        const CORRUPT = '{ not valid json';
+        fs.writeFileSync(statePath, CORRUPT);
+        fs.writeFileSync(flagPath, 'full');
 
         const result = runSessionHook(tmpHome);
         assert.equal(result.status, 0);
-        assert.equal(result.stdout, '');
         assert.equal(result.stderr, '');
-        assert.ok(!fs.existsSync(path.join(tmpHome, '.claude', '.feynman-active')));
+        // Self-heal: rules are emitted, not silence.
+        assert.ok(result.stdout.length > 50, 'corrupt state must self-heal and emit rules');
+        // Flag is kept (active), not unlinked.
+        assert.ok(fs.existsSync(flagPath), 'flag must remain present after self-heal');
+        // state.json is rewritten as a valid default; enabled resets to true
+        // (the prior value is unrecoverable from a corrupt file).
+        const healed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+        assert.equal(healed.enabled, true);
+        // Original corrupt bytes preserved for forensics.
+        assert.equal(
+          fs.readFileSync(statePath + '.bak', 'utf8'),
+          CORRUPT,
+          'original corrupt bytes must be preserved in state.json.bak'
+        );
       } finally {
         rmrf(tmpHome);
       }
@@ -412,6 +431,7 @@ describe('feynman-activate hook', () => {
   describe('Path 5: corrupt state recovery', () => {
     let tmpHome: string;
     let result: HookResult;
+    let bakPath: string;
 
     before(() => {
       tmpHome = makeTempHome();
@@ -419,6 +439,7 @@ describe('feynman-activate hook', () => {
       fs.mkdirSync(feynmanDir, { recursive: true });
       const statePath = path.join(feynmanDir, 'state.json');
       const flagPath  = path.join(tmpHome, '.claude', '.feynman-active');
+      bakPath = statePath + '.bak';
       // Write malformed JSON
       fs.writeFileSync(statePath, '{ this is not valid json !!!');
       // Flag exists so hook tries to proceed
@@ -436,6 +457,12 @@ describe('feynman-activate hook', () => {
     it('does not throw or produce error output', () => {
       // stderr should be empty — no Node.js uncaught exceptions
       assert.equal(result.stderr.trim(), '', 'no stderr output expected');
+    });
+
+    it('self-heals: injects rules and backs up the corrupt file (ADR-0005)', () => {
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.ok(ctx.length > 0, 'corrupt state must self-heal and inject rules');
+      assert.ok(fs.existsSync(bakPath), 'corrupt file must be backed up to state.json.bak');
     });
   });
 
@@ -577,12 +604,15 @@ describe('feynman-activate hook', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Path 8: Lines 84-85 — flag absent + state.json exists but is corrupt JSON
-  // (distinct from Path 5 which has the flag present → hits the step-3 catch instead)
+  // Path 8: flag absent + corrupt state.json. Under ADR-0005 this self-heals
+  // (backup + bootstrap + inject) just like the flag-present case (Path 5); with
+  // no flag present, the bootstrap also creates it.
   // -------------------------------------------------------------------------
-  describe('Path 8: flag absent + corrupt state.json (lines 84-85)', () => {
+  describe('Path 8: flag absent + corrupt state.json → self-heal', () => {
     let tmpHome: string;
     let result: HookResult;
+    let flagPath: string;
+    let bakPath: string;
 
     before(() => {
       tmpHome = makeTempHome();
@@ -590,6 +620,8 @@ describe('feynman-activate hook', () => {
       fs.mkdirSync(feynmanDir, { recursive: true });
       // Write unparseable JSON — no flag file created.
       fs.writeFileSync(path.join(feynmanDir, 'state.json'), '{ this is not valid json !!!');
+      flagPath = path.join(tmpHome, '.claude', '.feynman-active');
+      bakPath = path.join(feynmanDir, 'state.json.bak');
       // Deliberately do NOT create .feynman-active flag.
 
       result = runHook(tmpHome, { prompt: 'any prompt' });
@@ -597,30 +629,36 @@ describe('feynman-activate hook', () => {
 
     after(() => rmrf(tmpHome));
 
-    it('exits 0 (catch block in !flagExists+stateExists branch)', () => {
+    it('exits 0', () => {
       assert.equal(result.status, 0);
     });
 
-    it('emits no stdout', () => {
-      assert.equal(result.stdout.trim(), '');
+    it('injects rules (self-heal, not silence)', () => {
+      const ctx = parseAdditionalContext(result.stdout);
+      assert.ok(ctx.length > 0, 'corrupt state must self-heal and inject');
     });
 
     it('emits no stderr', () => {
       assert.equal(result.stderr.trim(), '');
     });
+
+    it('creates the flag and backs up the corrupt file', () => {
+      assert.ok(fs.existsSync(flagPath), 'bootstrap must create the flag');
+      assert.ok(fs.existsSync(bakPath), 'corrupt file must be backed up to state.json.bak');
+    });
   });
 
   // -------------------------------------------------------------------------
   // ADR-0004: canonical flag reconcile on the activate (UserPromptSubmit) path.
-  // reconcileState enforces one rule for both hooks: not active + flag present
-  // → unlink the flag. This CHANGES the legacy activate hook in two cases where
-  // it previously left a present flag dangling (corrupt JSON; valid enabled=false),
-  // and PRESERVES #35713 (flag absent + disabled → flag is not recreated).
+  // reconcileState enforces one rule: not active + flag present → unlink the flag.
+  // Under ADR-0005 this still applies to valid enabled=false (below), but corrupt
+  // JSON is no longer "not active" — it self-heals (backup + bootstrap + inject),
+  // keeping the flag. #35713 is preserved (flag absent + disabled → not recreated).
   // -------------------------------------------------------------------------
   describe('ADR-0004: activate canonical flag reconcile', () => {
-    // Behaviour change 1 — corrupt state.json + flag present → flag unlinked.
-    // (Path 5 already asserts exit-0; this pins the new self-heal of the flag.)
-    describe('corrupt state.json + flag present → flag unlinked', () => {
+    // Corrupt state.json + flag present → self-heal (ADR-0005): backup the file,
+    // bootstrap default, inject, and KEEP the flag (was: unlink, no injection).
+    describe('corrupt state.json + flag present → self-heal, flag kept', () => {
       let tmpHome: string;
       let result: HookResult;
       let flagAfter: boolean;
@@ -639,9 +677,12 @@ describe('feynman-activate hook', () => {
       after(() => rmrf(tmpHome));
 
       it('exits 0 (graceful recovery)', () => assert.equal(result.status, 0));
-      it('emits no stdout (no injection)', () => assert.equal(result.stdout.trim(), ''));
-      it('unlinks the dangling flag', () => {
-        assert.equal(flagAfter, false, 'corrupt state + present flag must self-heal the flag');
+      it('injects rules (self-heal)', () => {
+        const ctx = parseAdditionalContext(result.stdout);
+        assert.ok(ctx.length > 0, 'corrupt state must self-heal and inject');
+      });
+      it('keeps the flag (active after self-heal)', () => {
+        assert.equal(flagAfter, true, 'corrupt state + present flag must self-heal, not unlink');
       });
     });
 

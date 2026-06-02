@@ -95,6 +95,13 @@ function unlinkFlag(flagPath: string): void {
   try { fs.unlinkSync(flagPath); } catch (_) { /* already absent — fine */ }
 }
 
+// Move an unreadable state.json aside to state.json.bak before bootstrapping a
+// fresh one (ADR-0005). Best-effort: if the rename fails, self-heal proceeds and
+// the corrupt bytes are overwritten — a live plugin beats preserved forensics.
+function backupCorruptState(statePath: string): void {
+  try { fs.renameSync(statePath, statePath + '.bak'); } catch (_) { /* proceed to overwrite */ }
+}
+
 // The .feynman-active flag stores the active intensity; fall back to the default.
 export function flagContent(state: FeynmanState): string {
   return state.intensity || DEFAULT_STATE.intensity;
@@ -128,19 +135,36 @@ export function writeState(rootDir: string, state: FeynmanState): void {
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
 }
 
+// Bootstrap default full-mode state + flag and report active. Shared by the
+// first-run path (no state.json) and the corrupt-recovery path (ADR-0005). When
+// the flag is already present it is left untouched; the end state is flag-present
+// + active either way.
+function bootstrapDefault(
+  rootDir: string,
+  flagPath: string,
+  flagPresent: boolean,
+): { state: FeynmanState; active: boolean } {
+  const state = { ...DEFAULT_STATE };
+  writeState(rootDir, state);
+  if (!flagPresent) fs.writeFileSync(flagPath, flagContent(state));
+  return { state, active: true };
+}
+
 /**
  * The mutating policy shared by both injection hooks: bootstrap default state if
  * absent, merge with DEFAULT_STATE, reconcile the flag with `enabled`, and
- * fail-safe on corrupt JSON. The name signals the side effects (it writes and
+ * self-heal corrupt JSON. The name signals the side effects (it writes and
  * deletes files), unlike a plain `loadState`.
  *
- * One canonical rule for both hooks: **not active + flag present → unlink the
+ * Canonical rule for the disabled case: **not active + flag present → unlink the
  * flag**. This preserves #35713 (flag absent + enabled=false → flag not
- * recreated, active=false) and self-heals the two cases the legacy activate hook
- * used to leave dangling (corrupt JSON; valid enabled=false). It also converges
- * the legacy activate hook onto session-start's first-run self-heal: a missing
- * state.json now bootstraps and activates regardless of the flag (the legacy
- * activate hook skipped bootstrap when the flag was present). See ADR-0004.
+ * recreated, active=false) and self-heals the dangling flag the legacy activate
+ * hook left on valid enabled=false. It also converges the legacy activate hook
+ * onto session-start's first-run self-heal: a missing state.json bootstraps and
+ * activates regardless of the flag (the legacy hook skipped bootstrap when the
+ * flag was present). Corrupt JSON is no longer a fail-safe: it backs up the
+ * unreadable file and bootstraps the same as first run (ADR-0005, amends 0004).
+ * See ADR-0004.
  *
  * Returns the merged state and whether the caller should inject (`active`). When
  * `active` is false the returned `state` is not meant to be used.
@@ -152,18 +176,19 @@ export function reconcileState(rootDir: string): { state: FeynmanState; active: 
 
   // First run: no state.json → bootstrap default full mode and activate.
   if (!stateExists) {
-    const state = { ...DEFAULT_STATE };
-    writeState(rootDir, state);
-    if (!flagPresent) fs.writeFileSync(flagPath, flagContent(state));
-    return { state, active: true };
+    return bootstrapDefault(rootDir, flagPath, flagPresent);
   }
 
   // State exists — raw read distinguishes corrupt (null) from present.
   const raw = readState(rootDir);
   if (raw === null) {
-    // Corrupt JSON → fail-safe: not active, unlink a dangling flag (canonical rule).
-    unlinkFlag(flagPath);
-    return { state: { ...DEFAULT_STATE }, active: false };
+    // Corrupt JSON → self-heal (ADR-0005, amends ADR-0004): back up the
+    // unreadable file, then bootstrap default state and activate. Without this
+    // the plugin stays silently dead forever — every run re-reads the same
+    // corrupt file and exits not-active. The prior `enabled` is unrecoverable,
+    // so it resets to the default (true); state.json.bak preserves the bytes.
+    backupCorruptState(statePath);
+    return bootstrapDefault(rootDir, flagPath, flagPresent);
   }
 
   const state = { ...DEFAULT_STATE, ...raw };
