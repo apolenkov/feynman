@@ -161,7 +161,7 @@ delete `state.json`.
 The `install`, `doctor`, and `uninstall` subcommands SHALL run using only Node.js built-in
 modules, with `dependencies` in `package.json` staying `{}`. In development the `.ts` source
 runs directly via Node's type-stripping at Node >=22.6; the published npm package ships
-compiled `.js` files with no build step on the user's machine.
+pre-compiled `.js` files, so the user's machine runs them directly without any local compilation.
 
 #### Scenario: No third-party imports at runtime
 
