@@ -12,6 +12,7 @@ import { type FeynmanState, DEFAULT_STATE, readRulesForIntensity, readState, wri
 import type { TargetConfig, InstallResult, UninstallResult, TargetAdapter, ExampleEntry } from './cli/types.ts';
 import { c } from './cli/ansi.ts';
 import { HELP, EXAMPLES_HELP, BOOTSTRAP_HELP, INSTALL_HELP, UNINSTALL_HELP, DOCTOR_HELP, LINT_HELP, VERSION_HELP, cmdHelp } from './cli/help.ts';
+import { ensureDir, copyFileIfExists, copyMarkdownDir } from './cli/fs-utils.ts';
 
 const require = createRequire(import.meta.url);
 const PKG = require('../package.json') as { version: string; name: string };
@@ -111,40 +112,6 @@ const DEFAULT_BOOTSTRAP_DIR = 'feynman-package';
 const ACTIVATOR_JS   = HOOK_PATH;   // activate hook path (dev: .ts, package: .js)
 const CLI_JS         = path.resolve(ROOT_DIR, 'bin', `feynman${_hookExt}`);
 const PACKAGE_JSON   = path.resolve(ROOT_DIR, 'package.json');
-
-function ensureDir(dir: string): void {
-  fs.mkdirSync(dir, { recursive: true });
-}
-
-function copyFileIfExists(src: string, dest: string): boolean {
-  if (!fs.existsSync(src)) return false;
-  ensureDir(path.dirname(dest));
-  fs.copyFileSync(src, dest);
-  return true;
-}
-
-function copyMarkdownDir(src: string, dest: string): number {
-  if (!fs.existsSync(src)) return 0;
-  let copied = 0;
-  for (const entry of fs.readdirSync(src, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-    const sourcePath = path.join(src, entry.name);
-    const destPath   = path.join(dest, entry.name);
-
-    if (entry.isDirectory()) {
-      copied += copyMarkdownDir(sourcePath, destPath);
-      continue;
-    }
-
-    if (!entry.isFile() || !entry.name.endsWith('.md')) {
-      continue;
-    }
-
-    ensureDir(path.dirname(destPath));
-    fs.copyFileSync(sourcePath, destPath);
-    copied += 1;
-  }
-  return copied;
-}
 
 function examplesIndex(): ExampleEntry[] {
   if (!fs.existsSync(EXAMPLES_DIR)) return [];
