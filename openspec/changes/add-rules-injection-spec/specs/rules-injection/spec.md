@@ -44,6 +44,23 @@ injecting rules. If the flag file does not exist and `state.json` exists with `e
 - **WHEN** the flag file already exists
 - **THEN** the hook skips first-activation bootstrap and proceeds to read state.json
 
+### Requirement: SessionStart removes the flag file when disabled or state is corrupt
+
+The SessionStart hook SHALL delete the flag file at `$CLIENT_HOME/.feynman-active` when `state.json`
+fails to parse, and when `state.json` has `enabled: false`. This keeps the flag absent while feynman
+is disabled, so the next run re-evaluates activation from a clean state. The deletion SHALL be
+best-effort and tolerate a missing flag file.
+
+#### Scenario: Corrupt state removes the flag
+
+- **WHEN** the SessionStart hook reads a `state.json` that is not valid JSON
+- **THEN** the hook removes the flag file (if present) and exits 0 without injecting
+
+#### Scenario: Disabled state removes the flag
+
+- **WHEN** the SessionStart hook reads `state.json` with `enabled: false`
+- **THEN** the hook removes the flag file (if present) and exits 0 without injecting
+
 ### Requirement: state.json is read to obtain the enabled flag and Intensity
 
 The hook SHALL read `state.json` from `$CLIENT_HOME/.feynman/state.json` to determine the `enabled`
@@ -92,6 +109,40 @@ trimming, the hook SHALL inject nothing.
 
 - **WHEN** the extracted block for the active Intensity is empty after trimming
 - **THEN** the hook exits 0 and injects nothing
+
+### Requirement: UserPromptSubmit degrades to a fallback on malformed rules and records it in state
+
+On the UserPromptSubmit path, when the rules file has unbalanced `<intensity>` tags, the hook SHALL
+inject the `MALFORMED_FALLBACK` string, set `malformed_rules: true` in `state.json`, and exit 0. On a
+later run where the tags parse correctly, the hook SHALL clear the `malformed_rules` field from state.
+This is the UserPromptSubmit-specific divergence from the SessionStart path, which injects nothing on
+the same condition.
+
+#### Scenario: Unbalanced tags — UserPromptSubmit path
+
+- **WHEN** the rules file has mismatched `<intensity>` open/close counts and the hook is UserPromptSubmit
+- **THEN** the hook injects the `MALFORMED_FALLBACK` string, sets `malformed_rules: true` in state, and exits 0
+
+#### Scenario: Recovery clears the malformed flag
+
+- **WHEN** a later UserPromptSubmit run parses the `<intensity>` tags successfully and `malformed_rules` was set
+- **THEN** the hook removes the `malformed_rules` field from state
+
+### Requirement: UserPromptSubmit appends an output_style suffix to the injected rules
+
+On the UserPromptSubmit path, the hook SHALL append the suffix string mapped to the active
+`output_style` (from the `OUTPUT_STYLE_SUFFIX` map) to the rules text before writing stdout. The
+default style `full` maps to no suffix. The SessionStart path SHALL NOT append any suffix.
+
+#### Scenario: Non-default style appends a suffix
+
+- **WHEN** the UserPromptSubmit hook injects rules and an `output_style` with a mapped suffix is active
+- **THEN** the suffix is appended to the rules text inside `additionalContext`
+
+#### Scenario: Default style appends no suffix
+
+- **WHEN** the active `output_style` is `full` (or has no mapped suffix)
+- **THEN** no suffix is appended to the injected rules
 
 ### Requirement: SessionStart outputs plain text; UserPromptSubmit outputs a JSON wrapper
 

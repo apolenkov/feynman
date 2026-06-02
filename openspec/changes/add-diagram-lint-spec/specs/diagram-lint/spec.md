@@ -5,7 +5,10 @@
 The linter SHALL report an error (L01) when any `┌` corner has no matching `└` at the same
 character column below it, any `┐` has no matching `┘` at the same character column below it,
 or any bottom corner (`└`, `┘`) appears with no matching top corner at the same column above it.
-Severity: **error**.
+Severity: **error**. The "character column" here is a raw character index (UTF-16 code unit
+position), not a display column — unlike L09, L01 does not strip ANSI escapes or count CJK wide
+characters as two columns. Consuming tools must treat L01 column numbers as character offsets, not
+terminal-display columns.
 
 #### Scenario: unclosed top-left corner
 
