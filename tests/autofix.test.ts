@@ -240,9 +240,10 @@ describe('autofix(text) — frame definition shared with the linter', () => {
   });
 
   // Scenario (b): a runaway row (starts with │, no closing │) is NOT an inner
-  // row — matching the linter's frame detection. The frame's well-formed rows
-  // are aligned and the runaway line is collapsed with the rest of the hole.
-  it('does not treat a row missing its right border as an inner row', () => {
+  // row — matching the linter's frame detection — so it gets no right border and
+  // is collapsed away with the rest of the hole. The content line does not
+  // survive (decided behaviour: --fix normalises the frame to its bordered rows).
+  it('collapses a row missing its right border instead of bordering it', () => {
     const text = [
       '┌────┐',
       '│ alpha │',
@@ -252,6 +253,7 @@ describe('autofix(text) — frame definition shared with the linter', () => {
     ].join('\n');
     const out = autofix(text);
     assert.equal(out, ['┌──────┐', '│ alpha│', '│ b    │', '└──────┘'].join('\n'));
+    assert.doesNotMatch(out, /runaway/, 'the runaway content line is collapsed away');
   });
 
   // Guard: an opener OUTSIDE a fence must not let frame detection scan across the
@@ -274,6 +276,18 @@ describe('autofix(text) — frame definition shared with the linter', () => {
   // already well-formed frame and changes nothing.
   it('is idempotent on a holed frame', () => {
     const text = ['┌────┐', '│ alpha │', '', '│ b │', '└────┘'].join('\n');
+    const once = autofix(text);
+    assert.equal(autofix(once), once);
+  });
+
+  it('is idempotent after collapsing a runaway row', () => {
+    const text = [
+      '┌────┐',
+      '│ alpha │',
+      '│ runaway with no right border',
+      '│ b │',
+      '└────┘',
+    ].join('\n');
     const once = autofix(text);
     assert.equal(autofix(once), once);
   });
