@@ -864,6 +864,30 @@ function uninstallOpenCodeTarget(): UninstallResult {
   return { target: 'opencode', missing: false, hadHook };
 }
 
+// Render a doctor report: a titled frame around the check lines, then a status
+// line. Shared by both doctor entry points (the only difference was the target
+// name in the title). Frame width = longest stripped line + 2, min 48.
+function renderDoctorReport(target: string, checks: string[], failCount: number): void {
+  const strippedLines = checks.map(l => l.replace(/\x1b\[[0-9;]*m/g, ''));
+  const maxLen = Math.max(...strippedLines.map(l => l.length));
+  const innerW = Math.max(maxLen + 2, 48); // +2 for one space on each side; min 48
+  const titlePart = `feynman doctor ${target} `;
+  const border = '─'.repeat(innerW);
+  const topDashes = '─'.repeat(innerW - titlePart.length - 1);
+  console.log(`┌─ ${titlePart}${topDashes}┐`);
+  for (let i = 0; i < checks.length; i++) {
+    const stripped = strippedLines[i] ?? '';
+    const pad = innerW - 1 - stripped.length; // 1 for leading space
+    console.log(`│ ${checks[i] ?? ''}${' '.repeat(Math.max(0, pad))}│`);
+  }
+  console.log(`└${border}┘`);
+
+  const status = failCount === 0
+    ? c.green('Status: OK')
+    : c.red(`Status: ISSUES (${failCount})`);
+  console.log(status);
+}
+
 function cmdDoctorOpenCode(): void {
   const tc = targetConfig('opencode');
   const rulesDestPath = path.join(tc.feynmanDir, 'rules.md');
@@ -919,24 +943,7 @@ function cmdDoctorOpenCode(): void {
     stateEnabled ? flagPresent : !flagPresent
   );
 
-  const strippedLines = checks.map(l => l.replace(/\x1b\[[0-9;]*m/g, ''));
-  const maxLen = Math.max(...strippedLines.map(l => l.length));
-  const innerW = Math.max(maxLen + 2, 48);
-  const titlePart = 'feynman doctor opencode ';
-  const border = '─'.repeat(innerW);
-  const topDashes = '─'.repeat(innerW - titlePart.length - 1);
-  console.log(`┌─ ${titlePart}${topDashes}┐`);
-  for (let i = 0; i < checks.length; i++) {
-    const stripped = strippedLines[i] ?? '';
-    const pad = innerW - 1 - stripped.length;
-    console.log(`│ ${checks[i] ?? ''}${' '.repeat(Math.max(0, pad))}│`);
-  }
-  console.log(`└${border}┘`);
-
-  const status = failCount === 0
-    ? c.green('Status: OK')
-    : c.red(`Status: ISSUES (${failCount})`);
-  console.log(status);
+  renderDoctorReport('opencode', checks, failCount);
 }
 
 // ─── Target adapters ──────────────────────────────────────────────────────────
@@ -1098,25 +1105,7 @@ function cmdDoctor(opts: { target?: string; noExit?: boolean } = {}): void {
   const lintStatus = lintHookRegistered ? 'registered' : 'not registered (optional)';
   check(`lint hook: ${lintStatus}`, true, true); // always INFO
 
-  // Compute frame width from longest stripped line (innerW = max content + 2 for "│ " and " │")
-  const strippedLines = checks.map(l => l.replace(/\x1b\[[0-9;]*m/g, ''));
-  const maxLen = Math.max(...strippedLines.map(l => l.length));
-  const innerW = Math.max(maxLen + 2, 48); // +2 for one space on each side; min 48
-  const titlePart = `feynman doctor ${target} `;
-  const border = '─'.repeat(innerW);
-  const topDashes = '─'.repeat(innerW - titlePart.length - 1);
-  console.log(`┌─ ${titlePart}${topDashes}┐`);
-  for (let i = 0; i < checks.length; i++) {
-    const stripped = strippedLines[i] ?? '';
-    const pad = innerW - 1 - stripped.length; // 1 for leading space
-    console.log(`│ ${checks[i] ?? ''}${' '.repeat(Math.max(0, pad))}│`);
-  }
-  console.log(`└${border}┘`);
-
-  const status = failCount === 0
-    ? c.green('Status: OK')
-    : c.red(`Status: ISSUES (${failCount})`);
-  console.log(status);
+  renderDoctorReport(target, checks, failCount);
 
   if (!opts.noExit) process.exit(0);
 }
