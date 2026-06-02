@@ -51,3 +51,8 @@ smallest sufficient form along the ladder `prose < glyph < dot-leader < tree < t
 - **WHEN** a status list of five items and a full table would both convey the content
 - **THEN** the smaller form (dot-leader list) is chosen over the table
 
+#### Scenario: Annotations are exempt from the mutex
+
+- **WHEN** a response carries a single primary Visual alongside glyph-level Annotations (`▲▼` priority scale, `✓✗` status, `**bold**` keys)
+- **THEN** the Annotations may co-occur with the primary Visual and with each other, and are not counted against the one-primary-Visual mutex
+
