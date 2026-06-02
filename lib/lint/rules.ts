@@ -454,8 +454,12 @@ export function L07_no_mermaid_mix(_ast: ASTNode | null, fullText: string): Issu
   // _ast may be null when called for full-text check
   if (!fullText) return [];
 
-  const hasMermaid = /```mermaid/i.test(fullText);
-  if (!hasMermaid) return [];
+  // Mermaid must be a real opening fence at the start of a line — not a
+  // `\`\`\`mermaid` mention in prose or inline code, which would warn on any
+  // answer that merely references mermaid next to an ASCII diagram.
+  const lines = fullText.split('\n');
+  const mermaidIdx = lines.findIndex(l => /^\s*```+\s*mermaid\b/i.test(l));
+  if (mermaidIdx === -1) return [];
 
   // Check for ASCII diagram indicators
   const hasAsciiBoxDrawing = /[┌┐└┘─│├┤┬┴┼→←↑↓▲▼]/.test(fullText);
@@ -464,15 +468,7 @@ export function L07_no_mermaid_mix(_ast: ASTNode | null, fullText: string): Issu
 
   if (!hasAsciiBoxDrawing && !hasAsciiFlow && !hasTree) return [];
 
-  // Find the mermaid block line
-  const lines = fullText.split('\n');
-  let mermaidLine = 1;
-  for (let li = 0; li < lines.length; li++) {
-    if (/```mermaid/i.test(lines[li]!)) {
-      mermaidLine = li + 1;
-      break;
-    }
-  }
+  const mermaidLine = mermaidIdx + 1;
 
   return [issue(
     'L07', 'warn', mermaidLine, 1,

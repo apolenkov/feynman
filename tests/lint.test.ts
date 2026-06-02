@@ -378,6 +378,16 @@ describe('L07 no mermaid mix — unit tests', () => {
     const result = lint(md);
     assert.ok(result.issues.filter(i => i.rule === 'L07').length >= 1);
   });
+
+  it('a prose/inline mention of mermaid next to a tree is not flagged', () => {
+    // "```mermaid" appears only inside inline code, not as an opening fence.
+    const md = 'Use `\\`\\`\\`mermaid` syntax elsewhere.\n\n```\nroot\n├── a\n└── b\n```';
+    const result = lint(md);
+    assert.equal(
+      result.issues.filter(i => i.rule === 'L07').length, 0,
+      'a mermaid mention that is not a real opening fence must not warn',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
