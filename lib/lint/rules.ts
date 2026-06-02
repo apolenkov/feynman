@@ -6,6 +6,7 @@
 import { visualWidth, firstVisualColumnOf, lastVisualColumnOf } from './width.ts';
 import { createRequire } from 'node:module';
 import { nextFrame } from './frames.ts';
+import { STATE_MARKER_RE } from './markers.ts';
 
 export interface Issue {
   rule: string;
@@ -915,7 +916,6 @@ export function L15_homogeneous_frame(ast: ASTNode): Issue[] {
   const lines = ast.content.split('\n');
   const baseLineNum = ast.startLine;
   const issues: Issue[] = [];
-  const stateMarkerRe = /(← (?:готов|решение|заморожено|в работе|блок:[^│\n]+))|((?:✓|✗|◐|⌛|→) \S+)|\b(done|pending|wip|ok|fail|wait)\b\s*$/i;
 
   let li = 0;
   while (li < lines.length) {
@@ -949,7 +949,7 @@ export function L15_homogeneous_frame(ast: ASTNode): Issue[] {
     if (stripped.some(l => (l.match(/│/g) || []).length >= 2)) { li = closeLi + 1; continue; }
     if (stripped.some(l => /─→|→|──>|-->/.test(l))) { li = closeLi + 1; continue; }
     // Status frames — let L11 handle.
-    if (stripped.every(l => stateMarkerRe.test(l))) { li = closeLi + 1; continue; }
+    if (stripped.every(l => STATE_MARKER_RE.test(l))) { li = closeLi + 1; continue; }
 
     // Detect homogeneous content type.
     let type: string | null = null;
