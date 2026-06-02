@@ -28,15 +28,6 @@ interface TargetConfig {
   commandsDir: string | null;
 }
 
-interface IdeTargetConfig {
-  name: string;
-  label: string;
-  rootDir: string;
-  dir: string;
-  rulesPath: string;
-  frontmatter: Record<string, string | boolean> | null;
-}
-
 interface FeynmanState {
   enabled: boolean;
   intensity: string;
@@ -46,8 +37,6 @@ interface FeynmanState {
 
 interface InstallResult { target: string; already: boolean; tc?: TargetConfig; }
 interface UninstallResult { target: string; missing: boolean; hadHook?: boolean; }
-interface IdeInstallResult { target: string; already: boolean; rulesPath: string; }
-interface DoctorResult { target: string; ok: boolean; reason?: string; rulesPath?: string; bytes?: number; }
 
 interface TargetAdapter {
   install(opts: { force: boolean }): InstallResult;
@@ -81,49 +70,7 @@ const RULES_PATH        = path.resolve(import.meta.dirname, '..', 'rules', 'feyn
 
 const DEFAULT_STATE: FeynmanState = { enabled: true, intensity: 'full', injections: 0 };
 const TARGET_ALIASES: Record<string, string> = {};
-const VALID_TARGETS = ['claude', 'codex', 'opencode', 'both', 'all', '*', 'cline', 'cursor', 'windsurf'];
-
-// IDE targets are project-local (write to CWD), unlike claude/codex which are
-// user-global (write to HOME). They install a rules file, not a hook.
-const IDE_TARGETS = ['cline', 'cursor', 'windsurf'];
-function isIdeTarget(name: string): boolean { return IDE_TARGETS.includes(name); }
-
-// Per-IDE rules-file location, filename, and frontmatter requirement.
-// `frontmatter` keys map onto the YAML emitted at the top of the rules file
-// (Cursor's `.mdc` format requires alwaysApply + globs).
-function ideTargetConfig(name: string): IdeTargetConfig | null {
-  const cwd = process.cwd();
-  const configs: Record<string, { label: string; dir: string; file: string; frontmatter: Record<string, string | boolean> | null }> = {
-    cline: {
-      label: 'Cline / Windsurf-Cline',
-      dir: '.clinerules',
-      file: 'feynman-rules.md',
-      frontmatter: null,
-    },
-    cursor: {
-      label: 'Cursor',
-      dir: path.join('.cursor', 'rules'),
-      file: 'feynman.mdc',
-      frontmatter: { description: 'feynman ASCII diagram rules', alwaysApply: true, globs: '**' },
-    },
-    windsurf: {
-      label: 'Windsurf',
-      dir: path.join('.windsurf', 'rules'),
-      file: 'feynman.md',
-      frontmatter: null,
-    },
-  };
-  const cfg = configs[name];
-  if (!cfg) return null;
-  return {
-    name,
-    label: cfg.label,
-    rootDir: cwd,
-    dir: path.join(cwd, cfg.dir),
-    rulesPath: path.join(cwd, cfg.dir, cfg.file),
-    frontmatter: cfg.frontmatter,
-  };
-}
+const VALID_TARGETS = ['claude', 'codex', 'opencode', 'both', 'all', '*'];
 
 function targetConfig(name: string): TargetConfig {
   if (name === 'opencode') {
@@ -173,30 +120,11 @@ function parseTarget(args: string[], fallback = 'codex'): { target: string; args
     }
   }
   if (!VALID_TARGETS.includes(target)) {
-    console.error(`feynman: invalid --target '${target}' (expected claude, codex, opencode, both, all, *, cline, cursor, or windsurf)`);
+    console.error(`feynman: invalid --target '${target}' (expected claude, codex, opencode, both, all, or *)`);
     process.exit(2);
   }
   target = TARGET_ALIASES[target] ?? target;
   return { target, args: keep };
-}
-
-// ─── IDE install / doctor (project-local rules-file installs) ─────────────────
-
-// Render YAML frontmatter (Cursor .mdc format) from an object. Keys emitted in
-// stable order. Values are emitted unquoted for booleans/numbers, quoted for
-// strings (single-quoted; no nested quotes expected).
-function renderFrontmatter(obj: Record<string, string | boolean> | null): string {
-  if (!obj) return '';
-  const order = ['description', 'alwaysApply', 'globs'];
-  const lines = ['---'];
-  for (const k of order) {
-    if (!(k in obj)) continue;
-    const v = obj[k];
-    if (typeof v === 'boolean' || typeof v === 'number') lines.push(`${k}: ${v}`);
-    else lines.push(`${k}: "${String(v).replace(/"/g, '\\"')}"`);
-  }
-  lines.push('---', '');
-  return lines.join('\n');
 }
 
 // Read rules content at a given intensity level from feynman-activate.md.
@@ -214,45 +142,6 @@ function readIntensityRules(intensity: string): string {
   const i2 = content.indexOf(close, i1);
   if (i1 !== -1 && i2 !== -1) return content.slice(i1 + open.length, i2).trim();
   return content;
-}
-
-// Build the rules content for IDE installs. Uses the same rules file the
-// runtime hook reads, but always emits the `full` intensity (IDEs are
-// developer tools, default to richest variant). The full intensity content
-// is extracted from rules/feynman-activate.md by the same XML matcher used
-// in hooks/feynman-activate.ts.
-function readFullIntensityRules(): string {
-  return readIntensityRules('full');
-}
-
-function installIde(target: string): IdeInstallResult {
-  const cfg = ideTargetConfig(target);
-  if (!cfg) throw new Error(`unknown IDE target: ${target}`);
-  ensureDir(cfg.dir);
-  const rules = readFullIntensityRules();
-  const fm = renderFrontmatter(cfg.frontmatter);
-  const body = fm + '# feynman — ASCII diagram rules (auto-injected for ' + cfg.label + ')\n\n' + rules + '\n';
-  const already = fs.existsSync(cfg.rulesPath);
-  fs.writeFileSync(cfg.rulesPath, body);
-  return { target, already, rulesPath: cfg.rulesPath };
-}
-
-function doctorIde(target: string): DoctorResult {
-  const cfg = ideTargetConfig(target);
-  if (!cfg) return { target, ok: false, reason: 'unknown target' };
-  if (!fs.existsSync(cfg.rulesPath)) {
-    return { target, ok: false, reason: 'rules file missing — run install --target ' + target };
-  }
-  const content = fs.readFileSync(cfg.rulesPath, 'utf8');
-  if (cfg.frontmatter) {
-    if (!/^---\n[\s\S]*?\nalwaysApply:\s*true/m.test(content)) {
-      return { target, ok: false, reason: 'frontmatter missing or alwaysApply≠true' };
-    }
-  }
-  if (!content.includes('feynman') && content.length < 100) {
-    return { target, ok: false, reason: 'rules content suspiciously short' };
-  }
-  return { target, ok: true, rulesPath: cfg.rulesPath, bytes: content.length };
 }
 
 function hookCommandFor(target: string): string {
@@ -846,19 +735,6 @@ function installHookTarget(target: string, opts: { force: boolean }): InstallRes
 }
 
 function cmdInstall(opts: { force: boolean; target: string }): void {
-  // IDE targets follow a different install path — project-local rules file,
-  // no hook registration, no HOME writes. Route early and return.
-  if (isIdeTarget(opts.target)) {
-    const r = installIde(opts.target);
-    const cfg = ideTargetConfig(opts.target);
-    if (!cfg) { process.exit(1); }
-    console.log('');
-    console.log(`feynman ${r.already ? 'updated' : 'installed'}: ${cfg.label}`);
-    console.log(`  rules: ${r.rulesPath.replace(process.cwd(), '.')}`);
-    console.log('');
-    process.exit(0);
-  }
-
   const results = targetNames(opts.target).map(t => installOne(t, opts));
 
   if (results.every(r => r.already)) {
@@ -1106,24 +982,6 @@ function cmdUninstall(opts: { target: string }): void {
 
 function cmdDoctor(opts: { target?: string; noExit?: boolean } = {}): void {
   const target = opts.target ?? 'claude';
-
-  // IDE doctor — simpler check: rules file exists, frontmatter valid.
-  if (isIdeTarget(target)) {
-    const r = doctorIde(target);
-    const cfg = ideTargetConfig(target);
-    if (!cfg) { process.exit(1); }
-    console.log('');
-    console.log(`feynman doctor — ${cfg.label}`);
-    if (r.ok) {
-      console.log(`  [OK]   ${(r.rulesPath ?? '').replace(process.cwd(), '.')} (${r.bytes} bytes)`);
-      console.log('');
-      process.exit(0);
-    } else {
-      console.log(`  [FAIL] ${r.reason}`);
-      console.log('');
-      process.exit(1);
-    }
-  }
 
   if (target === 'opencode') {
     cmdDoctorOpenCode();

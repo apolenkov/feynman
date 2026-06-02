@@ -1100,135 +1100,29 @@ describe('feynman-lint CLI error branches', () => {
   });
 });
 
-// ─── feynman install --target cline|cursor|windsurf (Phase 12 IDE compat) ────
+// ─── feynman install --target validation ─────────────────────────────────────
 
-describe('feynman install --target <ide>', () => {
-  function makeTmpCwd(): string {
-    return fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-ide-test-'));
-  }
-
-  function runFromCwd(args: string[], cwd: string): RunResult {
-    const result = spawnSync(process.execPath, [FEYNMAN_JS, ...args], {
-      encoding: 'utf8',
-      env: {
-        PATH: process.env['PATH'],
-        HOME: cwd,
-        NO_COLOR: '1',
-      },
-      cwd,
-    });
-    return {
-      stdout: result.stdout || '',
-      stderr: result.stderr || '',
-      status: result.status ?? 1,
-    };
-  }
-
-  it('install --target cline writes .clinerules/feynman-rules.md', () => {
-    const tmp = makeTmpCwd();
+describe('feynman install --target validation', () => {
+  it('rejects an unknown target with exit 2', () => {
+    const tmp = makeTempHome();
     try {
-      const r = runFromCwd(['install', '--target', 'cline'], tmp);
-      assert.equal(r.status, 0, `expected exit 0, got ${r.status}: ${r.stderr}`);
-      const rules = path.join(tmp, '.clinerules', 'feynman-rules.md');
-      assert.ok(fs.existsSync(rules), 'rules file must exist');
-      const content = fs.readFileSync(rules, 'utf8');
-      assert.ok(content.length > 200, 'rules content must be substantive');
-      assert.doesNotMatch(content, /^---\n/, 'cline format has no frontmatter');
-    } finally {
-      rmrf(tmp);
-    }
-  });
-
-  it('install --target cursor writes .cursor/rules/feynman.mdc with YAML frontmatter', () => {
-    const tmp = makeTmpCwd();
-    try {
-      const r = runFromCwd(['install', '--target', 'cursor'], tmp);
-      assert.equal(r.status, 0, `expected exit 0, got ${r.status}: ${r.stderr}`);
-      const rules = path.join(tmp, '.cursor', 'rules', 'feynman.mdc');
-      assert.ok(fs.existsSync(rules), 'rules file must exist at .cursor/rules/feynman.mdc');
-      const content = fs.readFileSync(rules, 'utf8');
-      assert.match(content, /^---\n/, 'cursor format must start with frontmatter');
-      assert.match(content, /alwaysApply:\s*true/, 'alwaysApply must be true');
-      assert.match(content, /globs:\s*"\*\*"/, 'globs must be "**"');
-    } finally {
-      rmrf(tmp);
-    }
-  });
-
-  it('install --target windsurf writes .windsurf/rules/feynman.md', () => {
-    const tmp = makeTmpCwd();
-    try {
-      const r = runFromCwd(['install', '--target', 'windsurf'], tmp);
-      assert.equal(r.status, 0, `expected exit 0, got ${r.status}: ${r.stderr}`);
-      const rules = path.join(tmp, '.windsurf', 'rules', 'feynman.md');
-      assert.ok(fs.existsSync(rules), 'rules file must exist at .windsurf/rules/feynman.md');
-      const content = fs.readFileSync(rules, 'utf8');
-      assert.ok(content.length > 200, 'rules content must be substantive');
-      assert.doesNotMatch(content, /^---\n/, 'windsurf format has no frontmatter');
-    } finally {
-      rmrf(tmp);
-    }
-  });
-
-  it('install --target cline is idempotent', () => {
-    const tmp = makeTmpCwd();
-    try {
-      const r1 = runFromCwd(['install', '--target', 'cline'], tmp);
-      assert.equal(r1.status, 0);
-      const r2 = runFromCwd(['install', '--target', 'cline'], tmp);
-      assert.equal(r2.status, 0, 'second install must succeed');
-      const rules = path.join(tmp, '.clinerules', 'feynman-rules.md');
-      assert.ok(fs.existsSync(rules));
-    } finally {
-      rmrf(tmp);
-    }
-  });
-
-  it('doctor --target cline succeeds after install', () => {
-    const tmp = makeTmpCwd();
-    try {
-      runFromCwd(['install', '--target', 'cline'], tmp);
-      const r = runFromCwd(['doctor', '--target', 'cline'], tmp);
-      assert.equal(r.status, 0, `doctor expected exit 0, got ${r.status}: ${r.stderr}`);
-      assert.match(r.stdout, /\[OK\]/, 'doctor must report OK');
-    } finally {
-      rmrf(tmp);
-    }
-  });
-
-  it('doctor --target cline fails when rules file is missing', () => {
-    const tmp = makeTmpCwd();
-    try {
-      const r = runFromCwd(['doctor', '--target', 'cline'], tmp);
-      assert.equal(r.status, 1, 'doctor must fail when not installed');
-      assert.match(r.stdout, /\[FAIL\]/, 'doctor must report FAIL');
-    } finally {
-      rmrf(tmp);
-    }
-  });
-
-  it('doctor --target cursor validates frontmatter alwaysApply', () => {
-    const tmp = makeTmpCwd();
-    try {
-      runFromCwd(['install', '--target', 'cursor'], tmp);
-      // Corrupt the frontmatter
-      const rules = path.join(tmp, '.cursor', 'rules', 'feynman.mdc');
-      const content = fs.readFileSync(rules, 'utf8');
-      fs.writeFileSync(rules, content.replace('alwaysApply: true', 'alwaysApply: false'));
-      const r = runFromCwd(['doctor', '--target', 'cursor'], tmp);
-      assert.equal(r.status, 1, 'doctor must fail when frontmatter alwaysApply≠true');
-    } finally {
-      rmrf(tmp);
-    }
-  });
-
-  it('invalid --target value still rejected', () => {
-    const tmp = makeTmpCwd();
-    try {
-      const r = runFromCwd(['install', '--target', 'visualstudio'], tmp);
+      const r = runFeynman(['install', '--target', 'visualstudio'], tmp);
       assert.equal(r.status, 2, 'unknown target must exit 2');
+      assert.match(r.stderr, /invalid --target/, 'must explain the rejection');
     } finally {
       rmrf(tmp);
+    }
+  });
+
+  it('rejects a removed IDE target (cline/cursor/windsurf) with exit 2', () => {
+    for (const ide of ['cline', 'cursor', 'windsurf']) {
+      const tmp = makeTempHome();
+      try {
+        const r = runFeynman(['install', '--target', ide], tmp);
+        assert.equal(r.status, 2, `removed IDE target ${ide} must exit 2`);
+      } finally {
+        rmrf(tmp);
+      }
     }
   });
 });

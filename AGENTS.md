@@ -28,8 +28,9 @@ Run `npm run typecheck`, `npm run eslint`, and `npm test` — all green.
 
 ## Targets
 
-Claude Code and Codex are both first-class. IDE compat: Cline/Windsurf
-(`.clinerules/`), Cursor (`.cursor/rules/*.mdc`).
+Claude Code, Codex, and OpenCode are the three first-class install targets
+(`--target all` expands to exactly these). IDE adapters (Cline, Cursor,
+Windsurf) are not supported.
 
 ## Commits
 
