@@ -41,6 +41,18 @@ point of the change. The alternative (parameterise `nextFrame` with an
 early-break flag) would move the divergence inside the seam instead of removing
 it, exactly the anti-pattern ADR-0004 rejected.
 
+**Bound the `nextFrame` scan to the current non-fence segment.** `nextFrame`
+scans to end-of-input, but `autofix` runs on the whole document (the linter,
+by contrast, receives one fence-free block at a time from the parser). Left
+unbounded, an opener *outside* a ` ``` ` fence would let detection scan across
+the fence and align a frame whose closer lives inside fenced sample content —
+silently violating the "fenced frames are deliberate samples, leave them alone"
+contract. So before each call we cap the scan at the next fence line
+(`nextFenceLine`); this keeps fence behaviour byte-identical to the old loop and
+makes autofix and the linter agree on segment boundaries, not just frame shape.
+This bounds *where* `nextFrame` looks — it does not parameterise the helper or
+re-add the old per-hole early-break, so the frame definition stays single.
+
 ## Risks / Trade-offs
 
 - **A real diagram with an intentional blank separator line inside a frame now
