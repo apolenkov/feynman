@@ -8,7 +8,6 @@
 //   - Closer: /^(\s*)└─*┘\s*$/ — matches ┌┘ (zero dashes) used in L15.
 //   - Indent equality: botMatch indent must equal top indent.
 //   - inner: lines strictly between top and close that contain │ (leading bar).
-//   - titled: true when the opener has text between the dashes.
 //   - Caller advances past closeLi or stays at topLi+1 depending on the 'found' flag.
 
 export interface FrameInfo {
@@ -20,17 +19,11 @@ export interface FrameInfo {
   indent: string;
   /** Lines strictly between top and close that contain a │ character. */
   inner: string[];
-  /** True when the opener has non-dash text in the title area. */
-  titled: boolean;
 }
 
 // Title-aware opener: ┌─ followed by anything that isn't ┌ or newline, ending ┐.
 // This matches both ┌──────┐ (untitled) and ┌─ Some Title ─┐ (titled).
 const TOP_RE = /^(\s*)┌─[^┌\n]*┐\s*$/;
-
-// Title detection: the opener contains non-dash / non-space visible chars after ┌─.
-// Matches a titled frame like ┌─ Title ─┐ (has letter/digit/punctuation).
-const TITLED_RE = /┌─[^─┐\s]/;
 
 // Closer: └ followed by zero or more dashes, then ┘ (with optional leading indent/trailing space).
 const BOT_RE = /^(\s*)└─*┘\s*$/;
@@ -60,7 +53,6 @@ export function nextFrame(lines: readonly string[], startLi: number): FrameInfo 
     if (!topMatch) continue;
 
     const indent = topMatch[1]!;
-    const titled = TITLED_RE.test(top);
 
     // Search for the matching closer at the same indent.
     let closeLi = -1;
@@ -74,15 +66,15 @@ export function nextFrame(lines: readonly string[], startLi: number): FrameInfo 
         break;
       }
       // Collect lines that are fully bordered (start AND end with │),
-    // matching the original /^\s*│.*│\s*$/ predicate used by L11, L12,
-    // and explainFrames. This keeps inner-set semantics byte-identical
-    // with the pre-migration code for all well-formed frames.
+      // matching the original /^\s*│.*│\s*$/ predicate used by L11, L12,
+      // and explainFrames. This keeps inner-set semantics byte-identical
+      // with the pre-migration code for all well-formed frames.
       if (/^\s*│.*│\s*$/.test(next)) {
         inner.push(next);
       }
     }
 
-    return { topLi: li, closeLi, indent, inner, titled };
+    return { topLi: li, closeLi, indent, inner };
   }
 
   return null;
