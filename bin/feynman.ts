@@ -8,12 +8,13 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { DEFAULT_STATE, readRulesForIntensity, readState } from '../lib/feynman-state.ts';
+import { DEFAULT_STATE, readState } from '../lib/feynman-state.ts';
 import type { InstallResult, UninstallResult, TargetAdapter, ExampleEntry } from './cli/types.ts';
 import { c } from './cli/ansi.ts';
 import { HELP, EXAMPLES_HELP, BOOTSTRAP_HELP, INSTALL_HELP, UNINSTALL_HELP, DOCTOR_HELP, LINT_HELP, VERSION_HELP, cmdHelp } from './cli/help.ts';
 import { ensureDir, copyFileIfExists, copyMarkdownDir } from './cli/fs-utils.ts';
 import { readJsonConfig, readSettings, writeSettings, isSessionStartHookCommand, hasFeynmanHook, hasAnyFeynmanHook, extractHookScriptPath, removeFeynmanHooks, bootstrapState, installClaudeCommand, targetConfig } from './cli/settings.ts';
+import { targetNames, parseTarget, hookCommandFor, readIntensityRules } from './cli/targets.ts';
 
 const require = createRequire(import.meta.url);
 const PKG = require('../package.json') as { version: string; name: string };
@@ -32,51 +33,6 @@ const _hookExt = fs.existsSync(path.resolve(import.meta.dirname, '..', 'hooks', 
 const HOOK_PATH         = path.resolve(import.meta.dirname, '..', 'hooks', `feynman-activate${_hookExt}`);
 const SESSION_HOOK_PATH = path.resolve(import.meta.dirname, '..', 'hooks', `feynman-session-start${_hookExt}`);
 const RULES_PATH        = path.resolve(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
-
-const TARGET_ALIASES: Record<string, string> = {};
-const VALID_TARGETS = ['claude', 'codex', 'opencode', 'both', 'all', '*'];
-
-
-function targetNames(target: string): string[] {
-  if (target === 'both') return ['claude', 'codex'];
-  if (target === 'all' || target === '*') return ['claude', 'codex', 'opencode'];
-  return [target];
-}
-
-function parseTarget(args: string[], fallback = 'codex'): { target: string; args: string[] } {
-  let target = fallback;
-  const keep: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i] ?? '';
-    if (arg === '--target') {
-      target = args[++i] ?? target;
-    } else if (arg.startsWith('--target=')) {
-      target = arg.slice('--target='.length);
-    } else {
-      keep.push(arg);
-    }
-  }
-  if (!VALID_TARGETS.includes(target)) {
-    console.error(`feynman: invalid --target '${target}' (expected claude, codex, opencode, both, all, or *)`);
-    process.exit(2);
-  }
-  target = TARGET_ALIASES[target] ?? target;
-  return { target, args: keep };
-}
-
-// Read rules content at a given intensity level from feynman-activate.md.
-// Delegates to shared readRulesForIntensity; falls back to the whole file on miss.
-function readIntensityRules(intensity: string): string {
-  const rulesPath = path.resolve(ROOT_DIR, 'rules', 'feynman-activate.md');
-  const content = fs.readFileSync(rulesPath, 'utf8');
-  const block = readRulesForIntensity(content, intensity);
-  return block || content;
-}
-
-function hookCommandFor(target: string): string {
-  const cfg = targetConfig(target);
-  return `FEYNMAN_HOME="${cfg.rootDir}" node "${HOOK_PATH}"`;
-}
 
 // ─── Help text ────────────────────────────────────────────────────────────────
 // Moved to bin/cli/help.ts; imported above.
