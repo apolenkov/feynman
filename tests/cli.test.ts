@@ -985,6 +985,61 @@ describe('bin/feynman.js', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // install/uninstall must NOT destroy an unparseable settings.json
+  // -------------------------------------------------------------------------
+  describe('feynman install/uninstall (corrupt config data-loss guard)', () => {
+    // A trailing comma is valid JSONC a user may have hand-edited; JSON.parse
+    // rejects it. The old code returned {} on parse failure, then overwrote the
+    // file — silently destroying model/permissions/foreign hooks.
+    const CORRUPT = '{"model":"opus","permissions":{"allow":["Bash"]},}\n';
+
+    it('install --target claude refuses and leaves the file untouched', () => {
+      const tmp = makeTempHome();
+      try {
+        const settingsPath = path.join(tmp, '.claude', 'settings.json');
+        fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+        fs.writeFileSync(settingsPath, CORRUPT);
+
+        const r = runFeynman(['install', '--target', 'claude'], tmp);
+
+        assert.equal(r.status, 2, `expected exit 2, got ${r.status}: ${r.stderr}`);
+        assert.match(r.stderr, /not valid JSON/i, `expected refusal message: ${r.stderr}`);
+        assert.equal(fs.readFileSync(settingsPath, 'utf8'), CORRUPT, 'corrupt file must be left byte-for-byte unchanged');
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('uninstall --target claude refuses and leaves the file untouched', () => {
+      const tmp = makeTempHome();
+      try {
+        const settingsPath = path.join(tmp, '.claude', 'settings.json');
+        fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+        fs.writeFileSync(settingsPath, CORRUPT);
+
+        const r = runFeynman(['uninstall', '--target', 'claude'], tmp);
+
+        assert.equal(r.status, 2, `expected exit 2, got ${r.status}: ${r.stderr}`);
+        assert.equal(fs.readFileSync(settingsPath, 'utf8'), CORRUPT, 'corrupt file must be left byte-for-byte unchanged');
+      } finally {
+        rmrf(tmp);
+      }
+    });
+
+    it('a missing settings.json is still treated as empty (install succeeds)', () => {
+      const tmp = makeTempHome();
+      try {
+        const r = runFeynman(['install', '--target', 'claude'], tmp);
+        assert.equal(r.status, 0, `expected exit 0, got ${r.status}: ${r.stderr}`);
+        const cfg = readSettings(tmp);
+        assert.ok(cfg['hooks'], 'feynman hook should be installed into a fresh settings.json');
+      } finally {
+        rmrf(tmp);
+      }
+    });
+  });
+
 });
 
 // ─── feynman-lint --explain (Plan 09-05) ─────────────────────────────────────

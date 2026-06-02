@@ -546,13 +546,39 @@ Prints: ${VERSION}
 
 // ─── Settings helpers ─────────────────────────────────────────────────────────
 
-function readSettings(target: string): Record<string, unknown> {
-  const cfg = targetConfig(target);
+// Print a clean error and abort. Used where continuing would corrupt user data.
+function fatal(message: string): never {
+  console.error(`feynman: ${message}`);
+  process.exit(2);
+}
+
+// Read a JSON config file we may later REWRITE. The whole point is to merge our
+// hook entry into the user's existing config and write it back — so we must
+// distinguish "file absent" (safe to start from {}) from "file present but
+// unparseable" (a trailing comma, a comment, or a truncated write). Returning {}
+// in the latter case would silently DESTROY the user's settings on the next
+// write, so we refuse and exit instead.
+function readJsonConfig(filePath: string): Record<string, unknown> {
+  let text: string;
   try {
-    return JSON.parse(fs.readFileSync(cfg.settingsPath, 'utf8')) as Record<string, unknown>;
-  } catch (_) {
-    return {};
+    text = fs.readFileSync(filePath, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {};
+    return fatal(`cannot read ${filePath}: ${(err as Error).message}`);
   }
+  if (text.trim() === '') return {};
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch (_) {
+    return fatal(
+      `refusing to touch ${filePath}: file exists but is not valid JSON ` +
+      `(trailing comma, comment, or truncated write?). Fix it by hand and re-run.`,
+    );
+  }
+}
+
+function readSettings(target: string): Record<string, unknown> {
+  return readJsonConfig(targetConfig(target).settingsPath);
 }
 
 function writeSettings(target: string, settings: Record<string, unknown>): void {
@@ -762,12 +788,7 @@ function uninstallHookTarget(target: string): UninstallResult {
 // ─── OpenCode adapter ─────────────────────────────────────────────────────────
 
 function readOpenCodeSettings(settingsPath: string): Record<string, unknown> {
-  if (!fs.existsSync(settingsPath)) return {};
-  try {
-    return JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as Record<string, unknown>;
-  } catch (_) {
-    return {};
-  }
+  return readJsonConfig(settingsPath);
 }
 
 function installOpenCodeTarget(opts: { force: boolean }): InstallResult {
