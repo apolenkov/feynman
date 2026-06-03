@@ -31,6 +31,18 @@ export const OUTPUT_STYLE_SUFFIX: Record<string, string> = {
   middle: '\n\nOutput style: middle — frame blocks only for ≥6 items; prefer trees and markdown tables.',
 };
 
+/**
+ * Append the output_style suffix to already-extracted rules text. Shared by both
+ * injection hooks (the SessionStart and UserPromptSubmit paths applied this
+ * identically). A non-string or unmapped style (incl. the default `full`) adds
+ * no suffix — invalid values fall back to no-suffix for safety, never throw.
+ */
+export function applyOutputStyle(rulesText: string, outputStyle: unknown): string {
+  const styleValue = typeof outputStyle === 'string' ? outputStyle : 'full';
+  const styleSuffix = OUTPUT_STYLE_SUFFIX[styleValue];
+  return styleSuffix ? rulesText + styleSuffix : rulesText;
+}
+
 // ─── Rules extraction ─────────────────────────────────────────────────────────
 
 const VALID_INTENSITIES = ['lite', 'full', 'ultra'];

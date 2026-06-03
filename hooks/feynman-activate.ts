@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { pathToFileURL } from 'url';
-import { OUTPUT_STYLE_SUFFIX, readRulesForIntensity, reconcileState, writeState } from '../lib/feynman-state.ts';
+import { applyOutputStyle, readRulesForIntensity, reconcileState, writeState } from '../lib/feynman-state.ts';
 
 // Path constants — use os.homedir(), never tilde strings (bug #8810).
 // FEYNMAN_HOME lets the same hook serve Claude Code (~/.claude) and Codex (~/.codex).
@@ -87,12 +87,8 @@ process.stdin.on('end', () => {
     // Step 4: append output_style suffix (Phase 10 STYLE-03)
     // Orthogonal axis to intensity: intensity controls rules-file SIZE,
     // output_style controls visual verbosity in the model's response.
-    // Invalid values fall back to 'full' (no suffix) for safety.
-    const styleValue = (typeof state.output_style === 'string') ? state.output_style : 'full';
-    const styleSuffix = OUTPUT_STYLE_SUFFIX[styleValue]; // undefined for 'full' or invalid
-    if (styleSuffix) {
-      rulesText = rulesText + styleSuffix;
-    }
+    // Shared helper: invalid values fall back to 'full' (no suffix) for safety.
+    rulesText = applyOutputStyle(rulesText, state.output_style);
 
     // Step 5: increment injection counter and write state back (HOOK-05).
     // The legacy count→injections migration already happened in reconcileState.

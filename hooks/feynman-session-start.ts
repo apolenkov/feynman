@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { OUTPUT_STYLE_SUFFIX, readRulesForIntensity, reconcileState } from '../lib/feynman-state.ts';
+import { applyOutputStyle, readRulesForIntensity, reconcileState } from '../lib/feynman-state.ts';
 
 // state.json / .feynman-active I/O now lives behind the store (ADR-0004), keyed by CLIENT_HOME.
 const HOME        = os.homedir();
@@ -43,12 +43,8 @@ process.stdin.on('end', () => {
     if (!rulesText) process.exit(0);
 
     // Apply output_style suffix (Phase 10 STYLE-03) — same axis as activate hook.
-    // Invalid values fall back to 'full' (no suffix) for safety.
-    const styleValue = (typeof state.output_style === 'string') ? state.output_style : 'full';
-    const styleSuffix = OUTPUT_STYLE_SUFFIX[styleValue];
-    if (styleSuffix) {
-      rulesText = rulesText + styleSuffix;
-    }
+    // Shared helper: invalid values fall back to 'full' (no suffix) for safety.
+    rulesText = applyOutputStyle(rulesText, state.output_style);
 
     // SessionStart accepts plain stdout as context, matching caveman's hook shape.
     process.stdout.write(rulesText);
