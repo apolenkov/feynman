@@ -55,6 +55,20 @@ const XML_MATCHERS: Record<string, RegExp> = {
 };
 
 /**
+ * Sanity-check that opening and closing <intensity> tags balance (WR-01/02/03).
+ * Counts only the `name=` opening form — exactly what XML_MATCHERS extracts — so a
+ * stray `<intensity>` without a name attribute cannot inflate the open count past
+ * what the extractor can actually read. A file with zero tags is balanced
+ * (0 === 0), letting the legacy HTML-comment fallback in readRulesForIntensity
+ * still fire. Shared by both injection hooks so "balanced" means one thing.
+ */
+export function assertTagPairs(content: string): boolean {
+  const opens  = (content.match(/<intensity\s+name\s*=/gi) || []).length;
+  const closes = (content.match(/<\/intensity>/gi)         || []).length;
+  return opens === closes;
+}
+
+/**
  * Extract the intensity-gated block from rules file content.
  *
  * Supports XML format (<intensity name="X">…</intensity>) and legacy

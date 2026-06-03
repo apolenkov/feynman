@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { pathToFileURL } from 'url';
-import { applyOutputStyle, readRulesForIntensity, reconcileState, writeState } from '../lib/feynman-state.ts';
+import { applyOutputStyle, assertTagPairs, readRulesForIntensity, reconcileState, writeState } from '../lib/feynman-state.ts';
 
 // Path constants — use os.homedir(), never tilde strings (bug #8810).
 // FEYNMAN_HOME lets the same hook serve Claude Code (~/.claude) and Codex (~/.codex).
@@ -15,15 +15,6 @@ import { applyOutputStyle, readRulesForIntensity, reconcileState, writeState } f
 const HOME        = os.homedir();
 const CLIENT_HOME = process.env['FEYNMAN_HOME'] || path.join(HOME, '.claude');
 const RULES_PATH  = process.env['FEYNMAN_RULES_PATH'] || path.join(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
-
-// Sanity-check: opening and closing <intensity> tags must balance (WR-01/02/03).
-// Called before block extraction to prevent lazy-quantifier cross-contamination.
-// Returns true when counts match (including 0===0 for non-XML files).
-export function assertTagPairs(content: string): boolean {
-  const opens  = (content.match(/<intensity\s+name\s*=/gi) || []).length;
-  const closes = (content.match(/<\/intensity>/gi)         || []).length;
-  return opens === closes;
-}
 
 // Fallback injected when rules file is malformed (WR-02).
 // Short enough to stay well under the 10 000-char additionalContext cap.

@@ -1,11 +1,11 @@
 // tests/hook_sanity.test.ts — unit tests for assertTagPairs (WR-01/02/03)
-// Uses node:test + node:assert/strict. Imports assertTagPairs directly from
-// the hook module — no child-process spawn needed for pure-function tests.
+// Uses node:test + node:assert/strict. Imports assertTagPairs from the shared
+// core (both hooks use the same definition) — no child-process spawn needed.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { assertTagPairs } from '../hooks/feynman-activate.ts';
+import { assertTagPairs } from '../lib/feynman-state.ts';
 
 describe('assertTagPairs', () => {
 
