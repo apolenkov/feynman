@@ -36,7 +36,7 @@
 - [ ] 3.1 Grep every reference to `feynman-activate` (the hook, not
   `feynman-activate.md`), `UserPromptSubmit`, `MALFORMED_FALLBACK`, and
   `malformed_rules` across `tests/`, `docs/` (architecture.md, README.md,
-  PRIVACY.md, CONTRIBUTING.md, `skills/feynman/SKILL.md`, self-improvement.md,
+  PRIVACY.md, CONTRIBUTING.md, `skills/feynman/SKILL.md`,
   token-economy-planning.md), `scripts/` (build-package.ts, release-smoke.ts,
   feynman-highlight.ts), and `evals/evals.json`; update or remove each. Leave the
   legacy-cleanup matcher (task 2.4) intact.
