@@ -133,7 +133,13 @@ export function parse(markdown: string): DiagramNode[] {
     const line = lines[i]!;
     const trimmed = line.trim();
 
-    // Check for fenced code block: ```
+    // Check for fenced code block: a line that is exactly three backticks plus an
+    // optional language word. KNOWN LIMITATION (won't-fix): only exactly-three
+    // backtick fences are recognised — longer fences (````, valid CommonMark used
+    // to nest a ``` block inside) and nested fences are not parsed; the first inner
+    // ``` is treated as the outer close. No shipped rules/ or examples/ content uses
+    // them, so this stays a documented edge rather than added parser state. Revisit
+    // only if a real diagram needs a nested or 4-backtick fence.
     const fenceMatch = trimmed.match(/^```(\w*)$/);
     if (fenceMatch) {
       const lang = fenceMatch[1]!.toLowerCase();
