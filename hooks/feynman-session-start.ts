@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { applyOutputStyle, readRulesForIntensity, reconcileState } from '../lib/feynman-state.ts';
+import { applyOutputStyle, assertTagPairs, readRulesForIntensity, reconcileState } from '../lib/feynman-state.ts';
 
 // state.json / .feynman-active I/O now lives behind the store (ADR-0004), keyed by CLIENT_HOME.
 const HOME        = os.homedir();
@@ -16,10 +16,12 @@ const RULES_PATH  = process.env['FEYNMAN_RULES_PATH'] || path.join(import.meta.d
 function readRules(intensity: string): string {
   const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
 
-  // Sanity: opening/closing intensity tags must balance (WR-02 cross-block guard)
-  const opens  = (rulesContent.match(/<intensity\b/gi) || []).length;
-  const closes = (rulesContent.match(/<\/intensity>/gi) || []).length;
-  if (opens === 0 || opens !== closes) return '';
+  // Sanity: <intensity> tag pairs must balance (WR-02), via the shared check so
+  // "balanced" means the same thing as the UserPromptSubmit hook. A balanced file
+  // with no XML tags (0===0) still passes, so the legacy HTML-comment fallback in
+  // readRulesForIntensity can fire — matching the rules-injection spec's
+  // "Legacy HTML-comment fallback" scenario on this path too.
+  if (!assertTagPairs(rulesContent)) return '';
 
   return readRulesForIntensity(rulesContent, intensity);
 }

@@ -1353,6 +1353,44 @@ describe('hook output_style suffix injection (Phase 10)', () => {
   });
 });
 
+// ─── H1: SessionStart legacy HTML-comment fallback (tag-pair consolidation) ──
+// Both injection hooks now share assertTagPairs; a balanced file with no XML
+// tags (0===0) passes the check, so the legacy <!-- --> fallback fires on the
+// SessionStart path too — parity with UserPromptSubmit (Path 11) and the
+// rules-injection spec's "Legacy HTML-comment fallback" scenario.
+
+describe('session-start legacy HTML-comment fallback (H1)', () => {
+  it('injects legacy <!-- --> marker content when the rules file has no XML tags', () => {
+    const tmpHome = makeTempHome();
+    try {
+      const feynmanDir = path.join(tmpHome, '.claude', '.feynman');
+      fs.mkdirSync(feynmanDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(feynmanDir, 'state.json'),
+        JSON.stringify({ enabled: true, intensity: 'full', injections: 0 })
+      );
+      fs.writeFileSync(path.join(tmpHome, '.claude', '.feynman-active'), 'full');
+
+      const rulesPath = path.join(tmpHome, 'legacy-rules.md');
+      fs.writeFileSync(rulesPath, [
+        '<!-- full -->',
+        'Legacy full rules content via HTML-comment markers.',
+        '<!-- /full -->',
+      ].join('\n'));
+
+      const result = runSessionHookWithRulesPath(tmpHome, rulesPath);
+      assert.equal(result.status, 0);
+      assert.match(
+        result.stdout,
+        /Legacy full rules content via HTML-comment markers\./,
+        'session-start must inject legacy HTML-comment content (parity with UserPromptSubmit)'
+      );
+    } finally {
+      rmrf(tmpHome);
+    }
+  });
+});
+
 // ─── A04: SessionStart output_style suffix (finding A04) ─────────────────────
 
 describe('session-start output_style suffix injection (A04)', () => {
