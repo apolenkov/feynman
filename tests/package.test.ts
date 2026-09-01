@@ -1,56 +1,41 @@
-// tests/package.test.ts — package metadata and plugin manifests
-// Uses node:test + node:assert/strict.
-
+// Package metadata and native Codex marketplace contract.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const REPO_DIR = path.resolve(import.meta.dirname, '..');
+const ROOT = path.resolve(import.meta.dirname, '..');
 
-function readJson(relPath: string): Record<string, unknown> {
-  return JSON.parse(fs.readFileSync(path.join(REPO_DIR, relPath), 'utf8'));
+function readJson(rel: string): Record<string, unknown> {
+  return JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 }
 
 describe('package metadata', () => {
-  it('uses the albinocrabs npm scope while keeping CLI bin names', () => {
+  it('uses the public npm scope and TypeScript CLI entrypoints', () => {
     const pkg = readJson('package.json');
     assert.equal(pkg['name'], '@albinocrabs/feynman');
-    assert.equal((pkg['bin'] as Record<string, string>)['feynman'], 'bin/feynman.ts');
-    assert.equal((pkg['bin'] as Record<string, string>)['feynman-lint'], 'bin/feynman-lint.ts');
+    assert.deepEqual(pkg['bin'], { feynman: 'bin/feynman.ts', 'feynman-lint': 'bin/feynman-lint.ts' });
   });
 
-  it('ships the native Codex marketplace files in the npm package', () => {
-    const pkg = readJson('package.json');
-    assert.ok((pkg['files'] as string[]).includes('.agents/'));
-    assert.ok((pkg['files'] as string[]).includes('plugins/'));
-  });
-
-  it('ships Claude plugin manifest in npm package file list', () => {
-    const pkg = readJson('package.json');
-    assert.ok((pkg['files'] as string[]).includes('.claude-plugin/'), '.claude-plugin/ must be in files');
-  });
-
-  it('ships public open-source docs in npm package file list', () => {
-    const pkg = readJson('package.json');
-    for (const file of ['docs/', 'examples/', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md', 'PRIVACY.md']) {
-      assert.ok((pkg['files'] as string[]).includes(file), `${file} should be included in package files`);
+  it('publishes only Codex marketplace assets and public documentation', () => {
+    const files = readJson('package.json')['files'] as string[];
+    for (const entry of ['.agents/', 'plugins/', 'hooks/', 'rules/', 'docs/', 'examples/', 'README.md']) {
+      assert.ok(files.includes(entry), `${entry} should be included in package files`);
     }
+    assert.equal(files.some((entry) => /claude|opencode/i.test(entry)), false);
+    assert.equal(files.includes('skills/'), false, 'retired root skills directory must not be packaged');
   });
 
-  it('measures application source instead of test harness files in coverage', () => {
-    const pkg = readJson('package.json');
-    const coverage = (pkg['scripts'] as Record<string, string>)['coverage'];
-    assert.ok(coverage, 'package.json must define a coverage script');
-    assert.match(coverage, /--test-coverage-exclude=tests\/\*\*/);
+  it('keeps coverage focused on application files', () => {
+    const scripts = readJson('package.json')['scripts'] as Record<string, string>;
+    assert.match(scripts['coverage']!, /--test-coverage-exclude=tests\/\*\*/);
   });
 
-  it('ships a native Codex marketplace plugin without an unsupported hook declaration', () => {
+  it('ships a native Codex marketplace plugin without hook declarations', () => {
     const pkg = readJson('package.json');
     const marketplace = readJson('.agents/plugins/marketplace.json');
-    const plugins = marketplace['plugins'] as Array<{ name: string; source: { path: string } }>;
     assert.equal(marketplace['name'], 'feynman');
-    assert.deepEqual(plugins, [{
+    assert.deepEqual(marketplace['plugins'], [{
       name: 'feynman',
       source: { source: 'local', path: './plugins/feynman' },
       policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
@@ -60,46 +45,26 @@ describe('package metadata', () => {
     const manifest = readJson('plugins/feynman/.codex-plugin/plugin.json');
     assert.equal(manifest['name'], 'feynman');
     assert.equal(manifest['version'], pkg['version']);
-    assert.equal(manifest['hooks'], undefined, 'native Codex manifests do not declare hook files');
+    assert.equal(manifest['hooks'], undefined);
+    assert.equal(manifest['mcpServers'], undefined);
+    assert.equal(manifest['apps'], undefined);
     assert.equal(manifest['skills'], './skills/');
-    assert.match(
-      fs.readFileSync(path.join(REPO_DIR, 'plugins/feynman/skills/feynman/SKILL.md'), 'utf8'),
-      /Run `feynman --help`/,
-    );
-  });
+    assert.match(String(manifest['description']), /visual architecture/i);
+    assert.deepEqual(manifest['keywords'], [
+      'codex', 'ascii-diagrams', 'visual-architecture', 'flows', 'comparisons', 'status', 'productivity',
+    ]);
 
-  it('Claude plugin hooks.json registers only SessionStart hook (no UserPromptSubmit)', () => {
-    const hooks = readJson('hooks/hooks.json');
-    const hooksMap = hooks['hooks'] as Record<string, unknown[]>;
-    const sessionEntries = hooksMap['SessionStart'];
-    assert.ok(Array.isArray(sessionEntries));
-    assert.equal(hooksMap['UserPromptSubmit'], undefined, 'UserPromptSubmit must not be registered (v0.7.0+)');
-    const sessionEntry = sessionEntries![0] as { matcher?: string; hooks: { command: string }[] };
-    assert.ok(sessionEntry.matcher?.includes('compact'), 'matcher must include compact');
-    assert.ok(sessionEntry.matcher?.includes('clear'), 'matcher must include clear');
-    const sessionCommand = sessionEntry.hooks[0]!.command;
-    assert.ok(sessionCommand.includes('FEYNMAN_HOME="$HOME/.claude"'));
-    assert.ok(sessionCommand.includes('${CLAUDE_PLUGIN_ROOT}/hooks/feynman-session-start.ts'));
-  });
+    const interfaceMeta = manifest['interface'] as Record<string, unknown>;
+    assert.equal(interfaceMeta['brandColor'], '#2563EB');
+    assert.deepEqual(interfaceMeta['capabilities'], ['Interactive']);
+    const prompts = interfaceMeta['defaultPrompt'] as string[];
+    assert.ok(prompts.length > 0 && prompts.length <= 3);
+    assert.ok(prompts.every((prompt) => prompt.length <= 128));
 
-  it('Feynman skill resolves Claude and Codex runtime homes', () => {
-    const skill = fs.readFileSync(path.join(REPO_DIR, 'skills/feynman/SKILL.md'), 'utf8');
-    assert.ok(skill.includes('FEYNMAN_TARGET'));
-    assert.ok(skill.includes('CODEX_THREAD_ID'));
-    assert.ok(skill.includes("path.join(os.homedir(), '.codex')"));
-    assert.ok(skill.includes("path.join(os.homedir(), '.claude')"));
-  });
-
-  it('Feynman skill documents style subcommand (Phase 10 STYLE-02)', () => {
-    const skill = fs.readFileSync(path.join(REPO_DIR, 'skills/feynman/SKILL.md'), 'utf8');
-    // The skill must mention the new `style <preset>` argument.
-    assert.ok(/style\s+short\|middle\|full|style\s+\<preset\>|`style`/.test(skill),
-      'SKILL.md must document the style subcommand for STYLE-02');
-    // All three presets must be referenced.
-    assert.ok(skill.includes('short'), 'short preset documented');
-    assert.ok(skill.includes('middle'), 'middle preset documented');
-    // Status output must surface output_style alongside intensity.
-    assert.ok(skill.includes('output_style'),
-      'status output must include output_style field');
+    const skill = fs.readFileSync(path.join(ROOT, 'plugins/feynman/skills/feynman/SKILL.md'), 'utf8');
+    assert.match(skill, /visual architecture/i);
+    assert.match(skill, /npx -y @albinocrabs\/feynman@latest state/);
+    assert.doesNotMatch(skill, /disable-model-invocation/);
+    assert.match(skill, /never write `~\/\.codex\/\.feynman\/state\.json`/);
   });
 });

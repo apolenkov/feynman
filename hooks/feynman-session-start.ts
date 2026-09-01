@@ -6,12 +6,13 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { applyOutputStyle, assertTagPairs, readRulesForIntensity, reconcileState, writeState } from '../lib/feynman-state.ts';
+import { applyOutputStyle, assertTagPairs, readRulesForIntensity } from '../lib/state/index.ts';
+import { reconcileState, writeState } from '../bin/adapters/state-store.ts';
 
 // state.json / .feynman-active I/O now lives behind the store (ADR-0004), keyed by CLIENT_HOME.
 const HOME        = os.homedir();
-const CLIENT_HOME = process.env['FEYNMAN_HOME'] || path.join(HOME, '.claude');
-const RULES_PATH  = process.env['FEYNMAN_RULES_PATH'] || path.join(import.meta.dirname, '..', 'rules', 'feynman-activate.md');
+const CLIENT_HOME = process.env['FEYNMAN_HOME'] || path.join(HOME, '.codex');
+const RULES_PATH  = process.env['FEYNMAN_RULES_PATH'] || path.join(import.meta.dirname, '..', 'rules', 'feynman-contract.md');
 
 function readRules(intensity: string): string {
   const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');

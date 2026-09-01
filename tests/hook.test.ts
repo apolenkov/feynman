@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { assertTagPairs, readRulesForIntensity } from '../lib/feynman-state.ts';
+import { assertTagPairs, readRulesForIntensity } from '../lib/state/index.ts';
 
 const SESSION_HOOK_PATH = path.resolve(import.meta.dirname, '..', 'hooks', 'feynman-session-start.ts');
 
@@ -59,7 +59,7 @@ describe('SessionStart rule injection', () => {
       assert.match(result.stdout, /<triggers>|<contract>|→|├──/);
       assert.equal(result.stdout.endsWith('\n'), false, 'hook output must not add a trailing newline');
 
-      const root = path.join(home, '.claude');
+      const root = path.join(home, '.codex');
       const state = JSON.parse(fs.readFileSync(path.join(root, '.feynman', 'state.json'), 'utf8'));
       assert.deepEqual(state, {
         enabled: true,
@@ -73,7 +73,7 @@ describe('SessionStart rule injection', () => {
     }
   });
 
-  it('uses FEYNMAN_HOME for Codex state without touching the Claude home', () => {
+  it('uses FEYNMAN_HOME for Codex state without changing the configured Codex home', () => {
     const home = makeTempHome();
     const codexHome = path.join(home, '.codex');
     try {
@@ -81,7 +81,6 @@ describe('SessionStart rule injection', () => {
       const result = runSessionHook(home, { session_id: 'codex-session' }, { FEYNMAN_HOME: codexHome });
       assert.equal(result.status, 0, result.stderr);
       assert.match(result.stdout, /<triggers>|<contract>|→|├──/);
-      assert.equal(fs.existsSync(path.join(home, '.claude', '.feynman', 'state.json')), false);
       const state = JSON.parse(fs.readFileSync(path.join(codexHome, '.feynman', 'state.json'), 'utf8'));
       assert.equal(state.injections, 4, 'each successful SessionStart injection increments the local counter');
     } finally {
@@ -91,7 +90,7 @@ describe('SessionStart rule injection', () => {
 
   it('is silent and removes a stale active flag when state is disabled', () => {
     const home = makeTempHome();
-    const root = path.join(home, '.claude');
+    const root = path.join(home, '.codex');
     try {
       writeState(root, { enabled: false, intensity: 'full', output_style: 'full', injections: 0 });
       const result = runSessionHook(home);
@@ -109,7 +108,7 @@ describe('SessionStart rule injection', () => {
       const result = runSessionHook(home, { session_id: '../../outside' });
       assert.equal(result.status, 0, result.stderr);
       assert.equal(result.stdout, '');
-      assert.equal(fs.existsSync(path.join(home, '.claude', '.feynman', 'state.json')), false);
+      assert.equal(fs.existsSync(path.join(home, '.codex', '.feynman', 'state.json')), false);
     } finally {
       removeTempHome(home);
     }
@@ -117,7 +116,7 @@ describe('SessionStart rule injection', () => {
 
   it('rejects malformed XML and legacy HTML-comment rule files', () => {
     const home = makeTempHome();
-    const root = path.join(home, '.claude');
+    const root = path.join(home, '.codex');
     const malformedRules = path.join(home, 'malformed.md');
     const legacyRules = path.join(home, 'legacy.md');
     try {
@@ -138,7 +137,7 @@ describe('SessionStart rule injection', () => {
 
   it('appends the configured output-style suffix to SessionStart output', () => {
     const home = makeTempHome();
-    const root = path.join(home, '.claude');
+    const root = path.join(home, '.codex');
     try {
       writeState(root, { enabled: true, intensity: 'full', output_style: 'short', injections: 0 });
       const result = runSessionHook(home);
@@ -151,7 +150,7 @@ describe('SessionStart rule injection', () => {
 
   it('normalizes a malformed injection counter before incrementing it', () => {
     const home = makeTempHome();
-    const root = path.join(home, '.claude');
+    const root = path.join(home, '.codex');
     try {
       writeState(root, { enabled: true, intensity: 'full', output_style: 'full', injections: 'broken' });
       const result = runSessionHook(home);

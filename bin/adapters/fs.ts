@@ -1,3 +1,5 @@
+// bin/adapters/fs.ts — filesystem operations used by application commands.
+
 import fs from 'node:fs';
 import path from 'node:path';
 

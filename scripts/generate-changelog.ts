@@ -3,6 +3,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import url from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
@@ -122,14 +123,46 @@ function render(version: string, tag: string, commits: Commit[]): string {
   return lines.join('\n');
 }
 
-const tag = previousTag();
-const commits = commitsSince(tag);
-const generated = render(pkg.version, tag, commits);
-const existing = fs.existsSync(CHANGELOG) ? fs.readFileSync(CHANGELOG, 'utf8') : '';
-const previous = existing.replace(/^# Changelog[\s\S]*?(?=^##\s)/m, '').trim();
-const content = previous && !previous.startsWith(`## ${pkg.version} `)
-  ? `${generated}\n${previous}\n`
-  : `${generated}\n`;
+/**
+ * Turn a maintained Unreleased section into the release section without
+ * inferring a range from git tags. This preserves curated release notes when
+ * an older repository has gaps in its tag history.
+ */
+export function promoteUnreleased(existing: string, version: string, date: string): string | undefined {
+  const heading = /^## \[Unreleased\][ \t]*$/m.exec(existing);
+  if (!heading || heading.index === undefined) return undefined;
 
-fs.writeFileSync(CHANGELOG, content);
-console.log(`CHANGELOG.md updated for ${pkg.version} (${commits.length} commits since ${tag || 'repo start'})`);
+  const afterHeading = heading.index + heading[0].length;
+  const nextSection = existing.indexOf('\n## ', afterHeading);
+  const unreleasedBody = existing.slice(afterHeading, nextSection === -1 ? undefined : nextSection);
+  if (!unreleasedBody.trim()) return undefined;
+
+  return `${existing.slice(0, heading.index)}## ${version} - ${date}${existing.slice(afterHeading)}`;
+}
+
+function main(): void {
+  const existing = fs.existsSync(CHANGELOG) ? fs.readFileSync(CHANGELOG, 'utf8') : '';
+  const date = new Date().toISOString().slice(0, 10);
+  const promoted = promoteUnreleased(existing, pkg.version, date);
+
+  if (promoted) {
+    fs.writeFileSync(CHANGELOG, promoted);
+    console.log(`CHANGELOG.md promoted [Unreleased] for ${pkg.version}`);
+    return;
+  }
+
+  const tag = previousTag();
+  const commits = commitsSince(tag);
+  const generated = render(pkg.version, tag, commits);
+  const previous = existing.replace(/^# Changelog[\s\S]*?(?=^##\s)/m, '').trim();
+  const content = previous && !previous.startsWith(`## ${pkg.version} `)
+    ? `${generated}\n${previous}\n`
+    : `${generated}\n`;
+
+  fs.writeFileSync(CHANGELOG, content);
+  console.log(`CHANGELOG.md updated for ${pkg.version} (${commits.length} commits since ${tag || 'repo start'})`);
+}
+
+const invokedPath = process.argv[1] ? fs.realpathSync(process.argv[1]) : '';
+const modulePath = fs.realpathSync(url.fileURLToPath(import.meta.url));
+if (invokedPath === modulePath) main();

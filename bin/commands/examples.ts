@@ -1,7 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ExampleEntry } from '../cli/types.ts';
 import { EXAMPLES_HELP } from '../cli/help.ts';
+
+interface ExampleEntry {
+  name: string;
+  title: string;
+  question: string;
+  path: string;
+}
 
 // EXAMPLES_DIR resolves to <repo>/examples.
 // import.meta.dirname is bin/commands/, so we need '../../' to reach repo root.

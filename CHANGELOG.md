@@ -4,11 +4,20 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- feynman is now Codex-only. Retired client adapters, hook manifests, skills,
+  and target-selection commands are no longer shipped. Use `feynman state` or
+  `feynman status` to manage the one supported local runtime.
+
 ### Changed
 
-- Codex now ships as a native marketplace skill; the explicit installer remains
-  the supported way to register its `SessionStart` hook. Obsolete root Codex
-  hook manifests and the retired `feynman-activate` runtime were removed.
+- Codex ships as a native marketplace skill; the explicit installer remains the
+  supported way to register its `SessionStart` hook.
+- Native-plugin metadata and the skill description now cover visual
+  architecture, flows, trees, comparisons, priorities, and status. The skill
+  invokes the packaged CLI through `npx`, so it has no global-binary
+  prerequisite.
 - The supported Node.js baseline is now 22.18 or newer, matching Node's stable
   built-in TypeScript support and the current ESLint runtime requirement.
 - Development tooling was refreshed to current compatible releases. TypeScript
@@ -25,6 +34,8 @@ All notable changes to this project are documented here.
 - `SessionStart` now increments only a valid local injection counter and
   recovers safely from malformed counter values.
 - Release bumping requires explicit `--commit`, `--tag`, and `--push` flags.
+- Changelog generation promotes a maintained `[Unreleased]` section instead of
+  duplicating history when legacy git tags are incomplete.
 
 ## 1.4.0 - 2026-05-25
 

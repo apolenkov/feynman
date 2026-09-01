@@ -3,14 +3,14 @@
 // Subcommands: install, uninstall, doctor, lint, examples, bootstrap, version, help
 // Zero runtime deps. ESM TypeScript. Node >= 22.18.
 
-import { HELP, INSTALL_HELP, UNINSTALL_HELP, DOCTOR_HELP, cmdHelp } from './cli/help.ts';
-import { parseTarget } from './cli/targets.ts';
+import { HELP, INSTALL_HELP, UNINSTALL_HELP, DOCTOR_HELP, STATE_HELP, cmdHelp } from './cli/help.ts';
 import { cmdExamples } from './commands/examples.ts';
 import { cmdVersion } from './commands/version.ts';
 import { cmdLint } from './commands/lint.ts';
 import { cmdBootstrap } from './commands/bootstrap.ts';
 import { cmdInstall, cmdUninstall } from './commands/install.ts';
 import { cmdDoctor } from './commands/doctor.ts';
+import { cmdState } from './commands/state.ts';
 
 // ─── Help text ────────────────────────────────────────────────────────────────
 // Moved to bin/cli/help.ts; imported above.
@@ -40,21 +40,28 @@ if (!sub || sub === 'help' || sub === '--help' || sub === '-h') {
 switch (sub) {
   case 'install': {
     if (rest.includes('--help')) { console.log(INSTALL_HELP); process.exit(0); }
-    const parsed = parseTarget(rest);
-    const force = parsed.args.includes('--force');
-    cmdInstall({ force, target: parsed.target });
+    const force = rest.includes('--force');
+    const unknown = rest.filter(arg => arg !== '--force');
+    if (unknown.length > 0) { console.error(`feynman install: unexpected arguments "${unknown.join(' ')}"`); process.exit(2); }
+    cmdInstall({ force });
     break;
   }
   case 'uninstall': {
     if (rest.includes('--help')) { console.log(UNINSTALL_HELP); process.exit(0); }
-    const parsed = parseTarget(rest);
-    cmdUninstall({ target: parsed.target });
+    if (rest.length > 0) { console.error(`feynman uninstall: unexpected arguments "${rest.join(' ')}"`); process.exit(2); }
+    cmdUninstall();
     break;
   }
   case 'doctor': {
     if (rest.includes('--help')) { console.log(DOCTOR_HELP); process.exit(0); }
-    const parsed = parseTarget(rest);
-    cmdDoctor({ target: parsed.target });
+    if (rest.length > 0) { console.error(`feynman doctor: unexpected arguments "${rest.join(' ')}"`); process.exit(2); }
+    cmdDoctor();
+    break;
+  }
+  case 'state':
+  case 'status': {
+    if (rest.includes('--help') || rest.includes('-h')) { console.log(STATE_HELP); process.exit(0); }
+    cmdState(sub === 'status' ? ['status', ...rest] : rest);
     break;
   }
   case 'lint': {

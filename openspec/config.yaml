@@ -1,33 +1,32 @@
 schema: spec-driven
 
-# Project context — shown to AI when creating artifacts.
 context: |
-  Project: feynman — an open-source Claude Code / Codex plugin that injects ASCII-diagram rules at
-  session start (and after /compact and /clear) via the SessionStart hook, so the assistant draws a
-  diagram whenever a response has Structure, without the developer having to ask.
+  Project: feynman — an open-source Codex-only plugin that injects a compact
+  Contract at SessionStart and provides a local ASCII Visual linter.
 
-  Single source of truth — do NOT duplicate facts here; point to the canonical file:
-    - Entry point & conventions  → AGENTS.md
-    - Domain terms (Structure, Trigger, Visual, Intensity), use exactly  → /CONTEXT.md
-    - Architecture (hook lifecycle, lint pipeline, state schema)  → docs/architecture.md
-    - Decisions & the toolchain / zero-runtime-deps contract  → docs/adr/ (ADR 0001)
+  Canonical sources:
+    - Repository conventions → AGENTS.md
+    - Domain terms (Structure, Trigger, Visual, Intensity) → CONTEXT.md
+    - Ownership and boundaries → docs/architecture.md
+    - Decisions and toolchain constraints → docs/adr/
+    - Active requirements → openspec/specs/
 
-  Linters: `npm run lint` is feynman's product diagram linter (bin/feynman-lint, L01–L14);
-  `npm run eslint` is the code linter — do not confuse them. Tests run on node --test.
-  Claude Code and Codex are both first-class targets; IDE compat covers Cline/Windsurf
-  (.clinerules/) and Cursor (.cursor/rules/*.mdc).
+  `npm run lint` is the product Visual linter; `npm run eslint` is the
+  TypeScript linter. Tests use Node's built-in node:test runner. The supported
+  runtime is Node.js 22.18 or newer and the published package has zero runtime
+  dependencies.
 
-  Conventions: conventional commits. Planning is OpenSpec (this directory); the legacy GSD
-  `.planning/` system was retired 2026-06-01.
+  The supported target is Codex. The native marketplace plugin and npm CLI are
+  delivery paths for the same Contract. Planning is OpenSpec; archived change
+  records are historical context, not active requirements.
 
-# Per-artifact rules.
 rules:
   proposal:
     - State the user-facing problem and why it matters before proposing a solution.
     - Always include a "Non-goals" section.
   specs:
-    - Use domain terms exactly as defined in /CONTEXT.md; do not drift to synonyms.
+    - Use domain terms exactly as defined in /CONTEXT.md.
     - Every requirement is a testable "The system SHALL ..." statement with at least one scenario.
   tasks:
-    - Break work into small, independently-committable steps that keep tests green.
+    - Break work into small, independently committable steps that keep tests green.
     - Each task names the files it touches.

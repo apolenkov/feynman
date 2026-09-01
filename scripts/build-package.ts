@@ -74,7 +74,7 @@ for (const dir of ['hooks', 'bin', 'lib']) {
 
 // --- Step 4: copy static package files ---
 const staticItems = [
-  'rules', 'skills', 'docs', 'examples', '.agents', 'plugins', '.claude-plugin',
+  'rules', 'docs', 'examples', '.agents', 'plugins',
   'LICENSE', 'README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md', 'PRIVACY.md',
 ];
 for (const item of staticItems) {
@@ -100,12 +100,6 @@ function rewriteTs(src: string, dest: string): void {
     .replace(/bin\/feynman\.ts/g,         'bin/feynman.js');
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.writeFileSync(dest, content);
-}
-
-// hooks/hooks.json (Claude plugin format) — was already copied; rewrite in place
-const hooksHooksJson = path.join(STAGING, 'hooks', 'hooks.json');
-if (fs.existsSync(path.join(ROOT, 'hooks', 'hooks.json'))) {
-  rewriteTs(path.join(ROOT, 'hooks', 'hooks.json'), hooksHooksJson);
 }
 
 for (const sh of ['install.sh', 'uninstall.sh']) {

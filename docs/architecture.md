@@ -1,233 +1,121 @@
-# feynman Architecture
+# Architecture
 
-Three independent layers: hook lifecycle, lint pipeline, and state schema.
+feynman is a small Codex-only plugin with a compact Onion / Ports-and-Adapters
+shape. The core has no knowledge of Codex or the filesystem; commands and
+adapters depend on that core, never the other way around.
 
-> **Source vs. published artifact:** file paths below name the repo **source**
-> (`.ts`). The published npm package ships the compiled `.js` equivalents —
-> `scripts/build-package.ts` rewrites source paths to compiled `.js` paths at
-> pack time. See [ADR 0001](adr/0001-typescript-source-with-packaging-build.md).
-
----
-
-## Layer 1: Hook Lifecycle
-
-The `SessionStart` hook primes new sessions, resumed sessions, and sessions
-after `/compact` or `/clear`. `UserPromptSubmit` is not used — rules are
-injected once at session start and remain in context for the full session.
-
-```
-~/.claude/settings.json       ~/.codex/hooks.json
-         │
-         └─ hooks.SessionStart  startup | resume | compact | clear
-         ▼
-hooks/feynman-session-start.ts
-         │
-         ├─ [0] FEYNMAN_HOME selects client state root
-         │        unset              → ~/.claude (backward compatible)
-         │        ~/.claude          → Claude Code install
-         │        ~/.codex           → Codex install
-         │
-         ├─ [1] validate session_id (path-traversal guard)
-         │
-         ├─ [2] reconcile $FEYNMAN_HOME/.feynman/state.json + active flag
-         │        state absent             → bootstrap default state + flag
-         │        corrupt JSON             → back up, then bootstrap defaults
-         │        enabled: false           → remove flag, exit 0
-         │        enabled: true            → ensure flag exists
-         │
-         ├─ [3] rules/feynman-activate.md
-         │        extract section for state.intensity
-         │        (lite | full | ultra)
-         │
-         ├─ [4] state.injections++  (best-effort local write)
-         │
-         └─ [5] stdout: plain-text rules → injected into session context
-                  SessionStart hook accepts plain text (no JSON wrapper needed)
+```text
+Core — no I/O
+  rules/feynman-contract.md          Contract: Structure, Trigger, Visual
+  lib/state/model.ts                 state shape and pure style formatting
+  lib/state/rules.ts                 intensity parsing and tag validation
+                 ▲
+Application
+  bin/commands/                      install, doctor, state, uninstall,
+                                     bootstrap, examples, lint
+                 ▲
+Adapters — Codex and filesystem boundary
+  bin/adapters/codex-config.ts       ~/.codex/hooks.json
+  bin/adapters/codex-hook.ts         command construction
+  bin/adapters/state-store.ts        ~/.codex/.feynman state and flag
+  hooks/feynman-session-start.ts     SessionStart input and stdout
+                 ▲
+Runtime
+  ~/.codex/hooks.json
+  ~/.codex/.feynman/state.json
 ```
 
-**Key constraints:**
+There are deliberately no empty domain, service, or repository layers. The core
+never imports an outer layer; adapters never import commands. Commands
+coordinate the concrete local adapters because this small product has one
+runtime, so adding one-implementation interfaces would obscure rather than
+protect the design. `state-store.ts` is the sole state-I/O gateway, so a command
+or hook cannot reimplement JSON, flag, or recovery policy.
 
-- Output is plain text — `SessionStart` hooks emit rules text directly; no
-  JSON wrapper is needed or accepted.
-- Paths use `os.homedir()`, never tilde literals (bug #8810).
-- Production install writes user hook config directly:
-  `~/.claude/settings.json` for Claude Code and `~/.codex/hooks.json` for
-  Codex. Plugin manifests are shipped for discoverability, but direct hook
-  registration remains the reliable fallback.
-- State reconciliation keeps the active flag aligned with `enabled` and handles
-  first run, disabled state, and corrupt JSON consistently (bug #35713).
+## SessionStart flow
 
-**File:** `hooks/feynman-session-start.ts`
+Codex invokes the registered `SessionStart` hook for `startup`, `resume`,
+`compact`, and `clear`:
 
----
-
-## Layer 2: Lint Pipeline
-
-The lint pipeline validates ASCII diagram correctness in markdown files.
-It runs as a CLI tool and as an optional `Stop` hook.
-
-```
-<file.md> or stdin
-         │
-         ▼
-lib/lint/parser.ts
-         │  parseMarkdown(text) → ASTNode[]
-         │  each node: {type, content, startLine, endLine}
-         │  types: fenced_code, ascii_art (freestanding)
-         │
-         ▼
-lib/lint/rules.ts
-         │  runs each rule against each AST node:
-         │
-         ├─ L01_box_closure(ast)
-         ├─ L02_tree_chars(ast)
-         ├─ L03_arrow_style(ast)
-         ├─ L04_column_widths(ast)
-         ├─ L05_flow_integrity(ast)
-         ├─ L06_priority_scale(ast)
-         ├─ L07_no_mermaid_mix(ast, fullText)
-         ├─ L08_frame_width(ast)
-         ├─ L09_right_edge_alignment(ast)
-         ├─ L10_mixed_script(ast, fullText)
-         ├─ L11_overdecoration(ast)
-         ├─ L12_token_budget(ast)
-         ├─ L13_double_wrap(ast)
-         ├─ L14_blank_line_separation(ast)
-         └─ L15_homogeneous_frame(ast)
-         │
-         │  each rule returns Issue[]:
-         │  {rule, severity, line, column, message, suggestion?}
-         │
-         ▼
-reporter (inline in CLI + Stop hook)
-         │
-         ├─ bin/feynman-lint.ts   ← standalone CLI
-         │     feynman lint <file>
-         │     exit 0: no errors
-         │     exit 1: errors found
-         │     exit 2: usage error
-         │     --json: machine-readable output
-         │     --strict: warnings treated as errors
-         │
-         └─ hooks/feynman-lint.ts ← Stop hook (optional)
-               fires after Claude's response
-               if issues found: injects correction context
-               into the next client turn
+```text
+Codex event
+  → hooks/feynman-session-start.ts
+  → validate session input
+  → read/reconcile ~/.codex/.feynman/state.json
+  → select <intensity name="lite|full|ultra">
+  → write best-effort local counter
+  → stdout: plain-text Contract
 ```
 
-**File:** `lib/lint/parser.ts`, `lib/lint/rules.ts`, `bin/feynman-lint.ts`,
-`hooks/feynman-lint.ts`
+Missing state is bootstrapped; corrupt state is backed up and recovered to a
+default. Disabled state emits nothing, and a stale flag is reconciled. The hook
+never reads prompt or response content.
 
----
+## CLI boundary
 
-## Layer 3: State Schema
+`bin/feynman.ts` is only an argument parser and dispatcher. Command behavior is
+under `bin/commands/`; Codex configuration, hook construction, JSON I/O, and
+filesystem helpers are under `bin/adapters/`. `bin/cli/` contains presentation
+only. There is no target-selection option.
 
-All runtime state lives in two files under the selected client root:
-`~/.claude/` for Claude Code, `~/.codex/` for Codex.
-
-```
-~/.claude/ or ~/.codex/
-├── .feynman-active          ← presence flag
-│     present  = feynman active
-│     absent   = user disabled only when state.enabled=false
-│     content  = current intensity string (informational)
-│
-└── .feynman/
-    └── state.json           ← runtime state
-          {
-            "enabled":      boolean,   // true = inject rules on each prompt
-            "intensity":    string,    // "lite" | "full" | "ultra"  — rules-file size
-            "output_style": string,    // "short" | "middle" | "full" — visual verbosity (v0.4.0+)
-            "injections":   number     // cumulative hook fire count
-          }
+```text
+feynman install   → ~/.codex/hooks.json + ~/.codex/.feynman/
+feynman doctor    → read-only health report
+feynman state     → show or change local state and active flag
+feynman uninstall → remove feynman hook and active flag; keep state.json
+feynman lint      → lib/lint/ parser → rules → reporter
 ```
 
-**Two orthogonal axes (v0.4.0):**
+The native marketplace package under `plugins/feynman/` exposes the Codex
+skill. The npm package supplies the CLI and compiled hook. These are two
+delivery paths for the same contract, not separate runtimes.
 
-```
-axis           controls                        value space
-─────────────  ───────────────────────────────  ──────────────────
-intensity      size of injected ruleset         lite / full / ultra
-output_style   verbosity of model's visuals     short / middle / full
-```
+## Lint pipeline
 
-`intensity` shapes how MUCH instruction the model receives (which trigger
-patterns are loaded). `output_style` shapes how HEAVY the model's response
-visuals can be (runtime suffix). The two compose: `lite + short` is the
-minimal pair for mobile/voice chat; `full + middle` is the recommended
-default; `ultra + full` is the maximum-visual configuration.
+The linter is a sibling application path, independent of hook state:
 
-`output_style` is implemented as a one-line runtime suffix appended to the raw
-`SessionStart` output. `rules/feynman-activate.md` is not modified, so the
-4480-byte rules budget stays intact regardless of the chosen style.
-
-**State transitions:**
-
-```
-[first run]
-  both files absent → bootstrap
-  writes state.json {enabled:true, intensity:'full', output_style:'full', injections:0}
-  writes .feynman-active with intensity string
-
-[/feynman off]
-  state.enabled = false
-  .feynman-active deleted
-
-[/feynman on]
-  state.enabled = true
-  .feynman-active created
-
-[/feynman lite | full | ultra]
-  state.intensity = <value>
-  .feynman-active content updated
-
-[/feynman style short | middle | full]
-  state.output_style = <value>
-  hook reads on next fire; no flag-file change
-
-[npx @albinocrabs/feynman uninstall --target claude|codex|both|all|*]
-  hook removed from target hook config
-  .feynman-active deleted
-  state.json preserved (user data)
+```text
+markdown/stdin → lib/lint/parser.ts → lib/lint/rules.ts → reporter
 ```
 
-**Back-compat:** Pre-v0.4.0 `state.json` files lack `output_style`. The
-hook reads `state.output_style || 'full'` so missing field is identical
-to `"full"`. No migration needed.
+Rules L01–L15 validate the rendered Visual after it exists. The injected
+Contract chooses a Visual; the linter checks its layout. `npm run lint` is the
+product linter, while `npm run eslint` checks TypeScript source.
 
-**Schema is frozen** — field names are used by the SessionStart hook, the CLI,
-and `skills/feynman/SKILL.md`. Any rename requires a coordinated update across
-all three consumers.
+## State contract
 
-**File:** read/written by `hooks/feynman-session-start.ts` and the CLI; managed
-by skill commands in `skills/feynman/SKILL.md`.
-
----
-
-## CLI Subcommand Map
-
-```
-   bin/feynman.ts
-   ├── install    → writes target hook config + state.json + flag
-   ├── uninstall  → removes target hook entries + flag (keeps state)
-   ├── doctor     → checks target health criteria, prints frame
-   ├── lint       → delegates to bin/feynman-lint.ts
-   ├── examples   → list and render built-in ASCII examples
-   ├── help       → this help/usage block
-   ├── bootstrap  → exports examples + manifests + skill into local package folder
-   └── version    → prints package.json version
+```json
+{
+  "enabled": true,
+  "intensity": "full",
+  "output_style": "full",
+  "injections": 0
+}
 ```
 
-`/feynman on|off|start|stop|lite|full|ultra` are handled by the skill contract
-in `skills/feynman/SKILL.md` and share aliases:
-`start` == `on`, `stop` == `off`.
+State is local to Codex, user-owned, and intentionally small. `intensity`
+controls the size of the injected Contract; `output_style` controls the visual
+suffix; `injections` is an informational local counter. The schema is consumed
+by the hook, CLI, and Codex skill, so a rename requires a coordinated change.
+The supported mutation boundary is the CLI:
 
-Targets:
-
+```text
+feynman state [on|off|lite|full|ultra]
+feynman state style short|middle|full
+feynman status
 ```
-claude → ~/.claude/settings.json + ~/.claude/.feynman/
-codex  → ~/.codex/hooks.json     + ~/.codex/.feynman/
-both, all, * → runs claude and codex installers/uninstallers idempotently
-```
 
-**File:** `bin/feynman.ts`
+The skill never writes state files directly.
+
+## Packaging
+
+TypeScript source is checked in. Development runs on Node.js 22.18+ with
+Node's built-in type stripping; `npm run build` creates the compiled `.js`
+package for consumers. The published package has zero runtime npm
+dependencies.
+
+See [CONTEXT.md](../CONTEXT.md) for domain vocabulary and
+[docs/adr/0001-typescript-source-with-packaging-build.md](adr/0001-typescript-source-with-packaging-build.md)
+for the source/package trade-off.
+See [ADR-0006](adr/0006-codex-only-ports-and-adapters.md) for the boundary
+decision.

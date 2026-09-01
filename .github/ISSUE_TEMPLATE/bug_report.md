@@ -32,7 +32,7 @@ What actually happens. If there is an error message, paste it verbatim:
 - **feynman version:** `npx @albinocrabs/feynman version`
 - **Node.js version:** `node --version`
 - **OS:** (macOS 14 / Ubuntu 22.04 / etc.)
-- **Claude Code version:** (from Help > About, or `claude --version`)
+- **Codex version:** (for example, `codex --version`)
 
 ## Additional Context
 

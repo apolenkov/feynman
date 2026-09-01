@@ -32,7 +32,6 @@ if (!arg || invalidFlag || (shouldTag && !shouldCommit) || (shouldPush && (!shou
 
 const VERSION_MANIFESTS: string[] = [
   'package.json',
-  '.claude-plugin/plugin.json',
   'plugins/feynman/.codex-plugin/plugin.json',
 ];
 const RELEASE_FILES: string[] = [...VERSION_MANIFESTS, 'package-lock.json', 'CHANGELOG.md'];
@@ -78,14 +77,13 @@ function npmRun(script: string): string {
   return r.stdout || '';
 }
 
-function runTests(): string {
-  const r = spawnSync('npm', ['test', '--silent'], { cwd: ROOT, encoding: 'utf8' });
+function runReleaseGate(): string {
+  const r = spawnSync('npm', ['run', '--silent', 'ci'], { cwd: ROOT, encoding: 'utf8' });
   if (r.status !== 0) {
     process.stderr.write(r.stderr || r.stdout || '');
-    throw new Error('npm test failed — refusing to bump');
+    throw new Error('full CI failed — refusing to bump');
   }
-  const m = (r.stdout || '').match(/tests (\d+)/);
-  return m ? `${m[1]}/${m[1]} pass` : 'pass';
+  return 'full CI passed';
 }
 
 function preflight(): void {
@@ -130,7 +128,7 @@ function main(): void {
   if (dryRun) {
     for (const rel of VERSION_MANIFESTS) console.log(`  would update ${rel}`);
     console.log('  would update package-lock.json');
-    console.log('  would run tests and regenerate CHANGELOG.md');
+    console.log('  would regenerate CHANGELOG.md and run full CI');
     return;
   }
 
@@ -144,13 +142,12 @@ function main(): void {
   }
   updatePackageLock(target);
 
-  console.log('running tests…');
-  const testResult = runTests();
-  console.log(`  ${testResult}`);
-
   console.log('regenerating changelog…');
   const changelogOut = npmRun('changelog').trim();
   if (changelogOut) console.log(`  ${changelogOut}`);
+
+  console.log('running full release gate…');
+  console.log(`  ${runReleaseGate()}`);
 
   if (shouldCommit) {
     console.log('committing…');

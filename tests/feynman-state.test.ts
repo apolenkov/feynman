@@ -4,7 +4,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyOutputStyle, OUTPUT_STYLE_SUFFIX } from '../lib/feynman-state.ts';
+import { applyOutputStyle, DEFAULT_STATE, normalizeState, OUTPUT_STYLE_SUFFIX } from '../lib/state/index.ts';
 
 describe('applyOutputStyle', () => {
   const RULES = 'RULES_TEXT';
@@ -32,5 +32,23 @@ describe('applyOutputStyle', () => {
 
   it('appends the middle suffix for output_style "middle"', () => {
     assert.equal(applyOutputStyle(RULES, 'middle'), RULES + OUTPUT_STYLE_SUFFIX['middle']);
+  });
+});
+
+describe('normalizeState', () => {
+  it('keeps a valid state unchanged', () => {
+    const state = { enabled: false, intensity: 'lite', output_style: 'short', injections: 4 };
+    assert.deepEqual(normalizeState(state), state);
+  });
+
+  it('defaults malformed fields and migrates the legacy counter', () => {
+    assert.deepEqual(normalizeState({ enabled: 'yes', intensity: 'wide', output_style: 42, count: 7 }), {
+      ...DEFAULT_STATE,
+      injections: 7,
+    });
+  });
+
+  it('does not retain an invalid counter', () => {
+    assert.equal(normalizeState({ injections: -1 }).injections, DEFAULT_STATE.injections);
   });
 });

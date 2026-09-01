@@ -1,43 +1,25 @@
-// bin/cli/settings.ts — settings/config helpers
-// fatal, readJsonConfig, readSettings, writeSettings,
-// isFeynmanHookCommand, isSessionStartHookCommand,
-// hasFeynmanHook, hasAnyFeynmanHook, extractHookScriptPath,
-// removeFeynmanHooks, bootstrapState, installClaudeCommand
+// bin/adapters/codex-config.ts — Codex filesystem and hook-config adapter.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { type FeynmanState, DEFAULT_STATE, readState, writeState, statePaths, flagContent } from '../../lib/feynman-state.ts';
-import type { TargetConfig } from './types.ts';
+import { type FeynmanState, DEFAULT_STATE, normalizeState } from '../../lib/state/index.ts';
+import { flagContent, readState, statePaths, writeState } from './state-store.ts';
+
+export interface CodexConfig {
+  rootDir: string;
+  settingsPath: string;
+  feynmanDir: string;
+  statePath: string;
+  flagPath: string;
+}
 
 // Resolve paths using os.homedir() — never tilde literal (bug #8810)
 const HOME = os.homedir();
 
-// ROOT_DIR: two levels up from bin/cli/ → repo root
-const ROOT_DIR = path.resolve(import.meta.dirname, '..', '..');
-
-function targetConfig(name: string): TargetConfig {
-  if (name === 'opencode') {
-    const rootDir = path.join(HOME, '.config', 'opencode');
-    return {
-      name: 'opencode',
-      label: 'OpenCode',
-      rootDir,
-      settingsPath: path.join(rootDir, 'opencode.json'),
-      ...statePaths(rootDir),
-      commandsDir: null,
-    };
-  }
-  const dirName = name === 'codex' ? '.codex' : '.claude';
-  const rootDir = path.join(HOME, dirName);
-  return {
-    name,
-    label: name === 'codex' ? 'Codex' : 'Claude Code',
-    rootDir,
-    settingsPath: path.join(rootDir, name === 'codex' ? 'hooks.json' : 'settings.json'),
-    ...statePaths(rootDir),
-    commandsDir: name === 'claude' ? path.join(rootDir, 'commands') : null,
-  };
+export function codexConfig(): CodexConfig {
+  const rootDir = path.join(HOME, '.codex');
+  return { rootDir, settingsPath: path.join(rootDir, 'hooks.json'), ...statePaths(rootDir) };
 }
 
 // Print a clean error and abort. Used where continuing would corrupt user data.
@@ -71,24 +53,18 @@ export function readJsonConfig(filePath: string): Record<string, unknown> {
   }
 }
 
-export function readSettings(target: string): Record<string, unknown> {
-  return readJsonConfig(targetConfig(target).settingsPath);
+export function readSettings(): Record<string, unknown> {
+  return readJsonConfig(codexConfig().settingsPath);
 }
 
-export function writeSettings(target: string, settings: Record<string, unknown>): void {
-  const cfg = targetConfig(target);
+export function writeSettings(settings: Record<string, unknown>): void {
+  const cfg = codexConfig();
   fs.mkdirSync(cfg.rootDir, { recursive: true });
   fs.writeFileSync(cfg.settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }
 
 export function isFeynmanHookCommand(command: string): boolean {
-  return (
-    isSessionStartHookCommand(command) ||
-    command.includes('feynman-activate.ts') ||
-    command.includes('feynman-activate.js') ||
-    command.includes('feynman-lint.ts') ||
-    command.includes('feynman-lint.js')
-  );
+  return isSessionStartHookCommand(command) || command.includes('feynman-lint.ts') || command.includes('feynman-lint.js');
 }
 
 // The SessionStart hook is the one doctor and install introspection look for.
@@ -160,15 +136,15 @@ export function removeFeynmanHooks(settings: Record<string, unknown>): Record<st
   return settings;
 }
 
-export function bootstrapState(target: string): void {
-  const cfg = targetConfig(target);
+export function bootstrapState(): void {
+  const cfg = codexConfig();
   // Absent or corrupt state.json → (re)write default; otherwise merge with defaults.
   const raw = readState(cfg.rootDir);
   let state: FeynmanState = { ...DEFAULT_STATE };
   if (raw === null) {
     writeState(cfg.rootDir, state);
   } else {
-    state = { ...DEFAULT_STATE, ...raw };
+    state = normalizeState(raw);
   }
   if (state.enabled) {
     fs.writeFileSync(cfg.flagPath, flagContent(state));
@@ -176,18 +152,3 @@ export function bootstrapState(target: string): void {
     fs.unlinkSync(cfg.flagPath);
   }
 }
-
-export function installClaudeCommand(): void {
-  const cfg = targetConfig('claude');
-  const skillSrc = path.resolve(ROOT_DIR, 'skills', 'feynman', 'SKILL.md');
-  if (!cfg.commandsDir) return;
-  const commandDest = path.join(cfg.commandsDir, 'feynman.md');
-  if (fs.existsSync(skillSrc)) {
-    fs.mkdirSync(cfg.commandsDir, { recursive: true });
-    if (!fs.existsSync(commandDest)) {
-      fs.copyFileSync(skillSrc, commandDest);
-    }
-  }
-}
-
-export { targetConfig };

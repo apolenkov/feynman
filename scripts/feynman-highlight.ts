@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// scripts/feynman-highlight.ts — apply highlight convention to rules/feynman-activate.md.
+// scripts/feynman-highlight.ts — apply highlight convention to rules/feynman-contract.md.
 // Adds: **markdown bold** for key nouns/verbs in prose, plus ▲▼ priority and
-// ✓ ✗ ⌛ status markers (for terminal contrast — Claude Code renders bold via ANSI).
+// ✓ ✗ ⌛ status markers for terminal contrast.
 //
 // Idempotent: detects existing marker line and skips if present. Verifies the
 // 4480-byte budget after the edit.
@@ -16,7 +16,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const RULES = path.join(ROOT, 'rules', 'feynman-activate.md');
+const RULES = path.join(ROOT, 'rules', 'feynman-contract.md');
 const BUDGET = 4480;
 
 const MARKER_LINE = '**bold** keys; ▲▼ priority; ✓✗ status.';

@@ -1,7 +1,7 @@
 {
   "name": "feynman",
   "version": "1.4.0",
-  "description": "Manage readable ASCII diagrams in structured Codex answers.",
+  "description": "Visual architecture, flows, trees, comparisons, and status diagrams for Codex.",
   "author": {
     "name": "apolenkov",
     "url": "https://github.com/apolenkov/feynman"
@@ -11,30 +11,32 @@
   "license": "MIT",
   "keywords": [
     "codex",
-    "ascii",
-    "diagrams",
+    "ascii-diagrams",
+    "visual-architecture",
+    "flows",
+    "comparisons",
+    "status",
     "productivity"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Feynman",
-    "shortDescription": "Draw ASCII diagrams when structure appears.",
-    "longDescription": "Feynman helps Codex render flows, hierarchies, comparisons, priorities, and status summaries as readable ASCII diagrams.",
+    "shortDescription": "Visual architecture and concise ASCII diagrams.",
+    "longDescription": "Feynman helps Codex make flows, hierarchies, comparisons, priorities, and status summaries immediately readable with concise ASCII diagrams.",
     "developerName": "apolenkov",
     "category": "Productivity",
     "capabilities": [
-      "Interactive",
-      "Write"
+      "Interactive"
     ],
     "websiteURL": "https://github.com/apolenkov/feynman",
     "privacyPolicyURL": "https://github.com/apolenkov/feynman/blob/main/PRIVACY.md",
     "termsOfServiceURL": "https://github.com/apolenkov/feynman/blob/main/LICENSE",
     "defaultPrompt": [
-      "Use feynman diagrams for structured answers.",
-      "Explain this architecture visually.",
-      "Compare these options with ASCII columns."
+      "Show this architecture as a compact ASCII diagram.",
+      "Compare these options in readable columns.",
+      "Set Feynman diagram intensity to lite."
     ],
-    "brandColor": "#10B981",
+    "brandColor": "#2563EB",
     "screenshots": []
   }
 }

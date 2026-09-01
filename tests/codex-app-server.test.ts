@@ -282,7 +282,7 @@ describe('Codex app-server hook visibility contract', () => {
       const codexHome = path.join(tmpHome, '.codex');
       const client = new CodexAppServerClient(tmpHome);
       try {
-        const install = runFeynman(tmpHome, ['install', '--target', 'codex', '--force']);
+        const install = runFeynman(tmpHome, ['install', '--force']);
         assert.equal(install.status, 0, `install failed: ${install.stderr}`);
         writeCodexConfig(codexHome);
 

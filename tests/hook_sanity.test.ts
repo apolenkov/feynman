@@ -5,7 +5,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { assertTagPairs } from '../lib/feynman-state.ts';
+import { assertTagPairs } from '../lib/state/index.ts';
 
 describe('assertTagPairs', () => {
 
