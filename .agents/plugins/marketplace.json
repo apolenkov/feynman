@@ -1,0 +1,20 @@
+{
+  "name": "feynman",
+  "interface": {
+    "displayName": "Feynman"
+  },
+  "plugins": [
+    {
+      "name": "feynman",
+      "source": {
+        "source": "local",
+        "path": "./plugins/feynman"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

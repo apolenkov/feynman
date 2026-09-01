@@ -11,8 +11,8 @@ const ROOT_DIR = path.resolve(import.meta.dirname, '..', '..');
 
 // Hook script lives relative to this file.
 // Prefer .ts (dev with strip-types); fall back to .js (installed npm package).
-const _hookExt = fs.existsSync(path.resolve(import.meta.dirname, '..', '..', 'hooks', 'feynman-activate.ts')) ? '.ts' : '.js';
-const HOOK_PATH = path.resolve(import.meta.dirname, '..', '..', 'hooks', `feynman-activate${_hookExt}`);
+const _hookExt = fs.existsSync(path.resolve(import.meta.dirname, '..', '..', 'hooks', 'feynman-session-start.ts')) ? '.ts' : '.js';
+const HOOK_PATH = path.resolve(import.meta.dirname, '..', '..', 'hooks', `feynman-session-start${_hookExt}`);
 
 const TARGET_ALIASES: Record<string, string> = {};
 const VALID_TARGETS = ['claude', 'codex', 'opencode', 'both', 'all', '*'];

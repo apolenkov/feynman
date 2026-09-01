@@ -1,7 +1,8 @@
 # doc-drift-guard Specification
 
 ## Purpose
-TBD - created by archiving change refresh-deps-and-doc-drift-guard. Update Purpose after archive.
+Keep live documentation aligned with the supported Node.js and packaging
+contract by rejecting superseded toolchain statements.
 ## Requirements
 ### Requirement: Superseded toolchain contract is blocked on live surfaces
 
@@ -43,4 +44,3 @@ place.
 - **WHEN** a maintainer opens `scripts/check-docs.ts`
 - **THEN** the full list of forbidden phrases and excluded paths is readable as
   named constants without tracing through scan logic
-

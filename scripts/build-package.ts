@@ -11,6 +11,37 @@ const DIST      = path.join(ROOT, 'dist');
 const BUILD_DIR = path.join(ROOT, '.build');
 const NPM_CACHE: string = process.env['FEYNMAN_NPM_CACHE'] || path.join(os.tmpdir(), 'npm-cache-feynman');
 
+interface PackedTarball {
+  filename: string;
+  size: number;
+  entryCount: number;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// npm 11 and earlier emit an array; npm 12 emits an object keyed by package
+// name. Accept both documented shapes so the packaging lane stays portable.
+function parsePackedTarball(output: string): PackedTarball {
+  const parsed: unknown = JSON.parse(output);
+  const candidates: unknown[] = Array.isArray(parsed)
+    ? parsed
+    : isRecord(parsed)
+      ? Object.values(parsed)
+      : [];
+  const packed = candidates.find(isRecord);
+  if (!packed) throw new Error('npm pack output contains no package metadata');
+
+  const filename = packed['filename'];
+  const size = packed['size'];
+  const entryCount = packed['entryCount'];
+  if (typeof filename !== 'string' || typeof size !== 'number' || typeof entryCount !== 'number') {
+    throw new Error('npm pack output has incomplete package metadata');
+  }
+  return { filename, size, entryCount };
+}
+
 // --- Step 1: compile .ts → .js ---
 fs.rmSync(BUILD_DIR, { recursive: true, force: true });
 const tscResult = spawnSync('npx', ['tsc', '--project', path.join(ROOT, 'tsconfig.build.json')], {
@@ -43,8 +74,8 @@ for (const dir of ['hooks', 'bin', 'lib']) {
 
 // --- Step 4: copy static package files ---
 const staticItems = [
-  'rules', 'skills', 'docs', 'examples', '.claude-plugin', '.codex-plugin',
-  'LICENSE', 'README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md',
+  'rules', 'skills', 'docs', 'examples', '.agents', 'plugins', '.claude-plugin',
+  'LICENSE', 'README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md', 'PRIVACY.md',
 ];
 for (const item of staticItems) {
   const src = path.join(ROOT, item);
@@ -64,7 +95,6 @@ fs.writeFileSync(path.join(STAGING, 'package.json'), JSON.stringify(pkg, null, 2
 // --- Step 6: rewrite hook command paths (.ts → .js) in JSON and sh files ---
 function rewriteTs(src: string, dest: string): void {
   const content = fs.readFileSync(src, 'utf8')
-    .replace(/feynman-activate\.ts/g,     'feynman-activate.js')
     .replace(/feynman-session-start\.ts/g, 'feynman-session-start.js')
     .replace(/feynman-lint\.ts/g,         'feynman-lint.js')
     .replace(/bin\/feynman\.ts/g,         'bin/feynman.js');
@@ -72,10 +102,6 @@ function rewriteTs(src: string, dest: string): void {
   fs.writeFileSync(dest, content);
 }
 
-// root hooks.json (Codex plugin format)
-if (fs.existsSync(path.join(ROOT, 'hooks.json'))) {
-  rewriteTs(path.join(ROOT, 'hooks.json'), path.join(STAGING, 'hooks.json'));
-}
 // hooks/hooks.json (Claude plugin format) — was already copied; rewrite in place
 const hooksHooksJson = path.join(STAGING, 'hooks', 'hooks.json');
 if (fs.existsSync(path.join(ROOT, 'hooks', 'hooks.json'))) {
@@ -108,9 +134,9 @@ if (result.status !== 0) {
   process.exit(result.status || 1);
 }
 
-let packed: { filename: string; size: number; entryCount: number };
+let packed: PackedTarball;
 try {
-  packed = JSON.parse(result.stdout)[0];
+  packed = parsePackedTarball(result.stdout);
 } catch (error) {
   process.stderr.write(`failed to parse npm pack output: ${(error as Error).message}\n${result.stdout}\n`);
   process.exit(1);

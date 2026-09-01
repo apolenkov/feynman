@@ -32,9 +32,9 @@ npm run ci
 - Use this section format:
 
 ```md
-## 0.5.0 - 2026-05-11
+## <version> - <YYYY-MM-DD>
 
-Changes since v0.4.0.
+Changes since v<previous-version>.
 
 ### Added
 - ...
@@ -66,7 +66,9 @@ The workflow ignores changelog command output at publish time; it extracts direc
 ### Step-by-step sequence
 
 1. Update files for release:
-   - `package.json` version bump.
+   - `package.json` and `package-lock.json` version bump.
+   - Matching versions in `.claude-plugin/plugin.json`,
+     and `plugins/feynman/.codex-plugin/plugin.json`.
    - top `CHANGELOG.md` section for that version.
 2. Run release checks:
    - `npm run ci`
@@ -84,11 +86,13 @@ The workflow ignores changelog command output at publish time; it extracts direc
 Manual local command examples:
 
 ```bash
-git add package.json CHANGELOG.md
-git commit -m "chore: release v0.5.0"
+git add package.json package-lock.json CHANGELOG.md \
+  .claude-plugin/plugin.json \
+  plugins/feynman/.codex-plugin/plugin.json
+git commit -m "chore: release v<version>"
 git push origin main
 
-gh release create v0.5.0 --generate-notes --target main
+gh release create v<version> --generate-notes --target main
 ```
 
 If you need a full dry run without publish, use workflow dispatch:
@@ -126,23 +130,23 @@ git rev-parse --short origin/main
 2. Release artifact validation:
 
 ```bash
-gh release view v0.5.0 --json name,tagName,isDraft,isPrerelease,url -q '.name+"\\n"+.tagName+"\\n"+.isDraft+"\\n"+.isPrerelease+"\\n"+.url'
-gh release view v0.5.0 --json body -q .body
+gh release view v<version> --json name,tagName,isDraft,isPrerelease,url -q '.name+"\\n"+.tagName+"\\n"+.isDraft+"\\n"+.isPrerelease+"\\n"+.url'
+gh release view v<version> --json body -q .body
 ```
 
 3. NPM publication:
 
 ```bash
-npm view @albinocrabs/feynman@0.5.0 version
+npm view @albinocrabs/feynman@<version> version
 npm view @albinocrabs/feynman dist-tags
 ```
 
 4. Smoke test from clean env:
 
 ```bash
-node -e "console.log('ok')" # placeholder for your install checks
+node --version # confirm the supported Node.js baseline
 npx -y @albinocrabs/feynman@latest version
-``
+```
 
 ## 7) Troubleshooting
 

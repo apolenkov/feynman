@@ -20,10 +20,10 @@ describe('package metadata', () => {
     assert.equal((pkg['bin'] as Record<string, string>)['feynman-lint'], 'bin/feynman-lint.ts');
   });
 
-  it('ships Codex plugin files in npm package file list', () => {
+  it('ships the native Codex marketplace files in the npm package', () => {
     const pkg = readJson('package.json');
-    assert.ok((pkg['files'] as string[]).includes('.codex-plugin/'));
-    assert.ok((pkg['files'] as string[]).includes('hooks.json'));
+    assert.ok((pkg['files'] as string[]).includes('.agents/'));
+    assert.ok((pkg['files'] as string[]).includes('plugins/'));
   });
 
   it('ships Claude plugin manifest in npm package file list', () => {
@@ -33,33 +33,39 @@ describe('package metadata', () => {
 
   it('ships public open-source docs in npm package file list', () => {
     const pkg = readJson('package.json');
-    for (const file of ['docs/', 'examples/', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md']) {
+    for (const file of ['docs/', 'examples/', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md', 'PRIVACY.md']) {
       assert.ok((pkg['files'] as string[]).includes(file), `${file} should be included in package files`);
     }
   });
 
-  it('Codex plugin manifest is valid and points at hooks + skills', () => {
+  it('measures application source instead of test harness files in coverage', () => {
     const pkg = readJson('package.json');
-    const manifest = readJson('.codex-plugin/plugin.json');
-    assert.equal(manifest['name'], 'feynman');
-    assert.equal(manifest['version'], pkg['version']);
-    assert.equal(manifest['hooks'], './hooks.json');
-    assert.equal(manifest['skills'], './skills/');
-    assert.ok((manifest['interface'] as { defaultPrompt: string[] }).defaultPrompt.length <= 3);
+    const coverage = (pkg['scripts'] as Record<string, string>)['coverage'];
+    assert.ok(coverage, 'package.json must define a coverage script');
+    assert.match(coverage, /--test-coverage-exclude=tests\/\*\*/);
   });
 
-  it('Codex hooks.json registers only SessionStart hook (no UserPromptSubmit)', () => {
-    const hooks = readJson('hooks.json');
-    const hooksMap = hooks['hooks'] as Record<string, unknown[]>;
-    const sessionEntries = hooksMap['SessionStart'];
-    assert.ok(Array.isArray(sessionEntries));
-    assert.equal(hooksMap['UserPromptSubmit'], undefined, 'UserPromptSubmit must not be registered (v0.7.0+)');
-    const sessionEntry = sessionEntries![0] as { matcher?: string; hooks: { command: string }[] };
-    assert.ok(sessionEntry.matcher?.includes('compact'), 'matcher must include compact');
-    assert.ok(sessionEntry.matcher?.includes('clear'), 'matcher must include clear');
-    const sessionCommand = sessionEntry.hooks[0]!.command;
-    assert.ok(sessionCommand.includes('FEYNMAN_HOME="$HOME/.codex"'));
-    assert.ok(sessionCommand.includes('feynman-session-start.ts'));
+  it('ships a native Codex marketplace plugin without an unsupported hook declaration', () => {
+    const pkg = readJson('package.json');
+    const marketplace = readJson('.agents/plugins/marketplace.json');
+    const plugins = marketplace['plugins'] as Array<{ name: string; source: { path: string } }>;
+    assert.equal(marketplace['name'], 'feynman');
+    assert.deepEqual(plugins, [{
+      name: 'feynman',
+      source: { source: 'local', path: './plugins/feynman' },
+      policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
+      category: 'Productivity',
+    }]);
+
+    const manifest = readJson('plugins/feynman/.codex-plugin/plugin.json');
+    assert.equal(manifest['name'], 'feynman');
+    assert.equal(manifest['version'], pkg['version']);
+    assert.equal(manifest['hooks'], undefined, 'native Codex manifests do not declare hook files');
+    assert.equal(manifest['skills'], './skills/');
+    assert.match(
+      fs.readFileSync(path.join(REPO_DIR, 'plugins/feynman/skills/feynman/SKILL.md'), 'utf8'),
+      /Run `feynman --help`/,
+    );
   });
 
   it('Claude plugin hooks.json registers only SessionStart hook (no UserPromptSubmit)', () => {
