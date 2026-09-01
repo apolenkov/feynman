@@ -3,6 +3,7 @@
 ![CI](https://github.com/apolenkov/feynman/actions/workflows/ci.yml/badge.svg?label=CI&color=2563EB)
 ![npm](https://img.shields.io/npm/v/@albinocrabs/feynman?color=2563EB)
 ![License](https://img.shields.io/github/license/apolenkov/feynman?color=2563EB)
+[![skills.sh](https://skills.sh/b/apolenkov/feynman)](https://skills.sh/apolenkov/feynman)
 
 feynman is a Codex plugin and local CLI that makes structured answers easier to
 read. It injects concise diagram guidance at Codex session start and provides a
@@ -20,6 +21,20 @@ codex plugin add feynman@feynman
 Open `/plugins` in Codex to search for **Feynman**, install it, then start a
 new session. The skill is discoverable for visual architecture, ASCII diagrams,
 flows, trees, comparisons, priorities, and status summaries.
+
+### skills.sh (Codex)
+
+For teams that distribute skills through [skills.sh](https://www.skills.sh/),
+install the same Codex-only skill directly from this repository:
+
+```bash
+npx skills add apolenkov/feynman --skill feynman --agent codex --global --yes
+```
+
+The skill delegates state changes to the published CLI through `npx`; it does
+not install or configure any non-Codex integration. The skills.sh catalog is
+indexed asynchronously after installations, so a newly released source can
+take a short time to appear in search.
 
 ### Local hook and CLI
 

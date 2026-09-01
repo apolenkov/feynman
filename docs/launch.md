@@ -15,6 +15,18 @@ npx -y @albinocrabs/feynman@latest doctor
 The installer writes only to `~/.codex` and is idempotent. Verify the package
 from a clean directory with `npx -y @albinocrabs/feynman@latest version`.
 
+## skills.sh discovery
+
+Feynman is also a public Codex skill source for skills.sh:
+
+```bash
+npx skills add apolenkov/feynman --skill feynman --agent codex --global --yes
+```
+
+This installs the skill only for Codex. The catalog is populated from public
+sources and anonymous install telemetry, so search visibility is asynchronous;
+the repository remains the source of truth.
+
 ## Release checklist
 
 - `npm run ci` passes locally.
