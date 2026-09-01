@@ -21,12 +21,32 @@ interface RunOpts {
   env?: NodeJS.ProcessEnv;
 }
 
+function isolatedNpmEnv(root: string): NodeJS.ProcessEnv {
+  // Verify the public artifact independently of a developer's global npm
+  // settings (including allow-scripts policies).
+  const home = path.join(root, 'npm-home');
+  fs.mkdirSync(home, { recursive: true });
+  const userConfig = path.join(home, '.npmrc');
+  fs.writeFileSync(userConfig, '');
+  return {
+    HOME: home,
+    npm_config_cache: path.join(root, 'npm-cache'),
+    npm_config_ignore_scripts: 'true',
+    npm_config_userconfig: userConfig,
+  };
+}
+
 function run(cmd: string, args: string[], opts: RunOpts = {}): string {
+  const inheritedEnv = { ...process.env };
+  // Do not inherit an npm-workspace allow-scripts policy into the clean
+  // consumer install used to verify a published artifact.
+  delete inheritedEnv['npm_config_allow_scripts'];
+  delete inheritedEnv['NPM_CONFIG_ALLOW_SCRIPTS'];
   const result = spawnSync(cmd, args, {
     cwd: opts.cwd || ROOT,
     encoding: 'utf8',
     env: {
-      ...process.env,
+      ...inheritedEnv,
       NO_COLOR: '1',
       ...opts.env,
     },
@@ -41,8 +61,8 @@ function run(cmd: string, args: string[], opts: RunOpts = {}): string {
   return result.stdout || '';
 }
 
-function npmViewVersion(fullName: string): string {
-  const out = run('npm', ['view', fullName, 'version']);
+function npmViewVersion(fullName: string, env: NodeJS.ProcessEnv): string {
+  const out = run('npm', ['view', fullName, 'version'], { env });
   const version = (out || '').trim();
   if (!version) {
     throw new Error(`empty npm view result for ${fullName}`);
@@ -51,13 +71,14 @@ function npmViewVersion(fullName: string): string {
 }
 
 try {
+  workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-release-verify-'));
+  const npmEnv = isolatedNpmEnv(workDir);
   const fullName = `${packageName}@${packageVersion}`;
-  const publishedVersion = npmViewVersion(fullName);
+  const publishedVersion = npmViewVersion(fullName, npmEnv);
   if (publishedVersion !== packageVersion) {
     throw new Error(`published version mismatch: expected ${packageVersion}, got ${publishedVersion}`);
   }
 
-  workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-release-verify-'));
   const projectDir = path.join(workDir, 'project');
   const homeDir = path.join(workDir, 'home');
   fs.mkdirSync(projectDir, { recursive: true });
@@ -72,7 +93,7 @@ try {
     '--no-audit',
     '--no-fund',
     '--ignore-scripts',
-  ]);
+  ], { env: npmEnv });
 
   const bin: string = path.join(projectDir, 'node_modules', '.bin', process.platform === 'win32' ? 'feynman.cmd' : 'feynman');
   if (!fs.existsSync(bin)) {

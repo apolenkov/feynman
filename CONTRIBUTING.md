@@ -10,14 +10,16 @@ how to get a PR merged.
 ```bash
 git clone https://github.com/apolenkov/feynman
 cd feynman
-npm install
+npm ci
+npm run typecheck
+npm run eslint
 npm test
 ```
 
 Tests use Node's built-in `node:test` runner — no external test framework
 needed.
 
-Lint the codebase: `node bin/feynman-lint.js README.md docs/*.md examples/*.md`
+Lint documentation diagrams: `npm run lint -- README.md docs/*.md examples/*.md`
 
 ---
 
@@ -28,8 +30,9 @@ These are well-scoped and require no architectural decisions:
 - **Add a lint-rule test case** — add a row to `tests/lint-cases.json` for
   an edge case that's currently untested.
 - **Improve an example** — add or improve a file in `examples/` following
-  the schema in `docs/architecture.md` and `06-CONTEXT.md`.
-- **Expand `feynman doctor`** — add a new health check to `bin/feynman.js`
+  the schema in `docs/architecture.md` and `CONTEXT.md`.
+- **Expand `feynman doctor`** — add a new health check to the TypeScript CLI in
+  `bin/commands/doctor.ts`
   `cmdDoctor()`.
 - **Fix a typo or improve prose** — in `README.md`, `docs/`, or `CONTRIBUTING.md`.
 - **Add a rule to `rules/feynman-activate.md`** — follow the rules-authoring
@@ -43,17 +46,19 @@ Before opening a pull request:
 
 - [ ] `npm test` passes (all existing tests green)
 - [ ] New behavior has a test in `tests/` covering the change
-- [ ] No new lint warnings: `node bin/feynman-lint.js <changed files>`
+- [ ] No new diagram-lint warnings: `npm run lint -- <changed markdown files>`
 - [ ] `README.md` updated if a user-facing feature changed
 - [ ] Commit message follows the format: `type(scope): description`
       (types: `feat`, `fix`, `test`, `docs`, `refactor`, `chore`)
-- [ ] Add labels `auto-merge` and `status:ready` when the PR is fully reviewed and safe to merge automatically
+- [ ] Keep the change small, documented, and reviewable; merging still requires
+      the repository's normal review and CI gates
 
 ---
 
 ## Rules Authoring Guidelines
 
-The hook injects `rules/feynman-activate.md` into every Claude prompt.
+The `SessionStart` hook injects `rules/feynman-activate.md` once per client
+session (and again after resume, `/compact`, or `/clear`).
 The rules must be declarative facts, not commands.
 
 **Good (declarative):**
@@ -69,14 +74,16 @@ may be filtered or reinterpreted.
 Each intensity variant must stay under 8,000 characters. Measure with:
 
 ```bash
-node -e "
-const f = require('fs').readFileSync('rules/feynman-activate.md', 'utf8');
-['lite','full','ultra'].forEach(v => {
-  const s = f.indexOf('<!-- ' + v + ' -->');
-  const e = f.indexOf('<!-- /' + v + ' -->', s);
-  console.log(v, f.slice(s, e + ('<!-- /' + v + ' -->').length).length, 'chars');
+node -e '
+const fs = require("node:fs");
+const f = fs.readFileSync("rules/feynman-activate.md", "utf8");
+["lite", "full", "ultra"].forEach((name) => {
+  const start = f.indexOf("<intensity name=\"" + name + "\">");
+  const end = f.indexOf("</intensity>", start);
+  if (start < 0 || end < 0) throw new Error("missing " + name + " XML block");
+  console.log(name, f.slice(start, end + "</intensity>".length).length, "chars");
 });
-"
+'
 ```
 
 ---
@@ -109,8 +116,8 @@ Feature requests may be deferred to a milestone.
 ## Testing
 
 ```bash
-npm test              # run all tests
-npm test -- --grep L01  # filter by test name pattern
+npm test                 # run all tests
+npm test -- --test-name-pattern L01  # filter by test name pattern
 ```
 
 Coverage report: `npm run coverage` (writes to `coverage/`)

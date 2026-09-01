@@ -32,7 +32,7 @@ every `┐` must have a matching `┘` at the same column.
 **Why:** An unclosed frame box is visually deceptive — it implies containment
 it doesn't deliver, and the unclosed edge is often invisible at a glance.
 
-**Source:** [`lib/lint/rules.js#L66`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L66`](../lib/lint/rules.ts)
 
 ### Valid
 
@@ -65,7 +65,7 @@ file:2:1: L01 Unclosed box: '┌' at line 2, col 1 has no matching '└' at same
 **Why:** `├──` means "more siblings follow"; `└──` means "last child." Using
 `├──` for the last item misleads the reader about the list's structure.
 
-**Source:** [`lib/lint/rules.js#L156`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L156`](../lib/lint/rules.ts)
 
 ### Valid
 
@@ -111,7 +111,7 @@ Recognized styles:
 **Why:** Mixed arrow styles force the reader to verify that the styles are
 equivalent rather than distinct, adding cognitive overhead without information.
 
-**Source:** [`lib/lint/rules.js#L227`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L227`](../lib/lint/rules.ts)
 
 ### Valid
 
@@ -140,7 +140,7 @@ The separator row (`|---|---|`) must match the header column count.
 **Why:** Mismatched column counts break the visual grid — the reader must
 count pipes instead of reading structure.
 
-**Source:** [`lib/lint/rules.js#L272`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L272`](../lib/lint/rules.ts)
 
 ### Valid
 
@@ -175,7 +175,7 @@ must exist between each consecutive pair.
 steps, parallel options, or unrelated elements? An arrow makes the
 relationship explicit.
 
-**Source:** [`lib/lint/rules.js#L349`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L349`](../lib/lint/rules.ts)
 
 Note: boxes separated by three or more spaces are treated as parallel layout
 (e.g. side-by-side comparison columns) and do not require an arrow.
@@ -207,7 +207,7 @@ file:1:1: L05 3 boxes on same line with no arrow between them: [Auth], [Handler]
 cannot determine whether the listed items are near the top or bottom of
 the full range.
 
-**Source:** [`lib/lint/rules.js#L399`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L399`](../lib/lint/rules.ts)
 
 ### Valid
 
@@ -244,7 +244,7 @@ diagram characters such as box corners, arrows, or tree branches.
 between visual vocabularies. It also signals that the response lacks a coherent
 visual strategy.
 
-**Source:** [`lib/lint/rules.js#L441`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L441`](../lib/lint/rules.ts)
 
 ### Valid
 
@@ -283,7 +283,7 @@ display width (measured in terminal columns).
 **Why:** Ragged right edges in a frame add visual noise without information.
 Consistent width makes the frame a clean visual container.
 
-**Source:** [`lib/lint/rules.js#L476`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L476`](../lib/lint/rules.ts)
 
 Display width counts each Unicode character as 1 column (box-drawing
 characters, Latin, and Cyrillic are single-width; CJK characters are
@@ -328,9 +328,9 @@ A common real-world example is `│  long row PASS │` whose right `│` extend
 past the top `┐`: L08 may flag the width difference, but L09 reports the
 column-precise drift on every offending row, including the bottom `┘`.
 
-**Source:** [`lib/lint/rules.js#L563`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L563`](../lib/lint/rules.ts)
 
-L09 uses visual-column indexing via the shared `lib/lint/width.js` helper:
+L09 uses visual-column indexing via the shared `lib/lint/width.ts` helper:
 ANSI escapes (`\x1b[...m`), combining marks (U+0300..U+036F), zero-width
 joiners (U+200B..U+200F), and BOM strip to width 0; CJK wide chars
 (U+4E00..U+9FFF and related ranges) count as 2 cols. Lines with no `│`
@@ -384,7 +384,7 @@ is `warn` not `error` — single-language teams may legitimately use
 Russian-spelled English-like terms, so the linter surfaces these without
 failing CI exit codes.
 
-**Source:** [`lib/lint/rules.js#L10_mixed_script`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L10_mixed_script`](../lib/lint/rules.ts)
 
 L10 operates on full text (not per-diagram AST), so it catches mixed
 tokens in prose, list items, and headings — anywhere words appear. Words
@@ -451,7 +451,7 @@ per session, this is the largest single token-economy lever feynman has.
 table columns (`│ key │ value │`) — those genuinely need the frame's
 grouping. L13 (double-wrap) handles the tree case separately.
 
-**Source:** [`lib/lint/rules.js#L11_overdecoration`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L11_overdecoration`](../lib/lint/rules.ts)
 
 ### Valid (same data as dot-leader)
 
@@ -505,7 +505,7 @@ the trimmed inner text.
 the frame to fit content, drop to a lighter visual, or accept the
 token tax explicitly.
 
-**Source:** [`lib/lint/rules.js#L12_token_budget`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L12_token_budget`](../lib/lint/rules.ts)
 
 ### Valid (content-dominated frame)
 
@@ -541,7 +541,7 @@ file:1: explain: equivalent dot-leader: ~120 chars
 file:1: explain: saving: -160 chars
 ```
 
-Cost data comes from `estimateFrameCost` in [`lib/lint/rules.js`](../lib/lint/rules.js)
+Cost data comes from `estimateFrameCost` in [`lib/lint/rules.ts`](../lib/lint/rules.ts)
 — the same source L12 uses for its threshold check.
 
 ---
@@ -556,7 +556,7 @@ at full border cost.
 double-encoding; the frame contributes nothing the indentation does not
 already deliver. Drop the frame, keep the tree.
 
-**Source:** [`lib/lint/rules.js#L13_double_wrap`](../lib/lint/rules.js)
+**Source:** [`lib/lint/rules.ts#L13_double_wrap`](../lib/lint/rules.ts)
 
 ### Valid (bare tree, no frame)
 
@@ -701,4 +701,3 @@ Idempotent — running `--fix` twice produces zero further diff.
 enable L15 conversion by default. Only `feynman lint --fix` opt-in triggers
 it. This preserves frames that an author drew intentionally, even if feynman
 cannot detect the intent.
-

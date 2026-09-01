@@ -4,6 +4,28 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Codex now ships as a native marketplace skill; the explicit installer remains
+  the supported way to register its `SessionStart` hook. Obsolete root Codex
+  hook manifests and the retired `feynman-activate` runtime were removed.
+- The supported Node.js baseline is now 22.18 or newer, matching Node's stable
+  built-in TypeScript support and the current ESLint runtime requirement.
+- Development tooling was refreshed to current compatible releases. TypeScript
+  stays on 6.0.x until `typescript-eslint` officially supports TypeScript 7.
+- CI is read-only, no longer self-merges pull requests, and retains package and
+  coverage artifacts instead of committing generated badge data. The coverage
+  gate measures application source rather than optional test-harness probes.
+
+### Fixed
+
+- Package builds accept both npm 11 and npm 12 `npm pack --json` output.
+- Release smoke checks use an isolated npm configuration, so workstation-level
+  npm policies cannot invalidate a clean-consumer verification.
+- `SessionStart` now increments only a valid local injection counter and
+  recovers safely from malformed counter values.
+- Release bumping requires explicit `--commit`, `--tag`, and `--push` flags.
+
 ## 1.4.0 - 2026-05-25
 
 ### Features
@@ -115,8 +137,8 @@ consecutive-lines requirement prevent false positives on unrelated prose.
 - New lightweight diagram triggers in the injected rules, all using
   token-frugal minimal notation (no heavy frames, no UML boilerplate):
   - sequence messages: `A->>B: msg` (sync) / `A-->>B: ok` (return)
-  - activity flow: `[step] -> [decision?] -> [step]` arrow chains
-  - C4 context: `Person(x) --> WebApp: label` (no Boundary macros)
+  - activity-flow arrow chains through a decision
+  - C4 context notation without Boundary macros
   - 2-column comparison via a single `│` separator (not a markdown table)
 - Seven design principles baked into the `<contract>` blocks: explicit
   smallest-visual-fits ladder, mutex (now in lite too), terse-label rule,

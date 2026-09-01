@@ -24,15 +24,18 @@ State commands (work on local install, no repo writes):
   - `style short|middle|full` — set output_style preset (orthogonal to
     intensity). `short` = inline glyphs + dot-leader only; `middle` =
     frames only for ≥6 items, prefer trees + markdown tables; `full` =
-    default (all visuals allowed). The hook reads this and appends a
-    one-line suffix to additionalContext when style ≠ full; no rules-file
-    bytes are added.
+    default (all visuals allowed). The SessionStart hook reads this and appends
+    a one-line suffix to its raw output when style ≠ full; no rules-file bytes
+    are added.
   - no argument or `status` — show current state, no changes
 
-Maintenance commands (work on the repo, expect to be invoked from project root):
-  - `bump <version>` or `bump patch|minor|major` — version bump in 3 manifests +
-    changelog regen + tests + commit + tag + push. Stops short of `npm publish`
-    (2FA gate). Refuses to run on dirty tree or non-`main` branch.
+Maintenance commands (work on a source checkout, invoked from its project root):
+  - `bump <version>` or `bump patch|minor|major` — version bump in the
+    manifests, lockfile, changelog regeneration, and validation. By default it
+    leaves changes local. Pass `--commit` only when requested; `--tag` requires
+    `--commit`; `--push` requires both and must be explicitly requested. It
+    stops short of `npm publish` (2FA gate). Refuses dirty trees; tagging and
+    pushing also require `main`.
   - `highlight` — apply highlight convention markers (`**bold** keys; ▲▼ priority;
     ✓✗ status`) to all 3 `<contract>` blocks in `rules/feynman-activate.md`.
     Idempotent. Verifies the 4480-byte budget after the edit and reverts if tests fail.
@@ -135,17 +138,19 @@ matching repo script instead of the state-toggle path above.
 ### bump
 
 ```bash
-# arg passes through to scripts/feynman-bump.js: <version> | patch | minor | major
-node scripts/feynman-bump.js ${ARGUMENTS_REST:-patch}
+# Default: local version files + validation only. Add --commit, --tag, and
+# --push only when the user explicitly requests each external Git action.
+node scripts/feynman-bump.ts ${ARGUMENTS_REST:-patch}
 ```
 
-Report what landed (commit sha, tag) and the next manual step
-(`npm publish --access public --ignore-scripts` — needs 2FA OTP).
+Report what changed locally or landed (commit SHA, tag, push) and the next
+explicitly authorized release step (`npm publish --access public --ignore-scripts`
+needs a 2FA OTP).
 
 ### highlight
 
 ```bash
-node scripts/feynman-highlight.js
+node scripts/feynman-highlight.ts
 ```
 
 The script is idempotent (re-run is a no-op) and refuses to write if the rules

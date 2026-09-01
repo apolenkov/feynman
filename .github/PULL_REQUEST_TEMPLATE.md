@@ -25,16 +25,7 @@ Closes #
 - [ ] Added tests covering the change
 - [ ] All existing tests pass (`npm test`)
 
-## Coverage
-
-- [ ] Line coverage maintained or improved (run `npm run coverage` to check)
-
 ## Lint
 
-- [ ] No new lint warnings (`node bin/feynman-lint.js <changed markdown files>`)
+- [ ] No new diagram-lint warnings (`npm run lint -- <changed markdown files>`)
 - [ ] All ASCII diagrams in changed files pass `feynman lint`
-
-## Auto-merge
-
-- [ ] Add label `auto-merge` (required for workflow-driven merge after CI)
-- [ ] Add label `status:ready` (required for workflow-driven merge)

@@ -1,7 +1,7 @@
 // lib/feynman-state.ts — canonical FeynmanState store: schema, defaults, style map,
 // and the single owner of state.json + .feynman-active flag I/O (ADR-0004).
-// Imported by hooks/feynman-activate.ts, hooks/feynman-session-start.ts, bin/feynman.ts.
-// Zero runtime dependencies (node: builtins only). ESM + TypeScript (Node.js v22.6+ strip-types).
+// Imported by hooks/feynman-session-start.ts, bin/feynman.ts.
+// Zero runtime dependencies (node: builtins only). ESM + TypeScript (Node.js v22.18+ strips types by default).
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,7 +11,6 @@ export interface FeynmanState {
   intensity: string;
   output_style?: string;
   injections: number;
-  malformed_rules?: boolean;
   /** @deprecated legacy field, migrated to injections */
   count?: number;
 }
@@ -24,17 +23,16 @@ export const DEFAULT_STATE: FeynmanState = {
 };
 
 // One-line suffix per output_style. `full` is the default — no suffix.
-// Suffix is appended to additionalContext after the rules text (Phase 10
-// STYLE-03). Keeps rules-file 4480-byte budget intact — pure runtime hint.
+// Suffix is appended to raw SessionStart output after the rules text (Phase 10
+// STYLE-03). Keeps the rules-file byte budget intact — pure runtime hint.
 export const OUTPUT_STYLE_SUFFIX: Record<string, string> = {
   short:  '\n\nOutput style: short — dot-leader and inline glyphs only; no frames, no ASCII art, no trees.',
   middle: '\n\nOutput style: middle — frame blocks only for ≥6 items; prefer trees and markdown tables.',
 };
 
 /**
- * Append the output_style suffix to already-extracted rules text. Shared by both
- * injection hooks (the SessionStart and UserPromptSubmit paths applied this
- * identically). A non-string or unmapped style (incl. the default `full`) adds
+ * Append the output_style suffix to already-extracted rules text. A non-string
+ * or unmapped style (incl. the default `full`) adds
  * no suffix — invalid values fall back to no-suffix for safety, never throw.
  */
 export function applyOutputStyle(rulesText: string, outputStyle: unknown): string {
@@ -58,9 +56,7 @@ const XML_MATCHERS: Record<string, RegExp> = {
  * Sanity-check that opening and closing <intensity> tags balance (WR-01/02/03).
  * Counts only the `name=` opening form — exactly what XML_MATCHERS extracts — so a
  * stray `<intensity>` without a name attribute cannot inflate the open count past
- * what the extractor can actually read. A file with zero tags is balanced
- * (0 === 0), letting the legacy HTML-comment fallback in readRulesForIntensity
- * still fire. Shared by both injection hooks so "balanced" means one thing.
+ * what the extractor can actually read.
  */
 export function assertTagPairs(content: string): boolean {
   const opens  = (content.match(/<intensity\s+name\s*=/gi) || []).length;
@@ -71,9 +67,8 @@ export function assertTagPairs(content: string): boolean {
 /**
  * Extract the intensity-gated block from rules file content.
  *
- * Supports XML format (<intensity name="X">…</intensity>) and legacy
- * HTML-comment format (<!-- X --> … <!-- /X -->). Returns the extracted block
- * as a trimmed string, or '' if the intensity block is not found.
+ * Supports the XML format (<intensity name="X">…</intensity>). Returns the
+ * extracted block as a trimmed string, or '' if the intensity block is not found.
  *
  * Callers are responsible for their own policy (malformed-rules handling,
  * tag-pair sanity checks, fallback to whole file, etc.).
@@ -84,20 +79,13 @@ export function readRulesForIntensity(rulesContent: string, intensity: string): 
   const xmlMatch = XML_MATCHERS[selected]!.exec(rulesContent);
   if (xmlMatch) return xmlMatch[1]!.trim();
 
-  // Legacy HTML-comment fallback (kept until Plan 02 rule-file rewrite lands).
-  const openMarker  = '<!-- ' + selected + ' -->';
-  const closeMarker = '<!-- /' + selected + ' -->';
-  const i1 = rulesContent.indexOf(openMarker);
-  const i2 = rulesContent.indexOf(closeMarker, i1);
-  if (i1 !== -1 && i2 !== -1) return rulesContent.slice(i1 + openMarker.length, i2).trim();
-
   return '';
 }
 
 // ─── State store (ADR-0004) ───────────────────────────────────────────────────
-// The single owner of state.json + .feynman-active flag I/O. All three callers
-// (both hooks via FEYNMAN_HOME, the CLI via targetConfig(t).rootDir) cross this
-// seam instead of open-coding JSON.parse(fs.readFileSync(statePath)).
+// The single owner of state.json + .feynman-active flag I/O. The SessionStart
+// hook (via FEYNMAN_HOME) and CLI (via targetConfig(t).rootDir) cross this seam
+// instead of open-coding JSON.parse(fs.readFileSync(statePath)).
 
 interface StatePaths {
   feynmanDir: string;
@@ -177,20 +165,16 @@ function bootstrapDefault(
 }
 
 /**
- * The mutating policy shared by both injection hooks: bootstrap default state if
- * absent, merge with DEFAULT_STATE, reconcile the flag with `enabled`, and
- * self-heal corrupt JSON. The name signals the side effects (it writes and
- * deletes files), unlike a plain `loadState`.
+ * The mutating SessionStart policy: bootstrap default state if absent, merge
+ * with DEFAULT_STATE, reconcile the flag with `enabled`, and self-heal corrupt
+ * JSON. The name signals the side effects (it writes and deletes files), unlike
+ * a plain `loadState`.
  *
  * Canonical rule for the disabled case: **not active + flag present → unlink the
  * flag**. This preserves #35713 (flag absent + enabled=false → flag not
- * recreated, active=false) and self-heals the dangling flag the legacy activate
- * hook left on valid enabled=false. It also converges the legacy activate hook
- * onto session-start's first-run self-heal: a missing state.json bootstraps and
- * activates regardless of the flag (the legacy hook skipped bootstrap when the
- * flag was present). Corrupt JSON is no longer a fail-safe: it backs up the
- * unreadable file and bootstraps the same as first run (ADR-0005, amends 0004).
- * See ADR-0004.
+ * recreated, active=false). A missing state.json bootstraps and activates
+ * regardless of the flag. Corrupt JSON is backed up, then bootstrapped as a
+ * first run (ADR-0005, amends 0004). See ADR-0004.
  *
  * Returns the merged state and whether the caller should inject (`active`). When
  * `active` is false the returned `state` is not meant to be used.
@@ -218,10 +202,15 @@ export function reconcileState(rootDir: string): { state: FeynmanState; active: 
   }
 
   const state = { ...DEFAULT_STATE, ...raw };
-  // Preserve the legacy count→injections migration from the RAW value: the merge
-  // would otherwise default injections to 0 and hide an absent field, breaking
-  // the fallback. Read from raw so absence is still detectable.
-  state.injections = raw.injections ?? raw.count ?? DEFAULT_STATE.injections;
+  // Preserve the legacy count→injections migration, but never let malformed
+  // local JSON turn `injections += 1` into string concatenation or NaN.
+  const rawInjections: unknown = raw.injections;
+  const legacyCount: unknown = raw.count;
+  state.injections = typeof rawInjections === 'number' && Number.isSafeInteger(rawInjections) && rawInjections >= 0
+    ? rawInjections
+    : typeof legacyCount === 'number' && Number.isSafeInteger(legacyCount) && legacyCount >= 0
+      ? legacyCount
+      : DEFAULT_STATE.injections;
   delete state.count;
 
   // Disabled → canonical rule: not active + flag present → unlink. Not active.

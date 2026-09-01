@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { applyOutputStyle, assertTagPairs, readRulesForIntensity, reconcileState } from '../lib/feynman-state.ts';
+import { applyOutputStyle, assertTagPairs, readRulesForIntensity, reconcileState, writeState } from '../lib/feynman-state.ts';
 
 // state.json / .feynman-active I/O now lives behind the store (ADR-0004), keyed by CLIENT_HOME.
 const HOME        = os.homedir();
@@ -16,11 +16,7 @@ const RULES_PATH  = process.env['FEYNMAN_RULES_PATH'] || path.join(import.meta.d
 function readRules(intensity: string): string {
   const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
 
-  // Sanity: <intensity> tag pairs must balance (WR-02), via the shared check so
-  // "balanced" means the same thing as the UserPromptSubmit hook. A balanced file
-  // with no XML tags (0===0) still passes, so the legacy HTML-comment fallback in
-  // readRulesForIntensity can fire — matching the rules-injection spec's
-  // "Legacy HTML-comment fallback" scenario on this path too.
+  // Sanity: <intensity> tag pairs must balance (WR-02).
   if (!assertTagPairs(rulesContent)) return '';
 
   return readRulesForIntensity(rulesContent, intensity);
@@ -44,9 +40,19 @@ process.stdin.on('end', () => {
     let rulesText = readRules(state.intensity);
     if (!rulesText) process.exit(0);
 
-    // Apply output_style suffix (Phase 10 STYLE-03) — same axis as activate hook.
+    // Apply output_style suffix (Phase 10 STYLE-03).
     // Shared helper: invalid values fall back to 'full' (no suffix) for safety.
     rulesText = applyOutputStyle(rulesText, state.output_style);
+
+    // Count only successful rule injections. The write is advisory: a read-only
+    // state directory must not prevent an otherwise valid SessionStart hook from
+    // supplying its rules.
+    try {
+      state.injections += 1;
+      writeState(CLIENT_HOME, state);
+    } catch (_) {
+      // Keep injection available when local state bookkeeping cannot be updated.
+    }
 
     // SessionStart accepts plain stdout as context, matching caveman's hook shape.
     process.stdout.write(rulesText);

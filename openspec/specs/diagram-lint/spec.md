@@ -1,7 +1,8 @@
 # diagram-lint Specification
 
 ## Purpose
-TBD - created by archiving change add-diagram-lint-spec. Update Purpose after archive.
+Define the diagnostics and layout rules that keep feynman's text diagrams
+consistent, readable, and economical.
 ## Requirements
 ### Requirement: L01 — box corners close at the same column
 
@@ -359,4 +360,3 @@ same way the linter only ever sees one fence-free block at a time.
 - **WHEN** autofix runs on a frame whose inner lines are all well-formed
   `│ … │` rows
 - **THEN** the aligned output is identical to the pre-consolidation output
-

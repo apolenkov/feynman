@@ -4,7 +4,10 @@
 
 ## What feynman does
 
-feynman is a hook-based Claude Code / Codex plugin. When you submit a prompt, the hook reads a rules file from your local install and prepends those rules to the prompt via `additionalContext`. No part of the prompt or response is sent anywhere by feynman.
+feynman is a local Claude Code / Codex / OpenCode integration. At a matching
+`SessionStart` event, its hook reads a rules file from the local install and
+writes it as local session context. feynman does not read prompt or response
+content, and it does not send any of that content anywhere.
 
 ## What feynman writes to disk
 
@@ -29,7 +32,7 @@ The `injections` field is a local counter (incremented on each hook fire). It ne
 - ❌ Make network requests
 - ❌ Track which prompts you submit or which responses you get
 - ❌ Share state across machines (unless you copy the files yourself)
-- ❌ Auto-update without your action (`npx feynman install` is explicit)
+- ❌ Auto-update without your action (`npx @albinocrabs/feynman install` is explicit)
 
 ## Dependencies
 
@@ -37,7 +40,7 @@ feynman has **zero npm runtime dependencies** by design. It uses only Node.js bu
 
 ## Source
 
-All source code is public at https://github.com/apolenkov/feynman under the MIT license. You can verify the above claims by reading the code (about 4000 lines of CommonJS).
+All source code is public at https://github.com/apolenkov/feynman under the MIT license. You can verify the above claims by reading the TypeScript source and the compiled npm artifact.
 
 ## Contact
 
@@ -45,4 +48,4 @@ For privacy concerns: open an issue at https://github.com/apolenkov/feynman/issu
 
 ---
 
-*Last updated: 2026-05-11 (v0.4.0)*
+*Last reviewed: 2026-09-01*

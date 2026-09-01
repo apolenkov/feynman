@@ -8,6 +8,10 @@ status: accepted
 > fail-safe described below (not active, flag unlinked, file untouched) is
 > superseded. Corrupt `state.json` now self-heals — backup to `state.json.bak`,
 > bootstrap default, activate. The rest of this ADR stands.
+>
+> **Amended 2026-09-01:** the legacy `UserPromptSubmit` hook referenced below
+> was removed. Its references preserve the historical decision record. The
+> surviving `SessionStart` hook now owns the successful-injection counter.
 
 `lib/feynman-state.ts` grows from a schema-and-extraction module into the single
 owner of `state.json` + `.feynman-active` flag I/O. Before this change the module

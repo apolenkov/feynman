@@ -4,8 +4,8 @@ Three independent layers: hook lifecycle, lint pipeline, and state schema.
 
 > **Source vs. published artifact:** file paths below name the repo **source**
 > (`.ts`). The published npm package ships the compiled `.js` equivalents —
-> `scripts/build-package.ts` rewrites every `.ts` reference to `.js` at pack
-> time. See [ADR 0001](adr/0001-typescript-source-with-packaging-build.md).
+> `scripts/build-package.ts` rewrites source paths to compiled `.js` paths at
+> pack time. See [ADR 0001](adr/0001-typescript-source-with-packaging-build.md).
 
 ---
 
@@ -29,23 +29,19 @@ hooks/feynman-session-start.ts
          │
          ├─ [1] validate session_id (path-traversal guard)
          │
-         ├─ [2] $FEYNMAN_HOME/.feynman-active  ← flag file
-         │        absent + no state.json      → bootstrap first run
-         │        absent + state.enabled=true → recreate flag
-         │        absent + state.enabled=false → exit 0 (user disabled)
-         │        present                     → continue
+         ├─ [2] reconcile $FEYNMAN_HOME/.feynman/state.json + active flag
+         │        state absent             → bootstrap default state + flag
+         │        corrupt JSON             → back up, then bootstrap defaults
+         │        enabled: false           → remove flag, exit 0
+         │        enabled: true            → ensure flag exists
          │
-         ├─ [3] $FEYNMAN_HOME/.feynman/state.json
-         │        enabled: false           → exit 0
-         │        corrupt JSON             → exit 0 (fail safe)
-         │
-         ├─ [4] rules/feynman-activate.md
+         ├─ [3] rules/feynman-activate.md
          │        extract section for state.intensity
          │        (lite | full | ultra)
          │
-         ├─ [5] state.injections++  (write back)
+         ├─ [4] state.injections++  (best-effort local write)
          │
-         └─ [6] stdout: plain-text rules → injected into session context
+         └─ [5] stdout: plain-text rules → injected into session context
                   SessionStart hook accepts plain text (no JSON wrapper needed)
 ```
 
@@ -58,8 +54,8 @@ hooks/feynman-session-start.ts
   `~/.claude/settings.json` for Claude Code and `~/.codex/hooks.json` for
   Codex. Plugin manifests are shipped for discoverability, but direct hook
   registration remains the reliable fallback.
-- Flag file checked before state file to detect intentional disabling
-  vs. first run (bug #35713).
+- State reconciliation keeps the active flag aligned with `enabled` and handles
+  first run, disabled state, and corrupt JSON consistently (bug #35713).
 
 **File:** `hooks/feynman-session-start.ts`
 
@@ -116,7 +112,7 @@ reporter (inline in CLI + Stop hook)
          └─ hooks/feynman-lint.ts ← Stop hook (optional)
                fires after Claude's response
                if issues found: injects correction context
-               into next UserPromptSubmit cycle
+               into the next client turn
 ```
 
 **File:** `lib/lint/parser.ts`, `lib/lint/rules.ts`, `bin/feynman-lint.ts`,
@@ -161,8 +157,8 @@ visuals can be (runtime suffix). The two compose: `lite + short` is the
 minimal pair for mobile/voice chat; `full + middle` is the recommended
 default; `ultra + full` is the maximum-visual configuration.
 
-`output_style` is implemented as a one-line runtime suffix appended to
-`additionalContext` — `rules/feynman-activate.md` is NOT modified, so the
+`output_style` is implemented as a one-line runtime suffix appended to the raw
+`SessionStart` output. `rules/feynman-activate.md` is not modified, so the
 4480-byte rules budget stays intact regardless of the chosen style.
 
 **State transitions:**
@@ -199,12 +195,12 @@ default; `ultra + full` is the maximum-visual configuration.
 hook reads `state.output_style || 'full'` so missing field is identical
 to `"full"`. No migration needed.
 
-**Schema is frozen** — field names are used by `hooks/feynman-activate.ts`,
-`bin/feynman.ts`, and `skills/feynman/SKILL.md`. Any rename requires
-coordinated update across all three files.
+**Schema is frozen** — field names are used by the SessionStart hook, the CLI,
+and `skills/feynman/SKILL.md`. Any rename requires a coordinated update across
+all three consumers.
 
-**File:** read/written by `hooks/feynman-activate.ts` and `bin/feynman.ts`;
-managed by skill commands in `skills/feynman/SKILL.md`.
+**File:** read/written by `hooks/feynman-session-start.ts` and the CLI; managed
+by skill commands in `skills/feynman/SKILL.md`.
 
 ---
 

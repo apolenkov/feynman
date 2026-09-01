@@ -75,7 +75,7 @@ describe('detectDrift', () => {
   it('passes a clean tree', () => {
     const findings = detectDrift([
       { rel: 'README.md', content: 'all current, no stale wording here' },
-      { rel: 'install.sh', content: 'Node >=22.6 required' },
+      { rel: 'install.sh', content: 'Node >=22.18 required' },
     ]);
     assert.deepEqual(findings, []);
   });

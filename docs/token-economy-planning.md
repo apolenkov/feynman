@@ -25,7 +25,8 @@ a notification."
 ```
 
 The rules live in [`rules/feynman-activate.md`](../rules/feynman-activate.md)
-and fire on every prompt — including prompts that ask the model to write or
+and are loaded at matching session-start events, then remain available for all
+prompts in that session — including prompts that ask the model to write or
 review a plan file.
 
 Three orthogonal interventions combine in v0.5.0:

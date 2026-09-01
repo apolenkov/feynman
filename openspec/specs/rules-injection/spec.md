@@ -1,7 +1,8 @@
 # rules-injection Specification
 
 ## Purpose
-TBD - created by archiving change add-rules-injection-spec. Update Purpose after archive.
+Specify the fail-safe SessionStart hook that selects and emits the active
+feynman rule block as plain text.
 ## Requirements
 ### Requirement: session_id path-traversal guard runs before any file access
 
@@ -88,20 +89,20 @@ An unknown or absent `intensity` value SHALL be treated as `full`.
 
 ### Requirement: the rule block matching the active Intensity is injected
 
-The hook SHALL read the rules file and extract the block whose `<intensity name="...">` tag matches
-the active Intensity. If the XML tags are unbalanced the hook SHALL inject nothing (SessionStart)
-or a short fallback string (UserPromptSubmit legacy path). If the matched block is empty after
-trimming, the hook SHALL inject nothing.
+The SessionStart hook SHALL read the rules file and extract the block whose `<intensity name="...">`
+tag matches the active Intensity. If the tags are unbalanced, or if the file has no XML intensity
+tags, the hook SHALL inject nothing. If the matched block is empty after trimming, the hook SHALL
+inject nothing. The rules file is XML-only; there is no HTML-comment fallback.
 
 #### Scenario: XML format — correct Intensity block extracted
 
 - **WHEN** the rules file contains `<intensity name="lite">…</intensity>` and the active Intensity is `lite`
 - **THEN** the content inside that tag (trimmed) is injected
 
-#### Scenario: Legacy HTML-comment fallback
+#### Scenario: No XML intensity tags
 
-- **WHEN** the rules file has no XML `<intensity>` tags but has `<!-- full -->…<!-- /full -->` markers
-- **THEN** the content between the markers (trimmed) is injected
+- **WHEN** the rules file has no `<intensity name="...">` tags
+- **THEN** the hook exits 0 and injects nothing
 
 #### Scenario: Unbalanced intensity tags — SessionStart path
 
@@ -113,59 +114,33 @@ trimming, the hook SHALL inject nothing.
 - **WHEN** the extracted block for the active Intensity is empty after trimming
 - **THEN** the hook exits 0 and injects nothing
 
-### Requirement: UserPromptSubmit degrades to a fallback on malformed rules and records it in state
+### Requirement: the injection hook appends the output_style suffix
 
-On the UserPromptSubmit path, when the rules file has unbalanced `<intensity>` tags, the hook SHALL
-inject the `MALFORMED_FALLBACK` string, set `malformed_rules: true` in `state.json`, and exit 0. On a
-later run where the tags parse correctly, the hook SHALL clear the `malformed_rules` field from state.
-This is the UserPromptSubmit-specific divergence from the SessionStart path, which injects nothing on
-the same condition.
-
-#### Scenario: Unbalanced tags — UserPromptSubmit path
-
-- **WHEN** the rules file has mismatched `<intensity>` open/close counts and the hook is UserPromptSubmit
-- **THEN** the hook injects the `MALFORMED_FALLBACK` string, sets `malformed_rules: true` in state, and exits 0
-
-#### Scenario: Recovery clears the malformed flag
-
-- **WHEN** a later UserPromptSubmit run parses the `<intensity>` tags successfully and `malformed_rules` was set
-- **THEN** the hook removes the `malformed_rules` field from state
-
-### Requirement: UserPromptSubmit appends an output_style suffix to the injected rules
-
-On the UserPromptSubmit path, the hook SHALL append the suffix string mapped to the active
-`output_style` (from the `OUTPUT_STYLE_SUFFIX` map) to the rules text before writing stdout. The
-default style `full` maps to no suffix. The SessionStart path SHALL NOT append any suffix.
+The SessionStart hook SHALL append the suffix string mapped to the active `output_style` (from the
+`OUTPUT_STYLE_SUFFIX` map) to the rules text before writing stdout. The default style `full`, any
+unmapped style, and any non-string value map to no suffix.
 
 #### Scenario: Non-default style appends a suffix
 
-- **WHEN** the UserPromptSubmit hook injects rules and an `output_style` with a mapped suffix is active
-- **THEN** the suffix is appended to the rules text inside `additionalContext`
+- **WHEN** the SessionStart hook injects rules and an `output_style` with a mapped suffix is active
+- **THEN** the suffix is appended to the raw rules text written to stdout
 
-#### Scenario: Default style appends no suffix
+#### Scenario: Default or invalid style appends no suffix
 
 - **WHEN** the active `output_style` is `full` (or has no mapped suffix)
 - **THEN** no suffix is appended to the injected rules
 
-### Requirement: SessionStart outputs plain text; UserPromptSubmit outputs a JSON wrapper
+### Requirement: the injection hook writes plain text to stdout
 
 The SessionStart hook SHALL write the extracted rules text directly to stdout with no wrapping and
-no trailing newline. The legacy UserPromptSubmit hook SHALL wrap the rules text in a JSON object
-`{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"<rules>"}}` and
-write it to stdout with no trailing newline.
+no trailing newline.
 
 #### Scenario: SessionStart plain-text output
 
 - **WHEN** the SessionStart hook injects rules successfully
 - **THEN** stdout is the raw rules text (no JSON wrapper, no trailing newline)
 
-#### Scenario: UserPromptSubmit JSON output
+#### Scenario: No trailing newline
 
-- **WHEN** the UserPromptSubmit hook injects rules successfully
-- **THEN** stdout is a JSON object with `hookSpecificOutput.additionalContext` set to the rules text
-
-#### Scenario: No trailing newline on either path
-
-- **WHEN** either hook writes its output to stdout
+- **WHEN** the hook writes its output to stdout
 - **THEN** the last byte written is the last character of the content, not a newline character
-

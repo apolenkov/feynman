@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // bin/feynman.ts — feynman unified CLI
 // Subcommands: install, uninstall, doctor, lint, examples, bootstrap, version, help
-// Zero runtime deps. ESM TypeScript. Node >= 22.6.
+// Zero runtime deps. ESM TypeScript. Node >= 22.18.
 
 import { HELP, INSTALL_HELP, UNINSTALL_HELP, DOCTOR_HELP, cmdHelp } from './cli/help.ts';
 import { parseTarget } from './cli/targets.ts';

@@ -6,8 +6,8 @@ status: accepted
 
 Rule injection — loading `rules/feynman-activate.md` into the model context —
 happens once at `SessionStart`, not on every turn via `UserPromptSubmit`.
-`UserPromptSubmit` is retained as a legacy path but is not the primary
-injection site.
+At the time of this decision, `UserPromptSubmit` was retained as a legacy path;
+the 2026-09-01 amendment below records its removal.
 
 ## Context
 
@@ -52,22 +52,20 @@ defense because the rules arrive before the conversation begins.
 intensity block, and writes the rules text to stdout. No JSON wrapper.
 No per-prompt I/O.
 
-`hooks/feynman-activate.ts` is kept as the `UserPromptSubmit` hook to maintain
-backward compatibility with installs that predate `SessionStart` support and to
-provide the injection counter (`state.injections`) that tracks lifetime usage.
-It carries all the JSON-wrapping and flag-file logic that `SessionStart` does
-not need.
+The legacy `hooks/feynman-activate.ts` UserPromptSubmit hook is removed. The
+cleanup matcher still recognizes its old `.ts` and `.js` command paths so
+pre-existing installs are removed by install and uninstall.
 
 ## Consequences
 
 - Fresh sessions receive rules in context immediately, before the first user
   prompt arrives.
-- The `UserPromptSubmit` hook retains its JSON output format and flag-file check,
-  but is not load-bearing for injection correctness in a current install.
-- Any future refactor that removes `UserPromptSubmit` must preserve the
-  `injections` counter or migrate it elsewhere.
-- Documentation and specs describing the hook lifecycle must mention both hooks
-  and clarify which is primary (see `docs/architecture.md`).
-- The `FEYNMAN_HOME` environment variable allows both hooks to serve Claude Code
+- Documentation and specs describe the single SessionStart injection lifecycle.
+- The `FEYNMAN_HOME` environment variable allows the hook to serve Claude Code
   (`~/.claude`) and Codex (`~/.codex`) from the same binary without path
   hardcoding.
+
+## Amendment — 2026-09-01
+
+The legacy UserPromptSubmit path is now retired; only SessionStart is shipped
+and registered. This records the conclusion of the original decision.

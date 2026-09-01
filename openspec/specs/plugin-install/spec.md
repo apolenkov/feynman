@@ -1,17 +1,18 @@
 # plugin-install Specification
 
 ## Purpose
-TBD - created by archiving change add-plugin-install-spec. Update Purpose after archive.
+Specify installation, health checks, and removal for feynman's Claude,
+Codex, and OpenCode integrations.
 ## Requirements
 ### Requirement: Node baseline gate enforced before install
 
-The CLI SHALL refuse to run on Node.js older than 22.6 and SHALL exit with a non-zero status
+The CLI SHALL refuse to run on Node.js older than 22.18 and SHALL exit with a non-zero status
 and a human-readable error message.
 
 #### Scenario: Node version too old
 
-- **WHEN** `install.sh` is run with a Node.js version below 22.6
-- **THEN** the script exits with status 1 and prints "Node.js >=22.6 required"
+- **WHEN** `install.sh` is run with a Node.js version below 22.18
+- **THEN** the script exits with status 1 and prints "Node.js >=22.18 required"
 
 #### Scenario: Node not found
 
@@ -182,7 +183,7 @@ delete `state.json`.
 
 The `install`, `doctor`, and `uninstall` subcommands SHALL run using only Node.js built-in
 modules, with `dependencies` in `package.json` staying `{}`. In development the `.ts` source
-runs directly via Node's type-stripping at Node >=22.6; the published npm package ships
+runs directly via Node's default type stripping at Node >=22.18; the published npm package ships
 pre-compiled `.js` files, so the user's machine runs them directly without any local compilation.
 
 #### Scenario: No third-party imports at runtime
@@ -197,4 +198,3 @@ pre-compiled `.js` files, so the user's machine runs them directly without any l
 - **WHEN** `feynman install` updates a target's settings file
 - **THEN** the merge is performed in-process by `bin/feynman.ts` (read → JSON.parse → mutate →
   JSON.stringify → writeFileSync) and no external command is shelled out for the merge
-

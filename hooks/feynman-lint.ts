@@ -4,7 +4,7 @@
 // If lint fails: emit additionalContext with corrections
 // If lint passes: exit 0 silently
 // ALWAYS exits 0 — never block Claude (best practice)
-// Zero deps. ESM + TypeScript (Node.js v22.6+ strip-types — runs .ts directly).
+// Zero deps. ESM + TypeScript (Node.js v22.18+ strips types by default — runs .ts directly).
 
 import { lint, RULE_DESCRIPTIONS } from '../lib/lint/index.ts';
 import { autofix } from '../lib/lint/autofix.ts';
