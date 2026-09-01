@@ -1,39 +1,37 @@
 # AGENTS.md
 
-Universal agent rules for feynman — the **single entry point**. All AI tools
-(Claude Code, Codex, …) read this file. `CLAUDE.md` is just `@AGENTS.md`.
-
-> **Thin by design.** Engineering standards are enforced by tooling and
-> documented in the canonical files below — never duplicated here. If a fact
-> lives in two places, one of them is wrong.
+Repository instructions for Codex contributors. Keep this file short; canonical
+details live in the files below.
 
 ## Before committing
 
-Run `npm run typecheck`, `npm run eslint`, and `npm test` — all green.
-The supported development runtime is Node.js 22.18 or newer; use `npm ci` for
-reproducible dependency installation.
+Use Node.js 22.18 or newer and run:
 
-## Two linters — don't confuse them
+```bash
+npm ci
+npm run ci
+```
 
-- `npm run lint` → feynman's **product** diagram linter (`bin/feynman-lint`, rules L01–L15)
-- `npm run eslint` → the **code** linter (`eslint .`)
+`npm run lint` is the product diagram linter. `npm run eslint` is the
+TypeScript code linter.
 
-## Canonical sources — each fact has exactly one home
+## Canonical sources
 
-| Topic | Home |
-|-------|------|
-| Domain language (Structure, Trigger, Visual, Intensity) — use exactly, no synonyms | `CONTEXT.md` |
-| Architecture (hook lifecycle, lint pipeline, state schema) | `docs/architecture.md` |
-| Decisions & constraints (toolchain, zero-runtime-deps, Node baseline) | `docs/adr/` (start at [0001](docs/adr/0001-typescript-source-with-packaging-build.md)) |
-| Agent ops (issue tracker, triage labels, domain workflow) | `docs/agents/` |
-| Planning / specs | `openspec/` |
+| Topic | Source |
+|---|---|
+| Domain terms | [CONTEXT.md](CONTEXT.md) |
+| Architecture and ownership | [docs/architecture.md](docs/architecture.md) |
+| Decisions | [docs/adr/](docs/adr/) |
+| Active requirements | [openspec/specs/](openspec/specs/) |
+| Contribution workflow | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Release workflow | [docs/release.md](docs/release.md) |
 
-## Targets
+## Scope
 
-Claude Code, Codex, and OpenCode are the three first-class install targets
-(`--target all` expands to exactly these). IDE adapters (Cline, Cursor,
-Windsurf) are not supported.
+feynman supports Codex only. The native marketplace plugin and npm CLI are the
+two delivery paths; the CLI always operates on `~/.codex` and has no target
+selection option.
 
 ## Commits
 
-Conventional Commits (`type: subject`, imperative).
+Use Conventional Commits (`type(scope): subject`) and keep changes focused.

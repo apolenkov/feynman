@@ -378,7 +378,7 @@ numeric-suffixed alphas (`foo123`) — are whitelisted.
 
 **Why:** Mixed Cyrillic+Latin tokens are a classic Runglish defect under
 fast typing or autocorrect ("Anti-Runglish" rule from
-`~/.claude/rules/language.md`). The token usually renders identically to
+`~/.codex/rules/language.md`). The token usually renders identically to
 its Latin counterpart but breaks search, grep, and IDE rename. Severity
 is `warn` not `error` — single-language teams may legitimately use
 Russian-spelled English-like terms, so the linter surfaces these without
@@ -697,7 +697,6 @@ plain text. Bullet frames normalise to `- item` style. Title lines
 (`┌─ Title ─┐`) are preserved as a leading plain line above the content.
 Idempotent — running `--fix` twice produces zero further diff.
 
-**Conservative-first:** the stop-hook (`feynman-session-start`) does **not**
-enable L15 conversion by default. Only `feynman lint --fix` opt-in triggers
-it. This preserves frames that an author drew intentionally, even if feynman
-cannot detect the intent.
+**Conservative-first:** the SessionStart hook never rewrites output. Only
+`feynman lint --fix` opts into L15 conversion. This preserves frames that an
+author drew intentionally, even if feynman cannot detect the intent.

@@ -68,12 +68,8 @@ function readJson(filePath: string): Record<string, unknown> {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
-function runtimeConfigPath(homeDir: string, target: string): string {
-  return path.join(homeDir, target === 'codex' ? '.codex/hooks.json' : '.claude/settings.json');
-}
-
-function runtimeHome(homeDir: string, target: string): string {
-  return path.join(homeDir, target === 'codex' ? '.codex' : '.claude');
+function runtimeConfigPath(homeDir: string): string {
+  return path.join(homeDir, '.codex', 'hooks.json');
 }
 
 function findHookCommand(config: Record<string, unknown>, eventName: string, scriptName: string): string {
@@ -116,27 +112,21 @@ function runHookCommand(command: string, homeDir: string, stdin: HookStdin): str
   return result.stdout || '';
 }
 
-function verifyInstalledHooks(homeDir: string, target: string): void {
-  const cfg = readJson(runtimeConfigPath(homeDir, target));
-
-  // v0.7.0: only SessionStart hook, no UserPromptSubmit
-  const hooks = cfg['hooks'] as Record<string, unknown[]> | undefined;
-  if (hooks?.['UserPromptSubmit'] !== undefined) {
-    throw new Error(`${target} must not have UserPromptSubmit registered (v0.7.0+)`);
-  }
+function verifyInstalledHooks(homeDir: string): void {
+  const cfg = readJson(runtimeConfigPath(homeDir));
 
   const sessionCommand = findHookCommand(cfg, 'SessionStart', 'feynman-session-start.js');
-  const expectedHome = runtimeHome(homeDir, target);
+  const expectedHome = path.join(homeDir, '.codex');
   if (!sessionCommand.includes(expectedHome)) {
-    throw new Error(`${target} SessionStart command missing expected FEYNMAN_HOME`);
+    throw new Error('Codex SessionStart command missing expected FEYNMAN_HOME');
   }
 
   const sessionOut = runHookCommand(sessionCommand, homeDir, {
     hook_event_name: 'SessionStart',
-    session_id: `${target}-release-smoke`,
+    session_id: 'codex-release-smoke',
   });
   if (!/<triggers>|<contract>|→|├──/.test(sessionOut)) {
-    throw new Error(`${target} SessionStart did not emit rule-file diagram tokens`);
+    throw new Error('Codex SessionStart did not emit rule-file diagram tokens');
   }
 }
 
@@ -160,6 +150,37 @@ function verifyTarballManifest(tarball: string, filesField: string[]): void {
   }
 }
 
+function readTarballEntry(tarball: string, entry: string): string {
+  const result = spawnSync('tar', ['-xOf', tarball, `package/${entry}`], { encoding: 'utf8' });
+  if (result.status !== 0 || !result.stdout) {
+    throw new Error(`tarball entry missing or unreadable: ${entry}`);
+  }
+  return result.stdout;
+}
+
+/** Verify the installable artifact, not merely the source-tree plugin files. */
+function verifyNativePlugin(tarball: string): void {
+  const manifest = JSON.parse(readTarballEntry(tarball, 'plugins/feynman/.codex-plugin/plugin.json')) as Record<string, unknown>;
+  const interfaceMeta = manifest['interface'];
+  if (
+    manifest['name'] !== 'feynman' ||
+    manifest['version'] !== pkg.version ||
+    manifest['skills'] !== './skills/' ||
+    typeof interfaceMeta !== 'object' || interfaceMeta === null || Array.isArray(interfaceMeta) ||
+    (interfaceMeta as Record<string, unknown>)['brandColor'] !== '#2563EB'
+  ) {
+    throw new Error('packed native Codex plugin manifest is incomplete or out of sync');
+  }
+
+  const skill = readTarballEntry(tarball, 'plugins/feynman/skills/feynman/SKILL.md');
+  if (!/npx -y @albinocrabs\/feynman@latest state/.test(skill)) {
+    throw new Error('packed native Codex skill lacks its self-contained npx state bridge');
+  }
+  if (/disable-model-invocation/i.test(skill)) {
+    throw new Error('packed native Codex skill contains non-discoverable metadata');
+  }
+}
+
 // Expect a pre-built tarball in dist/ (produced by `npm run build`).
 // Running npm pack here would pack raw .ts sources, which fail in node_modules.
 const DIST = path.join(ROOT, 'dist');
@@ -175,6 +196,7 @@ if (!fs.existsSync(expectedTarball)) {
 }
 
 verifyTarballManifest(expectedTarball, pkg.files ?? []);
+verifyNativePlugin(expectedTarball);
 console.log(`tarball manifest OK (${(pkg.files ?? []).length} files[] entries present)`);
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-release-smoke-'));
@@ -198,15 +220,11 @@ try {
     throw new Error(`version mismatch: expected ${pkg.version}, got ${version}`);
   }
 
-  run(feynman, ['install', '--target', 'both', '--force'], { env: { HOME: homeDir } });
+  run(feynman, ['install', '--force'], { env: { HOME: homeDir } });
 
-  const claudeDoctor = run(feynman, ['doctor', '--target', 'claude'], { env: { HOME: homeDir } });
-  const codexDoctor = run(feynman, ['doctor', '--target', 'codex'], { env: { HOME: homeDir } });
-  if (!claudeDoctor.includes('Status: OK') || !codexDoctor.includes('Status: OK')) {
-    throw new Error('doctor smoke failed for packed install');
-  }
-  verifyInstalledHooks(homeDir, 'claude');
-  verifyInstalledHooks(homeDir, 'codex');
+  const codexDoctor = run(feynman, ['doctor'], { env: { HOME: homeDir } });
+  if (!codexDoctor.includes('Status: OK')) throw new Error('Codex doctor smoke failed for packed install');
+  verifyInstalledHooks(homeDir);
 
   const lintOut = run(lint, ['--json', path.join(ROOT, 'tests', 'fixtures', 'valid-flow.md')]);
   const parsed = JSON.parse(lintOut) as { issues: unknown[] };

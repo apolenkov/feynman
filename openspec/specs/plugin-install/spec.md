@@ -1,200 +1,138 @@
 # plugin-install Specification
 
 ## Purpose
-Specify installation, health checks, and removal for feynman's Claude,
-Codex, and OpenCode integrations.
+
+Define installation, health checks, and removal for the Codex-only feynman
+distribution.
+
 ## Requirements
-### Requirement: Node baseline gate enforced before install
 
-The CLI SHALL refuse to run on Node.js older than 22.18 and SHALL exit with a non-zero status
-and a human-readable error message.
+### Requirement: Node baseline is enforced
 
-#### Scenario: Node version too old
+The CLI SHALL refuse to run on Node.js older than 22.18 with a non-zero status
+and a human-readable error.
 
-- **WHEN** `install.sh` is run with a Node.js version below 22.18
-- **THEN** the script exits with status 1 and prints "Node.js >=22.18 required"
+#### Scenario: unsupported runtime
 
-#### Scenario: Node not found
+- **WHEN** an install command runs on Node.js below 22.18
+- **THEN** it exits with status 1 and reports `Node.js >=22.18 required`
 
-- **WHEN** `install.sh` is run and the `node` binary is not on PATH
-- **THEN** the script exits with status 1 and prints "node not found"
+### Requirement: install registers the Codex SessionStart hook
 
-### Requirement: install writes a SessionStart hook entry into the target settings file
+The `install` command SHALL register an idempotent `SessionStart` hook in
+`~/.codex/hooks.json` and bootstrap `~/.codex/.feynman/state.json` with enabled
+`true` and Intensity `full` when state is absent.
 
-The `install` subcommand SHALL register a `SessionStart` hook entry in the target's settings
-file and SHALL bootstrap a `state.json` with `{ enabled: true, intensity: "full" }` if one does
-not already exist.
+#### Scenario: first install
 
-#### Scenario: First install for claude target
+- **WHEN** `feynman install` runs without an existing feynman registration
+- **THEN** Codex receives a hook referencing `feynman-session-start` and local state is created
 
-- **WHEN** `feynman install --target claude` runs and no feynman hook is registered
-- **THEN** `~/.claude/settings.json` gains a `SessionStart` hook group with a command referencing
-  `feynman-session-start` and `~/.claude/.feynman/state.json` is created with `enabled: true`
+#### Scenario: repeat install
 
-#### Scenario: First install for codex target
+- **WHEN** `feynman install` runs with an existing feynman registration
+- **THEN** the hook is not duplicated and the command exits successfully
 
-- **WHEN** `feynman install --target codex` runs and no feynman hook is registered
-- **THEN** `~/.codex/hooks.json` gains a `SessionStart` hook group with a command referencing
-  `feynman-session-start` and `~/.codex/.feynman/state.json` is created with `enabled: true`
+### Requirement: install reflects enabled state
 
-#### Scenario: both target installs into claude and codex
+The CLI SHALL create `~/.codex/.feynman-active` when state is enabled and SHALL
+remove it when state is disabled.
 
-- **WHEN** `feynman install --target both` runs
-- **THEN** the install is performed for both `claude` and `codex` targets in sequence
+#### Scenario: enabled state
 
-#### Scenario: Idempotent re-install without --force
+- **WHEN** install completes with `enabled: true`
+- **THEN** the active flag exists and contains the current Intensity
 
-- **WHEN** `feynman install` runs and a feynman `SessionStart` hook is already registered
-- **THEN** the settings file is not modified and the CLI exits 0
+#### Scenario: disabled state
 
-#### Scenario: --force re-registers the hook
+- **WHEN** install reads `enabled: false`
+- **THEN** the active flag is absent
 
-- **WHEN** `feynman install --force` runs and a feynman hook is already registered
-- **THEN** existing feynman hook entries are removed and a new `SessionStart` entry is registered
+### Requirement: the CLI has one Codex installation surface
 
-#### Scenario: default target is codex
+The CLI SHALL install, inspect, and remove only the Codex integration. It SHALL
+not expose a target-selection option; commands always use `~/.codex`.
 
-- **WHEN** `feynman install` runs with no `--target` flag
-- **THEN** the install targets `codex`
+#### Scenario: install uses Codex
 
-### Requirement: install creates the .feynman-active flag reflecting enabled state
+- **WHEN** `feynman install` runs
+- **THEN** it writes only the Codex hook and state paths
 
-The `install` subcommand SHALL write the `.feynman-active` flag file in the target's root
-directory when `state.json` reports `enabled: true`, and SHALL omit the flag when `enabled: false`.
+#### Scenario: target option is rejected
 
-#### Scenario: Flag written on enabled install
+- **WHEN** a command receives `--target`
+- **THEN** it reports an unsupported option and exits with code 2
 
-- **WHEN** `feynman install` completes and state is enabled
-- **THEN** `~/.claude/.feynman-active` (or `~/.codex/.feynman-active`) exists and contains
-  the Intensity string
+### Requirement: doctor is advisory and checks Codex health
 
-#### Scenario: Flag absent when state is disabled
+The `doctor` command SHALL check the hook registration, readable hook file,
+valid state, and active-flag consistency. It SHALL print a status report and
+exit 0 even when a check fails.
 
-- **WHEN** `state.json` has `enabled: false` and install is re-run
-- **THEN** no `.feynman-active` flag is written
+#### Scenario: healthy installation
 
-### Requirement: install for the opencode target registers a rules file via instructions[]
+- **WHEN** `feynman doctor` runs after a successful install
+- **THEN** checks report `OK`, the status is `OK`, and the exit code is 0
 
-The `install` subcommand for the `opencode` target SHALL bootstrap `state.json`, write a
-`rules.md` file under `~/.config/opencode/.feynman/` (containing the active Intensity rule block
-when enabled, or an empty file when disabled), and register that file's absolute path in the
-`instructions[]` array of `~/.config/opencode/opencode.json`, creating `opencode.json` as `{}`
-if it does not exist. Registration SHALL be check-before-append (idempotent unless `--force`).
-Unlike `claude` and `codex`, opencode is driven by an `instructions[]` file path, not a
-`SessionStart` hook.
+#### Scenario: missing registration
 
-#### Scenario: First install for opencode target
+- **WHEN** the hook is absent
+- **THEN** the registration check reports `FAIL`, the status is `ISSUES`, and the exit code remains 0
 
-- **WHEN** `feynman install --target opencode` runs and the path is not yet registered
-- **THEN** `~/.config/opencode/.feynman/rules.md` is written with the `full` Intensity content
-  and its absolute path is appended to `instructions[]` in `~/.config/opencode/opencode.json`
+### Requirement: uninstall preserves user state
 
-#### Scenario: Idempotent opencode re-install
+The `uninstall` command SHALL remove feynman's Codex hook entries and active
+flag, preserve `state.json`, and leave unrelated Codex hooks unchanged.
 
-- **WHEN** `feynman install --target opencode` runs and the rules path is already in `instructions[]`
-- **THEN** the path is not duplicated and `opencode.json` is left unchanged
+#### Scenario: registered hook
 
-#### Scenario: Disabled state writes an empty opencode rules file
+- **WHEN** `feynman uninstall` runs after installation
+- **THEN** feynman's registration and active flag are removed while state remains
 
-- **WHEN** `feynman install --target opencode` runs and `state.json` has `enabled: false`
-- **THEN** `~/.config/opencode/.feynman/rules.md` is written empty
+#### Scenario: already absent
 
-### Requirement: supported install surface is the three CLI agent targets only
+- **WHEN** `feynman uninstall` runs without a feynman registration
+- **THEN** it exits 0 and reports that nothing was found
 
-feynman's supported install surface SHALL be the three CLI agent targets `claude`, `codex`, and
-`opencode` (the `all` / `*` aliases expand to exactly these three). No IDE adapters are supported:
-`cline`, `cursor`, and `windsurf` SHALL be rejected as invalid targets (exit code 2).
+### Requirement: state is managed through one Codex CLI surface
 
-#### Scenario: all expands to the three supported targets
+The CLI SHALL show and change local Feynman state through `feynman state` and
+the `feynman status` alias. It SHALL keep `state.json` and the active flag
+consistent without requiring a user or skill to edit either file directly.
 
-- **WHEN** `feynman install --target all` (or `--target '*'`) runs
-- **THEN** the install is performed for `claude`, `codex`, and `opencode` in sequence
+#### Scenario: state change
 
-#### Scenario: a removed IDE target is rejected
+- **WHEN** `feynman state lite` runs
+- **THEN** `state.json` has intensity `lite` and `.feynman-active` contains
+  `lite` when state is enabled
 
-- **WHEN** `feynman install --target cline` (or `cursor`, or `windsurf`) runs
-- **THEN** the CLI prints an `invalid --target` error and exits with code 2
+#### Scenario: disable state
 
-### Requirement: doctor for hook targets reports health and always exits 0
+- **WHEN** `feynman state off` runs
+- **THEN** `state.json` has `enabled: false` and `.feynman-active` is absent
 
-The `doctor` subcommand for hook targets (`claude`, `codex`) SHALL check whether the
-`SessionStart` hook is registered, the hook script file is readable, `state.json` is valid,
-and the `.feynman-active` flag matches the enabled state, then SHALL print a status report
-and SHALL exit 0 (advisory-only, never blocks). The optional lint-hook check SHALL always be
-reported as `[INFO]` and SHALL never count toward failures or change the exit status.
+### Requirement: the published package has no runtime dependencies
 
-#### Scenario: All checks pass
+Install, doctor, and uninstall SHALL use only Node.js built-ins. Development
+may run TypeScript directly on Node.js 22.18+; the published package SHALL ship
+compiled JavaScript and SHALL declare an empty `dependencies` object.
 
-- **WHEN** `feynman doctor --target claude` runs on a healthy install
-- **THEN** all items show `[OK]` and the output ends with "Status: OK"
+#### Scenario: package inspection
 
-#### Scenario: Missing hook registration
+- **WHEN** the package is packed for publication
+- **THEN** it contains compiled CLI/hook files and no third-party runtime dependency
 
-- **WHEN** `feynman doctor` runs and no feynman `SessionStart` hook is registered
-- **THEN** the hook registration check shows `[FAIL]` and the CLI still exits 0
+### Requirement: the native Codex skill is discoverable and self-contained
 
-#### Scenario: lint-hook check is informational only
+The repository SHALL publish a native Codex plugin with a marketplace entry,
+manifest, and `SKILL.md`. Its name, description, and keywords SHALL describe
+visual architecture and ASCII diagram use cases. The skill SHALL invoke the
+published CLI through `npx` for a state operation and SHALL not require an MCP
+server or a globally installed binary.
 
-- **WHEN** `feynman doctor` runs whether or not the optional lint hook is registered
-- **THEN** the lint-hook line is reported as `[INFO]`, never as `[FAIL]`, and does not affect the exit status
+#### Scenario: plugin search and invocation
 
-### Requirement: doctor for the opencode target reports health and always exits 0
-
-The `doctor` subcommand for the `opencode` target SHALL check that `opencode.json` exists, the
-rules path is registered in `instructions[]`, `rules.md` exists and is non-empty, `state.json` is
-valid, and the `.feynman-active` flag matches the enabled state, then SHALL print a status report
-and SHALL exit 0 (advisory-only, never blocks).
-
-#### Scenario: opencode doctor on a healthy install
-
-- **WHEN** `feynman doctor --target opencode` runs after a successful install
-- **THEN** all checks pass, the report ends with "Status: OK", and the CLI exits 0
-
-#### Scenario: opencode doctor with a missing registration
-
-- **WHEN** `feynman doctor --target opencode` runs and the rules path is not in `instructions[]`
-- **THEN** that check shows `[FAIL]`, the report shows "Status: ISSUES", and the CLI still exits 0
-
-### Requirement: uninstall removes hook entries and the flag file, preserving state.json
-
-The `uninstall` subcommand SHALL remove feynman's registration from the target's settings file —
-the `SessionStart` hook entries for `claude`/`codex`, or the rules path in `instructions[]` plus
-the `rules.md` file for `opencode` — and SHALL delete the `.feynman-active` flag, and SHALL NOT
-delete `state.json`.
-
-#### Scenario: Successful uninstall for opencode
-
-- **WHEN** `feynman uninstall --target opencode` runs and the rules path is registered
-- **THEN** the path is removed from `instructions[]` in `~/.config/opencode/opencode.json`,
-  `~/.config/opencode/.feynman/rules.md` is deleted, the flag is deleted, and `state.json` is preserved
-
-#### Scenario: Successful uninstall for claude
-
-- **WHEN** `feynman uninstall --target claude` runs and a hook is registered
-- **THEN** all feynman entries are removed from `~/.claude/settings.json`, the flag
-  `~/.claude/.feynman-active` is deleted, and `~/.claude/.feynman/state.json` is preserved
-
-#### Scenario: Idempotent uninstall
-
-- **WHEN** `feynman uninstall` runs and no feynman hook is registered
-- **THEN** the CLI exits 0 and prints that nothing was found to uninstall
-
-### Requirement: the CLI ships with zero runtime dependencies per ADR 0001
-
-The `install`, `doctor`, and `uninstall` subcommands SHALL run using only Node.js built-in
-modules, with `dependencies` in `package.json` staying `{}`. In development the `.ts` source
-runs directly via Node's default type stripping at Node >=22.18; the published npm package ships
-pre-compiled `.js` files, so the user's machine runs them directly without any local compilation.
-
-#### Scenario: No third-party imports at runtime
-
-- **WHEN** `bin/feynman.ts` or its compiled `.js` counterpart runs any install, doctor, or
-  uninstall command
-- **THEN** all imports are from `node:fs`, `node:path`, `node:os`, `node:child_process`,
-  `node:module`, or `package.json` — no `node_modules` package is loaded
-
-#### Scenario: Published package settings.json merge is in-process
-
-- **WHEN** `feynman install` updates a target's settings file
-- **THEN** the merge is performed in-process by `bin/feynman.ts` (read → JSON.parse → mutate →
-  JSON.stringify → writeFileSync) and no external command is shelled out for the merge
+- **WHEN** a user searches the Codex plugin browser for visual architecture,
+  ASCII diagrams, flows, comparisons, or status
+- **THEN** the Feynman marketplace entry and skill metadata describe that
+  capability, and the skill can manage state with `npx`

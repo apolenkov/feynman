@@ -1,51 +1,29 @@
-# Privacy Policy
+# Privacy
 
-**TL;DR:** feynman does not collect, store, or transmit any user data. It runs entirely on your local machine and makes no network requests.
+feynman is a local-only Codex plugin. The installed hook and CLI do not
+collect, store, or transmit prompt content, response content, analytics, or
+telemetry, and they make no runtime network requests.
 
-## What feynman does
+The native skill resolves its CLI through an explicit `npx` command only when a
+user asks to read or change Feynman state. If the package is not cached, npm may
+contact the configured registry to download the public package. That operation
+sends no Codex prompt or response content and is not telemetry.
 
-feynman is a local Claude Code / Codex / OpenCode integration. At a matching
-`SessionStart` event, its hook reads a rules file from the local install and
-writes it as local session context. feynman does not read prompt or response
-content, and it does not send any of that content anywhere.
+## Local data
 
-## What feynman writes to disk
+The Codex hook reads its packaged rules and the following user-owned files:
 
-| path                              | contents                                              |
-|-----------------------------------|-------------------------------------------------------|
-| `~/.claude/.feynman/state.json`   | `{enabled, intensity, output_style, injections}`     |
-| `~/.claude/.feynman-active`       | presence flag + active intensity name                |
-| `~/.codex/.feynman/state.json`    | same schema, Codex variant                           |
-| `~/.codex/.feynman-active`        | same flag, Codex variant                             |
+| Path | Purpose |
+|---|---|
+| `~/.codex/.feynman/state.json` | enabled state, Intensity, style, local counter |
+| `~/.codex/.feynman-active` | active flag and current Intensity |
 
-The `injections` field is a local counter (incremented on each hook fire). It never leaves your machine.
+The `injections` counter never leaves the machine. `feynman lint <file>` reads
+only the file explicitly passed to it.
 
-## What feynman reads from disk
+Uninstall removes feynman's hook registration and active flag while preserving
+`state.json`; it does not alter unrelated Codex settings.
 
-- Its own rules file (`rules/feynman-activate.md` inside the npm-installed package)
-- Its own state file (above)
-- Anything you explicitly pass to `feynman lint <file>` (read-only)
+For security reports, see [SECURITY.md](SECURITY.md).
 
-## What feynman does NOT do
-
-- ❌ Send analytics or telemetry
-- ❌ Make network requests
-- ❌ Track which prompts you submit or which responses you get
-- ❌ Share state across machines (unless you copy the files yourself)
-- ❌ Auto-update without your action (`npx @albinocrabs/feynman install` is explicit)
-
-## Dependencies
-
-feynman has **zero npm runtime dependencies** by design. It uses only Node.js built-in modules (`fs`, `path`, `os`, `child_process`, `node:test`). There is no third-party code that could collect data on its behalf.
-
-## Source
-
-All source code is public at https://github.com/apolenkov/feynman under the MIT license. You can verify the above claims by reading the TypeScript source and the compiled npm artifact.
-
-## Contact
-
-For privacy concerns: open an issue at https://github.com/apolenkov/feynman/issues.
-
----
-
-*Last reviewed: 2026-09-01*
+Last reviewed: 2026-09-01

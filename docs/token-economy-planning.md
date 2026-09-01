@@ -24,7 +24,7 @@ persist the result and send
 a notification."
 ```
 
-The rules live in [`rules/feynman-activate.md`](../rules/feynman-activate.md)
+The rules live in [`rules/feynman-contract.md`](../rules/feynman-contract.md)
 and are loaded at matching session-start events, then remain available for all
 prompts in that session — including prompts that ask the model to write or
 review a plan file.

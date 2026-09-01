@@ -105,8 +105,8 @@ try {
     throw new Error(`installed package version mismatch: expected ${packageVersion}, got ${version}`);
   }
 
-  run(bin, ['install', '--target', 'both', '--force'], { env: { HOME: homeDir } });
-  const doctorOut = run(bin, ['doctor', '--target', 'both'], { env: { HOME: homeDir } });
+  run(bin, ['install', '--force'], { env: { HOME: homeDir } });
+  const doctorOut = run(bin, ['doctor'], { env: { HOME: homeDir } });
   if (!doctorOut.includes('Status: OK')) {
     throw new Error('released package doctor check failed');
   }

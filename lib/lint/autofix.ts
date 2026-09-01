@@ -364,14 +364,12 @@ function nextFenceLine(lines: string[], from: number): number {
 // Walk text, locate frame regions (sequence of lines starting with ┌ … ending
 // with └), build node objects, and rewrite each region in place.
 //
-// Two orthogonal opt-ins, both default OFF (Stop-hook Phase 8.5 contract):
+// Two orthogonal opt-ins, both default OFF to keep programmatic use conservative:
 //   - opts.processFenced — also process frames inside ``` fenced code blocks.
-//     CLI --fix opts in; Stop-hook does NOT (fenced frames in model output
-//     are deliberate samples).
+//     CLI --fix opts in; default callers preserve fenced author samples.
 //   - opts.convertL11 — for L11-eligible frames (1-5 inner lines, no nested
 //     tree, no embedded table column), convert to dot-leader list instead of
-//     just aligning. CLI --fix opts in; Stop-hook does NOT (silent semantic
-//     rewrite would surprise the model and the user reading the response).
+//     just aligning. CLI --fix opts in; default callers avoid semantic rewrites.
 //
 // Empty frames (┌┐ next to └┘ with no inner lines) — return unchanged.
 // Each frame is matched by indent: top and bottom lines share leading
@@ -395,7 +393,7 @@ export function autofix(text: string, opts?: AutofixOptions): string {
   let inFence = false;
   while (i < lines.length) {
     const line = lines[i]!;
-    // Fenced code block toggle — opt-out by default (Stop-hook contract).
+    // Fenced code block toggle — opt-out by default to preserve author intent.
     if (/^\s*```/.test(line)) {
       inFence = !inFence;
       out.push(line);

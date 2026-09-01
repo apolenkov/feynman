@@ -1,54 +1,36 @@
-# feynman
+# feynman domain language
 
-feynman is a Claude Code / Codex plugin that injects ASCII-diagram rules at session start, so the
-assistant draws a diagram whenever a response has Structure — without the developer having to ask.
+feynman is a Codex plugin that injects a compact Contract at session start.
+The Contract helps Codex make structured answers visible without turning plain
+prose into decoration.
 
-## Language
+## Canonical terms
 
-**Structure**:
-A recognizable shape in a response's content — sequence, hierarchy, comparison, status,
-state-machine, and the like — that warrants being drawn. The thing feynman classifies a response by.
-_Avoid_: shape
+**Structure** — a recognizable shape in content: sequence, hierarchy,
+comparison, status, or state machine.
 
-**Trigger**:
-The mapping from one Structure to the Visual it should become. The mechanism feynman applies, not
-the content it looks at.
+**Trigger** — the mapping from a Structure to a Visual. It describes when a
+visual form is useful, not the content itself.
 
-**Contract**:
-The injected instruction the assistant follows: classify a response's Structure against the Trigger
-table, then channel it into the mapped Visual, amplify it, or suppress it (leave as prose).
-Suppression outranks Triggers.
-_Avoid_: rule (bare)
+**Contract** — the injected instruction that classifies Structure, applies the
+Trigger table, and either selects, amplifies, or suppresses a Visual.
+Suppression wins; definitions, greetings, recommendations, and question-backs
+remain prose.
 
-**Visual**:
-The rendered form a Structure becomes. Two axes: a *kind* — what a Trigger turns the Structure into
-(`arrow flow`, `▲▼ scale`, `✓✗ status`, `tree`, `table`, `frame`) — and a *size* ladder
-`glyph < dot-leader < tree < table < frame`, used by the smallest-sufficient-form rule.
-_Avoid_: diagram (informal/marketing word; reserve "ASCII diagram" for README and tagline, not specs)
+**Visual** — the rendered form selected for a Structure: flow, tree, table,
+status marker, or frame. The smallest-sufficient ladder is:
+`prose < glyph < dot-leader < tree < table < frame`.
 
-**Primary Visual**:
-The single Visual that *carries* a response's Structure — the one the smallest-sufficient-form rule
-picks (anywhere on the ladder, a `glyph` included). At most one per response: the mutex governs the
-Primary Visual only.
-_Avoid_: diagram
+**Primary Visual** — the one Visual that carries a response's main Structure.
+At most one is used per response.
 
-**Annotation**:
-A glyph-level marker that *decorates* content rather than carrying it — `▲▼` priority scale,
-`✓✗` status, `**bold**` keys. Annotations may co-occur with a Primary Visual and with each other;
-they are not bound by the one-Primary-Visual mutex. The same marker is a Primary Visual when it is
-the response's carrier (a `priority → ▲▼ scale` answer) and an Annotation when it merely decorates
-another Visual (a `▲` inside a table).
-_Avoid_: glyph (that is the size rung, not the decorating role)
+**Annotation** — a marker that decorates content without carrying its main
+Structure, such as `▲▼`, `✓✗`, or a bold key. Annotations may accompany a
+Primary Visual.
 
-**Intensity**:
-The verbosity tier of the injected rules — `lite`, `full`, or `ultra`. Selects how many Triggers and
-how much syntax detail feynman injects; `full` is the default.
-_Avoid_: verbosity, level, mode
+**Intensity** — the size of the injected Contract: `lite`, `full`, or `ultra`.
+`full` is the default.
 
-**Lint rule**:
-One of the product linter's L-numbered checks that flags a malformed Visual *after* it is rendered —
-box closure, tree characters, arrow style, column widths, and the like. The product linter
-(`feynman-lint`) owns the bare word "rule". Distinct from the assistant-facing guidance feynman
-injects, which is made of Triggers at an Intensity and tells the assistant how to draw.
-_Avoid_: check; "rule" for the injected guidance (reserve bare "rule" for README/tagline, not specs —
-in specs say Trigger / Intensity / the injected Contract)
+**Lint rule** — an L-numbered diagnostic applied after a Visual is rendered.
+It checks layout and economy; it is distinct from the assistant-facing
+Triggers in the Contract.

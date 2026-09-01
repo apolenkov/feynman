@@ -1,5 +1,5 @@
 // tests/install.test.ts — install.sh idempotency + settings.json merge
-// Stubs HOME to os.tmpdir() — never touches real ~/.claude/
+// Stubs HOME to os.tmpdir() — never touches real ~/.codex/
 // Uses node:test + node:assert/strict.
 
 import { describe, it, before, after } from 'node:test';
@@ -82,13 +82,12 @@ describe('install.sh', () => {
       assert.ok(fs.existsSync(settingsPath), 'codex hooks.json should be created');
     });
 
-    it('settings.json contains SessionStart hook (no UserPromptSubmit)', () => {
+    it('settings.json contains a Codex SessionStart hook', () => {
       const cfg = readSettings(tmpHome);
       assert.ok(cfg['hooks'], 'hooks key must exist');
       const hooks = cfg['hooks'] as Record<string, unknown[]>;
       assert.ok(Array.isArray(hooks['SessionStart']), 'SessionStart must be array');
       assert.ok(hooks['SessionStart']!.length >= 1, 'at least one session hook entry');
-      assert.equal(hooks['UserPromptSubmit'], undefined, 'UserPromptSubmit must not be registered (v0.7.0+)');
     });
 
     it('SessionStart hook entry points to feynman-session-start with absolute path', () => {
@@ -103,13 +102,6 @@ describe('install.sh', () => {
       assert.ok(!sessionHook.command.includes('~/'), 'session hook command must not use tilde');
       assert.ok(sessionEntry!.matcher?.includes('compact'), 'matcher must include compact');
       assert.ok(sessionEntry!.matcher?.includes('clear'), 'matcher must include clear');
-    });
-
-    it('installs /feynman command to ~/.claude/commands/ with explicit claude target', () => {
-      const result = runInstall(tmpHome, {}, ['--target', 'claude']);
-      assert.equal(result.status, 0, `install --target claude failed: ${result.stderr}`);
-      const commandPath = path.join(tmpHome, '.claude', 'commands', 'feynman.md');
-      assert.ok(fs.existsSync(commandPath), 'feynman.md command should be installed');
     });
 
     it('stdout mentions "hook: installed"', () => {
@@ -141,7 +133,6 @@ describe('install.sh', () => {
         e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-session-start.ts'))
       );
       assert.equal(sessionHooks.length, 1, `session hook should appear exactly once, found ${sessionHooks.length}`);
-      assert.equal(hooks['UserPromptSubmit'], undefined, 'UserPromptSubmit must not be registered (v0.7.0+)');
     });
 
     it('second install stdout says "already installed"', () => {
@@ -163,20 +154,20 @@ describe('install.sh', () => {
     before(() => {
       tmpHome = makeTempHome();
       // Create pre-existing codex hooks.json with another hook
-      const claudeDir = path.join(tmpHome, '.codex');
-      fs.mkdirSync(claudeDir, { recursive: true });
+      const codexDir = path.join(tmpHome, '.codex');
+      fs.mkdirSync(codexDir, { recursive: true });
       const existingCfg = {
         hooks: {
-          UserPromptSubmit: [
+          SessionStart: [
             {
-              hooks: [{ type: 'command', command: 'node /other/my-hook.js', timeout: 3 }]
+              hooks: [{ type: 'command', command: 'node /other/codex-hook.js', timeout: 3 }]
             }
           ]
         },
         someOtherConfig: { value: 42 }
       };
         fs.writeFileSync(
-        path.join(claudeDir, 'hooks.json'),
+        path.join(codexDir, 'hooks.json'),
         JSON.stringify(existingCfg, null, 2)
       );
 
@@ -185,22 +176,22 @@ describe('install.sh', () => {
 
     after(() => rmrf(tmpHome));
 
-    it('existing UserPromptSubmit hook preserved after merge', () => {
+    it('existing Codex SessionStart hook preserved after merge', () => {
       const cfg = readSettings(tmpHome);
       const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
-      const existing = (hooks['UserPromptSubmit'] ?? []).find(e =>
-        e.hooks && e.hooks.some(h => h.command && h.command.includes('my-hook.js'))
+      const existing = (hooks['SessionStart'] ?? []).find(e =>
+        e.hooks && e.hooks.some(h => h.command && h.command.includes('codex-hook.js'))
       );
-      assert.ok(existing, 'pre-existing UserPromptSubmit hook should be preserved in merged settings');
+      assert.ok(existing, 'pre-existing Codex SessionStart hook should be preserved in merged settings');
     });
 
-    it('feynman does NOT add its own UserPromptSubmit hook (v0.7.0+)', () => {
+    it('adds exactly one Feynman SessionStart hook', () => {
       const cfg = readSettings(tmpHome);
       const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
-      const feynman = (hooks['UserPromptSubmit'] ?? []).find(e =>
-        e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-activate.ts'))
+      const feynman = (hooks['SessionStart'] ?? []).filter(e =>
+        e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-session-start.ts'))
       );
-      assert.equal(feynman, undefined, 'feynman must NOT add UserPromptSubmit hook in v0.7.0+');
+      assert.equal(feynman.length, 1, 'feynman must add one SessionStart hook');
     });
 
     it('other config keys preserved', () => {
@@ -208,13 +199,13 @@ describe('install.sh', () => {
       assert.deepEqual(cfg['someOtherConfig'], { value: 42 }, 'non-hooks config should not be touched');
     });
 
-    it('total UserPromptSubmit hook count is 1 (only pre-existing)', () => {
+    it('preserves unrelated Codex hook groups', () => {
       const cfg = readSettings(tmpHome);
-      const hooks = cfg['hooks'] as Record<string, unknown[]>;
-      assert.equal(
-        (hooks['UserPromptSubmit'] ?? []).length, 1,
-        `expected 1 pre-existing hook only, found ${(hooks['UserPromptSubmit'] ?? []).length}`
-      );
+      const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
+      assert.equal((hooks['SessionStart'] ?? []).filter((entry) =>
+        entry.hooks?.some((hook) => hook.command.includes('codex-hook.js')),
+      ).length, 1);
+      assert.equal(hooks['SessionStart']!.length, 2, 'unrelated and Feynman SessionStart groups must both remain');
     });
   });
 

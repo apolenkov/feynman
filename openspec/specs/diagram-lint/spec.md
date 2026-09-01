@@ -204,7 +204,7 @@ Severity: **warn**.
 
 #### Scenario: hyphenated identifier
 
-- **WHEN** a line contains `feynman-activate` (hyphenated)
+- **WHEN** a line contains `feynman-contract` (hyphenated)
 - **THEN** L10 does not report any issue
 
 ---

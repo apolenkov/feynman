@@ -1,77 +1,27 @@
-# Launch Notes
+# Launch guide
 
-## Positioning
+feynman makes structured Codex answers readable with small terminal-native
+visuals. It is distributed as a native Codex plugin and an npm CLI.
 
-feynman is a Claude Code and Codex plugin that makes structured answers
-visible by default. Flows become arrows, hierarchies become trees, comparisons
-become columns, priorities become scales, and status summaries render at the
-smallest visual that fits — dot-leader by default, markdown table for larger
-sets, frame only when lighter forms lose information.
-
-## One-liner
+## Install
 
 ```bash
-npx -y @albinocrabs/feynman@latest install --target all
+codex plugin marketplace add apolenkov/feynman --ref main
+codex plugin add feynman@feynman
+npx -y @albinocrabs/feynman@latest install
+npx -y @albinocrabs/feynman@latest doctor
 ```
 
-## Short Description
+The installer writes only to `~/.codex` and is idempotent. Verify the package
+from a clean directory with `npx -y @albinocrabs/feynman@latest version`.
 
-feynman automatically injects ASCII diagram rules into Claude Code and Codex
-prompts, so structured answers render as readable terminal-native diagrams
-without asking every time.
+## Release checklist
 
-## Benefits
+- `npm run ci` passes locally.
+- CI is green on `main`.
+- The top `[Unreleased]` section of `CHANGELOG.md` is curated.
+- `npm run build` and `npm publish --dry-run --access public` pass.
+- A GitHub Release is created from the matching `v<version>` tag.
+- The package and `npx` smoke test are verified after publication.
 
-- No runtime dependencies
-- Works with Claude Code and Codex
-- Installs with `npx`
-- Keeps state local under `~/.claude` or `~/.codex`
-- Ships a diagram linter for public docs and generated responses
-- Uses plain ASCII/Unicode text, not external renderers
-
-## Demo Script
-
-```bash
-npx -y @albinocrabs/feynman@latest install --target '*'
-npx -y @albinocrabs/feynman@latest doctor --target claude
-npx -y @albinocrabs/feynman@latest doctor --target codex
-feynman bootstrap --out ./feynman-package
-```
-
-Prompt:
-
-```text
-Compare SQLite, Postgres, and Redis for a local-first prototype.
-```
-
-Expected shape:
-
-```text
-SQLite           | Postgres         | Redis
------------------|------------------|----------------
-single-file      | server database  | memory-first
-easy local setup | richer SQL       | fast cache
-limited writes   | production-ready | persistence opt
-```
-
-## Release Checklist
-
-- `npm run ci`
-- GitHub Actions CI green
-- `npm run changelog`
-- `npm run build`
-- `npm publish --dry-run --access public`
-- GitHub Release created from changelog notes
-- npm package visible at `@albinocrabs/feynman@latest`
-- Smoke test from clean directory:
-
-```bash
-npx -y @albinocrabs/feynman@latest version
-```
-
-For the full release playbook, see: [docs/release.md](release.md)
-
-## Detailed Release Docs
-
-- [docs/release.md](release.md): full end-to-end release procedure, release notes
-  contract, workflow behavior, and post-release verification.
+See [release.md](release.md) for the complete procedure.

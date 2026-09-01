@@ -1,0 +1,58 @@
+// State domain model and pure formatting/normalization rules.
+
+export const INTENSITIES = ['lite', 'full', 'ultra'] as const;
+export const OUTPUT_STYLES = ['short', 'middle', 'full'] as const;
+
+export type Intensity = (typeof INTENSITIES)[number];
+export type OutputStyle = (typeof OUTPUT_STYLES)[number];
+
+export interface FeynmanState {
+  enabled: boolean;
+  intensity: Intensity;
+  output_style: OutputStyle;
+  injections: number;
+}
+
+export const DEFAULT_STATE: FeynmanState = {
+  enabled: true,
+  intensity: 'full',
+  output_style: 'full',
+  injections: 0,
+};
+
+export const OUTPUT_STYLE_SUFFIX: Record<string, string> = {
+  short: '\n\nOutput style: short — dot-leader and inline glyphs only; no frames, no ASCII art, no trees.',
+  middle: '\n\nOutput style: middle — frame blocks only for ≥6 items; prefer trees and markdown tables.',
+};
+
+export function isIntensity(value: unknown): value is Intensity {
+  return typeof value === 'string' && (INTENSITIES as readonly string[]).includes(value);
+}
+
+export function isOutputStyle(value: unknown): value is OutputStyle {
+  return typeof value === 'string' && (OUTPUT_STYLES as readonly string[]).includes(value);
+}
+
+function nonNegativeInteger(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+/** Convert arbitrary JSON into the one safe state shape used by the runtime. */
+export function normalizeState(raw: unknown): FeynmanState {
+  const record = typeof raw === 'object' && raw !== null && !Array.isArray(raw)
+    ? raw as Record<string, unknown>
+    : {};
+  return {
+    enabled: typeof record['enabled'] === 'boolean' ? record['enabled'] : DEFAULT_STATE.enabled,
+    intensity: isIntensity(record['intensity']) ? record['intensity'] : DEFAULT_STATE.intensity,
+    output_style: isOutputStyle(record['output_style']) ? record['output_style'] : DEFAULT_STATE.output_style,
+    injections: nonNegativeInteger(record['injections']) ?? nonNegativeInteger(record['count']) ?? DEFAULT_STATE.injections,
+  };
+}
+
+/** Append a safe, optional output-style hint to injected rules. */
+export function applyOutputStyle(rulesText: string, outputStyle: unknown): string {
+  const styleValue = typeof outputStyle === 'string' ? outputStyle : 'full';
+  const styleSuffix = OUTPUT_STYLE_SUFFIX[styleValue];
+  return styleSuffix ? rulesText + styleSuffix : rulesText;
+}

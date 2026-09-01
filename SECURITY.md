@@ -1,44 +1,32 @@
 # Security Policy
 
-## Supported Versions
+Security fixes are supported for the latest published npm version. The
+supported runtime is Node.js 22.18 or newer.
 
-Security fixes are shipped for the latest published npm version. The supported
-runtime baseline is Node.js 22.18 or newer.
+## Report a vulnerability
 
-## Reporting a Vulnerability
-
-Please report security issues privately by opening a GitHub security advisory:
+Open a private GitHub security advisory:
 
 https://github.com/apolenkov/feynman/security/advisories/new
 
-Do not file public issues for vulnerabilities. Include:
+Do not disclose vulnerabilities in a public issue. Include the affected
+version, reproduction steps, impact, and a suggested fix when available. We
+aim to acknowledge reports within 72 hours.
 
-- affected version
-- reproduction steps
-- expected impact
-- suggested fix, if known
+## Security boundaries
 
-We aim to acknowledge reports within 72 hours.
+feynman is a local Codex hook. Sensitive surfaces are the Codex hook
+registration in `~/.codex/hooks.json`, reads from the installed package, and
+the local state files under `~/.codex/.feynman/`.
 
-## Scope
+The published package has zero runtime npm dependencies. The hook validates
+session input, confines state to the selected Codex home, and fails safe on
+invalid state or rules.
 
-feynman is a local hook package. The main security-sensitive surfaces are:
+## Release checks
 
-- hook command registration in `~/.claude/settings.json`
-- hook command registration in `~/.codex/hooks.json`
-- file reads from the installed package directory
-- state files under `~/.claude/.feynman/` and `~/.codex/.feynman/`
-
-The package has zero runtime npm dependencies.
-
-## Release Security Checklist
-
-Before publishing a new npm version:
-
-- CI required checks must pass on the supported Node.js baseline across Ubuntu
-  and macOS.
-- `npm run audit` must pass at `moderate` severity or higher.
-- GitHub release tag must match `package.json` version with a `v` prefix.
-- GitHub Actions secret `NPM_TOKEN` must be present for first publish of a new version.
-- npm provenance is enabled in the release workflow.
-- Registry smoke verification must pass after publish (`npm view`, install from npm, `feynman doctor --target all`).
+- CI passes on the supported Node.js baseline on Ubuntu and macOS.
+- `npm run audit` reports no moderate-or-higher vulnerabilities.
+- The GitHub tag matches `package.json` with a `v` prefix.
+- npm provenance is enabled.
+- A clean-directory npm smoke test passes after publication.

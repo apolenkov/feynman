@@ -34,8 +34,7 @@ export interface RuleEntry {
 
 /**
  * Canonical registry of all 15 lint rules (L01–L15).
- * Descriptions for L01-L08 are kept byte-identical to the original
- * RULE_DESCRIPTIONS in hooks/feynman-lint.ts so that hook output is unchanged.
+ * Descriptions are part of the CLI's stable diagnostic output.
  */
 export const RULE_REGISTRY: readonly RuleEntry[] = [
   {

@@ -1,6 +1,6 @@
 {
   "skill_name": "feynman-rules",
-  "description": "Eval set for rules/feynman-activate.md (full intensity). Tests whether the injected rule set causes Claude to render appropriate ASCII diagrams for structured content, and avoid them for non-structured content.",
+  "description": "Eval set for rules/feynman-contract.md (full intensity). Tests whether the injected rule set helps Codex render appropriate ASCII diagrams for structured content and avoid them for non-structured content.",
   "evals": [
     {
       "id": 1,
