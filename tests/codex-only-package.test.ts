@@ -45,6 +45,17 @@ describe('Codex-only package contract', () => {
     }
   });
 
+  it('publishes the built tarball through an explicit local path', () => {
+    const pkg = JSON.parse(read('package.json')) as { scripts: { release: string } };
+    const localTarball = 'npm publish "./$(cat dist/TARBALL.txt)"';
+    assert.ok(pkg.scripts.release.includes(localTarball));
+
+    const releaseWorkflow = read('.github/workflows/release.yml');
+    const publishLines = releaseWorkflow.split('\n').filter(line => line.trimStart().startsWith('run: npm publish'));
+    assert.equal(publishLines.length, 2);
+    for (const line of publishLines) assert.ok(line.includes(localTarball));
+  });
+
   it('publishes the native Codex marketplace entry', () => {
     const marketplace = JSON.parse(read('.agents/plugins/marketplace.json')) as {
       plugins: Array<{ source: { path: string } }>;
