@@ -39,9 +39,26 @@ gh release create v<version> --title "<version>" --target main \
 ```
 
 The release workflow checks out the tag, runs the full CI/build gate, uploads
-the package artifact, and publishes to npm with provenance using the repository
-`NPM_TOKEN`. It then verifies registry propagation and runs the published
-package smoke test.
+the package artifact, and publishes it through npm Trusted Publishing (GitHub
+OIDC). It then verifies registry propagation and runs the published-package
+smoke test. The workflow has the required `id-token: write` permission and
+does not receive an npm publish token. It upgrades npm to the current release
+before publishing; npm 11.5.1 or newer is required for Trusted Publishing.
+
+### One-time npm configuration
+
+In npm package settings for `@albinocrabs/feynman`, add a **Trusted Publisher**
+of type **GitHub Actions** with these exact values:
+
+- GitHub user or organization: `apolenkov`
+- Repository: `feynman`
+- Workflow filename: `release.yml`
+- Allowed action: `npm publish`
+- Environment: leave empty
+
+Use npm's package settings rather than copying credentials into local files or
+chat. After the first successful OIDC release, remove the obsolete GitHub
+repository secret named `NPM_TOKEN`.
 
 For a non-publishing rehearsal, use the workflow's `dry_run=true` dispatch.
 

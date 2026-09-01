@@ -56,6 +56,14 @@ describe('Codex-only package contract', () => {
     for (const line of publishLines) assert.ok(line.includes(localTarball));
   });
 
+  it('uses npm Trusted Publishing instead of a long-lived publish token', () => {
+    const releaseWorkflow = read('.github/workflows/release.yml');
+    assert.match(releaseWorkflow, /id-token:\s*write/);
+    assert.match(releaseWorkflow, /name: Publish to npm via OIDC/);
+    assert.match(releaseWorkflow, /npm install --global npm@latest/);
+    assert.doesNotMatch(releaseWorkflow, /NPM_TOKEN|NODE_AUTH_TOKEN|npm_token/);
+  });
+
   it('publishes the native Codex marketplace entry', () => {
     const marketplace = JSON.parse(read('.agents/plugins/marketplace.json')) as {
       plugins: Array<{ source: { path: string } }>;

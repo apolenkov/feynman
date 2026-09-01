@@ -36,6 +36,8 @@ All notable changes to this project are documented here.
 - Release bumping requires explicit `--commit`, `--tag`, and `--push` flags.
 - Changelog generation promotes a maintained `[Unreleased]` section instead of
   duplicating history when legacy git tags are incomplete.
+- npm publication now uses GitHub OIDC Trusted Publishing rather than a
+  long-lived repository token.
 
 ## 1.4.0 - 2026-05-25
 
