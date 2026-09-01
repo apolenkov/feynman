@@ -80,25 +80,4 @@ jobs:
 
       - name: Check coverage threshold (≥95% lines)
         if: matrix.os == 'ubuntu-latest' && matrix.node == 22
-        run: |
-          set -euo pipefail
-          # The preceding coverage step already wrote this standard lcov file.
-          # Summing LH/LF avoids a second full test run just to read a terminal table.
-          COVERAGE=$(awk -F: '
-            /^LH:/ { hit += $2 }
-            /^LF:/ { found += $2 }
-            END {
-              if (found == 0) exit 1
-              printf "%.2f", (100 * hit / found)
-            }
-          ' coverage/lcov.info)
-          echo "Line coverage: ${COVERAGE}%"
-          awk -v cov="${COVERAGE}" 'BEGIN {
-            if (cov+0 < 95) {
-              print "FAIL: Coverage " cov "% is below 95% threshold"
-              exit 1
-            } else {
-              print "PASS: Coverage " cov "% meets >=95% threshold"
-              exit 0
-            }
-          }'
+        run: npm run check:coverage
