@@ -38,6 +38,13 @@ describe('package metadata', () => {
     }
   });
 
+  it('measures application source instead of test harness files in coverage', () => {
+    const pkg = readJson('package.json');
+    const coverage = (pkg['scripts'] as Record<string, string>)['coverage'];
+    assert.ok(coverage, 'package.json must define a coverage script');
+    assert.match(coverage, /--test-coverage-exclude=tests\/\*\*/);
+  });
+
   it('ships a native Codex marketplace plugin without an unsupported hook declaration', () => {
     const pkg = readJson('package.json');
     const marketplace = readJson('.agents/plugins/marketplace.json');

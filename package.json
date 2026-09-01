@@ -54,7 +54,7 @@
   "scripts": {
     "test": "node --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "coverage": "mkdir -p coverage && node --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test tests/*.test.ts",
+    "coverage": "mkdir -p coverage && node --experimental-test-coverage --test-coverage-exclude=tests/** --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test tests/*.test.ts",
     "lint": "node bin/feynman-lint.ts",
     "eslint": "eslint .",
     "audit": "npm audit --audit-level=moderate",

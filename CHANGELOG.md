@@ -14,7 +14,8 @@ All notable changes to this project are documented here.
 - Development tooling was refreshed to current compatible releases. TypeScript
   stays on 6.0.x until `typescript-eslint` officially supports TypeScript 7.
 - CI is read-only, no longer self-merges pull requests, and retains package and
-  coverage artifacts instead of committing generated badge data.
+  coverage artifacts instead of committing generated badge data. The coverage
+  gate measures application source rather than optional test-harness probes.
 
 ### Fixed
 
