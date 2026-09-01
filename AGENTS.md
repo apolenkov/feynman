@@ -10,6 +10,8 @@ Universal agent rules for feynman — the **single entry point**. All AI tools
 ## Before committing
 
 Run `npm run typecheck`, `npm run eslint`, and `npm test` — all green.
+The supported development runtime is Node.js 22.18 or newer; use `npm ci` for
+reproducible dependency installation.
 
 ## Two linters — don't confuse them
 

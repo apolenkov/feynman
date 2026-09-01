@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { BOOTSTRAP_HELP } from '../cli/help.ts';
-import { ensureDir, copyFileIfExists, copyMarkdownDir } from '../cli/fs-utils.ts';
+import { ensureDir, copyDirectory, copyFileIfExists, copyMarkdownDir } from '../cli/fs-utils.ts';
 
 const require = createRequire(import.meta.url);
 const PKG = require('../../package.json') as { version: string; name: string };
@@ -12,17 +12,18 @@ const ROOT_DIR = path.resolve(import.meta.dirname, '..', '..');
 
 // Hook script lives relative to this file.
 // Prefer .ts (dev with strip-types); fall back to .js (installed npm package).
-const _hookExt = fs.existsSync(path.resolve(import.meta.dirname, '..', '..', 'hooks', 'feynman-activate.ts')) ? '.ts' : '.js';
-const HOOK_PATH         = path.resolve(import.meta.dirname, '..', '..', 'hooks', `feynman-activate${_hookExt}`);
+const _hookExt = fs.existsSync(path.resolve(import.meta.dirname, '..', '..', 'hooks', 'feynman-session-start.ts')) ? '.ts' : '.js';
+const HOOK_PATH         = path.resolve(import.meta.dirname, '..', '..', 'hooks', `feynman-session-start${_hookExt}`);
 const RULES_PATH        = path.resolve(import.meta.dirname, '..', '..', 'rules', 'feynman-activate.md');
 
 const EXAMPLES_DIR = path.resolve(import.meta.dirname, '..', '..', 'examples');
 const SKILL_SRC    = path.resolve(ROOT_DIR, 'skills', 'feynman', 'SKILL.md');
 const CLAUDE_PLUGIN  = path.resolve(ROOT_DIR, '.claude-plugin', 'plugin.json');
-const CODEX_PLUGIN   = path.resolve(ROOT_DIR, '.codex-plugin', 'plugin.json');
+const CODEX_MARKETPLACE = path.resolve(ROOT_DIR, '.agents', 'plugins', 'marketplace.json');
+const CODEX_PLUGIN_DIR = path.resolve(ROOT_DIR, 'plugins', 'feynman');
 const PACKAGE_HOOKS  = path.resolve(ROOT_DIR, 'hooks', 'hooks.json');
 const DEFAULT_BOOTSTRAP_DIR = 'feynman-package';
-const ACTIVATOR_JS   = HOOK_PATH;   // activate hook path (dev: .ts, package: .js)
+const ACTIVATOR_JS   = HOOK_PATH;   // session-start hook path (dev: .ts, package: .js)
 const CLI_JS         = path.resolve(ROOT_DIR, 'bin', `feynman${_hookExt}`);
 const PACKAGE_JSON   = path.resolve(ROOT_DIR, 'package.json');
 
@@ -89,16 +90,18 @@ export function cmdBootstrap(args: string[]): void {
     fs.rmSync(out, { recursive: true, force: true });
   }
 
+  const claudePlugin = copyFileIfExists(CLAUDE_PLUGIN, path.join(out, '.claude-plugin', 'plugin.json')) ? 1 : 0;
+  const codexMarketplace = copyFileIfExists(CODEX_MARKETPLACE, path.join(out, '.agents', 'plugins', 'marketplace.json')) ? 1 : 0;
+  const codexPlugin = copyDirectory(CODEX_PLUGIN_DIR, path.join(out, 'plugins', 'feynman'));
+
   const counts = {
     examples:        copyMarkdownDir(EXAMPLES_DIR, path.join(out, 'examples')),
     rules:           copyFileIfExists(RULES_PATH, path.join(out, 'rules', 'feynman-activate.md')) ? 1 : 0,
     hooks:           copyFileIfExists(PACKAGE_HOOKS, path.join(out, 'hooks', 'hooks.json')) ? 1 : 0,
-    hookRuntime:     copyFileIfExists(ACTIVATOR_JS, path.join(out, 'hooks', `feynman-activate${_hookExt}`)) ? 1 : 0,
+    hookRuntime:     copyFileIfExists(ACTIVATOR_JS, path.join(out, 'hooks', `feynman-session-start${_hookExt}`)) ? 1 : 0,
     cliRuntime:      copyFileIfExists(CLI_JS, path.join(out, 'bin', `feynman${_hookExt}`)) ? 1 : 0,
     packageManifest: copyFileIfExists(PACKAGE_JSON, path.join(out, 'package.json')) ? 1 : 0,
-    plugins:
-      (copyFileIfExists(CLAUDE_PLUGIN, path.join(out, '.claude-plugin', 'plugin.json')) ? 1 : 0) +
-      (copyFileIfExists(CODEX_PLUGIN,  path.join(out, '.codex-plugin',  'plugin.json')) ? 1 : 0),
+    plugins: claudePlugin + codexMarketplace + codexPlugin,
     skill: copyFileIfExists(SKILL_SRC, path.join(out, 'skills', 'feynman', 'SKILL.md')) ? 1 : 0,
   };
 

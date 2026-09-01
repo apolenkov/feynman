@@ -1,7 +1,8 @@
 # diagram-rules Specification
 
 ## Purpose
-TBD - created by archiving change establish-feynman-openspec-baseline. Update Purpose after archive.
+Define how feynman classifies response structure and selects a single,
+smallest-sufficient visual representation for each intensity tier.
 ## Requirements
 ### Requirement: Intensity tiers select the injected rule set
 
@@ -55,4 +56,3 @@ smallest sufficient form along the ladder `prose < glyph < dot-leader < tree < t
 
 - **WHEN** a response carries a single primary Visual alongside glyph-level Annotations (`▲▼` priority scale, `✓✗` status, `**bold**` keys)
 - **THEN** the Annotations may co-occur with the primary Visual and with each other, and are not counted against the one-primary-Visual mutex
-

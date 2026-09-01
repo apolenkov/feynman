@@ -138,10 +138,11 @@ describe('bin/feynman.js', () => {
         assert.ok(fs.existsSync(path.join(out, 'examples', 'feature-planning.md')));
         assert.ok(fs.existsSync(path.join(out, 'rules', 'feynman-activate.md')));
         assert.ok(fs.existsSync(path.join(out, 'hooks', 'hooks.json')));
-        assert.ok(fs.existsSync(path.join(out, 'hooks', 'feynman-activate.ts')));
+        assert.ok(fs.existsSync(path.join(out, 'hooks', 'feynman-session-start.ts')));
         assert.ok(fs.existsSync(path.join(out, 'bin', 'feynman.ts')));
         assert.ok(fs.existsSync(path.join(out, '.claude-plugin', 'plugin.json')));
-        assert.ok(fs.existsSync(path.join(out, '.codex-plugin', 'plugin.json')));
+        assert.ok(fs.existsSync(path.join(out, '.agents', 'plugins', 'marketplace.json')));
+        assert.ok(fs.existsSync(path.join(out, 'plugins', 'feynman', '.codex-plugin', 'plugin.json')));
         assert.ok(fs.existsSync(path.join(out, 'skills', 'feynman', 'SKILL.md')));
         assert.ok(fs.existsSync(path.join(out, 'package.json')));
         assert.ok(fs.existsSync(path.join(out, 'feynman-bootstrap.json')));

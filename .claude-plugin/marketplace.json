@@ -18,7 +18,7 @@
       "source": {
         "source": "git",
         "url": "https://github.com/apolenkov/feynman.git",
-        "ref": "v0.4.0"
+        "ref": "main"
       },
       "homepage": "https://github.com/apolenkov/feynman"
     }

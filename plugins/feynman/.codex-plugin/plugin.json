@@ -1,7 +1,7 @@
 {
   "name": "feynman",
   "version": "1.4.0",
-  "description": "Auto-inject ASCII diagram rules into Codex and Claude Code prompts.",
+  "description": "Manage readable ASCII diagrams in structured Codex answers.",
   "author": {
     "name": "apolenkov",
     "url": "https://github.com/apolenkov/feynman"
@@ -11,18 +11,15 @@
   "license": "MIT",
   "keywords": [
     "codex",
-    "claude-code",
     "ascii",
     "diagrams",
-    "hooks",
     "productivity"
   ],
-  "hooks": "./hooks.json",
   "skills": "./skills/",
   "interface": {
-    "displayName": "feynman",
+    "displayName": "Feynman",
     "shortDescription": "Draw ASCII diagrams when structure appears.",
-    "longDescription": "feynman injects concise diagram rules on every prompt so flows, hierarchies, comparisons, priorities, and status summaries render as readable ASCII diagrams.",
+    "longDescription": "Feynman helps Codex render flows, hierarchies, comparisons, priorities, and status summaries as readable ASCII diagrams.",
     "developerName": "apolenkov",
     "category": "Productivity",
     "capabilities": [

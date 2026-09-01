@@ -1,7 +1,8 @@
 # cli-structure Specification
 
 ## Purpose
-TBD - created by archiving change decompose-feynman-cli-dispatcher. Update Purpose after archive.
+Keep the feynman CLI entrypoint as a small dispatcher while command behavior
+remains implemented and tested in focused modules.
 ## Requirements
 ### Requirement: The feynman CLI entrypoint is a thin dispatcher
 
@@ -37,4 +38,3 @@ exactly as before the split.
   decomposed entrypoint
 - **THEN** they pass unchanged, confirming no subcommand's behaviour, flags, or
   exit codes drifted during the move
-

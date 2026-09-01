@@ -15,7 +15,9 @@ const FEYNMAN_JS = path.join(REPO_DIR, 'bin', 'feynman.ts');
 const TEST_MODEL = 'gpt-5.4-mini';
 
 function makeTempHome(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-codex-app-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-codex-app-'));
+  fs.mkdirSync(path.join(home, '.codex'), { recursive: true });
+  return home;
 }
 
 function rmrf(dir: string): void {
@@ -294,12 +296,17 @@ describe('Codex app-server hook visibility contract', () => {
           (params) => (params as { run?: { eventName: string } }).run?.eventName === 'sessionStart'
         );
 
-        await client.request('thread/start', {
+        const started = await client.request('thread/start', {
           cwd: REPO_DIR,
           ephemeral: true,
           model: TEST_MODEL,
           approvalPolicy: 'never',
           sandbox: 'danger-full-access',
+        });
+        const threadId = (started as { thread: { id: string } }).thread.id;
+        await client.request('turn/start', {
+          threadId,
+          input: [{ type: 'text', text: 'feynman hook probe' }],
         });
 
         const completed = await hookCompleted as {

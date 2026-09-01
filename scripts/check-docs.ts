@@ -75,6 +75,7 @@ function main(): void {
   const files: string[] = [
     'README.md',
     'CONTRIBUTING.md',
+    'CHANGELOG.md',
     ...listMarkdown('docs'),
     ...listMarkdown('examples'),
   ];

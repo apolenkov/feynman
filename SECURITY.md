@@ -2,7 +2,8 @@
 
 ## Supported Versions
 
-Security fixes are shipped for the latest published npm version.
+Security fixes are shipped for the latest published npm version. The supported
+runtime baseline is Node.js 22.18 or newer.
 
 ## Reporting a Vulnerability
 
@@ -34,7 +35,8 @@ The package has zero runtime npm dependencies.
 
 Before publishing a new npm version:
 
-- CI required checks must pass on Node 18 and 20 across Ubuntu and macOS.
+- CI required checks must pass on the supported Node.js baseline across Ubuntu
+  and macOS.
 - `npm run audit` must pass at `moderate` severity or higher.
 - GitHub release tag must match `package.json` version with a `v` prefix.
 - GitHub Actions secret `NPM_TOKEN` must be present for first publish of a new version.

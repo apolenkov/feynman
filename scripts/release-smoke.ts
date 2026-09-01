@@ -13,17 +13,38 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const pkg = require(path.join(ROOT, 'package.json')) as { version: string; name: string; files?: string[] };
 const NPM_CACHE: string = process.env['FEYNMAN_NPM_CACHE'] || path.join(os.tmpdir(), 'npm-cache-feynman');
 
+function isolatedNpmEnv(root: string): NodeJS.ProcessEnv {
+  // Isolate both HOME and npm's user config so a developer's global npm policy
+  // cannot make this package-level smoke test environment-dependent.
+  const home = path.join(root, 'npm-home');
+  fs.mkdirSync(home, { recursive: true });
+  const userConfig = path.join(home, '.npmrc');
+  fs.writeFileSync(userConfig, '');
+  return {
+    HOME: home,
+    npm_config_cache: path.join(root, 'npm-cache'),
+    npm_config_ignore_scripts: 'true',
+    npm_config_userconfig: userConfig,
+  };
+}
+
 interface RunOpts {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
 }
 
 function run(cmd: string, args: string[], opts: RunOpts = {}): string {
+  const inheritedEnv = { ...process.env };
+  // `npm run` exports this policy into child processes. It is valid for a
+  // workspace, but npm 12 rejects it for the isolated --prefix install below.
+  // A release smoke test must model a clean consumer environment instead.
+  delete inheritedEnv['npm_config_allow_scripts'];
+  delete inheritedEnv['NPM_CONFIG_ALLOW_SCRIPTS'];
   const result = spawnSync(cmd, args, {
     cwd: opts.cwd || ROOT,
     encoding: 'utf8',
     env: {
-      ...process.env,
+      ...inheritedEnv,
       NO_COLOR: '1',
       npm_config_cache: NPM_CACHE,
       ...opts.env,
@@ -163,10 +184,11 @@ try {
 
   const projectDir = path.join(tmp, 'project');
   const homeDir = path.join(tmp, 'home');
+  const npmEnv = isolatedNpmEnv(tmp);
   fs.mkdirSync(projectDir, { recursive: true });
   fs.mkdirSync(homeDir, { recursive: true });
 
-  run('npm', ['install', '--prefix', projectDir, tarball]);
+  run('npm', ['install', '--prefix', projectDir, tarball], { env: npmEnv });
 
   const feynman = binPath(projectDir, 'feynman');
   const lint = binPath(projectDir, 'feynman-lint');

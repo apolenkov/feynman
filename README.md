@@ -11,7 +11,6 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@albinocrabs/feynman"><img src="https://img.shields.io/npm/v/@albinocrabs/feynman?style=flat&color=blue" alt="npm version"></a>
   <a href="https://github.com/apolenkov/feynman/actions/workflows/ci.yml"><img src="https://github.com/apolenkov/feynman/workflows/CI/badge.svg" alt="CI"></a>
-  <a href="https://github.com/apolenkov/feynman/blob/main/.github/coverage-badge.json"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/apolenkov/feynman/main/.github/coverage-badge.json" alt="Coverage"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/apolenkov/feynman?style=flat" alt="License"></a>
   <a href="https://github.com/apolenkov/feynman/stargazers"><img src="https://img.shields.io/github/stars/apolenkov/feynman?style=flat&color=yellow" alt="Stars"></a>
   <a href="https://github.com/apolenkov/feynman/commits/main"><img src="https://img.shields.io/github/last-commit/apolenkov/feynman?style=flat" alt="Last Commit"></a>
@@ -19,7 +18,7 @@
 
 <p align="center">
   <a href="#why-feynman">Why</a> •
-  <a href="#why-feynman-uses-userpromptsubmit-not-sessionstart">Compaction</a> •
+  <a href="#how-feynman-survives-context-compaction">Compaction</a> •
   <a href="#before--after">Before/After</a> •
   <a href="#install">Install</a> •
   <a href="#verify-the-install">Verify</a> •
@@ -46,12 +45,12 @@ npx -y @albinocrabs/feynman@latest doctor --target opencode
 ## Why feynman
 
 Structured information explained in prose forces you to rebuild the structure
-in your head before you can reason about it. feynman intercepts every Claude
-Code, Codex, or OpenCode prompt and injects rules that turn flows into arrows,
-hierarchies into trees, comparisons into columns, and status into the
+in your head before you can reason about it. feynman injects rules at matching
+Claude Code, Codex, or OpenCode session-start events, so flows become arrows,
+hierarchies become trees, comparisons become columns, and status uses the
 smallest fitting visual — dot-leader by default, markdown table for larger
-sets, frame only when lighter forms lose information. The structure is
-visible before you have to think about it.
+sets, frame only when lighter forms lose information. The structure is visible
+before you have to think about it.
 
 Conceptually, feynman is inspired by prompt-compression ideas from the Caveman
 agent style: smaller prompts, clearer intent, and explicit diagram-first thinking.
@@ -205,10 +204,18 @@ prime the rules.
 
 **Uninstall:** `npx @albinocrabs/feynman uninstall --target claude|codex|opencode|both|all|*`
 
-**Plugin manifests:** this repo also ships `.claude-plugin/plugin.json`,
-`hooks/hooks.json`, `.codex-plugin/plugin.json`, and `hooks.json` for direct
-client integrations. The npx installer remains the production fallback because
-both clients still support direct user hook registration.
+**Plugin manifests:** this repo ships native manifests for Claude Code and
+Codex, plus the OpenCode integration. To add the native Codex skill from the
+repository marketplace:
+
+```bash
+codex plugin marketplace add apolenkov/feynman --ref main
+codex plugin add feynman@feynman
+```
+
+The native plugin supplies the Codex skill. The npx installer remains required
+for automatic diagram-rule injection because it registers the `SessionStart`
+hook directly in each client’s user configuration.
 
 <details>
 <summary>Manual install</summary>
@@ -330,9 +337,9 @@ Toggle:
 /feynman style full    — all visuals (default)
 ```
 
-Implementation note: output-style is enforced via a one-line runtime
-suffix in the prompt-submit hook — it does NOT modify `rules/feynman-activate.md`,
-so the 4480-byte budget stays intact.
+Implementation note: output-style is enforced via a one-line runtime suffix in
+the `SessionStart` hook output. It does not modify
+`rules/feynman-activate.md`, so the 4480-byte budget stays intact.
 
 ## Lint
 
@@ -377,19 +384,6 @@ why L11 or L12 fired and how many chars a lighter visual would save.
 
 See [docs/lint-rules.md](docs/lint-rules.md) for the full L01-L15 reference.
 
-### Quick hard-disable / re-enable (testing and emergency)
-
-For temporary global disable in Codex (for smoke tests or troubleshooting), use:
-
-```bash
-touch ~/.codex/.feynman-disable-global    # hard OFF
-rm ~/.codex/.feynman-disable-global       # hard ON
-```
-
-This bypasses `~/.codex/hooks.json` hook execution entirely.
-Regular `/feynman off` and `/feynman on` continue to use normal profile state
-files (`~/.codex/.feynman-active`, `~/.codex/.feynman/state.json`).
-
 ## Security notes
 
 feynman hooks are local prompt-context hooks. They do not require network
@@ -401,9 +395,10 @@ mode is stored only in the client-local state path:
 ~/.codex/.feynman/state.json
 ```
 
-The hook runtime treats invalid state as disabled for that turn, removes the
-activation flag, and stays silent. That prevents a corrupted state file from
-silently forcing diagram rules into future prompts.
+The hook runtime backs up a corrupt state file as `state.json.bak`, restores
+safe defaults, and records the recovery in `doctor`. To stop rule injection,
+use `/feynman off` or uninstall the target; do not rely on undocumented marker
+files.
 
 `uninstall` removes only feynman hook commands and preserves unrelated hooks in
 the same hook group. `doctor` validates that registered commands point to real
@@ -506,6 +501,7 @@ feynman examples --name <example-name>
   └── Observability
       └── Events
   ```
+
 - [C4 platform design](examples/c4-platform-diagramming.md) — context → container → component  
   ```
   [User] --> [Web] --> [API] --> [DB]
@@ -691,7 +687,7 @@ a harness-level bonus outside the plugin's scope.
 
 ## Release process
 
-Every push runs tests on Node 18 and 20 across Ubuntu and macOS. The release
+Every push runs tests on the supported Node.js baseline across Ubuntu and macOS. The release
 lane also lints public docs, smoke-tests the packed npm tarball, builds a
 `dist/*.tgz` artifact, and can publish to npm from a GitHub Release when
 `NPM_TOKEN` is configured. If the token is absent and the package version is

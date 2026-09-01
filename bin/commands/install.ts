@@ -12,8 +12,7 @@ const HOME = os.homedir();
 
 // Hook script lives relative to this file.
 // Prefer .ts (dev with strip-types); fall back to .js (installed npm package).
-const _hookExt = fs.existsSync(path.resolve(import.meta.dirname, '..', '..', 'hooks', 'feynman-activate.ts')) ? '.ts' : '.js';
-const HOOK_PATH         = path.resolve(import.meta.dirname, '..', '..', 'hooks', `feynman-activate${_hookExt}`);
+const _hookExt = fs.existsSync(path.resolve(import.meta.dirname, '..', '..', 'hooks', 'feynman-session-start.ts')) ? '.ts' : '.js';
 const SESSION_HOOK_PATH = path.resolve(import.meta.dirname, '..', '..', 'hooks', `feynman-session-start${_hookExt}`);
 
 // ─── Install ──────────────────────────────────────────────────────────────────
@@ -45,7 +44,7 @@ function installHookTarget(target: string, opts: { force: boolean }): InstallRes
     matcher: 'startup|resume|compact|clear',
     hooks: [{
       type: 'command',
-      command: hookCommandFor(target).replace(HOOK_PATH, SESSION_HOOK_PATH),
+      command: hookCommandFor(target),
       timeout: 5,
     }]
   };

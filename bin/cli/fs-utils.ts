@@ -34,3 +34,21 @@ export function copyMarkdownDir(src: string, dest: string): number {
   }
   return copied;
 }
+
+/** Copy every regular file in a directory tree and return the copied-file count. */
+export function copyDirectory(src: string, dest: string): number {
+  if (!fs.existsSync(src)) return 0;
+  let copied = 0;
+  for (const entry of fs.readdirSync(src, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    const sourcePath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copied += copyDirectory(sourcePath, destPath);
+    } else if (entry.isFile()) {
+      ensureDir(path.dirname(destPath));
+      fs.copyFileSync(sourcePath, destPath);
+      copied += 1;
+    }
+  }
+  return copied;
+}
