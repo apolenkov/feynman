@@ -41,148 +41,190 @@ interface ExplainEntry {
   cost: FrameCost;
 }
 
-// Parse arguments
-const argv = process.argv.slice(2);
-let useJson = false;
-let useStrict = false;
-let useFix = false;
-let useExplain = false;
-let filePath: string | null = null;
-let useStdin = false;
+// Parse arguments. Exporting the entrypoint keeps the CLI testable without
+// spawning a second process (which Node's coverage collector cannot merge).
+export function main(argv = process.argv.slice(2)): void {
+  let useJson = false;
+  let useStrict = false;
+  let useFix = false;
+  let useExplain = false;
+  let filePath: string | null = null;
+  let useStdin = false;
 
-for (const arg of argv) {
-  if (arg === '--json') { useJson = true; continue; }
-  if (arg === '--strict') { useStrict = true; continue; }
-  if (arg === '--fix') { useFix = true; continue; }
-  if (arg === '--explain') { useExplain = true; continue; }
-  if (arg === '--help') { process.stdout.write(USAGE); process.exit(0); }
-  if (arg === '-') { useStdin = true; continue; }
-  if (arg.startsWith('-') && arg !== '-') {
-    process.stderr.write(`feynman-lint: unknown flag '${arg}'\n${USAGE}`);
+  for (const arg of argv) {
+    if (arg === '--json') {
+      useJson = true;
+      continue;
+    }
+    if (arg === '--strict') {
+      useStrict = true;
+      continue;
+    }
+    if (arg === '--fix') {
+      useFix = true;
+      continue;
+    }
+    if (arg === '--explain') {
+      useExplain = true;
+      continue;
+    }
+    if (arg === '--help') {
+      process.stdout.write(USAGE);
+      process.exit(0);
+    }
+    if (arg === '-') {
+      useStdin = true;
+      continue;
+    }
+    if (arg.startsWith('-') && arg !== '-') {
+      process.stderr.write(`feynman-lint: unknown flag '${arg}'\n${USAGE}`);
+      process.exit(2);
+    }
+    if (filePath !== null) {
+      process.stderr.write(`feynman-lint: too many file arguments\n${USAGE}`);
+      process.exit(2);
+    }
+    filePath = arg;
+  }
+
+  if (filePath === null && !useStdin) {
+    process.stderr.write(USAGE);
     process.exit(2);
   }
-  if (filePath !== null) {
-    process.stderr.write(`feynman-lint: too many file arguments\n${USAGE}`);
-    process.exit(2);
-  }
-  filePath = arg;
-}
 
-if (filePath === null && !useStdin) {
-  process.stderr.write(USAGE);
-  process.exit(2);
-}
-
-// --fix mode: read file, run autofix, write back.
-if (useFix) {
-  if (useStdin || filePath === null) {
-    process.stderr.write('feynman-lint: --fix requires a file path (not stdin)\n');
-    process.exit(2);
-  }
-  let before: string;
-  try {
-    before = fs.readFileSync(filePath, 'utf8');
-  } catch (e) {
-    process.stderr.write(`feynman-lint: cannot read ${filePath}: ${(e as NodeJS.ErrnoException).message}\n`);
-    process.exit(2);
-  }
-  const after = autofix(before, { processFenced: true, convertL11: true, convertL15: true });
-  if (after !== before) {
-    fs.writeFileSync(filePath, after);
-  }
-  process.exit(0);
-}
-
-function explainFrames(text: string): ExplainEntry[] {
-  if (!text || !text.includes('┌')) return [];
-  const lines = text.split('\n');
-  const out: ExplainEntry[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const frame = nextFrame(lines, i);
-    if (!frame) break;
-
-    const { topLi, closeLi, inner } = frame;
-    if (closeLi === -1) { i = topLi + 1; continue; }
-
-    const cost = estimateFrameCost({
-      top: lines[topLi] ?? '',
-      inner,
-      bottom: lines[closeLi] ?? '',
+  // --fix mode: read file, run autofix, write back.
+  if (useFix) {
+    if (useStdin || filePath === null) {
+      process.stderr.write(
+        'feynman-lint: --fix requires a file path (not stdin)\n',
+      );
+      process.exit(2);
+    }
+    let before: string;
+    try {
+      before = fs.readFileSync(filePath, 'utf8');
+    } catch (e) {
+      process.stderr.write(
+        `feynman-lint: cannot read ${filePath}: ${(e as NodeJS.ErrnoException).message}\n`,
+      );
+      process.exit(2);
+    }
+    const after = autofix(before, {
+      processFenced: true,
+      convertL11: true,
+      convertL15: true,
     });
-    out.push({ line: topLi + 1, cost });
-    i = closeLi + 1;
-  }
-  return out;
-}
-
-function run(markdown: string, displayName: string): void {
-  const result = lint(markdown);
-  const { issues } = result;
-  const explain = useExplain ? explainFrames(markdown) : null;
-
-  if (useJson) {
-    const out: Record<string, unknown> = {
-      file: displayName,
-      passed: useStrict ? issues.length === 0 : result.passed,
-      issues,
-    };
-    if (explain !== null) out['explain'] = explain;
-    process.stdout.write(JSON.stringify(out, null, 2) + '\n');
-    const failed = useStrict ? issues.length > 0 : !result.passed;
-    process.exit(failed ? 1 : 0);
-  }
-
-  // gcc mode
-  const isTTY = process.stdout.isTTY === true;
-  const output = format(issues, 'gcc', displayName, isTTY);
-
-  if (explain !== null && explain.length > 0) {
-    const explainLines = explain.map(e =>
-      `${displayName}:${e.line}: explain: framing block: ~${e.cost.framing_chars} chars (border: ${e.cost.border_chars}, padding: ${e.cost.padding_chars}, content: ${e.cost.content_chars})\n` +
-      `${displayName}:${e.line}: explain: equivalent dot-leader: ~${e.cost.dotleader_equivalent} chars\n` +
-      `${displayName}:${e.line}: explain: saving: -${e.cost.saving} chars`
-    );
-    process.stdout.write(explainLines.join('\n') + '\n');
-  }
-
-  if (output) {
-    process.stdout.write(output + '\n');
-  }
-
-  const failed = useStrict ? issues.length > 0 : !result.passed;
-
-  if (failed) {
-    const errCount = issues.filter(i => i.severity === 'error').length;
-    const warnCount = issues.filter(i => i.severity === 'warn').length;
-    const parts: string[] = [];
-    if (errCount > 0) parts.push(`${errCount} error${errCount !== 1 ? 's' : ''}`);
-    if (warnCount > 0) parts.push(`${warnCount} warning${warnCount !== 1 ? 's' : ''}`);
-    process.stderr.write(`${displayName}: ${parts.join(', ')}\n`);
-    process.exit(1);
-  } else {
+    if (after !== before) {
+      fs.writeFileSync(filePath, after);
+    }
     process.exit(0);
   }
+
+  function explainFrames(text: string): ExplainEntry[] {
+    if (!text || !text.includes('┌')) return [];
+    const lines = text.split('\n');
+    const out: ExplainEntry[] = [];
+    let i = 0;
+    while (i < lines.length) {
+      const frame = nextFrame(lines, i);
+      if (!frame) break;
+
+      const { topLi, closeLi, inner } = frame;
+      if (closeLi === -1) {
+        i = topLi + 1;
+        continue;
+      }
+
+      const cost = estimateFrameCost({
+        top: lines[topLi] ?? '',
+        inner,
+        bottom: lines[closeLi] ?? '',
+      });
+      out.push({ line: topLi + 1, cost });
+      i = closeLi + 1;
+    }
+    return out;
+  }
+
+  function run(markdown: string, displayName: string): void {
+    const result = lint(markdown);
+    const { issues } = result;
+    const explain = useExplain ? explainFrames(markdown) : null;
+
+    if (useJson) {
+      const out: Record<string, unknown> = {
+        file: displayName,
+        passed: useStrict ? issues.length === 0 : result.passed,
+        issues,
+      };
+      if (explain !== null) out['explain'] = explain;
+      process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+      const failed = useStrict ? issues.length > 0 : !result.passed;
+      process.exit(failed ? 1 : 0);
+    }
+
+    // gcc mode
+    const isTTY = process.stdout.isTTY === true;
+    const output = format(issues, 'gcc', displayName, isTTY);
+
+    if (explain !== null && explain.length > 0) {
+      const explainLines = explain.map(
+        (e) =>
+          `${displayName}:${e.line}: explain: framing block: ~${e.cost.framing_chars} chars (border: ${e.cost.border_chars}, padding: ${e.cost.padding_chars}, content: ${e.cost.content_chars})\n` +
+          `${displayName}:${e.line}: explain: equivalent dot-leader: ~${e.cost.dotleader_equivalent} chars\n` +
+          `${displayName}:${e.line}: explain: saving: -${e.cost.saving} chars`,
+      );
+      process.stdout.write(explainLines.join('\n') + '\n');
+    }
+
+    if (output) {
+      process.stdout.write(output + '\n');
+    }
+
+    const failed = useStrict ? issues.length > 0 : !result.passed;
+
+    if (failed) {
+      const errCount = issues.filter((i) => i.severity === 'error').length;
+      const warnCount = issues.filter((i) => i.severity === 'warn').length;
+      const parts: string[] = [];
+      if (errCount > 0)
+        parts.push(`${errCount} error${errCount !== 1 ? 's' : ''}`);
+      if (warnCount > 0)
+        parts.push(`${warnCount} warning${warnCount !== 1 ? 's' : ''}`);
+      process.stderr.write(`${displayName}: ${parts.join(', ')}\n`);
+      process.exit(1);
+    } else {
+      process.exit(0);
+    }
+  }
+
+  // Read input
+  if (useStdin) {
+    let buf = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (chunk: string) => {
+      buf += chunk;
+    });
+    process.stdin.on('end', () => {
+      run(buf, '<stdin>');
+    });
+  } else {
+    const absPath = path.resolve(filePath!);
+    if (!fs.existsSync(absPath)) {
+      process.stderr.write(`feynman-lint: file not found: ${filePath!}\n`);
+      process.exit(2);
+    }
+    let markdown: string;
+    try {
+      markdown = fs.readFileSync(absPath, 'utf8');
+    } catch (e) {
+      process.stderr.write(
+        `feynman-lint: cannot read file: ${filePath!}: ${(e as NodeJS.ErrnoException).message}\n`,
+      );
+      process.exit(2);
+    }
+    run(markdown, filePath!);
+  }
 }
 
-// Read input
-if (useStdin) {
-  let buf = '';
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', (chunk: string) => { buf += chunk; });
-  process.stdin.on('end', () => { run(buf, '<stdin>'); });
-} else {
-  const absPath = path.resolve(filePath!);
-  if (!fs.existsSync(absPath)) {
-    process.stderr.write(`feynman-lint: file not found: ${filePath!}\n`);
-    process.exit(2);
-  }
-  let markdown: string;
-  try {
-    markdown = fs.readFileSync(absPath, 'utf8');
-  } catch (e) {
-    process.stderr.write(`feynman-lint: cannot read file: ${filePath!}: ${(e as NodeJS.ErrnoException).message}\n`);
-    process.exit(2);
-  }
-  run(markdown, filePath!);
-}
+if (import.meta.main) main();

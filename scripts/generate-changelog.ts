@@ -13,7 +13,7 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const pkg = require(path.join(ROOT, 'package.json')) as { version: string; name: string };
 const CHANGELOG = path.join(ROOT, 'CHANGELOG.md');
 
-interface Commit {
+export interface Commit {
   hash: string;
   subject: string;
   body: string;
@@ -53,7 +53,7 @@ function commitsSince(tag: string): Commit[] {
     });
 }
 
-function classify(subject: string): [string, string] {
+export function classify(subject: string): [string, string] {
   const match = subject.match(/^(\w+)(?:\([^)]+\))?!?:\s+(.+)$/);
   const type = match ? (match[1] ?? 'other') : 'other';
   const text = match ? (match[2] ?? subject) : subject;
@@ -74,7 +74,7 @@ function classify(subject: string): [string, string] {
   return [sections[type] ?? 'Other', text];
 }
 
-function render(version: string, tag: string, commits: Commit[]): string {
+export function render(version: string, tag: string, commits: Commit[]): string {
   const date = new Date().toISOString().slice(0, 10);
   const groups = new Map<string, string[]>();
 

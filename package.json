@@ -52,6 +52,7 @@
     "test": "node --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "coverage": "mkdir -p coverage && node --experimental-test-coverage --test-coverage-exclude=tests/** --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test tests/*.test.ts",
+    "check:coverage": "node scripts/check-coverage.ts",
     "lint": "node bin/feynman-lint.ts",
     "eslint": "eslint .",
     "audit": "npm audit --audit-level=moderate",
@@ -60,8 +61,8 @@
     "test:published": "node scripts/verify-published-package.ts",
     "build": "node scripts/build-package.ts",
     "changelog": "node scripts/generate-changelog.ts",
-    "ci": "npm run audit && npm run typecheck && npm run eslint && npm run coverage && npm run test:docs && npm run build && npm run test:release",
-    "prepublishOnly": "npm run audit && npm run typecheck && npm run coverage && npm run test:docs",
+    "ci": "npm run audit && npm run typecheck && npm run eslint && npm run coverage && npm run check:coverage && npm run test:docs && npm run build && npm run test:release",
+    "prepublishOnly": "npm run audit && npm run typecheck && npm run coverage && npm run check:coverage && npm run test:docs",
     "release": "npm run ci && npm publish \"$(cat dist/TARBALL.txt)\" --access public"
   },
   "devDependencies": {
