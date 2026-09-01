@@ -34,6 +34,11 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
 
+      - name: Upgrade npm for Trusted Publishing
+        run: |
+          npm install --global npm@latest
+          npm --version
+
       - name: Install dependencies
         run: npm ci
 
@@ -45,16 +50,18 @@ jobs:
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
-          echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
           CURRENT_TAG="v$PACKAGE_VERSION"
           PREVIOUS_TAG=$(git tag --sort=-creatordate --merged "$CURRENT_TAG" 2>/dev/null | awk 'NR==2')
           if [ -z "$PREVIOUS_TAG" ]; then
             PREVIOUS_TAG=$(git tag --sort=-creatordate --merged HEAD 2>/dev/null | awk 'NR==1')
           fi
-          echo "current_tag=$CURRENT_TAG" >> "$GITHUB_OUTPUT"
-          echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+          {
+            echo "package_name=$PACKAGE_NAME"
+            echo "package_version=$PACKAGE_VERSION"
+            echo "tag=v$PACKAGE_VERSION"
+            echo "current_tag=$CURRENT_TAG"
+            echo "previous_tag=$PREVIOUS_TAG"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog notes
         run: |
@@ -126,26 +133,6 @@ jobs:
           fi
           echo "✅ Release tag matches package version: ${PACKAGE_TAG}"
 
-      - name: Check npm publish token
-        id: npm_token
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Require token for new release publish
-        if: (github.event_name == 'release' || inputs.dry_run == false) && steps.npm_version.outputs.published != 'true'
-        run: |
-          if [ "${{ steps.npm_token.outputs.present }}" != "true" ]; then
-            echo "❌ NPM_TOKEN is required for publishing a new release."
-            echo "Set NPM_TOKEN in repository secrets and rerun release."
-            exit 1
-          fi
-
       - name: Update GitHub release notes
         if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
         env:
@@ -161,14 +148,12 @@ jobs:
               --target "$GITHUB_SHA"
           fi
 
-      - name: Publish to npm
-        if: (github.event_name == 'release' || inputs.dry_run == false) && steps.npm_version.outputs.published != 'true' && steps.npm_token.outputs.present == 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish "./$(cat dist/TARBALL.txt)" --access public --provenance --ignore-scripts
+      - name: Publish to npm via OIDC
+        if: (github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)) && steps.npm_version.outputs.published != 'true'
+        run: npm publish "./$(cat dist/TARBALL.txt)" --access public --ignore-scripts
 
       - name: Verify npm publish result
-        if: (github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)) && steps.npm_token.outputs.present == 'true'
+        if: (github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)) && steps.npm_version.outputs.published != 'true'
         env:
           PACKAGE_NAME: ${{ steps.release_metadata.outputs.package_name }}
           PACKAGE_VERSION: ${{ steps.release_metadata.outputs.package_version }}
@@ -184,11 +169,6 @@ jobs:
 
           echo "❌ npm publish verification failed for ${PACKAGE_NAME}@${PACKAGE_VERSION}."
           exit 1
-
-      - name: Skip npm publish
-        if: steps.npm_version.outputs.published == 'true' && steps.npm_token.outputs.present != 'true' && (github.event_name == 'release' || inputs.dry_run == false)
-        run: |
-          echo "⚠️ NPM_TOKEN is not configured; npm publish and verification were skipped."
 
       - name: Verify release package from npm registry
         if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
