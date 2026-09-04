@@ -8,17 +8,47 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import {
   detectDrift,
   isDriftExcluded,
   FORBIDDEN_PHRASES,
   DRIFT_EXCLUDED_PATHS,
+  checkDocs,
+  runDocsCheck,
 } from '../scripts/check-docs.ts';
+import { assertDefined } from './helpers/assertions.ts';
 
 const phrase = FORBIDDEN_PHRASES[0];
 if (phrase === undefined) throw new Error('FORBIDDEN_PHRASES must not be empty');
 const withPhrase = `intro text ${phrase} trailing text`;
+
+function docsFixture(): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-docs-'));
+  for (const [file, content] of [
+    ['README.md', '# Readme\n'],
+    ['CONTRIBUTING.md', '# Contributing\n'],
+    ['CHANGELOG.md', '# Changelog\n'],
+    ['docs/guide.md', '# Guide\n'],
+    ['examples/sample.md', '# Sample\n'],
+    ['bin/feynman.ts', '#!/usr/bin/env node\n'],
+    [
+      'bin/feynman-lint.ts',
+      "import fs from 'node:fs'; const text = fs.readFileSync(process.argv[2], 'utf8'); if (text.includes('LINT_FAIL')) process.exit(2);\n",
+    ],
+  ] as const) {
+    const target = path.join(root, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content);
+  }
+  assert.equal(spawnSync('git', ['init', '--quiet'], { cwd: root }).status, 0);
+  assert.equal(spawnSync('git', ['add', '.'], { cwd: root }).status, 0);
+  return root;
+}
 
 describe('isDriftExcluded', () => {
   it('excludes decision-record directories by prefix', () => {
@@ -50,7 +80,7 @@ describe('detectDrift', () => {
     const findings = detectDrift([{ rel: 'install.sh', content: withPhrase }]);
     assert.equal(findings.length, 1);
     const [first] = findings;
-    assert.ok(first);
+    assertDefined(first);
     assert.match(first, /install\.sh/);
     assert.ok(first.includes(phrase));
   });
@@ -99,5 +129,82 @@ describe('guard constants', () => {
 
   it('excludes the guard script itself so it does not flag its own constants', () => {
     assert.ok(DRIFT_EXCLUDED_PATHS.includes('scripts/check-docs.ts'));
+  });
+});
+
+describe('docs CLI boundary', () => {
+  it('passes a complete temporary documentation tree without touching the workspace', () => {
+    const root = docsFixture();
+    try {
+      assert.deepEqual(checkDocs(root), {
+        files: [
+          'README.md',
+          'CONTRIBUTING.md',
+          'CHANGELOG.md',
+          'docs/guide.md',
+          'examples/sample.md',
+        ],
+        lintFailures: [],
+        hasInvalidPublicInstallExample: false,
+        driftFindings: [],
+      });
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+      assert.equal(
+        runDocsCheck(root, {
+          stdout: (text) => stdout.push(text),
+          stderr: (text) => stderr.push(text),
+        }),
+        0,
+      );
+      assert.deepEqual(stdout, ['docs lint OK (5 files)\n']);
+      assert.deepEqual(stderr, []);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reports lint, public-command, and tracked-drift failures together', () => {
+    const root = docsFixture();
+    try {
+      fs.writeFileSync(path.join(root, 'README.md'), `npx feynman install\n${withPhrase}\n`);
+      fs.writeFileSync(path.join(root, 'docs', 'guide.md'), 'LINT_FAIL\n');
+      const result = checkDocs(root);
+      assert.deepEqual(
+        result.lintFailures.map(({ file }) => file),
+        ['docs/guide.md'],
+      );
+      assert.equal(result.hasInvalidPublicInstallExample, true);
+      assert.equal(result.driftFindings.length, 1);
+
+      const errors: string[] = [];
+      assert.equal(
+        runDocsCheck(root, {
+          stdout: () => undefined,
+          stderr: (text) => errors.push(text),
+        }),
+        1,
+      );
+      const message = errors.join('');
+      assert.match(message, /docs lint failed: docs\/guide\.md/);
+      assert.match(message, /public install examples/);
+      assert.match(message, /superseded toolchain contract/);
+      assert.match(message, /README\.md/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves the original git diagnostic when tracked files cannot be listed', () => {
+    const root = docsFixture();
+    try {
+      fs.rmSync(path.join(root, '.git'), { recursive: true, force: true });
+      assert.throws(
+        () => checkDocs(root),
+        /unable to list tracked files via git: .*fatal: not a git repository/is,
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });

@@ -9,6 +9,7 @@ import {
   normalizeState,
   OUTPUT_STYLE_SUFFIX,
 } from '../lib/state/index.ts';
+import { assertDefined } from './helpers/assertions.ts';
 
 describe('applyOutputStyle', () => {
   const RULES = 'RULES_TEXT';
@@ -34,11 +35,15 @@ describe('applyOutputStyle', () => {
   });
 
   it('appends the short suffix for output_style "short"', () => {
-    assert.equal(applyOutputStyle(RULES, 'short'), RULES + OUTPUT_STYLE_SUFFIX['short']);
+    const suffix = OUTPUT_STYLE_SUFFIX.short;
+    assertDefined(suffix);
+    assert.equal(applyOutputStyle(RULES, 'short'), RULES + suffix);
   });
 
   it('appends the middle suffix for output_style "middle"', () => {
-    assert.equal(applyOutputStyle(RULES, 'middle'), RULES + OUTPUT_STYLE_SUFFIX['middle']);
+    const suffix = OUTPUT_STYLE_SUFFIX.middle;
+    assertDefined(suffix);
+    assert.equal(applyOutputStyle(RULES, 'middle'), RULES + suffix);
   });
 });
 

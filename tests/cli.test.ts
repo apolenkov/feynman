@@ -5,6 +5,13 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  assertDefined,
+  assertRecord,
+  assertString,
+  assertUnknownArray,
+  parseJsonObject,
+} from './helpers/assertions.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const CLI = path.join(ROOT, 'bin', 'feynman.ts');
@@ -24,7 +31,32 @@ function configPath(home: string): string {
   return path.join(home, '.codex', 'hooks.json');
 }
 function readConfig(home: string): Record<string, unknown> {
-  return JSON.parse(fs.readFileSync(configPath(home), 'utf8')) as Record<string, unknown>;
+  return parseJsonObject(fs.readFileSync(configPath(home), 'utf8'));
+}
+function sessionStartGroups(home: string): unknown[] {
+  const hooks = readConfig(home)['hooks'];
+  assertRecord(hooks);
+  const groups = hooks['SessionStart'];
+  assertUnknownArray(groups);
+  return groups;
+}
+function commandsInSessionStart(home: string): string[] {
+  return sessionStartGroups(home).flatMap((group) => {
+    assertRecord(group);
+    const hooks = group['hooks'];
+    assertUnknownArray(hooks);
+    return hooks.map((hook) => {
+      assertRecord(hook);
+      const command = hook['command'];
+      assertString(command);
+      return command;
+    });
+  });
+}
+function readState(home: string): Record<string, unknown> {
+  return parseJsonObject(
+    fs.readFileSync(path.join(home, '.codex', '.feynman', 'state.json'), 'utf8'),
+  );
 }
 function cleanup(home: string): void {
   fs.rmSync(home, { recursive: true, force: true });
@@ -41,18 +73,15 @@ describe('feynman CLI', () => {
       const entrypoint = path.join(exported, 'bin', 'feynman.ts');
       assert.equal(run(home, ['install'], entrypoint).status, 0);
       assert.equal(run(home, ['install'], entrypoint).status, 0);
-      const settings = readConfig(home) as {
-        hooks: { SessionStart: Array<{ hooks: Array<{ command: string }> }> };
-      };
-      const handlers = settings.hooks.SessionStart.flatMap((group) => group.hooks);
+      const handlers = commandsInSessionStart(home);
       assert.equal(
         handlers.length,
         1,
         'literal command must remain recognizable on repeat install',
       );
-      const handler = handlers[0];
-      assert.ok(handler);
-      const result = spawnSync('sh', ['-c', handler.command], {
+      const command = handlers[0];
+      assertDefined(command);
+      const result = spawnSync('sh', ['-c', command], {
         cwd: temporary,
         input: '{"session_id":"quoted-path"}',
         encoding: 'utf8',
@@ -164,14 +193,9 @@ describe('feynman CLI', () => {
     const home = tempHome();
     try {
       assert.equal(run(home, ['install']).status, 0);
-      const first = readConfig(home);
-      const hooks = first['hooks'] as Record<string, unknown[]>;
-      assert.equal((hooks['SessionStart'] ?? []).length, 1);
+      assert.equal(sessionStartGroups(home).length, 1);
       assert.equal(run(home, ['install']).status, 0);
-      assert.equal(
-        (readConfig(home)['hooks'] as Record<string, unknown[]>)['SessionStart']!.length,
-        1,
-      );
+      assert.equal(sessionStartGroups(home).length, 1);
     } finally {
       cleanup(home);
     }
@@ -191,7 +215,7 @@ describe('feynman CLI', () => {
       assert.equal(run(home, ['install', '--force']).status, 0);
       const config = readConfig(home);
       assert.equal(config['profile'], 'work');
-      assert.equal((config['hooks'] as Record<string, unknown[]>)['SessionStart']!.length, 2);
+      assert.equal(sessionStartGroups(home).length, 2);
     } finally {
       cleanup(home);
     }
@@ -210,14 +234,31 @@ describe('feynman CLI', () => {
     }
   });
 
+  it('doctor reports malformed hook configuration without writing or failing', () => {
+    const home = tempHome();
+    try {
+      fs.mkdirSync(path.dirname(configPath(home)), { recursive: true });
+      fs.writeFileSync(configPath(home), '{broken');
+      const doctor = run(home, ['doctor']);
+      assert.equal(doctor.status, 0);
+      assert.match(doctor.stdout, /hook config invalid/);
+      assert.match(doctor.stdout, /not valid JSON/);
+      assert.match(doctor.stdout, /Status: ISSUES/);
+      assert.equal(doctor.stderr, '');
+      assert.equal(fs.readFileSync(configPath(home), 'utf8'), '{broken');
+    } finally {
+      cleanup(home);
+    }
+  });
+
   it('uninstall removes Feynman hooks and preserves state', () => {
     const home = tempHome();
     try {
       assert.equal(run(home, ['install']).status, 0);
       const statePath = path.join(home, '.codex', '.feynman', 'state.json');
       assert.equal(run(home, ['uninstall']).status, 0);
-      const hooks = readConfig(home)['hooks'] as Record<string, unknown> | undefined;
-      assert.equal(hooks?.['SessionStart'], undefined);
+      const hooks = readConfig(home)['hooks'];
+      assert.equal(hooks, undefined);
       assert.ok(fs.existsSync(statePath));
     } finally {
       cleanup(home);
@@ -287,22 +328,13 @@ describe('feynman CLI', () => {
       assert.equal(fs.existsSync(flagPath), false, 'status must not create the active flag');
 
       assert.equal(run(home, ['state', 'lite']).status, 0);
-      assert.equal(
-        (JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>)['intensity'],
-        'lite',
-      );
+      assert.equal(readState(home)['intensity'], 'lite');
       assert.equal(fs.readFileSync(flagPath, 'utf8'), 'lite');
       assert.equal(run(home, ['state', 'style', 'short']).status, 0);
-      assert.equal(
-        (JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>)['output_style'],
-        'short',
-      );
+      assert.equal(readState(home)['output_style'], 'short');
 
       assert.equal(run(home, ['state', 'off']).status, 0);
-      assert.equal(
-        (JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>)['enabled'],
-        false,
-      );
+      assert.equal(readState(home)['enabled'], false);
       assert.equal(fs.existsSync(flagPath), false);
       assert.equal(run(home, ['status']).status, 0);
       assert.equal(run(home, ['state', 'start']).status, 0);

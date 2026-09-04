@@ -8,8 +8,6 @@ import url from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const _ext = fs.existsSync(path.join(ROOT, 'bin', 'feynman-lint.ts')) ? '.ts' : '.js';
-const LINT = path.join(ROOT, 'bin', `feynman-lint${_ext}`);
 
 // --- doc-drift guard (capability: doc-drift-guard) ---------------------------
 // ADR 0001 superseded the "CommonJS-only / Node >= 18 / no build step" contract.
@@ -41,7 +39,7 @@ export const isDriftExcluded = (rel: string): boolean =>
 
 // Pure: given tracked {rel, content} entries, return one finding line per
 // (live file, forbidden phrase) hit. Binary files (NUL byte) are skipped.
-export function detectDrift(entries: ReadonlyArray<{ rel: string; content: string }>): string[] {
+export function detectDrift(entries: readonly { rel: string; content: string }[]): string[] {
   return entries
     .filter((e) => !isDriftExcluded(e.rel))
     .flatMap((e) =>
@@ -53,83 +51,123 @@ export function detectDrift(entries: ReadonlyArray<{ rel: string; content: strin
     );
 }
 
-function listMarkdown(dir: string): string[] {
-  const abs = path.join(ROOT, dir);
+export interface DocsCheckResult {
+  readonly files: readonly string[];
+  readonly lintFailures: readonly {
+    readonly file: string;
+    readonly stdout: string;
+    readonly stderr: string;
+  }[];
+  readonly hasInvalidPublicInstallExample: boolean;
+  readonly driftFindings: readonly string[];
+}
+
+interface DocsCheckOutput {
+  readonly stdout: (text: string) => void;
+  readonly stderr: (text: string) => void;
+}
+
+function sourceExtension(root: string): '.ts' | '.js' {
+  return fs.existsSync(path.join(root, 'bin', 'feynman-lint.ts')) ? '.ts' : '.js';
+}
+
+function listMarkdown(root: string, dir: string): string[] {
+  const abs = path.join(root, dir);
   if (!fs.existsSync(abs)) return [];
   return fs
     .readdirSync(abs)
     .filter((name: string) => name.endsWith('.md'))
     .map((name: string) => path.join(dir, name))
-    .sort();
+    .toSorted();
 }
 
-function trackedFiles(): string[] {
-  const result = spawnSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' });
+function trackedFiles(root: string): string[] {
+  const result = spawnSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' });
   if (result.status !== 0) {
-    process.stderr.write('doc-drift guard: unable to list tracked files via git\n');
-    process.exit(1);
+    const diagnostics = [
+      result.error?.message,
+      result.signal === null ? undefined : `signal ${result.signal}`,
+      result.stderr.trim().length === 0 ? undefined : result.stderr.trim(),
+    ].filter((diagnostic): diagnostic is string => diagnostic !== undefined);
+    const detail = diagnostics.length === 0 ? '' : `: ${diagnostics.join('; ')}`;
+    throw new Error(`doc-drift guard: unable to list tracked files via git${detail}`);
   }
   return result.stdout.split('\0').filter(Boolean);
 }
 
-function main(): void {
+export function checkDocs(root = ROOT): DocsCheckResult {
+  const extension = sourceExtension(root);
+  const lint = path.join(root, 'bin', `feynman-lint${extension}`);
   const files: string[] = [
     'README.md',
     'CONTRIBUTING.md',
     'CHANGELOG.md',
-    ...listMarkdown('docs'),
-    ...listMarkdown('examples'),
+    ...listMarkdown(root, 'docs'),
+    ...listMarkdown(root, 'examples'),
   ];
 
-  let failed = false;
-  for (const file of files) {
-    const result = spawnSync(process.execPath, [LINT, file], {
-      cwd: ROOT,
+  const lintFailures = files.flatMap((file) => {
+    const result = spawnSync(process.execPath, [lint, file], {
+      cwd: root,
       encoding: 'utf8',
       env: { ...process.env, NO_COLOR: '1' },
     });
-    if (result.status !== 0) {
-      failed = true;
-      process.stderr.write(`docs lint failed: ${file}\n`);
-      if (result.stdout) process.stderr.write(result.stdout);
-      if (result.stderr) process.stderr.write(result.stderr);
-    }
-  }
-
+    return result.status === 0 ? [] : [{ file, stdout: result.stdout, stderr: result.stderr }];
+  });
   const publicText: string = [
-    fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8'),
-    fs.readFileSync(path.join(ROOT, 'bin', `feynman${_ext}`), 'utf8'),
+    fs.readFileSync(path.join(root, 'README.md'), 'utf8'),
+    fs.readFileSync(path.join(root, 'bin', `feynman${extension}`), 'utf8'),
   ].join('\n');
 
-  if (publicText.includes('npx feynman ')) {
-    failed = true;
-    process.stderr.write(
-      'docs lint failed: public install examples must use npx @albinocrabs/feynman\n',
-    );
-  }
-
-  const entries = trackedFiles().flatMap((rel) => {
+  const hasInvalidPublicInstallExample = publicText.includes('npx feynman ');
+  const entries = trackedFiles(root).flatMap((rel) => {
     try {
-      return [{ rel, content: fs.readFileSync(path.join(ROOT, rel), 'utf8') }];
+      return [{ rel, content: fs.readFileSync(path.join(root, rel), 'utf8') }];
     } catch {
       return []; // unreadable or removed since `git ls-files`
     }
   });
   const driftFindings = detectDrift(entries);
-  if (driftFindings.length > 0) {
-    failed = true;
-    process.stderr.write(
+
+  return { files, lintFailures, hasInvalidPublicInstallExample, driftFindings };
+}
+
+export function runDocsCheck(
+  root = ROOT,
+  output: DocsCheckOutput = {
+    stdout: (text) => process.stdout.write(text),
+    stderr: (text) => process.stderr.write(text),
+  },
+): number {
+  const result = checkDocs(root);
+  for (const failure of result.lintFailures) {
+    output.stderr(`docs lint failed: ${failure.file}\n`);
+    if (failure.stdout.length > 0) output.stderr(failure.stdout);
+    if (failure.stderr.length > 0) output.stderr(failure.stderr);
+  }
+  if (result.hasInvalidPublicInstallExample) {
+    output.stderr('docs lint failed: public install examples must use npx @albinocrabs/feynman\n');
+  }
+  if (result.driftFindings.length > 0) {
+    output.stderr(
       'docs lint failed: superseded toolchain contract on live surfaces (see ADR 0001)\n',
     );
-    for (const finding of driftFindings) process.stderr.write(`${finding}\n`);
+    for (const finding of result.driftFindings) output.stderr(`${finding}\n`);
   }
 
-  if (failed) process.exit(1);
-  console.log(`docs lint OK (${files.length} files)`);
+  if (
+    result.lintFailures.length > 0 ||
+    result.hasInvalidPublicInstallExample ||
+    result.driftFindings.length > 0
+  ) {
+    return 1;
+  }
+  output.stdout(`docs lint OK (${result.files.length} files)\n`);
+  return 0;
 }
 
 // Run main() only when invoked directly, not when imported by a test.
 // realpathSync on both sides handles macOS symlinked temp/bin paths.
-const invokedPath = process.argv[1] ? fs.realpathSync(process.argv[1]) : '';
+const invokedPath = process.argv[1] === undefined ? '' : fs.realpathSync(process.argv[1]);
 const modulePath = fs.realpathSync(url.fileURLToPath(import.meta.url));
-if (invokedPath === modulePath) main();
+if (invokedPath === modulePath) process.exit(runDocsCheck());

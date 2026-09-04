@@ -60,9 +60,9 @@ export interface DiagramNode {
 }
 
 interface DiagramCharStats {
-  diagramCount: number;
-  nonSpaceCount: number;
-  hasBoxDrawing: boolean;
+  readonly diagramCount: number;
+  readonly nonSpaceCount: number;
+  readonly hasBoxDrawing: boolean;
 }
 
 /**
@@ -71,17 +71,17 @@ interface DiagramCharStats {
  * @returns {{diagramCount: number, nonSpaceCount: number, hasBoxDrawing: boolean}}
  */
 function countDiagramChars(text: string): DiagramCharStats {
-  let diagramCount = 0;
-  let nonSpaceCount = 0;
-  let hasBoxDrawing = false;
-
-  for (const ch of text) {
-    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') continue;
-    nonSpaceCount++;
-    if (DIAGRAM_CHARS.has(ch)) diagramCount++;
-    if (BOX_DRAWING_CHARS.has(ch)) hasBoxDrawing = true;
-  }
-  return { diagramCount, nonSpaceCount, hasBoxDrawing };
+  return Array.from(text).reduce<DiagramCharStats>(
+    (stats, ch) =>
+      /\s/.test(ch)
+        ? stats
+        : {
+            diagramCount: stats.diagramCount + Number(DIAGRAM_CHARS.has(ch)),
+            nonSpaceCount: stats.nonSpaceCount + 1,
+            hasBoxDrawing: stats.hasBoxDrawing || BOX_DRAWING_CHARS.has(ch),
+          },
+    { diagramCount: 0, nonSpaceCount: 0, hasBoxDrawing: false },
+  );
 }
 
 /**
@@ -91,7 +91,7 @@ function countDiagramChars(text: string): DiagramCharStats {
  * @param {string[]} lines
  * @returns {boolean}
  */
-function looksLikeDiagram(lines: string[]): boolean {
+function looksLikeDiagram(lines: readonly string[]): boolean {
   const text = lines.join('\n');
   const { nonSpaceCount, hasBoxDrawing } = countDiagramChars(text);
 
@@ -106,7 +106,7 @@ function looksLikeDiagram(lines: string[]): boolean {
     if (!trimmed) return true;
     // If the line has natural language (multiple word chars) and any box chars
     // but the box chars are embedded in prose (not structural)
-    const wordChars = (trimmed.match(/[a-zA-Z]/g) || []).length;
+    const wordChars = (trimmed.match(/[a-zA-Z]/g) ?? []).length;
     const boxChars = Array.from(trimmed).filter((ch) => BOX_DRAWING_CHARS.has(ch)).length;
     // Prose: more letters than box chars by a significant margin
     if (wordChars > 5 && boxChars > 0 && wordChars > boxChars * 3) return true;
@@ -143,9 +143,7 @@ function looksLikeDiagram(lines: string[]): boolean {
  * @returns {number}
  */
 function getIndent(line: string): number {
-  let i = 0;
-  while (i < line.length && line[i] === ' ') i++;
-  return i;
+  return /^ */.exec(line)?.[0].length ?? 0;
 }
 
 /**
@@ -153,7 +151,7 @@ function getIndent(line: string): number {
  * @param {string} markdown
  * @returns {Array<DiagramNode>}
  */
-export function parse(markdown: string): DiagramNode[] {
+export function parse(markdown: string): readonly DiagramNode[] {
   // Normalise CRLF/CR to LF first: a trailing \r left on each line inflates
   // visualWidth, skewing the width-sensitive rules (L08/L11/L12). Splitting on
   // the line-ending family keeps the same line count, so line numbers are intact.
@@ -162,7 +160,8 @@ export function parse(markdown: string): DiagramNode[] {
 
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i]!;
+    const line = lines[i];
+    if (line === undefined) break;
     const trimmed = line.trim();
 
     // Check for fenced code block: a line that is exactly three backticks plus an
@@ -172,16 +171,16 @@ export function parse(markdown: string): DiagramNode[] {
     // ``` is treated as the outer close. No shipped rules/ or examples/ content uses
     // them, so this stays a documented edge rather than added parser state. Revisit
     // only if a real diagram needs a nested or 4-backtick fence.
-    const fenceMatch = trimmed.match(/^```(\w*)$/);
+    const fenceMatch = /^```(\w*)$/.exec(trimmed);
     if (fenceMatch) {
-      const lang = fenceMatch[1]!.toLowerCase();
+      const lang = (fenceMatch[1] ?? '').toLowerCase();
 
       // Skip named language blocks (js, bash, python, mermaid, etc.)
       // Only process generic ``` fences (empty lang tag)
       if (lang !== '') {
         // Advance to closing fence, skip this block
         i++;
-        while (i < lines.length && lines[i]!.trim() !== '```') i++;
+        while ((lines[i]?.trim() ?? '```') !== '```') i++;
         i++; // skip closing ```
         continue;
       }
@@ -191,8 +190,10 @@ export function parse(markdown: string): DiagramNode[] {
       const blockLines: string[] = [];
       i++; // move past opening fence
       const startLine = i + 1; // 1-based line number of first content line
-      while (i < lines.length && lines[i]!.trim() !== '```') {
-        blockLines.push(lines[i]!);
+      while ((lines[i]?.trim() ?? '```') !== '```') {
+        const blockLine = lines[i];
+        if (blockLine === undefined) break;
+        blockLines.push(blockLine);
         i++;
       }
       const endLine = i + 1; // 1-based (points to closing ```)
@@ -227,7 +228,8 @@ export function parse(markdown: string): DiagramNode[] {
 
       // Extend block: include lines until we hit blank or markdown heading/fence
       while (j < lines.length) {
-        const nextLine = lines[j]!;
+        const nextLine = lines[j];
+        if (nextLine === undefined) break;
         const nextTrimmed = nextLine.trim();
 
         // Stop at blank lines, headings, or fences
@@ -248,8 +250,11 @@ export function parse(markdown: string): DiagramNode[] {
         const matches = [...l.matchAll(/\[[^\]]+\]/g)];
         if (matches.length < 2) return false;
         // Check what's between the first and last box
-        const firstEnd = matches[0]!.index + matches[0]![0].length;
-        const lastStart = matches[matches.length - 1]!.index;
+        const first = matches[0];
+        const last = matches.at(-1);
+        if (!first || !last) return false;
+        const firstEnd = first.index + first[0].length;
+        const lastStart = last.index;
         const between = l.slice(firstEnd, lastStart);
         // If "between" contains regular English words (sequences of alpha), it's prose
         // Allow: spaces, arrows, punctuation, special chars

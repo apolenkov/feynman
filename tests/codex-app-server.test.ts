@@ -9,6 +9,13 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  assertDefined,
+  assertRecord,
+  assertString,
+  assertUnknownArray,
+  isRecord,
+} from './helpers/assertions.ts';
 
 const REPO_DIR = path.resolve(import.meta.dirname, '..');
 const FEYNMAN_JS = path.join(REPO_DIR, 'bin', 'feynman.ts');
@@ -120,7 +127,7 @@ class CodexAppServerClient {
   pendingResponses: Map<number, PendingWaiter>;
   notificationWaiters: NotificationWaiter[];
   stderr: string;
-  child!: ChildProcessWithoutNullStreams;
+  child: ChildProcessWithoutNullStreams | undefined;
 
   constructor(tmpHome: string) {
     this.tmpHome = tmpHome;
@@ -173,24 +180,23 @@ class CodexAppServerClient {
       const line = this.buffer.slice(0, newlineIndex);
       this.buffer = this.buffer.slice(newlineIndex + 1);
       if (!line.trim()) continue;
-      const message = JSON.parse(line) as {
-        id?: number;
-        error?: unknown;
-        result?: unknown;
-        method?: string;
-        params?: unknown;
-      };
-      if (message.id && this.pendingResponses.has(message.id)) {
-        const waiter = this.pendingResponses.get(message.id)!;
-        this.pendingResponses.delete(message.id);
-        if (message.error) {
-          waiter.reject(new Error(JSON.stringify(message.error)));
+      const message: unknown = JSON.parse(line);
+      assertRecord(message, 'app-server message must be an object');
+      const id = message['id'];
+      if (typeof id === 'number' && this.pendingResponses.has(id)) {
+        const waiter = this.pendingResponses.get(id);
+        assertDefined(waiter);
+        this.pendingResponses.delete(id);
+        const error = message['error'];
+        if (error !== undefined) {
+          waiter.reject(new Error(JSON.stringify(error)));
         } else {
-          waiter.resolve(message.result);
+          waiter.resolve(message['result']);
         }
       }
-      if (message.method) {
-        this.resolveNotificationWaiters(message);
+      const method = message['method'];
+      if (typeof method === 'string') {
+        this.resolveNotificationWaiters({ method, params: message['params'] });
       }
     }
   }
@@ -199,7 +205,7 @@ class CodexAppServerClient {
     const remaining: NotificationWaiter[] = [];
     for (const waiter of this.notificationWaiters) {
       if (waiter.method === message.method && waiter.predicate(message.params)) {
-        if (waiter.timeout) clearTimeout(waiter.timeout);
+        if (waiter.timeout !== null) clearTimeout(waiter.timeout);
         waiter.resolve(message.params);
       } else {
         remaining.push(waiter);
@@ -226,7 +232,9 @@ class CodexAppServerClient {
           reject(error);
         },
       });
-      this.child.stdin.write(`${JSON.stringify(payload)}\n`);
+      const child = this.child;
+      assertDefined(child, 'client must be started before sending a request');
+      child.stdin.write(`${JSON.stringify(payload)}\n`);
     });
   }
 
@@ -259,7 +267,7 @@ class CodexAppServerClient {
   }
 
   close(): void {
-    if (!this.child || this.child.killed) return;
+    if (this.child === undefined || this.child.killed) return;
     this.child.kill('SIGTERM');
   }
 }
@@ -267,14 +275,14 @@ class CodexAppServerClient {
 async function trustCodexHooks(
   client: CodexAppServerClient,
 ): Promise<{ command: string; trustStatus: string; eventName: string }> {
-  const initial = (await client.request('hooks/list', { cwd: REPO_DIR })) as {
-    data: { hooks: { key: string; currentHash: string }[] }[];
-  };
-  const hooks = initial.data.flatMap((entry) => entry.hooks);
+  const initial = await client.request('hooks/list', { cwd: REPO_DIR });
+  const hooks = hookList(initial);
   assert.ok(hooks.length >= 1, 'expected at least one Feynman hook (SessionStart)');
 
   const trustState: Record<string, { trusted_hash: string }> = {};
   for (const hook of hooks) {
+    assertString(hook.key);
+    assertString(hook.currentHash);
     trustState[hook.key] = { trusted_hash: hook.currentHash };
   }
 
@@ -289,14 +297,56 @@ async function trustCodexHooks(
     reloadUserConfig: true,
   });
 
-  const verified = (await client.request('hooks/list', { cwd: REPO_DIR })) as {
-    data: { hooks: { command: string; trustStatus: string; eventName: string }[] }[];
-  };
-  const trustedHooks = verified.data.flatMap((entry) => entry.hooks);
+  const verified = await client.request('hooks/list', { cwd: REPO_DIR });
+  const trustedHooks = hookList(verified);
   const sessionHook = trustedHooks.find((hook) => hook.eventName === 'sessionStart');
   assert.ok(sessionHook, 'SessionStart hook should be listed');
+  assertString(sessionHook.trustStatus);
+  assertString(sessionHook.command);
   assert.equal(sessionHook.trustStatus, 'trusted');
-  return sessionHook;
+  assertString(sessionHook.eventName);
+  return {
+    command: sessionHook.command,
+    trustStatus: sessionHook.trustStatus,
+    eventName: sessionHook.eventName,
+  };
+}
+
+interface ListedHook {
+  key: string | undefined;
+  currentHash: string | undefined;
+  command: string | undefined;
+  trustStatus: string | undefined;
+  eventName: string | undefined;
+}
+
+function property(record: Record<string, unknown>, key: string): unknown {
+  return record[key];
+}
+
+function hookList(value: unknown): ListedHook[] {
+  assertRecord(value);
+  const data = value['data'];
+  assertUnknownArray(data);
+  return data.flatMap((entry) => {
+    assertRecord(entry);
+    const hooks = entry['hooks'];
+    assertUnknownArray(hooks);
+    return hooks.map((hook) => {
+      assertRecord(hook);
+      const key = property(hook, 'key');
+      const currentHash = property(hook, 'currentHash');
+      const command = property(hook, 'command');
+      const trustStatus = property(hook, 'trustStatus');
+      const eventName = property(hook, 'eventName');
+      assert.ok(key === undefined || typeof key === 'string');
+      assert.ok(currentHash === undefined || typeof currentHash === 'string');
+      assert.ok(command === undefined || typeof command === 'string');
+      assert.ok(trustStatus === undefined || typeof trustStatus === 'string');
+      assert.ok(eventName === undefined || typeof eventName === 'string');
+      return { key, currentHash, command, trustStatus, eventName };
+    });
+  });
 }
 
 describe('Codex app-server hook visibility contract', () => {
@@ -324,26 +374,33 @@ describe('Codex app-server hook visibility contract', () => {
       client.start();
       await client.initialize();
       const result = await client.request('skills/list', { cwds: [tmpHome], forceReload: true });
-      assert.ok(typeof result === 'object' && result !== null && 'data' in result);
-      assert.ok(Array.isArray(result.data));
-      const entries = result.data as Array<{
-        skills: Array<{ name: string; path: string; enabled: boolean; pluginId: string | null }>;
-        errors: unknown[];
-      }>;
-      for (const entry of entries) assert.deepEqual(entry.errors, []);
-      const skill = entries
-        .flatMap((entry) => entry.skills)
-        .find((entry) => entry.pluginId === 'feynman@feynman');
-      assert.ok(skill, 'installed plugin must be discoverable');
-      assert.equal(skill.name, 'feynman:feynman');
-      assert.equal(skill.enabled, true);
-      assert.ok(skill.path.startsWith(fs.realpathSync(codexHome) + path.sep));
+      assertRecord(result);
+      const entries = result['data'];
+      assertUnknownArray(entries);
+      const skills = entries.flatMap((entry) => {
+        assertRecord(entry);
+        assert.deepEqual(entry['errors'], []);
+        const entrySkills = entry['skills'];
+        assertUnknownArray(entrySkills);
+        return entrySkills;
+      });
+      const skill = skills.find((entry) => {
+        assertRecord(entry);
+        return entry['pluginId'] === 'feynman@feynman';
+      });
+      assertDefined(skill, 'installed plugin must be discoverable');
+      assertRecord(skill);
+      assert.equal(skill['name'], 'feynman:feynman');
+      assert.equal(skill['enabled'], true);
+      const skillPath = skill['path'];
+      assertString(skillPath);
+      assert.ok(skillPath.startsWith(fs.realpathSync(codexHome) + path.sep));
       assert.equal(
-        fs.readFileSync(skill.path, 'utf8'),
+        fs.readFileSync(skillPath, 'utf8'),
         fs.readFileSync(path.join(REPO_DIR, 'plugins/feynman/skills/feynman/SKILL.md'), 'utf8'),
       );
       assert.equal(
-        fs.readFileSync(path.join(path.dirname(skill.path), 'references/settings.md'), 'utf8'),
+        fs.readFileSync(path.join(path.dirname(skillPath), 'references/settings.md'), 'utf8'),
         fs.readFileSync(
           path.join(REPO_DIR, 'plugins/feynman/skills/feynman/references/settings.md'),
           'utf8',
@@ -375,10 +432,17 @@ describe('Codex app-server hook visibility contract', () => {
       const sessionHook = await trustCodexHooks(client);
       assert.match(sessionHook.command, /feynman-session-start\.ts/);
 
-      const hookCompleted = client.waitForNotification(
-        'hook/completed',
-        (params) => (params as { run?: { eventName: string } }).run?.eventName === 'sessionStart',
-      );
+      const hookCompleted = client.waitForNotification('hook/completed', (params) => {
+        if (!isRecord(params)) return false;
+        const run = property(params, 'run');
+        return (
+          typeof run === 'object' &&
+          run !== null &&
+          !Array.isArray(run) &&
+          isRecord(run) &&
+          property(run, 'eventName') === 'sessionStart'
+        );
+      });
 
       const started = await client.request('thread/start', {
         cwd: REPO_DIR,
@@ -387,25 +451,34 @@ describe('Codex app-server hook visibility contract', () => {
         approvalPolicy: 'never',
         sandbox: 'danger-full-access',
       });
-      const threadId = (started as { thread: { id: string } }).thread.id;
+      assertRecord(started);
+      const thread = started['thread'];
+      assertRecord(thread);
+      const threadId = thread['id'];
+      assertString(threadId);
       await client.request('turn/start', {
         threadId,
         input: [{ type: 'text', text: 'feynman hook probe' }],
       });
 
-      const completed = (await hookCompleted) as {
-        run: {
-          status: string;
-          handlerType: string;
-          entries: { kind: string; text: string }[];
-        };
-      };
-      assert.equal(completed.run.status, 'completed');
-      assert.equal(completed.run.handlerType, 'command');
+      const completed = await hookCompleted;
+      assertRecord(completed);
+      const run = completed['run'];
+      assertRecord(run);
+      assert.equal(run['status'], 'completed');
+      assert.equal(run['handlerType'], 'command');
+      const runEntries = run['entries'];
+      assertUnknownArray(runEntries);
       assert.ok(
-        completed.run.entries.some(
-          (entry) => entry.kind === 'context' && /<triggers>|<contract>|→|├──/.test(entry.text),
-        ),
+        runEntries.some((entry) => {
+          assertRecord(entry);
+          const text = entry['text'];
+          return (
+            entry['kind'] === 'context' &&
+            typeof text === 'string' &&
+            /<triggers>|<contract>|→|├──/.test(text)
+          );
+        }),
         'Codex should expose Feynman rule-file diagram tokens in SessionStart hook/completed entries',
       );
     } finally {

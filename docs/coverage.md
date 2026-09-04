@@ -1,32 +1,44 @@
 # Coverage
 
 `npm run coverage` emits `coverage/lcov.info`; `npm run check:coverage` is the
-single line-coverage gate used by local CI and GitHub Actions. It keeps the
-existing aggregate of every LCOV `LH` and `LF` record and requires at least
-95% lines. The checker rejects incomplete, duplicate, non-numeric, or
-internally inconsistent `LH`/`LF` records before it calculates that aggregate.
+single line-coverage gate used by local CI and GitHub Actions. The gate requires
+at least 95% of the aggregate LCOV `LH`/`LF` lines. Incomplete, duplicate,
+non-numeric and inconsistent line-total fields are rejected before calculation.
 
-The percentage is not a claim that every repository file is covered. On each
-run, the checker enumerates every first-party TypeScript source in `bin/`,
-`hooks/`, `lib/`, and `scripts/`, then separately prints the files absent from
-LCOV. Tests are intentionally outside that production inventory. LCOV can also
-contain support files outside the inventory, such as `eslint.config.mjs`; those
-records remain in the unchanged aggregate and are reported separately.
+The gate also requires a coverage record for every first-party TypeScript file
+under `bin/`, `hooks/`, `lib/` and `scripts/`, plus the executable
+`eslint.config.mjs`. Missing sources and arbitrary records outside that inventory
+fail acceptance. Tests are excluded from the production measurement. New
+production TypeScript files join the inventory automatically; there are no
+unmeasured production-file exceptions.
 
-## Reviewed inventory evidence
+The configuration file was already included in the historical percentage and
+remains included. Its explicit inventory entry preserves that denominator instead
+of dropping fully covered configuration lines to hide a mismatch. The current
+inventory contains 37 TypeScript files plus configuration, 38 sources total.
 
-The following was recorded from the local `npm run coverage && npm run
-check:coverage` run on 2026-09-04. It establishes the scope of the 95% gate at
-that point; the command remains the source of truth as files change.
+## Historical baseline and expanded scope
 
-| Evidence | Result |
-| --- | --- |
-| Aggregate line coverage | Recorded by the command output for all LCOV `LH`/`LF` records |
-| First-party TypeScript inventory | 36 files: all `.ts` files below `bin/`, `hooks/`, `lib/`, and `scripts/` |
-| Files recorded by LCOV | 29 of 36 production TypeScript files |
-| LCOV records outside that inventory | `eslint.config.mjs` |
-| Production files absent from LCOV | `scripts/build-package.ts`, `scripts/check-reproducibility.ts`, `scripts/evaluate.ts`, `scripts/feynman-bump.ts`, `scripts/feynman-highlight.ts`, `scripts/release-smoke.ts`, `scripts/verify-published-package.ts` |
+At `fa0d2d5521ae7f21576d8f67152a8cc9d69dc504`, the reported 95.47% covered
+29 of 36 production TypeScript files plus configuration. Seven scripts had no
+coverage record: build-package, check-reproducibility, evaluate, feynman-bump,
+feynman-highlight, release-smoke and verify-published-package. The earlier checker
+only disclosed these omissions; it did not fail them. That historical percentage
+must not be presented as whole-repository coverage or compared directly with a
+larger denominator without stating the scope change.
 
-The seven scripts listed as absent are not covered by the current LCOV report.
-They are disclosed by the checker; the 95% aggregate does not silently turn
-their absence into a whole-repository coverage claim.
+After the strict implementation pass, the first complete local run measured
+98.01% (6,741/6,878 lines), with all 38 inventory records and 502 passing tests.
+This is an intermediate worktree result, not final-revision acceptance; subsequent
+fixes require a new run. The retained command output and final acceptance record
+identify the source revision, runtime, numerator and denominator.
+
+## Meaning of the evidence
+
+The aggregate is a floor, not proof of correctness. Negative tests separately
+exercise malformed data, process failure, cleanup failure, atomic writes,
+rollback, source drift, missing coverage and unavailable commands. Script tests
+use temporary repositories and explicit fake command boundaries; real local
+process-adapter tests cover environment inheritance and `ENOENT`. They do not
+claim live model, registry or deployment success. Real packaging smoke and live
+skill evaluations remain separate acceptance evidence.

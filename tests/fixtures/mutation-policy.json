@@ -1,0 +1,276 @@
+{
+  "permissions": [
+    {
+      "file": "bin/adapters/codex-config.ts",
+      "owner": "literalShellWords",
+      "mutationHash": "0b8daa7208c9f360794a4aa7f8edc427cd60dd723b371c83ebde552049c36d01",
+      "count": 21,
+      "reason": "Owned lexical state and word buffer scan literal shell quoting and escapes once; no command execution or caller object mutation.",
+      "test": "tests/hook-command.test.ts"
+    },
+    {
+      "file": "bin/feynman-lint.ts",
+      "owner": "readStdin",
+      "mutationHash": "b62963af8f86fb80daea7a195227913f15361580ec732830a10f1bf9f70682ed",
+      "count": 2,
+      "reason": "Invocation-owned stream buffer accumulates stdin until end and never aliases caller data.",
+      "test": "tests/commands-coverage.test.ts"
+    },
+    {
+      "file": "hooks/feynman-session-start.ts",
+      "owner": "readStdin",
+      "mutationHash": "b62963af8f86fb80daea7a195227913f15361580ec732830a10f1bf9f70682ed",
+      "count": 2,
+      "reason": "Invocation-owned stream buffer accumulates the hook event until end before validation.",
+      "test": "tests/hook.test.ts"
+    },
+    {
+      "file": "lib/lint/autofix.ts",
+      "owner": "autofix",
+      "mutationHash": "d71d88b29d521869b264c6fb3dbb91a9d027106a54bd0059ef470ab53ecb22a0",
+      "count": 22,
+      "reason": "Source cursor skips complete handled frames while an owned output buffer retains untouched lines and full converted payloads; avoids recursive document traversal and growing-array copies.",
+      "test": "tests/diagram-properties.test.ts"
+    },
+    {
+      "file": "lib/lint/autofix.ts",
+      "owner": "buildSkipSet",
+      "mutationHash": "5ca0854660ae4b3e45a645345dc216fc6a0ead8c6767412b89cfe45a8e17bb54",
+      "count": 7,
+      "reason": "Single source-order fence scan builds an owned membership set without repeated set copying; fenced source remains untouched.",
+      "test": "tests/autofix.test.ts"
+    },
+    {
+      "file": "lib/lint/autofix.ts",
+      "owner": "detectAndFixArrows",
+      "mutationHash": "97332503a1b81b6ff2fd9527d593d80cf3660226b52b2d1deb096ea5fce852f6",
+      "count": 9,
+      "reason": "Indexed lookahead advances across detected arrow regions and writes only to a copied output array; avoids repeated whole-document copies.",
+      "test": "tests/autofix.test.ts"
+    },
+    {
+      "file": "lib/lint/autofix.ts",
+      "owner": "detectAndFixJunctions",
+      "mutationHash": "97332503a1b81b6ff2fd9527d593d80cf3660226b52b2d1deb096ea5fce852f6",
+      "count": 9,
+      "reason": "Indexed lookahead advances across detected junction regions and writes only to a copied output array; preserves unrelated content.",
+      "test": "tests/autofix.test.ts"
+    },
+    {
+      "file": "lib/lint/autofix.ts",
+      "owner": "detectAndFixSeparators",
+      "mutationHash": "36d221ab20be69e1879baaf28c6d202f3b22e0af0095d8b1716db2917876f396",
+      "count": 1,
+      "reason": "A private copy receives indexed separator replacements; caller lines are never written and repeated document copying is avoided.",
+      "test": "tests/autofix.test.ts"
+    },
+    {
+      "file": "lib/lint/autofix.ts",
+      "owner": "nextFenceLine",
+      "mutationHash": "5608c000ac2168e8d37bddb9b4a413ac32c131eccff905250ec50223b1e933d3",
+      "count": 2,
+      "reason": "Forward cursor returns at the next fence without materializing and searching a suffix copy.",
+      "test": "tests/autofix.test.ts"
+    },
+    {
+      "file": "lib/lint/frames.ts",
+      "owner": "iterateFrames",
+      "mutationHash": "8e244e9bd8f609e9fba316d745adecbfb637868efa1a14898fc1d8f1fd167a25",
+      "count": 2,
+      "reason": "Generator cursor skips closed frames and advances after unclosed openers without recursive traversal.",
+      "test": "tests/autofix.test.ts"
+    },
+    {
+      "file": "lib/lint/frames.ts",
+      "owner": "nextFrame",
+      "mutationHash": "12026a607781ebb37ea4c366eff957d49304f9174c6bce7c8c0a3b20b2ee7027",
+      "count": 7,
+      "reason": "Lookahead cursor and owned inner-row buffer detect the canonical closer within caller-supplied lines without copying each scanned suffix; autofix bounds those lines at fences.",
+      "test": "tests/autofix.test.ts"
+    },
+    {
+      "file": "lib/lint/parser.ts",
+      "owner": "parse",
+      "mutationHash": "d0bfe535959addfa79c7d368c8cde817f50c30c041bcdcd4dff6434bd6dbc2c3",
+      "count": 15,
+      "reason": "Source cursors and owned node/block buffers preserve coordinates while consuming variable-length fenced and unfenced blocks.",
+      "test": "tests/lint.test.ts"
+    },
+    {
+      "file": "lib/lint/rules.ts",
+      "owner": "L02_tree_chars",
+      "mutationHash": "4af9576d2b80e86e24458ba61750aca5634db4ca89a1a2507375487fe7c8c5fc",
+      "count": 5,
+      "reason": "Lookahead stops at the next sibling or shallower branch; owned diagnostic buffer avoids materializing each suffix or repeatedly copying accumulated findings.",
+      "test": "tests/lint.test.ts"
+    },
+    {
+      "file": "lib/lint/rules.ts",
+      "owner": "L03_arrow_style",
+      "mutationHash": "8a83faff631aa46b6045d24a0a20a2e45a108e7765a8fa494a5b68a60d090339",
+      "count": 1,
+      "reason": "An invocation-local Map records the first line per arrow family in source order, avoiding repeated searches or copying maps.",
+      "test": "tests/lint.test.ts"
+    },
+    {
+      "file": "lib/lint/rules.ts",
+      "owner": "L08_frame_width",
+      "mutationHash": "889034942131954634e1610ccfad7de6845663d0535b5cce5678d6de96219f32",
+      "count": 7,
+      "reason": "Current-frame state associates successive rows with their opener; an owned diagnostic buffer preserves source-order findings in one pass.",
+      "test": "tests/lint.test.ts"
+    },
+    {
+      "file": "lib/lint/rules.ts",
+      "owner": "L09_right_edge_alignment",
+      "mutationHash": "9a0732acbcd776d3aa4b44ee64b3c6b4d4ce1dd846543a2da4aa35185a9798d5",
+      "count": 12,
+      "reason": "Indexed closer search and skip cursor retain canonical visual-left matching and coordinates; an owned diagnostic buffer avoids repeated output copies.",
+      "test": "tests/lint.test.ts"
+    },
+    {
+      "file": "lib/lint/width.ts",
+      "owner": "visualCharacters",
+      "mutationHash": "188ab741c7d355526a671c031abab04c63432e8c8b858fae6d5a7e82a7a5562e",
+      "count": 7,
+      "reason": "Owned UTF-16/display cursors and result buffer process ANSI sequences and code points once; source coordinates remain separate from display columns.",
+      "test": "tests/lint.test.ts"
+    },
+    {
+      "file": "scripts/build-package.ts",
+      "owner": "buildPackage",
+      "mutationHash": "f03371a34769379b23325b6cc9043341033a72992709eba13bce6200cb210ce5",
+      "count": 2,
+      "reason": "The local catch slot retains the primary failure while finally independently attempts both cleanups; combined errors preserve original diagnostics.",
+      "test": "tests/packaging-failures.test.ts"
+    },
+    {
+      "file": "scripts/build-package.ts",
+      "owner": "buildPackageMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "Outer CLI boundary records failure only after build cleanup has completed.",
+      "test": "tests/packaging-behavior.test.ts"
+    },
+    {
+      "file": "scripts/check-coverage.ts",
+      "owner": "iterateLcovRecords",
+      "mutationHash": "ec7aad89f9e830294f1c07ddab848591271f27180d79fd6808cd718df030f431",
+      "count": 4,
+      "reason": "Single mutable open-record cursor with immutable field replacements streams LCOV records once without quadratic accumulated-array copying.",
+      "test": "tests/check-coverage.test.ts"
+    },
+    {
+      "file": "scripts/check-reproducibility.ts",
+      "owner": "hashBytes",
+      "mutationHash": "e6a564680beb6211149409462194d4c7891e3826fd71b4b84ef6a054e36f4838",
+      "count": 1,
+      "reason": "A newly created cryptographic digest builder consumes one byte buffer and exposes only the finalized digest.",
+      "test": "tests/reproducibility.test.ts"
+    },
+    {
+      "file": "scripts/check-reproducibility.ts",
+      "owner": "reproducibilityMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "Outer CLI boundary reports a failed reproducibility check through process status.",
+      "test": "tests/reproducibility.test.ts"
+    },
+    {
+      "file": "scripts/check-reproducibility.ts",
+      "owner": "sourceSnapshot",
+      "mutationHash": "2587e3157b0a7bcbc9f11f101e57e2957fda0685a605051254def78b2e23dc62",
+      "count": 4,
+      "reason": "Invocation-owned cryptographic builder streams sorted source metadata and bytes without concatenating the entire repository in memory.",
+      "test": "tests/reproducibility.test.ts"
+    },
+    {
+      "file": "scripts/evaluate.ts",
+      "owner": "evaluateMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "Outer CLI boundary reports failure after the evaluation runner has cleaned its isolated home.",
+      "test": "tests/evaluation-runner.test.ts"
+    },
+    {
+      "file": "scripts/evaluate.ts",
+      "owner": "hash",
+      "mutationHash": "0a829de1fc26ef2b933070c407d2cc1d9dd03e227655d2a930dc8f0bbefaf4e7",
+      "count": 1,
+      "reason": "A newly created cryptographic digest builder consumes one artifact and exposes only the finalized digest.",
+      "test": "tests/evaluation-runner.test.ts"
+    },
+    {
+      "file": "scripts/evaluate.ts",
+      "owner": "runEvaluation",
+      "mutationHash": "f03371a34769379b23325b6cc9043341033a72992709eba13bce6200cb210ce5",
+      "count": 2,
+      "reason": "The per-attempt catch slot preserves the original model-attempt failure when isolated-home cleanup also fails; raw attempt artifacts remain available.",
+      "test": "tests/evaluation-runner.test.ts"
+    },
+    {
+      "file": "scripts/feynman-bump.ts",
+      "owner": "bumpMain",
+      "mutationHash": "f062d93d8c00deeaa25ee16073fb6f2a5ffcb6e3424977aae8619fe9c0536798",
+      "count": 1,
+      "reason": "Outer CLI boundary assigns the validated command outcome to process status.",
+      "test": "tests/maintenance-scripts.test.ts"
+    },
+    {
+      "file": "scripts/feynman-highlight.ts",
+      "owner": "highlightMain",
+      "mutationHash": "c4202af306e48195262c616f7e54f87ca51c6d58dda8cbdd8c48bbd89be1da9f",
+      "count": 1,
+      "reason": "Outer CLI boundary assigns status after the reversible edit and any restoration finish.",
+      "test": "tests/maintenance-scripts.test.ts"
+    },
+    {
+      "file": "scripts/generate-changelog.ts",
+      "owner": "changelogMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "Outer CLI boundary reports failure after atomic-write cleanup has completed.",
+      "test": "tests/generate-changelog.test.ts"
+    },
+    {
+      "file": "scripts/generate-changelog.ts",
+      "owner": "sectionHash",
+      "mutationHash": "b8747fa89672d7efa9a6e012cac569a15f3e2dc2b29c8bc9117974a75b277a7e",
+      "count": 1,
+      "reason": "A newly created digest builder identifies untouched generated release text; manually edited or curated notes cannot be overwritten as generated content.",
+      "test": "tests/generate-changelog.test.ts"
+    },
+    {
+      "file": "scripts/release-smoke.ts",
+      "owner": "releaseSmoke",
+      "mutationHash": "f03371a34769379b23325b6cc9043341033a72992709eba13bce6200cb210ce5",
+      "count": 2,
+      "reason": "The invocation-local catch slot preserves the original consumer failure when temporary-directory cleanup also fails.",
+      "test": "tests/packaging-failures.test.ts"
+    },
+    {
+      "file": "scripts/release-smoke.ts",
+      "owner": "releaseSmokeMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "Outer CLI boundary reports failure after isolated consumer cleanup has completed.",
+      "test": "tests/packaging-behavior.test.ts"
+    },
+    {
+      "file": "scripts/verify-published-package.ts",
+      "owner": "verifyPublishedPackage",
+      "mutationHash": "f03371a34769379b23325b6cc9043341033a72992709eba13bce6200cb210ce5",
+      "count": 2,
+      "reason": "The invocation-local catch slot preserves the original registry or installed-consumer failure when temporary-directory cleanup also fails.",
+      "test": "tests/packaging-failures.test.ts"
+    },
+    {
+      "file": "scripts/verify-published-package.ts",
+      "owner": "verifyPublishedPackageMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "Outer CLI boundary reports failure after the isolated published-consumer cleanup finishes.",
+      "test": "tests/packaging-behavior.test.ts"
+    }
+  ]
+}

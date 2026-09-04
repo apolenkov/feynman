@@ -9,31 +9,32 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const LCOV_PATH = path.join(ROOT, 'coverage', 'lcov.info');
 export const MINIMUM_LINE_COVERAGE = 95;
 const PRODUCTION_SOURCE_DIRECTORIES = ['bin', 'hooks', 'lib', 'scripts'] as const;
+const EXECUTABLE_ROOT_SOURCES = ['eslint.config.mjs'] as const;
 
 export interface LineCoverage {
-  hit: number;
-  found: number;
-  percentage: number;
+  readonly hit: number;
+  readonly found: number;
+  readonly percentage: number;
 }
 
 export interface CoverageScope {
-  coverage: LineCoverage;
-  productionFiles: string[];
-  lcovFiles: string[];
-  missingProductionFiles: string[];
-  lcovFilesOutsideProductionInventory: string[];
+  readonly coverage: LineCoverage;
+  readonly coverageFiles: readonly string[];
+  readonly lcovFiles: readonly string[];
+  readonly missingCoverageFiles: readonly string[];
+  readonly lcovFilesOutsideCoverageInventory: readonly string[];
 }
 
 interface LcovRecord {
-  source: string;
-  hit: number;
-  found: number;
+  readonly source: string;
+  readonly hit: number;
+  readonly found: number;
 }
 
 interface OpenLcovRecord {
-  source: string;
-  hit?: number;
-  found?: number;
+  readonly source: string;
+  readonly hit?: number;
+  readonly found?: number;
 }
 
 function malformedLcov(message: string): Error {
@@ -61,10 +62,22 @@ function closeLcovRecord(record: OpenLcovRecord): LcovRecord {
   return { source: record.source, hit: record.hit, found: record.found };
 }
 
-function lcovRecords(lcov: string): LcovRecord[] {
-  const records: LcovRecord[] = [];
-  let record: OpenLcovRecord | undefined;
+function addLcovCount(record: OpenLcovRecord, label: 'LH' | 'LF', value: string): OpenLcovRecord {
+  if (label === 'LH') {
+    if (record.hit !== undefined) {
+      throw malformedLcov(`record for ${record.source} has more than one LH`);
+    }
+    return { ...record, hit: lcovCount(value, label, record.source) };
+  }
+  if (record.found !== undefined) {
+    throw malformedLcov(`record for ${record.source} has more than one LF`);
+  }
+  return { ...record, found: lcovCount(value, label, record.source) };
+}
 
+function* iterateLcovRecords(lcov: string): Generator<LcovRecord> {
+  // A single mutable cursor keeps scanning linear; completed records are yielded once.
+  let record: OpenLcovRecord | undefined;
   for (const [index, line] of lcov.split(/\r?\n/).entries()) {
     const lineNumber = index + 1;
     if (line === '' || line.startsWith('TN:')) continue;
@@ -84,7 +97,7 @@ function lcovRecords(lcov: string): LcovRecord[] {
     if (line === 'end_of_record') {
       if (record === undefined)
         throw malformedLcov(`end_of_record at line ${lineNumber} has no source`);
-      records.push(closeLcovRecord(record));
+      yield closeLcovRecord(record);
       record = undefined;
       continue;
     }
@@ -92,12 +105,8 @@ function lcovRecords(lcov: string): LcovRecord[] {
     if (line.startsWith('LH:') || line.startsWith('LF:')) {
       if (record === undefined)
         throw malformedLcov(`${line.slice(0, 2)} at line ${lineNumber} has no source`);
-      const label = line.slice(0, 2) as 'LH' | 'LF';
-      const property = label === 'LH' ? 'hit' : 'found';
-      if (record[property] !== undefined) {
-        throw malformedLcov(`record for ${record.source} has more than one ${label}`);
-      }
-      record[property] = lcovCount(line.slice(3), label, record.source);
+      const label = line.startsWith('LH:') ? 'LH' : 'LF';
+      record = addLcovCount(record, label, line.slice(3));
       continue;
     }
 
@@ -107,16 +116,17 @@ function lcovRecords(lcov: string): LcovRecord[] {
   if (record !== undefined) {
     throw malformedLcov(`record for ${record.source} is missing end_of_record`);
   }
-  return records;
+}
+
+function lcovRecords(lcov: string): LcovRecord[] {
+  return Array.from(iterateLcovRecords(lcov));
 }
 
 function calculateLineCoverage(records: readonly LcovRecord[]): LineCoverage {
-  let hit = 0;
-  let found = 0;
-  for (const record of records) {
-    hit += record.hit;
-    found += record.found;
-  }
+  const { hit, found } = records.reduce(
+    (totals, record) => ({ hit: totals.hit + record.hit, found: totals.found + record.found }),
+    { hit: 0, found: 0 },
+  );
   if (
     !Number.isSafeInteger(hit) ||
     !Number.isSafeInteger(found) ||
@@ -137,23 +147,27 @@ export function lineCoverage(lcov: string): LineCoverage {
 function collectTypeScriptFiles(directory: string, root: string): string[] {
   if (!fs.existsSync(directory)) return [];
 
-  const files: string[] = [];
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const filePath = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...collectTypeScriptFiles(filePath, root));
-    } else if (entry.isFile() && entry.name.endsWith('.ts')) {
-      files.push(path.relative(root, filePath).split(path.sep).join('/'));
-    }
-  }
-  return files;
+    if (entry.isDirectory()) return collectTypeScriptFiles(filePath, root);
+    if (!entry.isFile() || !entry.name.endsWith('.ts')) return [];
+    return [path.relative(root, filePath).split(path.sep).join('/')];
+  });
 }
 
 /** Enumerate first-party TypeScript sources whose coverage scope is reviewed by this gate. */
 export function productionSourceFiles(root = ROOT): string[] {
   return PRODUCTION_SOURCE_DIRECTORIES.flatMap((directory) =>
     collectTypeScriptFiles(path.join(root, directory), root),
-  ).sort();
+  ).toSorted();
+}
+
+/** Enumerate every executable source that contributes to the published line denominator. */
+export function coverageSourceFiles(root = ROOT): string[] {
+  const rootSources = EXECUTABLE_ROOT_SOURCES.filter((file) =>
+    fs.existsSync(path.join(root, file)),
+  );
+  return [...productionSourceFiles(root), ...rootSources].toSorted();
 }
 
 function repositoryRelativePath(source: string, root: string): string {
@@ -171,24 +185,24 @@ function repositoryRelativePath(source: string, root: string): string {
 }
 
 /**
- * Keep the existing LH/LF gate while reporting exactly which first-party
- * TypeScript sources the LCOV report does and does not enumerate.
+ * Keep the existing LH/LF gate while reporting exactly which executable
+ * sources the LCOV report does and does not enumerate.
  */
 export function coverageScope(lcov: string, root = ROOT): CoverageScope {
   const records = lcovRecords(lcov);
-  const productionFiles = productionSourceFiles(root);
+  const coverageFiles = coverageSourceFiles(root);
   const lcovFiles = [
     ...new Set(records.map((record) => repositoryRelativePath(record.source, root))),
-  ].sort();
+  ].toSorted();
   const lcovFileSet = new Set(lcovFiles);
-  const productionFileSet = new Set(productionFiles);
+  const coverageFileSet = new Set(coverageFiles);
 
   return {
     coverage: calculateLineCoverage(records),
-    productionFiles,
+    coverageFiles,
     lcovFiles,
-    missingProductionFiles: productionFiles.filter((file) => !lcovFileSet.has(file)),
-    lcovFilesOutsideProductionInventory: lcovFiles.filter((file) => !productionFileSet.has(file)),
+    missingCoverageFiles: coverageFiles.filter((file) => !lcovFileSet.has(file)),
+    lcovFilesOutsideCoverageInventory: lcovFiles.filter((file) => !coverageFileSet.has(file)),
   };
 }
 
@@ -201,36 +215,50 @@ export function assertMinimumCoverage(
   }
 }
 
+export function assertCompleteCoverageScope(scope: CoverageScope): void {
+  const failures = [
+    scope.missingCoverageFiles.length === 0
+      ? undefined
+      : `coverage sources absent from LCOV: ${scope.missingCoverageFiles.join(', ')}`,
+    scope.lcovFilesOutsideCoverageInventory.length === 0
+      ? undefined
+      : `LCOV records outside coverage inventory: ${scope.lcovFilesOutsideCoverageInventory.join(', ')}`,
+  ].filter((failure): failure is string => failure !== undefined);
+  if (failures.length > 0) throw new Error(`Incomplete coverage scope: ${failures.join('; ')}`);
+}
+
 function main(): void {
   const scope = coverageScope(fs.readFileSync(LCOV_PATH, 'utf8'));
   const { coverage } = scope;
   console.log(
     `Line coverage: ${coverage.percentage.toFixed(2)}% (${coverage.hit}/${coverage.found})`,
   );
-  console.log(`Production TypeScript inventory (${scope.productionFiles.length}):`);
-  for (const file of scope.productionFiles) console.log(`  - ${file}`);
+  console.log(`Executable coverage inventory (${scope.coverageFiles.length}):`);
+  for (const file of scope.coverageFiles) console.log(`  - ${file}`);
   console.log(`LCOV source records: ${scope.lcovFiles.length}`);
-  if (scope.missingProductionFiles.length === 0) {
-    console.log('Production files absent from LCOV: none');
+  if (scope.missingCoverageFiles.length === 0) {
+    console.log('Coverage sources absent from LCOV: none');
   } else {
-    console.log(`Production files absent from LCOV (${scope.missingProductionFiles.length}):`);
-    for (const file of scope.missingProductionFiles) console.log(`  - ${file}`);
+    console.log(`Coverage sources absent from LCOV (${scope.missingCoverageFiles.length}):`);
+    for (const file of scope.missingCoverageFiles) console.log(`  - ${file}`);
   }
-  if (scope.lcovFilesOutsideProductionInventory.length > 0) {
-    console.log('LCOV records outside the production TypeScript inventory:');
-    for (const file of scope.lcovFilesOutsideProductionInventory) console.log(`  - ${file}`);
+  if (scope.lcovFilesOutsideCoverageInventory.length > 0) {
+    console.log('LCOV records outside the executable coverage inventory:');
+    for (const file of scope.lcovFilesOutsideCoverageInventory) console.log(`  - ${file}`);
   }
+  assertCompleteCoverageScope(scope);
   assertMinimumCoverage(coverage);
   console.log(`PASS: Coverage meets >=${MINIMUM_LINE_COVERAGE}% threshold`);
 }
 
-const invokedPath = process.argv[1] ? fs.realpathSync(process.argv[1]) : '';
+const invokedPath = process.argv[1] === undefined ? '' : fs.realpathSync(process.argv[1]);
 const modulePath = fs.realpathSync(url.fileURLToPath(import.meta.url));
 if (invokedPath === modulePath) {
   try {
     main();
-  } catch (error) {
-    console.error(`FAIL: ${(error as Error).message}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`FAIL: ${message}`);
     process.exit(1);
   }
 }

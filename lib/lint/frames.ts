@@ -48,20 +48,22 @@ const BOT_RE = /^(\s*)└─*┘\s*$/;
  */
 export function nextFrame(lines: readonly string[], startLi: number): FrameInfo | null {
   for (let li = startLi; li < lines.length; li++) {
-    const top = lines[li]!;
-    const topMatch = top.match(TOP_RE);
+    const top = lines[li];
+    if (top === undefined) break;
+    const topMatch = TOP_RE.exec(top);
     if (!topMatch) continue;
 
-    const indent = topMatch[1]!;
+    const indent = topMatch[1] ?? '';
 
     // Search for the matching closer at the same indent.
     let closeLi = -1;
     const inner: string[] = [];
 
     for (let lj = li + 1; lj < lines.length; lj++) {
-      const next = lines[lj]!;
-      const botMatch = next.match(BOT_RE);
-      if (botMatch && botMatch[1] === indent) {
+      const next = lines[lj];
+      if (next === undefined) break;
+      const botMatch = BOT_RE.exec(next);
+      if (botMatch?.[1] === indent) {
         closeLi = lj;
         break;
       }
@@ -78,4 +80,15 @@ export function nextFrame(lines: readonly string[], startLi: number): FrameInfo 
   }
 
   return null;
+}
+
+/** Iterate frames in source order without materializing intermediate slices. */
+export function* iterateFrames(lines: readonly string[]): Generator<FrameInfo, void, unknown> {
+  let cursor = 0;
+  while (cursor < lines.length) {
+    const frame = nextFrame(lines, cursor);
+    if (frame === null) return;
+    yield frame;
+    cursor = frame.closeLi === -1 ? frame.topLi + 1 : frame.closeLi + 1;
+  }
 }

@@ -44,6 +44,15 @@ The script updates `package.json`, `package-lock.json`, and the native Codex
 manifest. A populated `[Unreleased]` section is promoted to the versioned
 section; conventional commits are only a fallback when notes are absent. It
 then runs the full `npm run ci` gate before it can create a commit or tag.
+If preparation fails, it restores the original bytes of all four release files
+and reports any restoration failure. Commit, tag and push happen after this
+reversible preparation phase.
+
+Repeated changelog generation preserves curated versioned notes. Generated
+sections carry a checksum comment and are replaced only while their contents
+remain unchanged. Editing a generated section makes it curated; unmarked older
+sections are also preserved. A current-version heading is never duplicated to
+promote additional `[Unreleased]` notes: those notes remain pending for review.
 
 ## GitHub publication
 

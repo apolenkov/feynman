@@ -10,8 +10,8 @@ const XML_MATCHERS: Readonly<Record<Intensity, RegExp>> = {
 
 /** Return whether named opening and closing intensity tags are balanced. */
 export function assertTagPairs(content: string): boolean {
-  const opens = (content.match(/<intensity\s+name\s*=/gi) || []).length;
-  const closes = (content.match(/<\/intensity>/gi) || []).length;
+  const opens = (content.match(/<intensity\s+name\s*=/gi) ?? []).length;
+  const closes = (content.match(/<\/intensity>/gi) ?? []).length;
   return opens === closes;
 }
 

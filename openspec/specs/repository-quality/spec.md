@@ -4,6 +4,9 @@ This acceptance contract was established before the quality refactor, against
 baseline `3d470161b5709da6cad764b23f9e10ae734b14df`. It includes the user's
 clarifications: prove usefulness and reconsider the delivery form. Research
 sources and applicability decisions belong in `docs/quality-research.md`.
+The 2026-09-05 user-requested implementation re-audit adds the binding
+[S01–S09 strict-code contract](strict-code.md), including exact lint presets,
+immutable command decisions and individually justified local mutation.
 
 ## Requirement: Bounded, evidence-based acceptance
 
@@ -79,9 +82,11 @@ experiment, not a claim of statistically established benefit for all users.
 ## Requirement: Proportionate implementation
 
 The system SHALL remain Codex-only and use TypeScript for first-party code,
-with no runtime npm dependencies. Local mutation inside a bounded algorithm or
-I/O adapter is permitted when it improves clarity and cannot mutate caller-owned
-data. Global mutable defaults and hidden state changes are not permitted.
+with no runtime npm dependencies. Immutable transformations are the default.
+Local algorithm or I/O-buffer mutation requires the named, bounded justification
+and enforcement in `strict-code.md`; this is not permission for mutable command
+mode flags or configuration assembly. Global mutable defaults, caller-owned data
+mutation and hidden state changes are not permitted.
 
 ### Scenario: Scope boundary
 

@@ -3,11 +3,17 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  assertRecord,
+  assertString,
+  assertUnknownArray,
+  parseJsonObject,
+} from './helpers/assertions.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 
 function readJson(rel: string): Record<string, unknown> {
-  return JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8')) as Record<string, unknown>;
+  return parseJsonObject(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 }
 
 describe('package metadata', () => {
@@ -21,7 +27,9 @@ describe('package metadata', () => {
   });
 
   it('publishes only Codex marketplace assets and public documentation', () => {
-    const files = readJson('package.json')['files'] as string[];
+    const files = readJson('package.json')['files'];
+    assertUnknownArray(files);
+    assert.ok(files.every((entry) => typeof entry === 'string'));
     for (const entry of [
       '.agents/',
       'plugins/',
@@ -45,8 +53,11 @@ describe('package metadata', () => {
   });
 
   it('keeps coverage focused on application files', () => {
-    const scripts = readJson('package.json')['scripts'] as Record<string, string>;
-    assert.match(scripts['coverage']!, /--test-coverage-exclude=tests\/\*\*/);
+    const scripts = readJson('package.json')['scripts'];
+    assertRecord(scripts);
+    const coverage = scripts['coverage'];
+    assertString(coverage);
+    assert.match(coverage, /--test-coverage-exclude=tests\/\*\*/);
   });
 
   it('ships a native Codex marketplace plugin without hook declarations', () => {
@@ -80,10 +91,13 @@ describe('package metadata', () => {
       'productivity',
     ]);
 
-    const interfaceMeta = manifest['interface'] as Record<string, unknown>;
+    const interfaceMeta = manifest['interface'];
+    assertRecord(interfaceMeta);
     assert.equal(interfaceMeta['brandColor'], '#2563EB');
     assert.deepEqual(interfaceMeta['capabilities'], ['Interactive']);
-    const prompts = interfaceMeta['defaultPrompt'] as string[];
+    const prompts = interfaceMeta['defaultPrompt'];
+    assertUnknownArray(prompts);
+    assert.ok(prompts.every((prompt) => typeof prompt === 'string'));
     assert.ok(prompts.length > 0 && prompts.length <= 3);
     assert.ok(prompts.every((prompt) => prompt.length <= 128));
 

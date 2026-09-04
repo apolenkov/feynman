@@ -27,7 +27,9 @@ Add `--explain` to annotate each frame with a token-cost breakdown:
 ## L01: Box Closure (severity: error)
 
 **What:** Every `┌` corner must have a matching `└` at the same column position;
-every `┐` must have a matching `┘` at the same column.
+every `┐` must have a matching `┘` at the same display column. Matching uses the
+shared Unicode/ANSI width model. Reported L01 diagnostic columns remain one-based
+UTF-16 source offsets so editor integrations keep their existing coordinates.
 
 **Why:** An unclosed frame box is visually deceptive — it implies containment
 it doesn't deliver, and the unclosed edge is often invisible at a glance.

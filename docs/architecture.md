@@ -83,8 +83,11 @@ Both `lib/state/` and `lib/lint/` are pure core modules. ESLint permits only
 static imports of sibling core modules and rejects runtime imports, outer-layer
 dependencies, package metadata reads, and ambient I/O. Tests exercise the gate
 with prohibited imports and verify that rules and autofix accept frozen inputs.
-Input node fields, frame rows and options are readonly; local algorithm buffers
-remain mutable and never alias caller-owned arrays.
+Input node fields, frame rows and options are readonly. Retained local buffers
+never alias caller-owned arrays and require an exact named permission in
+`tests/fixtures/mutation-policy.json`. The source-wide AST guard rejects changed
+or unused permissions; readonly types, frozen-input tests and review complement
+its syntactic checks. CLI decisions and configuration merges use immutable values.
 
 Autofix shares frame detection with lint, but detection does not authorize
 discarding content. A frame containing non-empty unclassified rows is skipped

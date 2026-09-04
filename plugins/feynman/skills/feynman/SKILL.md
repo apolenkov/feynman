@@ -19,6 +19,11 @@ an illustrative example as the user's actual system. Ask one focused question
 if a missing relationship would change the explanation; otherwise label the
 uncertainty in the answer.
 
+Distinguish a supplied fact from a premise the user asks you to assess. Correct
+a false premise instead of repeating it. When direction is unspecified, use
+an undirected connection or name the relationship in a table; an arrow would
+add a fact. For a shared hub, connect each member directly to that hub.
+
 Choose the smallest form that exposes the useful structure:
 
 - Sequence: a short arrow chain; use branches when the conditions matter.
@@ -38,6 +43,9 @@ when a horizontal one would wrap. Avoid decorative frames and repeated prose.
 Add only the explanation needed to interpret conditions, uncertainty, or the
 decision the visual supports. Before answering, check every edge and table cell
 against the source and verify that the visual preserves the important facts.
+Check the accompanying prose against the same relationships, especially words
+such as "only", "all", "none", and "cannot". If layout obscures an edge, simplify
+the representation before adding explanatory prose.
 
 ## Settings requests
 

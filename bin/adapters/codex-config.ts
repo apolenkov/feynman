@@ -10,7 +10,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function validSettings(value: unknown): value is Record<string, unknown> {
+export type ValidatedHook = Readonly<Record<string, unknown>>;
+export type ValidatedHookGroup = Readonly<
+  Record<string, unknown> & { hooks: readonly ValidatedHook[] }
+>;
+export type ValidatedHookGroups = Readonly<Record<string, readonly ValidatedHookGroup[]>>;
+export type ValidatedCodexConfig = Readonly<
+  Record<string, unknown> & { hooks?: ValidatedHookGroups }
+>;
+
+function validSettings(value: unknown): value is ValidatedCodexConfig {
   if (!isRecord(value)) return false;
   if (!('hooks' in value)) return true;
   if (!isRecord(value['hooks'])) return false;
@@ -27,11 +36,11 @@ function validSettings(value: unknown): value is Record<string, unknown> {
 }
 
 export interface CodexConfig {
-  rootDir: string;
-  settingsPath: string;
-  feynmanDir: string;
-  statePath: string;
-  flagPath: string;
+  readonly rootDir: string;
+  readonly settingsPath: string;
+  readonly feynmanDir: string;
+  readonly statePath: string;
+  readonly flagPath: string;
 }
 
 // Resolve paths using os.homedir() — never tilde literal (bug #8810)
@@ -54,35 +63,74 @@ export function fatal(message: string): never {
 // unparseable" (a trailing comma, a comment, or a truncated write). Returning {}
 // in the latter case would silently DESTROY the user's settings on the next
 // write, so we refuse and exit instead.
-export function readJsonConfig(filePath: string): Record<string, unknown> {
-  let text: string;
-  try {
-    text = fs.readFileSync(filePath, 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {};
-    return fatal(`cannot read ${filePath}: ${(err as Error).message}`);
-  }
-  if (text.trim() === '') return {};
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch (_) {
-    return fatal(
-      `refusing to touch ${filePath}: file exists but is not valid JSON ` +
-        `(trailing comma, comment, or truncated write?). Fix it by hand and re-run.`,
-    );
-  }
-  if (!validSettings(parsed)) {
-    return fatal(`refusing to touch ${filePath}: expected a JSON object with valid hook groups`);
-  }
-  return parsed;
+function errorCode(error: unknown): string | undefined {
+  return error instanceof Error && 'code' in error && typeof error.code === 'string'
+    ? error.code
+    : undefined;
 }
 
-export function readSettings(): Record<string, unknown> {
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+type FileReadResult =
+  | { readonly kind: 'contents'; readonly text: string }
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'error'; readonly message: string };
+
+export type ConfigReadResult =
+  | { readonly kind: 'ok'; readonly config: ValidatedCodexConfig }
+  | { readonly kind: 'error'; readonly message: string };
+
+function readOptionalFile(filePath: string): FileReadResult {
+  try {
+    return { kind: 'contents', text: fs.readFileSync(filePath, 'utf8') };
+  } catch (err) {
+    if (errorCode(err) === 'ENOENT') return { kind: 'absent' };
+    return { kind: 'error', message: `cannot read ${filePath}: ${errorMessage(err)}` };
+  }
+}
+
+function parseJson(text: string): { readonly kind: 'ok'; readonly value: unknown } | null {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return { kind: 'ok', value: parsed };
+  } catch {
+    return null;
+  }
+}
+
+export function inspectJsonConfig(filePath: string): ConfigReadResult {
+  const read = readOptionalFile(filePath);
+  if (read.kind === 'error') return read;
+  if (read.kind === 'absent' || read.text.trim() === '') return { kind: 'ok', config: {} };
+  const parsed = parseJson(read.text);
+  if (parsed === null) {
+    return {
+      kind: 'error',
+      message:
+        `refusing to touch ${filePath}: file exists but is not valid JSON ` +
+        `(trailing comma, comment, or truncated write?). Fix it by hand and re-run.`,
+    };
+  }
+  return validSettings(parsed.value)
+    ? { kind: 'ok', config: parsed.value }
+    : {
+        kind: 'error',
+        message: `refusing to touch ${filePath}: expected a JSON object with valid hook groups`,
+      };
+}
+
+export function readJsonConfig(filePath: string): ValidatedCodexConfig {
+  const result = inspectJsonConfig(filePath);
+  return result.kind === 'ok' ? result.config : fatal(result.message);
+}
+
+export function readSettings(): ValidatedCodexConfig {
   return readJsonConfig(codexConfig().settingsPath);
 }
 
-export function writeSettings(settings: Record<string, unknown>): void {
+export function writeSettings(settings: ValidatedCodexConfig): void {
   const cfg = codexConfig();
   fs.mkdirSync(cfg.rootDir, { recursive: true });
   atomicWrite(cfg.settingsPath, JSON.stringify(settings, null, 2) + '\n');
@@ -110,24 +158,21 @@ export function isSessionStartHookCommand(command: unknown): boolean {
   );
 }
 
-export function hasFeynmanHook(settings: Record<string, unknown>): boolean {
-  const hooks = settings['hooks'] as Record<string, unknown[]> | undefined;
-  return ((hooks?.['SessionStart'] ?? []) as Array<Record<string, unknown>>).some((g) => {
-    const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
-    return hs?.some((h) => isSessionStartHookCommand(h['command']));
-  });
+export function hasFeynmanHook(settings: ValidatedCodexConfig): boolean {
+  return (settings.hooks?.['SessionStart'] ?? []).some((group) =>
+    group.hooks.some((hook) => isSessionStartHookCommand(hook['command'])),
+  );
 }
 
-export function hasAnyFeynmanHook(settings: Record<string, unknown>): boolean {
-  const hooks = settings['hooks'] as Record<string, unknown[]> | undefined;
+export function hasAnyFeynmanHook(settings: ValidatedCodexConfig): boolean {
+  const { hooks } = settings;
   if (!hooks) return false;
   return ['SessionStart', 'UserPromptSubmit', 'Stop'].some((eventName) =>
-    ((hooks[eventName] ?? []) as Array<Record<string, unknown>>).some((g) => {
-      const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
-      return hs?.some(
-        (h) => typeof h['command'] === 'string' && isFeynmanHookCommand(h['command']),
-      );
-    }),
+    (hooks[eventName] ?? []).some((group) =>
+      group.hooks.some(
+        (hook) => typeof hook['command'] === 'string' && isFeynmanHookCommand(hook['command']),
+      ),
+    ),
   );
 }
 
@@ -183,8 +228,8 @@ function literalShellWords(command: string): string[] | null {
 
 export function extractHookScriptPath(command: string, scriptName: string): string | null {
   const words = literalShellWords(command);
-  if (!words) return null;
-  const offset = words[0]?.startsWith('FEYNMAN_HOME=') ? 1 : 0;
+  if (words === null) return null;
+  const offset = words[0]?.startsWith('FEYNMAN_HOME=') === true ? 1 : 0;
   const executable = words[offset];
   const script = words[offset + 1];
   return executable !== undefined &&
@@ -195,35 +240,30 @@ export function extractHookScriptPath(command: string, scriptName: string): stri
     : null;
 }
 
-export function removeFeynmanHooks(settings: Record<string, unknown>): Record<string, unknown> {
-  const hooks = settings['hooks'] as Record<string, unknown[]> | undefined;
-  if (!hooks) return settings;
-  for (const eventName of ['SessionStart', 'UserPromptSubmit', 'Stop']) {
-    if (!Array.isArray(hooks[eventName])) continue;
-    const groups = hooks[eventName] as Array<Record<string, unknown>>;
-    hooks[eventName] = groups
-      .map((g) => {
-        const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
-        if (!Array.isArray(hs)) return g;
-        return {
-          ...g,
-          hooks: hs.filter(
-            (h) => !(typeof h['command'] === 'string' && isFeynmanHookCommand(h['command'])),
-          ),
-        };
-      })
-      .filter((g) => {
-        const hs = g['hooks'] as Array<unknown> | undefined;
-        return !Array.isArray(hs) || hs.length > 0;
-      });
-    if (hooks[eventName].length === 0) {
-      delete hooks[eventName];
-    }
-  }
-  if (Object.keys(hooks).length === 0) {
-    delete settings['hooks'];
-  }
-  return settings;
+const FEYNMAN_HOOK_EVENTS = new Set(['SessionStart', 'UserPromptSubmit', 'Stop']);
+
+function removeFeynmanGroups(groups: readonly ValidatedHookGroup[]): readonly ValidatedHookGroup[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      hooks: group.hooks.filter(
+        (hook) => !(typeof hook['command'] === 'string' && isFeynmanHookCommand(hook['command'])),
+      ),
+    }))
+    .filter((group) => group.hooks.length > 0);
+}
+
+export function removeFeynmanHooks(settings: ValidatedCodexConfig): ValidatedCodexConfig {
+  if (!settings.hooks) return { ...settings };
+  const hooks = Object.fromEntries(
+    Object.entries(settings.hooks).flatMap(([eventName, groups]) => {
+      const nextGroups = FEYNMAN_HOOK_EVENTS.has(eventName) ? removeFeynmanGroups(groups) : groups;
+      return nextGroups.length === 0 ? [] : [[eventName, nextGroups]];
+    }),
+  );
+  return Object.keys(hooks).length === 0
+    ? Object.fromEntries(Object.entries(settings).filter(([key]) => key !== 'hooks'))
+    : { ...settings, hooks };
 }
 
 export function bootstrapState(): void {

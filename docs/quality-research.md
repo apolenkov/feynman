@@ -7,6 +7,11 @@ It is a bounded standards review, not a certification and
 not evidence that the Feynman idea improves answers. Any claim about user value
 requires a live, controlled with/without evaluation.
 
+The user requested a stricter implementation re-audit on 2026-09-05. Its binding
+requirements are in [S01–S09](../openspec/specs/repository-quality/strict-code.md).
+The historical allowance for local mutation below must be read subject to that
+more specific policy; the initial configured lint pass did not establish it.
+
 ## Decision: use a skill-only core, package it as a plugin
 
 OpenAI's current plugin documentation says that a plugin always has a

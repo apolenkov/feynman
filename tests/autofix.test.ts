@@ -17,9 +17,9 @@ import {
   autofixFrameToPlain,
 } from '../lib/lint/autofix.ts';
 import type { FrameNodeFull } from '../lib/lint/autofix.ts';
+import { iterateFrames } from '../lib/lint/frames.ts';
 
-const require = createRequire(import.meta.url);
-const cases = require(path.resolve(import.meta.dirname, 'lint-cases.json')) as Array<{
+interface AutofixCase {
   name: string;
   input: string;
   expected_after_autofix_shape?: {
@@ -29,7 +29,38 @@ const cases = require(path.resolve(import.meta.dirname, 'lint-cases.json')) as A
     aligned_dots?: boolean;
     preserves?: string[];
   };
-}>;
+}
+
+function isAutofixCase(value: unknown): value is AutofixCase {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = Object.fromEntries(Object.entries(value));
+  return typeof record['name'] === 'string' && typeof record['input'] === 'string';
+}
+
+const require = createRequire(import.meta.url);
+const loadedCases: unknown = require(path.resolve(import.meta.dirname, 'lint-cases.json'));
+if (!Array.isArray(loadedCases) || !loadedCases.every(isAutofixCase)) {
+  throw new TypeError('tests/lint-cases.json must contain autofix cases');
+}
+const cases: readonly AutofixCase[] = loadedCases;
+
+function lineAt(lines: readonly string[], index: number): string {
+  const line = lines[index];
+  if (line === undefined) throw new RangeError(`missing line ${index}`);
+  return line;
+}
+
+it('iterates closed and nested unclosed frame openers in source order', () => {
+  const lines = ['┌────┐', '│ ok │', '└────┘', 'text', '┌─ Outer ─┐', '┌─ Inner ─┐'];
+  assert.deepEqual(
+    Array.from(iterateFrames(lines), ({ topLi, closeLi }) => ({ topLi, closeLi })),
+    [
+      { topLi: 0, closeLi: 2 },
+      { topLi: 4, closeLi: -1 },
+      { topLi: 5, closeLi: -1 },
+    ],
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Helpers — build frame node objects matching the autofix.ts contract.
@@ -44,7 +75,7 @@ function frameNode(top: string, inner: string[], bottom: string, indent?: string
     top,
     inner,
     bottom,
-    indent: indent || '',
+    indent: indent ?? '',
   };
 }
 
@@ -64,14 +95,18 @@ describe('autofixFrame — single-frame repair', () => {
     // Top, two inner, bottom — 4 lines.
     assert.equal(lines.length, 4);
     // Top and bottom widths must match.
-    assert.equal(lines[0]!.length, lines[3]!.length);
+    assert.equal(lineAt(lines, 0).length, lineAt(lines, 3).length);
     // Every inner line must end with │ at the same column as ┐ on top.
-    const topBarEnd = Array.from(lines[0]!).length;
+    const topBarEnd = Array.from(lineAt(lines, 0)).length;
     for (let i = 1; i < lines.length - 1; i++) {
-      assert.equal(Array.from(lines[i]!).length, topBarEnd, `inner line ${i} must match top width`);
-      assert.equal(Array.from(lines[i]!).pop(), '│');
+      assert.equal(
+        Array.from(lineAt(lines, i)).length,
+        topBarEnd,
+        `inner line ${i} must match top width`,
+      );
+      assert.equal(Array.from(lineAt(lines, i)).pop(), '│');
     }
-    assert.equal(Array.from(lines[3]!).pop(), '┘');
+    assert.equal(Array.from(lineAt(lines, 3)).pop(), '┘');
   });
 
   it('repairs a frame whose right-edge │ is past the top ┐ column', () => {
@@ -79,7 +114,7 @@ describe('autofixFrame — single-frame repair', () => {
     const node = frameNode('┌─────┐', ['│ a       │', '│ b   │'], '└─────┘');
     const out = autofixFrame(node);
     const lines = out.split('\n');
-    const topBarEnd = Array.from(lines[0]!).length;
+    const topBarEnd = Array.from(lineAt(lines, 0)).length;
     for (const line of lines) {
       assert.equal(Array.from(line).length, topBarEnd);
     }
@@ -87,11 +122,19 @@ describe('autofixFrame — single-frame repair', () => {
 
   it('is idempotent on an already-clean frame', () => {
     const clean = ['┌────────┐', '│ hello  │', '│ world  │', '└────────┘'];
-    const node = frameNode(clean[0]!, [clean[1]!, clean[2]!], clean[3]!);
+    const node = frameNode(
+      lineAt(clean, 0),
+      [lineAt(clean, 1), lineAt(clean, 2)],
+      lineAt(clean, 3),
+    );
     const out = autofixFrame(node);
     assert.equal(out, clean.join('\n'));
     // Apply twice — no further change.
-    const node2 = frameNode(clean[0]!, [clean[1]!, clean[2]!], clean[3]!);
+    const node2 = frameNode(
+      lineAt(clean, 0),
+      [lineAt(clean, 1), lineAt(clean, 2)],
+      lineAt(clean, 3),
+    );
     assert.equal(autofixFrame(node2), out);
   });
 
@@ -107,7 +150,7 @@ describe('autofixFrame — single-frame repair', () => {
     assert.match(out, /├── child/);
     // All lines aligned.
     const lines = out.split('\n');
-    const w = Array.from(lines[0]!).length;
+    const w = Array.from(lineAt(lines, 0)).length;
     for (const line of lines) assert.equal(Array.from(line).length, w);
   });
 
@@ -148,11 +191,11 @@ describe('autofix(text) — full document rewriting', () => {
     assert.match(after, /^prose before$/m);
     assert.match(after, /^prose after$/m);
     // Frame is now well-formed.
-    const frameMatch = after.match(/┌[─]+┐\n(?:│[^\n]*│\n)+└[─]+┘/);
+    const frameMatch = /┌[─]+┐\n(?:│[^\n]*│\n)+└[─]+┘/.exec(after);
     assert.ok(frameMatch, 'frame must be repaired and matchable');
     // Width consistency on the rewritten frame.
     const flines = frameMatch[0].split('\n');
-    const w = Array.from(flines[0]!).length;
+    const w = Array.from(lineAt(flines, 0)).length;
     for (const l of flines) assert.equal(Array.from(l).length, w);
   });
 
@@ -170,10 +213,10 @@ describe('autofix(text) — full document rewriting', () => {
     const out = autofix(text);
     // Two frames — each must be self-consistent.
     const frames = out.match(/┌[─]+┐\n(?:│[^\n]*│\n)+└[─]+┘/g);
-    assert.ok(frames && frames.length === 2, `expected 2 frames, got ${frames?.length ?? 0}`);
+    assert.ok(frames?.length === 2, `expected 2 frames, got ${frames?.length ?? 0}`);
     for (const f of frames) {
       const fl = f.split('\n');
-      const w = Array.from(fl[0]!).length;
+      const w = Array.from(lineAt(fl, 0)).length;
       for (const l of fl) assert.equal(Array.from(l).length, w);
     }
   });
@@ -301,7 +344,7 @@ describe('autofixFrameToDotLeader — L11 conversion', () => {
       assert.match(ln, / \.{3,} /, `row "${ln}" must be dot-leader`);
     }
     // Column alignment: every row has same dot-count
-    const dotCounts = lines.map((ln) => (ln.match(/\.+/) || [''])[0].length);
+    const dotCounts = lines.map((ln) => (/\.+/.exec(ln) ?? [''])[0].length);
     assert.equal(new Set(dotCounts).size, 1, `dot-counts must be equal: ${dotCounts.join(',')}`);
     // Content preserved
     assert.ok(out.includes('ok'));
@@ -323,6 +366,46 @@ describe('autofixFrameToDotLeader — L11 conversion', () => {
     assert.ok(out.includes('← готов'), `expected '← готов' in: ${out}`);
   });
 
+  it('preserves the complete multiword payload after directional status markers', () => {
+    for (const payload of ['✓ built successfully', '← готов к запуску']) {
+      const node = frameNode('┌─ Deploy ─┐', [`│ api ${payload} │`], '└──────────┘');
+      const out = autofixFrameToDotLeader(node);
+      assert.ok(out.includes('Deploy'));
+      assert.ok(out.includes('api'));
+      assert.ok(out.includes(payload), `lost status payload from ${payload}: ${out}`);
+    }
+  });
+
+  it('preserves the title, labels, and statuses during direct conversion', () => {
+    const node = frameNode(
+      '┌─ Production ─┐',
+      ['│ API ... ok   │', '│ Web ... fail │'],
+      '└──────────────┘',
+    );
+    const out = autofixFrameToDotLeader(node);
+    assert.equal(out.split('\n')[0], 'Production');
+    for (const content of ['API', 'ok', 'Web', 'fail']) assert.ok(out.includes(content));
+  });
+
+  it('preserves a title for the one-item L11 conversion and converges', () => {
+    const input = '┌─ Release ─┐\n│ Deploy ... ready │\n└──────────────────┘';
+    const options = { processFenced: true, convertL11: true } as const;
+    const once = autofix(input, options);
+    assert.equal(once.split('\n')[0], 'Release');
+    assert.ok(once.includes('Deploy'));
+    assert.ok(once.includes('ready'));
+    assert.equal(autofix(once, options), once);
+  });
+
+  it('preserves a title through the L15 status fallback to L11', () => {
+    const input = '┌─ Production ─┐\n│ API ... ok   │\n│ Web ... fail │\n└──────────────┘';
+    const options = { processFenced: true, convertL11: true, convertL15: true } as const;
+    const once = autofix(input, options);
+    assert.equal(once.split('\n')[0], 'Production');
+    for (const content of ['API', 'ok', 'Web', 'fail']) assert.ok(once.includes(content));
+    assert.equal(autofix(once, options), once);
+  });
+
   it('non-pattern prose emits bullets', () => {
     const node = {
       kind: 'frame',
@@ -333,8 +416,8 @@ describe('autofixFrameToDotLeader — L11 conversion', () => {
     };
     const out = autofixFrameToDotLeader(node);
     const lines = out.split('\n');
-    assert.match(lines[0]!, /^\s*-\s+/);
-    assert.match(lines[1]!, /^\s*-\s+/);
+    assert.match(lineAt(lines, 0), /^\s*-\s+/);
+    assert.match(lineAt(lines, 1), /^\s*-\s+/);
   });
 
   it('preserves indentation', () => {
@@ -347,8 +430,8 @@ describe('autofixFrameToDotLeader — L11 conversion', () => {
     };
     const out = autofixFrameToDotLeader(node);
     const lines = out.split('\n');
-    assert.ok(lines[0]!.startsWith('    '), 'indentation preserved on row 1');
-    assert.ok(lines[1]!.startsWith('    '), 'indentation preserved on row 2');
+    assert.ok(lineAt(lines, 0).startsWith('    '), 'indentation preserved on row 1');
+    assert.ok(lineAt(lines, 1).startsWith('    '), 'indentation preserved on row 2');
   });
 
   it('idempotency: autofix(autofix(x), CLI opts) is no-op on second pass', () => {
@@ -418,6 +501,13 @@ const fixturesDir = path.resolve(import.meta.dirname, 'fixtures', 'autofix');
 // Pattern D — titled top frame (`┌─ Title ─┐`)
 // ---------------------------------------------------------------------------
 describe('Pattern D — titled top frame', () => {
+  it('preserves compact accepted titles during alignment-only repair', () => {
+    for (const top of ['┌─Deploy┐', '┌─Deploy─┐', '┌── Deploy ──┐']) {
+      const out = autofixFrame(frameNode(top, ['│ api ok │'], '└────────┘'));
+      assert.ok(out.includes('Deploy'), `lost compact title from ${top}: ${out}`);
+      assert.ok(out.includes('api ok'));
+    }
+  });
   it('autofixFrame: preserves title and expands width to widest inner line', () => {
     const node = frameNode(
       '┌─ Status ─┐',
@@ -427,10 +517,10 @@ describe('Pattern D — titled top frame', () => {
     const out = autofixFrame(node);
     const lines = out.split('\n');
     // Title preserved in top bar.
-    assert.match(lines[0]!, /^┌─ Status /);
-    assert.ok(lines[0]!.endsWith('┐'), `top must end with ┐: ${String(lines[0])}`);
+    assert.match(lineAt(lines, 0), /^┌─ Status /);
+    assert.ok(lineAt(lines, 0).endsWith('┐'), `top must end with ┐: ${lineAt(lines, 0)}`);
     // All lines same width.
-    const w = Array.from(lines[0]!).length;
+    const w = Array.from(lineAt(lines, 0)).length;
     for (const l of lines) assert.equal(Array.from(l).length, w, `misaligned: ${l}`);
     // Wider inner content forces expansion.
     assert.ok(w > '┌─ Status ─┐'.length, 'frame must expand to fit content');
@@ -440,8 +530,8 @@ describe('Pattern D — titled top frame', () => {
     const node = frameNode('┌──────────┐', ['│ short  │', '│ wider content │'], '└──────────┘');
     const out = autofixFrame(node);
     const lines = out.split('\n');
-    assert.match(lines[0]!, /^┌─+┐$/);
-    const w = Array.from(lines[0]!).length;
+    assert.match(lineAt(lines, 0), /^┌─+┐$/);
+    const w = Array.from(lineAt(lines, 0)).length;
     for (const l of lines) assert.equal(Array.from(l).length, w);
   });
 
@@ -455,9 +545,9 @@ describe('Pattern D — titled top frame', () => {
     const once = autofixFrame(node);
     const onceLines = once.split('\n');
     const node2 = frameNode(
-      onceLines[0]!,
+      lineAt(onceLines, 0),
       onceLines.slice(1, -1),
-      onceLines[onceLines.length - 1]!,
+      lineAt(onceLines, onceLines.length - 1),
     );
     const twice = autofixFrame(node2);
     assert.equal(twice, once, 'titled frame fix must be idempotent');
@@ -501,7 +591,7 @@ describe('Pattern D — titled top frame', () => {
     assert.match(out, /^prose after$/m);
     // All frame lines same width.
     const frameLines = out.split('\n').filter((l) => /[┌│└]/.test(l));
-    const w = Array.from(frameLines[0]!).length;
+    const w = Array.from(lineAt(frameLines, 0)).length;
     for (const l of frameLines)
       assert.equal(Array.from(l).length, w, `misaligned frame line: ${l}`);
   });
@@ -670,9 +760,10 @@ describe('autofix end-to-end via lint-cases.json fixtures (shape-based)', () => 
     it(`autofix shape matches: ${fx.name}`, () => {
       // CLI-context autofix: process fenced + convert L11.
       const out = autofix(fx.input, { processFenced: true, convertL11: true });
-      const shape = fx.expected_after_autofix_shape!;
+      const shape = fx.expected_after_autofix_shape;
+      if (shape === undefined) throw new TypeError(`missing autofix shape for ${fx.name}`);
 
-      if (shape.no_frame_chars) {
+      if (shape.no_frame_chars === true) {
         // The fence ``` lines may remain in output — that's fine. Only frame
         // corners + outer pipes must be gone from any non-fence line.
         const nonFence = out
@@ -704,8 +795,8 @@ describe('autofix end-to-end via lint-cases.json fixtures (shape-based)', () => 
         for (const ln of body) {
           assert.match(ln, / \.{3,} /, `row "${ln}" must be dot-leader shape in "${fx.name}"`);
         }
-        if (shape.aligned_dots) {
-          const dotCounts = body.map((ln: string) => (ln.match(/\.+/) || [''])[0].length);
+        if (shape.aligned_dots === true) {
+          const dotCounts = body.map((ln: string) => (/\.+/.exec(ln) ?? [''])[0].length);
           assert.equal(
             new Set(dotCounts).size,
             1,
@@ -720,7 +811,7 @@ describe('autofix end-to-end via lint-cases.json fixtures (shape-based)', () => 
         assert.equal(out, fx.input, `no_change mode: output must equal input for "${fx.name}"`);
       }
 
-      for (const token of shape.preserves || []) {
+      for (const token of shape.preserves ?? []) {
         assert.ok(
           out.includes(token),
           `expected to preserve "${token}" in output of "${fx.name}":\n${out}`,
@@ -795,6 +886,51 @@ describe('feynman-lint --fix CLI for L11 dot-leader conversion', () => {
       try {
         fs.unlinkSync(tmp);
       } catch (_) {}
+    }
+  });
+
+  it('--fix preserves a titled status frame in place', () => {
+    const tmp = path.join(os.tmpdir(), `feynman-l11-title-${process.pid}.md`);
+    const input =
+      '# Report\n\n```\n┌─ Production ─┐\n│ API ... ok   │\n│ Web ... fail │\n└──────────────┘\n```\n';
+    fs.writeFileSync(tmp, input);
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [path.resolve(import.meta.dirname, '..', 'bin', 'feynman-lint.ts'), '--fix', tmp],
+        { encoding: 'utf8' },
+      );
+      assert.equal(result.status, 0, result.stderr);
+      const after = fs.readFileSync(tmp, 'utf8');
+      for (const content of ['Production', 'API', 'ok', 'Web', 'fail'])
+        assert.ok(after.includes(content), `lost ${content}: ${after}`);
+      assert.doesNotMatch(after, /┌─ Production/);
+    } finally {
+      fs.rmSync(tmp, { force: true });
+    }
+  });
+
+  it('--fix preserves compact title and complete multiword status payloads', () => {
+    const tmp = path.join(os.tmpdir(), `feynman-l11-payload-${process.pid}.md`);
+    const input =
+      '# Report\n\n```\n┌─Deploy┐\n│ api ✓ built successfully │\n│ web ← готов к запуску │\n└────────┘\n```\n';
+    fs.writeFileSync(tmp, input);
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [path.resolve(import.meta.dirname, '..', 'bin', 'feynman-lint.ts'), '--fix', tmp],
+        { encoding: 'utf8' },
+      );
+      assert.equal(result.status, 0, result.stderr);
+      const after = fs.readFileSync(tmp, 'utf8');
+      for (const content of ['Deploy', 'api', '✓ built successfully', 'web', '← готов к запуску'])
+        assert.ok(after.includes(content), `lost ${content}: ${after}`);
+      assert.equal(
+        autofix(after, { processFenced: true, convertL11: true, convertL15: true }),
+        after,
+      );
+    } finally {
+      fs.rmSync(tmp, { force: true });
     }
   });
 });
