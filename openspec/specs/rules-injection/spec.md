@@ -48,17 +48,18 @@ injecting rules. If the flag file does not exist and `state.json` exists with `e
 - **WHEN** the flag file already exists
 - **THEN** the hook skips first-activation bootstrap and proceeds to read state.json
 
-### Requirement: SessionStart removes the flag file when disabled or state is corrupt
+### Requirement: SessionStart removes the flag file when disabled and backs up corrupt state
 
-The SessionStart hook SHALL delete the flag file at `$CLIENT_HOME/.feynman-active` when `state.json`
-fails to parse, and when `state.json` has `enabled: false`. This keeps the flag absent while feynman
+The SessionStart hook SHALL delete the flag file at `$CLIENT_HOME/.feynman-active`
+when `state.json` has `enabled: false`. This keeps the flag absent while feynman
 is disabled, so the next run re-evaluates activation from a clean state. The deletion SHALL be
 best-effort and tolerate a missing flag file.
 
-#### Scenario: Corrupt state removes the flag
+#### Scenario: Corrupt state is backed up before recovery
 
 - **WHEN** the SessionStart hook reads a `state.json` that is not valid JSON
-- **THEN** the hook removes the flag file (if present) and exits 0 without injecting
+- **THEN** the hook preserves the original bytes in `state.json.bak`, restores default state and injects the full block
+- **AND** if the backup fails, it leaves the original state intact and injects nothing
 
 #### Scenario: Disabled state removes the flag
 
@@ -68,14 +69,15 @@ best-effort and tolerate a missing flag file.
 ### Requirement: state.json is read to obtain the enabled flag and Intensity
 
 The hook SHALL read `state.json` from `$CLIENT_HOME/.feynman/state.json` to determine the `enabled`
-flag and the `intensity` field. If `state.json` is missing or unparseable, the hook SHALL exit 0
-and inject nothing (fail-safe). If `enabled` is `false`, the hook SHALL exit 0 and inject nothing.
+flag and the `intensity` field. Missing state SHALL be bootstrapped; unparseable state SHALL
+be backed up before recovery, as established by ADR-0005. Failed recovery SHALL exit 0
+and inject nothing. If `enabled` is `false`, the hook SHALL exit 0 and inject nothing.
 An unknown or absent `intensity` value SHALL be treated as `full`.
 
 #### Scenario: Corrupt state.json
 
 - **WHEN** `state.json` exists but is not valid JSON
-- **THEN** the hook exits 0 and injects nothing
+- **THEN** the hook backs up the corrupt bytes, restores defaults and injects the full block
 
 #### Scenario: Disabled in state.json
 

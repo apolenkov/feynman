@@ -21,7 +21,9 @@ function makeTempHome(): string {
 }
 
 function rmrf(dir: string): void {
-  try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch (_) {}
 }
 
 function codexAppServerAvailable(): boolean {
@@ -47,7 +49,9 @@ async function codexAppServerReachable(timeoutMs = 800): Promise<boolean> {
     await Promise.race([
       client.initialize(),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('probe timeout')), timeoutMs)
+        setTimeout(() => {
+          reject(new Error('probe timeout'));
+        }, timeoutMs),
       ),
     ]);
     return true;
@@ -59,7 +63,10 @@ async function codexAppServerReachable(timeoutMs = 800): Promise<boolean> {
   }
 }
 
-function runFeynman(tmpHome: string, args: string[]): { status: number; stdout: string; stderr: string } {
+function runFeynman(
+  tmpHome: string,
+  args: string[],
+): { status: number; stdout: string; stderr: string } {
   const result = spawnSync(process.execPath, [FEYNMAN_JS, ...args], {
     cwd: REPO_DIR,
     encoding: 'utf8',
@@ -88,7 +95,7 @@ function writeCodexConfig(codexHome: string): void {
       '[features]',
       'hooks = true',
       '',
-    ].join('\n')
+    ].join('\n'),
   );
 }
 
@@ -136,14 +143,18 @@ class CodexAppServerClient {
         OPENAI_API_KEY: 'feynman-test-key',
       },
       stdio: ['pipe', 'pipe', 'pipe'],
-    }) as ChildProcessWithoutNullStreams;
+    });
 
-    this.child.stdout.on('data', (chunk: Buffer) => this.onStdout(chunk));
+    this.child.stdout.on('data', (chunk: Buffer) => {
+      this.onStdout(chunk);
+    });
     this.child.stderr.on('data', (chunk: Buffer) => {
       this.stderr += chunk.toString();
     });
     this.child.on('exit', (code: number | null, signal: string | null) => {
-      const error = new Error(`codex app-server exited: code=${code} signal=${signal}\n${this.stderr}`);
+      const error = new Error(
+        `codex app-server exited: code=${String(code)} signal=${String(signal)}\n${this.stderr}`,
+      );
       for (const waiter of this.pendingResponses.values()) {
         waiter.reject(error);
       }
@@ -162,7 +173,13 @@ class CodexAppServerClient {
       const line = this.buffer.slice(0, newlineIndex);
       this.buffer = this.buffer.slice(newlineIndex + 1);
       if (!line.trim()) continue;
-      const message = JSON.parse(line) as { id?: number; error?: unknown; result?: unknown; method?: string; params?: unknown };
+      const message = JSON.parse(line) as {
+        id?: number;
+        error?: unknown;
+        result?: unknown;
+        method?: string;
+        params?: unknown;
+      };
       if (message.id && this.pendingResponses.has(message.id)) {
         const waiter = this.pendingResponses.get(message.id)!;
         this.pendingResponses.delete(message.id);
@@ -213,7 +230,11 @@ class CodexAppServerClient {
     });
   }
 
-  waitForNotification(method: string, predicate: (params: unknown) => boolean, timeoutMs = 5000): Promise<unknown> {
+  waitForNotification(
+    method: string,
+    predicate: (params: unknown) => boolean,
+    timeoutMs = 5000,
+  ): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const waiter: NotificationWaiter = {
         method,
@@ -243,8 +264,12 @@ class CodexAppServerClient {
   }
 }
 
-async function trustCodexHooks(client: CodexAppServerClient): Promise<{ command: string; trustStatus: string; eventName: string }> {
-  const initial = await client.request('hooks/list', { cwd: REPO_DIR }) as { data: { hooks: { key: string; currentHash: string }[] }[] };
+async function trustCodexHooks(
+  client: CodexAppServerClient,
+): Promise<{ command: string; trustStatus: string; eventName: string }> {
+  const initial = (await client.request('hooks/list', { cwd: REPO_DIR })) as {
+    data: { hooks: { key: string; currentHash: string }[] }[];
+  };
   const hooks = initial.data.flatMap((entry) => entry.hooks);
   assert.ok(hooks.length >= 1, 'expected at least one Feynman hook (SessionStart)');
 
@@ -254,15 +279,19 @@ async function trustCodexHooks(client: CodexAppServerClient): Promise<{ command:
   }
 
   await client.request('config/batchWrite', {
-    edits: [{
-      keyPath: 'hooks.state',
-      value: trustState,
-      mergeStrategy: 'upsert',
-    }],
+    edits: [
+      {
+        keyPath: 'hooks.state',
+        value: trustState,
+        mergeStrategy: 'upsert',
+      },
+    ],
     reloadUserConfig: true,
   });
 
-  const verified = await client.request('hooks/list', { cwd: REPO_DIR }) as { data: { hooks: { command: string; trustStatus: string; eventName: string }[] }[] };
+  const verified = (await client.request('hooks/list', { cwd: REPO_DIR })) as {
+    data: { hooks: { command: string; trustStatus: string; eventName: string }[] }[];
+  };
   const trustedHooks = verified.data.flatMap((entry) => entry.hooks);
   const sessionHook = trustedHooks.find((hook) => hook.eventName === 'sessionStart');
   assert.ok(sessionHook, 'SessionStart hook should be listed');
@@ -271,63 +300,117 @@ async function trustCodexHooks(client: CodexAppServerClient): Promise<{ command:
 }
 
 describe('Codex app-server hook visibility contract', () => {
-  it(
-    'exposes Feynman SessionStart output as hook context entries',
-    async (t) => {
-      if (!(await codexAppServerReachable())) {
-        t.skip('codex app-server did not respond within probe timeout — server unavailable');
-        return;
-      }
-      const tmpHome = makeTempHome();
-      const codexHome = path.join(tmpHome, '.codex');
-      const client = new CodexAppServerClient(tmpHome);
-      try {
-        const install = runFeynman(tmpHome, ['install', '--force']);
-        assert.equal(install.status, 0, `install failed: ${install.stderr}`);
-        writeCodexConfig(codexHome);
-
-        client.start();
-        await client.initialize();
-        const sessionHook = await trustCodexHooks(client);
-        assert.match(sessionHook.command, /feynman-session-start\.ts/);
-
-        const hookCompleted = client.waitForNotification(
-          'hook/completed',
-          (params) => (params as { run?: { eventName: string } }).run?.eventName === 'sessionStart'
-        );
-
-        const started = await client.request('thread/start', {
-          cwd: REPO_DIR,
-          ephemeral: true,
-          model: TEST_MODEL,
-          approvalPolicy: 'never',
-          sandbox: 'danger-full-access',
-        });
-        const threadId = (started as { thread: { id: string } }).thread.id;
-        await client.request('turn/start', {
-          threadId,
-          input: [{ type: 'text', text: 'feynman hook probe' }],
-        });
-
-        const completed = await hookCompleted as {
-          run: {
-            status: string;
-            handlerType: string;
-            entries: { kind: string; text: string }[];
-          }
-        };
-        assert.equal(completed.run.status, 'completed');
-        assert.equal(completed.run.handlerType, 'command');
-        assert.ok(
-          completed.run.entries.some((entry) =>
-            entry.kind === 'context' && /<triggers>|<contract>|→|├──/.test(entry.text)
-          ),
-          'Codex should expose Feynman rule-file diagram tokens in SessionStart hook/completed entries'
-        );
-      } finally {
-        client.close();
-        rmrf(tmpHome);
-      }
+  it('installs the native marketplace plugin and discovers its skill without CLI bootstrap', async (t) => {
+    if (!(await codexAppServerReachable())) {
+      t.skip('codex app-server unavailable; native discovery is unverified');
+      return;
     }
-  );
+    const tmpHome = makeTempHome();
+    const codexHome = path.join(tmpHome, '.codex');
+    const client = new CodexAppServerClient(tmpHome);
+    try {
+      for (const args of [
+        ['plugin', 'marketplace', 'add', REPO_DIR, '--json'],
+        ['plugin', 'add', 'feynman@feynman', '--json'],
+      ]) {
+        const installed = spawnSync('codex', args, {
+          cwd: tmpHome,
+          encoding: 'utf8',
+          env: { PATH: process.env['PATH'], HOME: tmpHome, CODEX_HOME: codexHome, NO_COLOR: '1' },
+          timeout: 15_000,
+        });
+        assert.equal(installed.status, 0, installed.stderr);
+      }
+      client.start();
+      await client.initialize();
+      const result = await client.request('skills/list', { cwds: [tmpHome], forceReload: true });
+      assert.ok(typeof result === 'object' && result !== null && 'data' in result);
+      assert.ok(Array.isArray(result.data));
+      const entries = result.data as Array<{
+        skills: Array<{ name: string; path: string; enabled: boolean; pluginId: string | null }>;
+        errors: unknown[];
+      }>;
+      for (const entry of entries) assert.deepEqual(entry.errors, []);
+      const skill = entries
+        .flatMap((entry) => entry.skills)
+        .find((entry) => entry.pluginId === 'feynman@feynman');
+      assert.ok(skill, 'installed plugin must be discoverable');
+      assert.equal(skill.name, 'feynman:feynman');
+      assert.equal(skill.enabled, true);
+      assert.ok(skill.path.startsWith(fs.realpathSync(codexHome) + path.sep));
+      assert.equal(
+        fs.readFileSync(skill.path, 'utf8'),
+        fs.readFileSync(path.join(REPO_DIR, 'plugins/feynman/skills/feynman/SKILL.md'), 'utf8'),
+      );
+      assert.equal(
+        fs.readFileSync(path.join(path.dirname(skill.path), 'references/settings.md'), 'utf8'),
+        fs.readFileSync(
+          path.join(REPO_DIR, 'plugins/feynman/skills/feynman/references/settings.md'),
+          'utf8',
+        ),
+      );
+      assert.equal(fs.existsSync(path.join(codexHome, '.feynman')), false);
+      assert.equal(fs.existsSync(path.join(codexHome, 'hooks.json')), false);
+    } finally {
+      client.close();
+      rmrf(tmpHome);
+    }
+  });
+
+  it('exposes Feynman SessionStart output as hook context entries', async (t) => {
+    if (!(await codexAppServerReachable())) {
+      t.skip('codex app-server did not respond within probe timeout — server unavailable');
+      return;
+    }
+    const tmpHome = makeTempHome();
+    const codexHome = path.join(tmpHome, '.codex');
+    const client = new CodexAppServerClient(tmpHome);
+    try {
+      const install = runFeynman(tmpHome, ['install', '--force']);
+      assert.equal(install.status, 0, `install failed: ${install.stderr}`);
+      writeCodexConfig(codexHome);
+
+      client.start();
+      await client.initialize();
+      const sessionHook = await trustCodexHooks(client);
+      assert.match(sessionHook.command, /feynman-session-start\.ts/);
+
+      const hookCompleted = client.waitForNotification(
+        'hook/completed',
+        (params) => (params as { run?: { eventName: string } }).run?.eventName === 'sessionStart',
+      );
+
+      const started = await client.request('thread/start', {
+        cwd: REPO_DIR,
+        ephemeral: true,
+        model: TEST_MODEL,
+        approvalPolicy: 'never',
+        sandbox: 'danger-full-access',
+      });
+      const threadId = (started as { thread: { id: string } }).thread.id;
+      await client.request('turn/start', {
+        threadId,
+        input: [{ type: 'text', text: 'feynman hook probe' }],
+      });
+
+      const completed = (await hookCompleted) as {
+        run: {
+          status: string;
+          handlerType: string;
+          entries: { kind: string; text: string }[];
+        };
+      };
+      assert.equal(completed.run.status, 'completed');
+      assert.equal(completed.run.handlerType, 'command');
+      assert.ok(
+        completed.run.entries.some(
+          (entry) => entry.kind === 'context' && /<triggers>|<contract>|→|├──/.test(entry.text),
+        ),
+        'Codex should expose Feynman rule-file diagram tokens in SessionStart hook/completed entries',
+      );
+    } finally {
+      client.close();
+      rmrf(tmpHome);
+    }
+  });
 });

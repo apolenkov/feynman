@@ -33,6 +33,12 @@ The `install` command SHALL register an idempotent `SessionStart` hook in
 - **WHEN** `feynman install` runs with an existing feynman registration
 - **THEN** the hook is not duplicated and the command exits successfully
 
+#### Scenario: literal filesystem paths
+
+- **WHEN** the package or user home path contains spaces, quotes or dollar signs
+- **THEN** the generated command invokes that literal path without shell expansion
+- **AND** repeated install and uninstall still identify that command correctly
+
 ### Requirement: install reflects enabled state
 
 The CLI SHALL create `~/.codex/.feynman-active` when state is enabled and SHALL
@@ -94,6 +100,23 @@ flag, preserve `state.json`, and leave unrelated Codex hooks unchanged.
 - **WHEN** `feynman uninstall` runs without a feynman registration
 - **THEN** it exits 0 and reports that nothing was found
 
+#### Scenario: unrelated script with a similar name
+
+- **WHEN** another hook invokes `not-feynman-session-start.js` or only mentions Feynman in a message
+- **THEN** install adds its own hook and uninstall leaves that unrelated entry intact
+
+#### Scenario: invalid configuration shape
+
+- **WHEN** `hooks.json` is a JSON array, scalar, or contains malformed hook groups
+- **THEN** installation fails without rewriting the existing bytes
+
+### Requirement: failed writes preserve user files
+
+Settings and state SHALL be written through a staged file and atomic rename.
+A write, flush or rename failure SHALL leave the previous destination intact.
+Corrupt state SHALL be backed up before replacement; backup failure SHALL stop
+recovery without overwriting the original bytes.
+
 ### Requirement: state is managed through one Codex CLI surface
 
 The CLI SHALL show and change local Feynman state through `feynman state` and
@@ -110,6 +133,28 @@ consistent without requiring a user or skill to edit either file directly.
 
 - **WHEN** `feynman state off` runs
 - **THEN** `state.json` has `enabled: false` and `.feynman-active` is absent
+
+#### Scenario: late hook bookkeeping
+
+- **WHEN** a SessionStart injection began before a preference change completed
+- **THEN** its counter update does not rewrite or revert those preferences
+- **AND** the CLI continues exposing the advisory counter through the state store
+
+### Requirement: bootstrap exports an operable local bundle safely
+
+Bootstrap SHALL include the CLI, hook and their core dependencies. Forceful
+replacement SHALL require existing Feynman ownership metadata and SHALL reject
+symlinked destinations and ancestors of the current worktree, home or runtime.
+
+#### Scenario: unowned output
+
+- **WHEN** `bootstrap --force` targets an unrelated existing directory
+- **THEN** it fails without deleting its files
+
+#### Scenario: exported runtime
+
+- **WHEN** bootstrap exports to a new directory
+- **THEN** its CLI and linter run without importing the original repository
 
 ### Requirement: the published package has no runtime dependencies
 
@@ -129,6 +174,18 @@ manifest, and `SKILL.md`. Its name, description, and keywords SHALL describe
 visual architecture and ASCII diagram use cases. The skill SHALL invoke the
 published CLI through `npx` for a state operation and SHALL not require an MCP
 server or a globally installed binary.
+
+#### Scenario: visual explanation without CLI installation
+
+- **WHEN** the user asks the installed native skill to explain a structure
+- **THEN** its packaged instructions describe visual selection and fact preservation
+- **AND** the explanation requires no CLI invocation, network access, or local state read/write
+
+#### Scenario: settings are explicitly requested
+
+- **WHEN** the user asks to inspect or change Feynman settings
+- **THEN** the skill uses the documented CLI state operation
+- **AND** it does not apply this operation to an ordinary explanation request
 
 #### Scenario: plugin search and invocation
 

@@ -8,23 +8,55 @@
 // Box-drawing: ┌┐└┘─│├┤┬┴┼ Tree: ├── └── Arrows: →←↑↓▲▼
 // Also count: + - | < > brackets used in ASCII art context
 const DIAGRAM_CHARS = new Set([
-  '┌', '┐', '└', '┘', '─', '│', '├', '┤', '┬', '┴', '┼',
-  '→', '←', '↑', '↓', '▲', '▼',
-  '+', '-', '|'
+  '┌',
+  '┐',
+  '└',
+  '┘',
+  '─',
+  '│',
+  '├',
+  '┤',
+  '┬',
+  '┴',
+  '┼',
+  '→',
+  '←',
+  '↑',
+  '↓',
+  '▲',
+  '▼',
+  '+',
+  '-',
+  '|',
 ]);
 
 // Box-drawing Unicode specifically (high-confidence indicators)
 const BOX_DRAWING_CHARS = new Set([
-  '┌', '┐', '└', '┘', '─', '│', '├', '┤', '┬', '┴', '┼',
-  '→', '←', '↑', '↓', '▲', '▼'
+  '┌',
+  '┐',
+  '└',
+  '┘',
+  '─',
+  '│',
+  '├',
+  '┤',
+  '┬',
+  '┴',
+  '┼',
+  '→',
+  '←',
+  '↑',
+  '↓',
+  '▲',
+  '▼',
 ]);
 
 export interface DiagramNode {
-  type: 'diagram';
-  content: string;
-  startLine: number;
-  endLine: number;
-  indent: number;
+  readonly type: 'diagram';
+  readonly content: string;
+  readonly startLine: number;
+  readonly endLine: number;
+  readonly indent: number;
 }
 
 interface DiagramCharStats {
@@ -69,13 +101,13 @@ function looksLikeDiagram(lines: string[]): boolean {
   // If any line looks like natural prose (has word chars AND box chars but ratio is low)
   // then exclude it from standalone detection.
   // Prose check: line has alphabetic words AND box chars but < 20% diagram chars overall
-  const isProse = lines.every(line => {
+  const isProse = lines.every((line) => {
     const trimmed = line.trim();
     if (!trimmed) return true;
     // If the line has natural language (multiple word chars) and any box chars
     // but the box chars are embedded in prose (not structural)
     const wordChars = (trimmed.match(/[a-zA-Z]/g) || []).length;
-    const boxChars = [...trimmed].filter(ch => BOX_DRAWING_CHARS.has(ch)).length;
+    const boxChars = Array.from(trimmed).filter((ch) => BOX_DRAWING_CHARS.has(ch)).length;
     // Prose: more letters than box chars by a significant margin
     if (wordChars > 5 && boxChars > 0 && wordChars > boxChars * 3) return true;
     return !trimmed; // blank lines are neutral
@@ -83,7 +115,7 @@ function looksLikeDiagram(lines: string[]): boolean {
 
   // For standalone blocks (not fenced), require structural indicators
   // Box-drawing Unicode dominant (≥40% of non-space chars are box-drawing)
-  const boxDrawingCount = [...text].filter(ch => BOX_DRAWING_CHARS.has(ch)).length;
+  const boxDrawingCount = Array.from(text).filter((ch) => BOX_DRAWING_CHARS.has(ch)).length;
   const boxRatio = nonSpaceCount > 0 ? boxDrawingCount / nonSpaceCount : 0;
 
   if (hasBoxDrawing && boxRatio >= 0.15 && !isProse) return true;
@@ -99,7 +131,7 @@ function looksLikeDiagram(lines: string[]): boolean {
   if (/^[\s]*[▲▼]/m.test(text)) return true;
 
   // Table: multiple lines starting with |
-  const tableRows = lines.filter(l => /^\s*\|.*\|/.test(l));
+  const tableRows = lines.filter((l) => /^\s*\|.*\|/.test(l));
   if (tableRows.length >= 2) return true;
 
   return false;
@@ -169,7 +201,7 @@ export function parse(markdown: string): DiagramNode[] {
       // Check if it looks like a diagram
       // Fenced blocks: also accept multiple [Box] tokens (even without arrows)
       // since those are clearly intended as flow diagrams (L05 will catch missing arrows)
-      const hasFencedBoxPattern = blockLines.some(line => {
+      const hasFencedBoxPattern = blockLines.some((line) => {
         const boxes = [...line.matchAll(/\[[^\]]+\]/g)];
         return boxes.length >= 2;
       });
@@ -179,7 +211,7 @@ export function parse(markdown: string): DiagramNode[] {
           content: blockLines.join('\n'),
           startLine,
           endLine,
-          indent
+          indent,
         });
       }
       continue;
@@ -199,7 +231,8 @@ export function parse(markdown: string): DiagramNode[] {
         const nextTrimmed = nextLine.trim();
 
         // Stop at blank lines, headings, or fences
-        if (nextTrimmed === '' || nextTrimmed.startsWith('#') || nextTrimmed.startsWith('```')) break;
+        if (nextTrimmed === '' || nextTrimmed.startsWith('#') || nextTrimmed.startsWith('```'))
+          break;
         blockLines.push(nextLine);
         j++;
       }
@@ -211,12 +244,12 @@ export function parse(markdown: string): DiagramNode[] {
       // Multiple [Box] tokens on one line without natural language between them
       // (even without arrows — L05 will catch missing arrows)
       // "Natural language between" means: word chars NOT in brackets between the boxes
-      const hasMultiBox = blockLines.some(l => {
+      const hasMultiBox = blockLines.some((l) => {
         const matches = [...l.matchAll(/\[[^\]]+\]/g)];
         if (matches.length < 2) return false;
         // Check what's between the first and last box
-        const firstEnd = matches[0]!.index! + matches[0]![0]!.length;
-        const lastStart = matches[matches.length - 1]!.index!;
+        const firstEnd = matches[0]!.index + matches[0]![0].length;
+        const lastStart = matches[matches.length - 1]!.index;
         const between = l.slice(firstEnd, lastStart);
         // If "between" contains regular English words (sequences of alpha), it's prose
         // Allow: spaces, arrows, punctuation, special chars
@@ -225,17 +258,21 @@ export function parse(markdown: string): DiagramNode[] {
       });
       const hasTree = /[├└]──/.test(text);
       const hasPriority = /^[\s]*[▲▼]/m.test(text);
-      const hasTable = blockLines.filter(l => /^\s*\|.*\|/.test(l)).length >= 2;
+      const hasTable = blockLines.filter((l) => /^\s*\|.*\|/.test(l)).length >= 2;
 
-      const isDiagram = hasBoxDrawing || hasBoxToken || hasMultiBox || hasTree || hasPriority || hasTable;
+      const isDiagram =
+        hasBoxDrawing || hasBoxToken || hasMultiBox || hasTree || hasPriority || hasTable;
 
-      if (isDiagram && (looksLikeDiagram(blockLines) || hasMultiBox || hasTree || hasPriority || hasTable)) {
+      if (
+        isDiagram &&
+        (looksLikeDiagram(blockLines) || hasMultiBox || hasTree || hasPriority || hasTable)
+      ) {
         nodes.push({
           type: 'diagram',
           content: text,
           startLine,
           endLine: j, // 1-based (last line index + 1)
-          indent
+          indent,
         });
         i = j;
         continue;

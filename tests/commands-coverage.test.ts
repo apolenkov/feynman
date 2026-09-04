@@ -1,8 +1,9 @@
-import { describe, it } from 'node:test';
+import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { cmdExamples } from '../bin/commands/examples.ts';
 import { cmdBootstrap } from '../bin/commands/bootstrap.ts';
 import { cmdLint } from '../bin/commands/lint.ts';
@@ -11,27 +12,36 @@ import { main as lintMain } from '../bin/feynman-lint.ts';
 
 class ExitSignal extends Error {
   readonly code: number;
-  constructor(code: number) { super(`exit ${code}`); this.code = code; }
+  constructor(code: number) {
+    super(`exit ${code}`);
+    this.code = code;
+  }
 }
 
-function invoke(fn: (args: string[]) => void, args: string[]): { code: number; out: string; err: string } {
+function invoke(
+  fn: (args: string[]) => void,
+  args: string[],
+): { code: number; out: string; err: string } {
   const output: string[] = [];
   const errors: string[] = [];
-  const oldExit = process.exit;
-  const oldLog = console.log;
-  const oldError = console.error;
-  process.exit = ((code?: number) => { throw new ExitSignal(code ?? 0); }) as typeof process.exit;
-  console.log = (...values: unknown[]) => output.push(values.join(' '));
-  console.error = (...values: unknown[]) => errors.push(values.join(' '));
+  const exitMock = mock.method(process, 'exit', (code?: number) => {
+    throw new ExitSignal(code ?? 0);
+  });
+  const logMock = mock.method(console, 'log', (...values: unknown[]) =>
+    output.push(values.join(' ')),
+  );
+  const errorMock = mock.method(console, 'error', (...values: unknown[]) =>
+    errors.push(values.join(' ')),
+  );
   try {
     fn(args);
   } catch (error) {
     if (!(error instanceof ExitSignal)) throw error;
     return { code: error.code, out: output.join('\n'), err: errors.join('\n') };
   } finally {
-    process.exit = oldExit;
-    console.log = oldLog;
-    console.error = oldError;
+    exitMock.mock.restore();
+    logMock.mock.restore();
+    errorMock.mock.restore();
   }
   return { code: 0, out: output.join('\n'), err: errors.join('\n') };
 }
@@ -39,21 +49,27 @@ function invoke(fn: (args: string[]) => void, args: string[]): { code: number; o
 function invokeLint(args: string[]): { code: number; out: string; err: string } {
   const output: string[] = [];
   const errors: string[] = [];
-  const oldExit = process.exit;
-  const oldStdoutWrite = process.stdout.write;
-  const oldStderrWrite = process.stderr.write;
-  process.exit = ((code?: number) => { throw new ExitSignal(code ?? 0); }) as typeof process.exit;
-  process.stdout.write = ((chunk: unknown) => { output.push(String(chunk)); return true; }) as typeof process.stdout.write;
-  process.stderr.write = ((chunk: unknown) => { errors.push(String(chunk)); return true; }) as typeof process.stderr.write;
+  const exitMock = mock.method(process, 'exit', (code?: number) => {
+    throw new ExitSignal(code ?? 0);
+  });
+  const stdoutMock = mock.method(process.stdout, 'write', (chunk: unknown) => {
+    output.push(String(chunk));
+    return true;
+  });
+  const stderrMock = mock.method(process.stderr, 'write', (chunk: unknown) => {
+    errors.push(String(chunk));
+    return true;
+  });
   try {
     lintMain(args);
   } catch (error) {
-    if (error instanceof ExitSignal) return { code: error.code, out: output.join(''), err: errors.join('') };
+    if (error instanceof ExitSignal)
+      return { code: error.code, out: output.join(''), err: errors.join('') };
     throw error;
   } finally {
-    process.exit = oldExit;
-    process.stdout.write = oldStdoutWrite;
-    process.stderr.write = oldStderrWrite;
+    exitMock.mock.restore();
+    stdoutMock.mock.restore();
+    stderrMock.mock.restore();
   }
   return { code: 0, out: output.join(''), err: errors.join('') };
 }
@@ -82,7 +98,31 @@ describe('command modules', { concurrency: false }, () => {
       assert.match(invoke(cmdBootstrap, ['--help']).out, /feynman bootstrap/);
       const out = path.join(home, 'out');
       assert.equal(invoke(cmdBootstrap, ['--out', out]).code, 0);
-      assert.ok(fs.existsSync(path.join(out, 'plugins', 'feynman', '.codex-plugin', 'plugin.json')));
+      assert.ok(
+        fs.existsSync(path.join(out, 'plugins', 'feynman', '.codex-plugin', 'plugin.json')),
+      );
+      const exportedCli = spawnSync(
+        process.execPath,
+        [path.join(out, 'bin', 'feynman.ts'), 'version'],
+        {
+          encoding: 'utf8',
+          cwd: home,
+          env: { PATH: process.env['PATH'], HOME: home },
+        },
+      );
+      assert.equal(exportedCli.status, 0, exportedCli.stderr);
+      assert.match(exportedCli.stdout, /^\d+\.\d+\.\d+/);
+      const exportedLint = spawnSync(
+        process.execPath,
+        [path.join(out, 'bin', 'feynman-lint.ts'), '-'],
+        {
+          input: 'Ordinary text.',
+          encoding: 'utf8',
+          cwd: home,
+          env: { PATH: process.env['PATH'], HOME: home },
+        },
+      );
+      assert.equal(exportedLint.status, 0, exportedLint.stderr);
       fs.writeFileSync(path.join(out, 'keep'), 'yes');
       assert.match(invoke(cmdBootstrap, ['--out', out]).out, /already exists/);
       assert.equal(fs.readFileSync(path.join(out, 'keep'), 'utf8'), 'yes');
@@ -91,6 +131,16 @@ describe('command modules', { concurrency: false }, () => {
       assert.equal(invoke(cmdBootstrap, ['--out']).code, 2);
       assert.equal(invoke(cmdBootstrap, ['--out=']).code, 2);
       assert.equal(invoke(cmdBootstrap, ['--bad']).code, 2);
+      const unrelated = path.join(home, 'unrelated');
+      fs.mkdirSync(unrelated);
+      fs.writeFileSync(path.join(unrelated, 'keep'), 'user bytes');
+      assert.equal(invoke(cmdBootstrap, ['--out', unrelated, '--force']).code, 2);
+      assert.equal(fs.readFileSync(path.join(unrelated, 'keep'), 'utf8'), 'user bytes');
+      assert.equal(invoke(cmdBootstrap, ['--out', home, '--force']).code, 2);
+      const link = path.join(home, 'link');
+      fs.symlinkSync(out, link);
+      assert.equal(invoke(cmdBootstrap, ['--out', link, '--force']).code, 2);
+      assert.ok(fs.existsSync(path.join(out, 'feynman-bootstrap.json')));
     } finally {
       process.chdir(cwd);
       fs.rmSync(home, { recursive: true, force: true });
@@ -107,7 +157,16 @@ describe('command modules', { concurrency: false }, () => {
   it('dispatches every public CLI route without spawning an uninstrumented process', () => {
     assert.equal(invoke(feynmanMain, []).code, 2);
     assert.equal(invoke(feynmanMain, ['unknown']).code, 2);
-    for (const command of ['install', 'uninstall', 'doctor', 'state', 'lint', 'examples', 'bootstrap', 'version']) {
+    for (const command of [
+      'install',
+      'uninstall',
+      'doctor',
+      'state',
+      'lint',
+      'examples',
+      'bootstrap',
+      'version',
+    ]) {
       assert.equal(invoke(feynmanMain, [command, '--help']).code, 0, command);
     }
     assert.equal(invoke(feynmanMain, ['status', '--help']).code, 0);
@@ -129,8 +188,20 @@ describe('command modules', { concurrency: false }, () => {
       fs.writeFileSync(frameFile, '┌─────┐\n│ key │\n└─────┘\n');
       assert.equal(invokeLint(['--fix', fixFile]).code, 0);
       assert.equal(invokeLint(['--explain', frameFile]).code, 0);
-      assert.equal(invokeLint(['--json', path.resolve(import.meta.dirname, 'fixtures', 'invalid-l01-unclosed-box.md')]).code, 1);
-      assert.equal(invokeLint(['--strict', path.resolve(import.meta.dirname, 'fixtures', 'invalid-l06-half-priority.md')]).code, 1);
+      assert.equal(
+        invokeLint([
+          '--json',
+          path.resolve(import.meta.dirname, 'fixtures', 'invalid-l01-unclosed-box.md'),
+        ]).code,
+        1,
+      );
+      assert.equal(
+        invokeLint([
+          '--strict',
+          path.resolve(import.meta.dirname, 'fixtures', 'invalid-l06-half-priority.md'),
+        ]).code,
+        1,
+      );
       assert.equal(invokeLint([path.join(temp, 'missing.md')]).code, 2);
       assert.equal(invokeLint(['--fix', path.join(temp, 'missing-fix.md')]).code, 2);
       assert.equal(invokeLint(['--unknown', fixture]).code, 2);

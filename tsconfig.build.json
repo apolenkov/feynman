@@ -9,15 +9,6 @@
     "declarationMap": false,
     "sourceMap": false
   },
-  "include": [
-    "hooks/**/*.ts",
-    "bin/**/*.ts",
-    "lib/**/*.ts"
-  ],
-  "exclude": [
-    "tests/**",
-    "scripts/**",
-    "node_modules/**",
-    ".build/**"
-  ]
+  "include": ["hooks/**/*.ts", "bin/**/*.ts", "lib/**/*.ts"],
+  "exclude": ["tests/**", "scripts/**", "node_modules/**", ".build/**"]
 }

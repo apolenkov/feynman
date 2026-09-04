@@ -54,22 +54,26 @@
     "coverage": "mkdir -p coverage && node --experimental-test-coverage --test-coverage-exclude=tests/** --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test tests/*.test.ts",
     "check:coverage": "node scripts/check-coverage.ts",
     "lint": "node bin/feynman-lint.ts",
-    "eslint": "eslint .",
+    "eslint": "eslint . --max-warnings=0",
+    "format": "prettier --write \"**/*.{ts,mjs,json,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,mjs,json,yml,yaml}\"",
     "audit": "npm audit --audit-level=moderate",
     "test:docs": "node scripts/check-docs.ts",
     "test:release": "node scripts/release-smoke.ts",
     "test:published": "node scripts/verify-published-package.ts",
     "build": "node scripts/build-package.ts",
     "changelog": "node scripts/generate-changelog.ts",
-    "ci": "npm run audit && npm run typecheck && npm run eslint && npm run coverage && npm run check:coverage && npm run test:docs && npm run build && npm run test:release",
+    "ci": "npm run audit && npm run format:check && npm run typecheck && npm run eslint && npm run coverage && npm run check:coverage && npm run test:docs && npm run check:reproducibility && npm run test:release",
     "prepublishOnly": "npm run audit && npm run typecheck && npm run coverage && npm run check:coverage && npm run test:docs",
-    "release": "npm run ci && npm publish \"./$(cat dist/TARBALL.txt)\" --access public"
+    "release": "npm run ci && npm publish \"./$(cat dist/TARBALL.txt)\" --access public",
+    "check:reproducibility": "node scripts/check-reproducibility.ts"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
     "@typescript-eslint/eslint-plugin": "^8.69.0",
     "@typescript-eslint/parser": "^8.69.0",
     "eslint": "^10.9.1",
+    "prettier": "3.9.6",
     "typescript": "^6.0.3"
   }
 }

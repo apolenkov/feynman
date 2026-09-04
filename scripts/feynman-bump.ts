@@ -24,32 +24,51 @@ const knownFlags = new Set(['--dry-run', '--commit', '--tag', '--push']);
 const invalidFlag = args.find((value) => value.startsWith('--') && !knownFlags.has(value));
 const arg: string | undefined = args.find((value: string) => !value.startsWith('--'));
 
-if (!arg || invalidFlag || (shouldTag && !shouldCommit) || (shouldPush && (!shouldCommit || !shouldTag)) || (dryRun && (shouldCommit || shouldTag || shouldPush))) {
-  console.error('usage: feynman-bump <version|patch|minor|major> [--dry-run] [--commit --tag --push]');
+if (
+  !arg ||
+  invalidFlag ||
+  (shouldTag && !shouldCommit) ||
+  (shouldPush && (!shouldCommit || !shouldTag)) ||
+  (dryRun && (shouldCommit || shouldTag || shouldPush))
+) {
+  console.error(
+    'usage: feynman-bump <version|patch|minor|major> [--dry-run] [--commit --tag --push]',
+  );
   console.error('`--tag` requires `--commit`; `--push` requires `--commit --tag`.');
   process.exit(2);
 }
 
-const VERSION_MANIFESTS: string[] = [
-  'package.json',
-  'plugins/feynman/.codex-plugin/plugin.json',
-];
+const VERSION_MANIFESTS: string[] = ['package.json', 'plugins/feynman/.codex-plugin/plugin.json'];
 const RELEASE_FILES: string[] = [...VERSION_MANIFESTS, 'package-lock.json', 'CHANGELOG.md'];
 
 function readManifest(rel: string): { version: string; [key: string]: unknown } {
-  return JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+  const value: unknown = JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value) ||
+    !('version' in value) ||
+    typeof value.version !== 'string'
+  ) {
+    throw new Error(`Invalid version manifest: ${rel}`);
+  }
+  return value as { version: string; [key: string]: unknown };
 }
 
 function bumpSemver(current: string, kind: string): string {
   const m = current.match(/^(\d+)\.(\d+)\.(\d+)$/);
   if (!m) throw new Error(`unparseable version: ${current}`);
-  const x = m[1];
+  const x = Number(m[1]);
   let y = Number(m[2]);
   let z = Number(m[3]);
   if (kind === 'patch') z += 1;
-  else if (kind === 'minor') { y += 1; z = 0; }
-  else if (kind === 'major') { const xn = Number(x) + 1; return `${xn}.0.0`; }
-  else throw new Error(`unknown bump kind: ${kind}`);
+  else if (kind === 'minor') {
+    y += 1;
+    z = 0;
+  } else if (kind === 'major') {
+    const xn = x + 1;
+    return `${xn}.0.0`;
+  } else throw new Error(`unknown bump kind: ${kind}`);
   return `${x}.${y}.${z}`;
 }
 
@@ -63,7 +82,7 @@ function git(gitArgs: string[]): string {
   const r = spawnSync('git', gitArgs, { cwd: ROOT, encoding: 'utf8' });
   if (r.status !== 0) {
     process.stderr.write(r.stderr || r.stdout || '');
-    throw new Error(`git ${gitArgs.join(' ')} failed (exit ${r.status})`);
+    throw new Error(`git ${gitArgs.join(' ')} failed (exit ${r.status ?? 'unavailable'})`);
   }
   return (r.stdout || '').trim();
 }
@@ -72,7 +91,7 @@ function npmRun(script: string): string {
   const r = spawnSync('npm', ['run', '--silent', script], { cwd: ROOT, encoding: 'utf8' });
   if (r.status !== 0) {
     process.stderr.write(r.stderr || r.stdout || '');
-    throw new Error(`npm run ${script} failed (exit ${r.status})`);
+    throw new Error(`npm run ${script} failed (exit ${r.status ?? 'unavailable'})`);
   }
   return r.stdout || '';
 }
@@ -106,7 +125,11 @@ function updatePackageLock(target: string): void {
     version?: unknown;
     packages?: Record<string, { version?: unknown }>;
   };
-  if (typeof lock.version !== 'string' || !lock.packages?.[''] || typeof lock.packages[''].version !== 'string') {
+  if (
+    typeof lock.version !== 'string' ||
+    !lock.packages?.[''] ||
+    typeof lock.packages[''].version !== 'string'
+  ) {
     throw new Error('package-lock.json does not have a root package version');
   }
   lock.version = target;
@@ -115,12 +138,12 @@ function updatePackageLock(target: string): void {
   console.log(`  updated ${rel}`);
 }
 
-function main(): void {
+function main(versionRequest: string): void {
   preflight();
 
   const pkg = readManifest('package.json');
   const current = pkg.version;
-  const target = resolveTarget(arg!, current);
+  const target = resolveTarget(versionRequest, current);
 
   if (target === current) throw new Error(`already at ${current}`);
   console.log(`bumping ${current} → ${target}${dryRun ? ' (dry-run)' : ''}`);
@@ -170,12 +193,20 @@ function main(): void {
   }
 
   console.log('\ndone. next:');
-  if (!shouldCommit) console.log('  review and commit the updated release files (or rerun with --commit)');
-  else if (!shouldTag) console.log(`  create tag v${target} explicitly (or rerun with --tag --push)`);
+  if (!shouldCommit)
+    console.log('  review and commit the updated release files (or rerun with --commit)');
+  else if (!shouldTag)
+    console.log(`  create tag v${target} explicitly (or rerun with --tag --push)`);
   else if (!shouldPush) console.log(`  push main and v${target} explicitly (or rerun with --push)`);
-  console.log('  publish only through the reviewed release workflow or an explicitly authorized npm command');
+  console.log(
+    '  publish only through the reviewed release workflow or an explicitly authorized npm command',
+  );
   console.log(`  https://github.com/apolenkov/feynman/releases/tag/v${target}`);
 }
 
-try { main(); }
-catch (e) { console.error('error:', (e as Error).message); process.exit(1); }
+try {
+  main(arg);
+} catch (e) {
+  console.error('error:', (e as Error).message);
+  process.exit(1);
+}

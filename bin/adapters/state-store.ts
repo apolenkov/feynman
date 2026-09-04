@@ -4,11 +4,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_STATE, normalizeState, type FeynmanState } from '../../lib/state/model.ts';
+import { atomicWrite } from './fs.ts';
 
 export interface StatePaths {
   feynmanDir: string;
   statePath: string;
   flagPath: string;
+  injectionsPath: string;
 }
 
 export function statePaths(rootDir: string): StatePaths {
@@ -17,6 +19,7 @@ export function statePaths(rootDir: string): StatePaths {
     feynmanDir,
     statePath: path.join(feynmanDir, 'state.json'),
     flagPath: path.join(rootDir, '.feynman-active'),
+    injectionsPath: path.join(feynmanDir, 'injections'),
   };
 }
 
@@ -26,34 +29,59 @@ export function flagContent(state: FeynmanState): string {
 
 /** Read JSON without trusting it; normalize it before making a state decision. */
 export function readState(rootDir: string): Record<string, unknown> | null {
-  const { statePath } = statePaths(rootDir);
+  const { statePath, injectionsPath } = statePaths(rootDir);
   try {
     const parsed: unknown = JSON.parse(fs.readFileSync(statePath, 'utf8'));
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
-    return parsed as Record<string, unknown>;
+    const state = parsed as Record<string, unknown>;
+    try {
+      const text = fs.readFileSync(injectionsPath, 'utf8').trim();
+      const injections = Number(text);
+      if (/^\d+$/.test(text) && Number.isSafeInteger(injections)) return { ...state, injections };
+    } catch {
+      /* Bookkeeping is optional; preferences remain readable. */
+    }
+    return state;
   } catch (_) {
     return null;
   }
 }
 
+/** Advisory bookkeeping must never write a stale snapshot of user preferences. */
+export function recordInjection(rootDir: string): void {
+  const raw = readState(rootDir);
+  if (raw === null) return;
+  const state = normalizeState(raw);
+  if (!state.enabled || state.injections === Number.MAX_SAFE_INTEGER) return;
+  atomicWrite(statePaths(rootDir).injectionsPath, String(state.injections + 1) + '\n');
+}
+
 export function writeState(rootDir: string, state: FeynmanState): void {
   const { feynmanDir, statePath } = statePaths(rootDir);
   fs.mkdirSync(feynmanDir, { recursive: true });
-  fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
+  atomicWrite(statePath, JSON.stringify(state, null, 2) + '\n');
 }
 
-function unlinkFlag(flagPath: string): void {
-  try { fs.unlinkSync(flagPath); } catch (_) { /* already absent */ }
+export function removeActiveFlag(rootDir: string): void {
+  try {
+    fs.unlinkSync(statePaths(rootDir).flagPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
 }
 
 function backupCorruptState(statePath: string): void {
-  try { fs.renameSync(statePath, statePath + '.bak'); } catch (_) { /* overwrite below */ }
+  // A failed backup is not permission to overwrite the only remaining copy.
+  fs.renameSync(statePath, statePath + '.bak');
 }
 
-function bootstrapDefault(rootDir: string, flagPath: string, flagPresent: boolean): { state: FeynmanState; active: boolean } {
+function bootstrapDefault(
+  rootDir: string,
+  flagPath: string,
+): { state: FeynmanState; active: boolean } {
   const state = { ...DEFAULT_STATE };
   writeState(rootDir, state);
-  if (!flagPresent) fs.writeFileSync(flagPath, flagContent(state));
+  atomicWrite(flagPath, flagContent(state));
   return { state, active: true };
 }
 
@@ -62,20 +90,34 @@ export function reconcileState(rootDir: string): { state: FeynmanState; active: 
   const { statePath, flagPath } = statePaths(rootDir);
   const stateExists = fs.existsSync(statePath);
   const flagPresent = fs.existsSync(flagPath);
-  if (!stateExists) return bootstrapDefault(rootDir, flagPath, flagPresent);
+  if (!stateExists) return bootstrapDefault(rootDir, flagPath);
 
   const raw = readState(rootDir);
   if (raw === null) {
     backupCorruptState(statePath);
-    return bootstrapDefault(rootDir, flagPath, flagPresent);
+    return bootstrapDefault(rootDir, flagPath);
   }
 
   const state = normalizeState(raw);
 
   if (!state.enabled) {
-    unlinkFlag(flagPath);
+    removeActiveFlag(rootDir);
     return { state, active: false };
   }
-  if (!flagPresent) fs.writeFileSync(flagPath, flagContent(state));
+  if (!flagPresent || fs.readFileSync(flagPath, 'utf8') !== flagContent(state)) {
+    atomicWrite(flagPath, flagContent(state));
+  }
   return { state, active: true };
+}
+
+/** Keep preference and active-flag mutations in the same filesystem adapter. */
+export function changeState(
+  rootDir: string,
+  change: Readonly<Partial<FeynmanState>>,
+): FeynmanState {
+  const state = { ...reconcileState(rootDir).state, ...change };
+  writeState(rootDir, state);
+  if (state.enabled) atomicWrite(statePaths(rootDir).flagPath, flagContent(state));
+  else removeActiveFlag(rootDir);
+  return state;
 }

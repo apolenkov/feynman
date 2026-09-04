@@ -67,8 +67,9 @@ feynman lint      → lib/lint/ parser → rules → reporter
 ```
 
 The native marketplace package under `plugins/feynman/` exposes the Codex
-skill. The npm package supplies the CLI and compiled hook. These are two
-delivery paths for the same contract, not separate runtimes.
+skill's self-contained visual-explanation instructions. The npm package supplies
+the linter, preferences CLI and compiled hook. The optional hook injects the
+separately maintained Contract; both delivery paths support Codex only.
 
 ## Lint pipeline
 
@@ -77,6 +78,17 @@ The linter is a sibling application path, independent of hook state:
 ```text
 markdown/stdin → lib/lint/parser.ts → lib/lint/rules.ts → reporter
 ```
+
+Both `lib/state/` and `lib/lint/` are pure core modules. ESLint permits only
+static imports of sibling core modules and rejects runtime imports, outer-layer
+dependencies, package metadata reads, and ambient I/O. Tests exercise the gate
+with prohibited imports and verify that rules and autofix accept frozen inputs.
+Input node fields, frame rows and options are readonly; local algorithm buffers
+remain mutable and never alias caller-owned arrays.
+
+Autofix shares frame detection with lint, but detection does not authorize
+discarding content. A frame containing non-empty unclassified rows is skipped
+by frame alignment and conversion so the user can repair it without text loss.
 
 Rules L01–L15 validate the rendered Visual after it exists. The injected
 Contract chooses a Visual; the linter checks its layout. `npm run lint` is the
@@ -106,6 +118,18 @@ feynman status
 ```
 
 The skill never writes state files directly.
+
+The store reads the advisory counter from `.feynman/injections`, using the
+value in `state.json` as its initial value when no valid counter exists.
+SessionStart updates only this bookkeeping file; it never rewrites preferences
+to increment a counter. A late hook therefore cannot undo `state off` or an
+intensity/style change. Concurrent counter increments may coalesce; this is
+usage information, not an exact event ledger. CLI status exposes the merged
+logical state through the same store.
+
+Settings, state and counter writes stage complete bytes in the destination
+directory and rename them into place. Write or rename failures preserve the
+previous file; existing permissions and symlink destinations are retained.
 
 ## Packaging
 

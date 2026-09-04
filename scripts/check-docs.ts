@@ -56,7 +56,8 @@ export function detectDrift(entries: ReadonlyArray<{ rel: string; content: strin
 function listMarkdown(dir: string): string[] {
   const abs = path.join(ROOT, dir);
   if (!fs.existsSync(abs)) return [];
-  return fs.readdirSync(abs)
+  return fs
+    .readdirSync(abs)
     .filter((name: string) => name.endsWith('.md'))
     .map((name: string) => path.join(dir, name))
     .sort();
@@ -102,7 +103,9 @@ function main(): void {
 
   if (publicText.includes('npx feynman ')) {
     failed = true;
-    process.stderr.write('docs lint failed: public install examples must use npx @albinocrabs/feynman\n');
+    process.stderr.write(
+      'docs lint failed: public install examples must use npx @albinocrabs/feynman\n',
+    );
   }
 
   const entries = trackedFiles().flatMap((rel) => {
@@ -115,7 +118,9 @@ function main(): void {
   const driftFindings = detectDrift(entries);
   if (driftFindings.length > 0) {
     failed = true;
-    process.stderr.write('docs lint failed: superseded toolchain contract on live surfaces (see ADR 0001)\n');
+    process.stderr.write(
+      'docs lint failed: superseded toolchain contract on live surfaces (see ADR 0001)\n',
+    );
     for (const finding of driftFindings) process.stderr.write(`${finding}\n`);
   }
 

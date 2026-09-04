@@ -1,166 +1,260 @@
 {
-  "skill_name": "feynman-rules",
-  "description": "Eval set for rules/feynman-contract.md (full intensity). Tests whether the injected rule set helps Codex render appropriate ASCII diagrams for structured content and avoid them for non-structured content.",
+  "skill_name": "feynman",
+  "description": "Frozen factual tasks for paired baseline, standalone skill, and full hook Contract evaluation. Diagram presence earns no credit. See evals/README.md.",
   "evals": [
     {
       "id": 1,
       "name": "sequence-deploy-pipeline",
       "category": "should-trigger",
       "structure_class": "sequence",
-      "prompt": "Explain in 3-5 sentences how a typical CI/CD deploy pipeline works: code commit, then build, then test, then deploy to staging, then production rollout.",
-      "expected": "ASCII flow diagram with arrows: [commit] → [build] → [test] → [staging] → [prod]"
+      "prompt": "In this pipeline, each successful stage enables only the next: commit, build, test, staging, production. A failed stage stops the pipeline. Explain the pipeline in 3–5 sentences using only these facts.",
+      "comprehension_question": "If test fails, can staging or production run?",
+      "answer_key": "No; both remain blocked.",
+      "required_facts": [
+        "Preserve the five stages in order.",
+        "Failure stops progression.",
+        "Do not invent approval, rollback, or parallel stages."
+      ]
     },
     {
       "id": 2,
       "name": "sequence-http-request",
       "category": "should-trigger",
       "structure_class": "sequence",
-      "prompt": "Walk me through what happens when I type a URL in browser and hit enter, in 4-6 stages.",
-      "expected": "ASCII flow with arrows showing DNS → TCP → TLS → HTTP → render or similar"
+      "prompt": "In this simplified HTTPS example there is no cache and no existing connection. The browser resolves the hostname with DNS, establishes TCP, negotiates TLS, sends HTTP, then renders the response. Explain these five stages using only these facts.",
+      "comprehension_question": "What happens between TCP establishment and the HTTP request?",
+      "answer_key": "TLS negotiation.",
+      "required_facts": [
+        "Keep all five stages in order.",
+        "Treat this as the supplied simplified example, not every browser request."
+      ]
     },
     {
       "id": 3,
       "name": "hierarchy-project-structure",
       "category": "should-trigger",
       "structure_class": "hierarchy",
-      "prompt": "Describe a typical Python project layout with src/, tests/, docs/, and config/ directories. Show me the structure with sub-files.",
-      "expected": "ASCII tree using ├── └── characters or 2-space indent"
+      "prompt": "Show this project layout: the root contains src/, tests/, docs/, and config/. src/ contains main.py; tests/ contains test_main.py; docs/ contains usage.md; config/ contains app.toml. Explain where a reader should look for the entry point and its test.",
+      "comprehension_question": "Where are the entry point and its test?",
+      "answer_key": "src/main.py and tests/test_main.py.",
+      "required_facts": [
+        "Preserve all four parent directories and their child files.",
+        "Do not add files."
+      ]
     },
     {
       "id": 4,
       "name": "hierarchy-org-chart",
       "category": "should-trigger",
       "structure_class": "hierarchy",
-      "prompt": "Describe the organizational hierarchy of a typical software engineering team: VP, then Directors, then Managers, then ICs.",
-      "expected": "ASCII tree showing 3+ levels"
+      "prompt": "Explain this fictional reporting hierarchy: VP Morgan has Directors Alex and Sam. Alex manages Manager Jo; Sam manages Manager Lee. Engineer Pat reports to Jo, and Engineer Kim reports to Lee.",
+      "comprehension_question": "Who is Pat’s director, and does Kim report to Jo?",
+      "answer_key": "Alex; no, Kim reports to Lee under Sam.",
+      "required_facts": [
+        "Preserve each reporting edge.",
+        "Do not imply cross-team reporting relationships."
+      ]
     },
     {
       "id": 5,
       "name": "comparison-3-databases",
       "category": "should-trigger",
       "structure_class": "comparison",
-      "prompt": "Compare PostgreSQL, MySQL, and SQLite across these criteria: typical use case, write throughput, replication support.",
-      "expected": "Side-by-side ASCII columns or markdown table with 3 rows"
+      "prompt": "Compare these fictional deployment options using only the supplied measurements. PostgreSQL: remote service, 800 writes/s, replication enabled. MySQL: remote service, 700 writes/s, replication enabled. SQLite: embedded file, 300 writes/s, replication disabled. These are measurements of this setup, not general database limits.",
+      "comprehension_question": "Which option is embedded, and which measured the most writes per second?",
+      "answer_key": "SQLite; PostgreSQL at 800 writes/s.",
+      "required_facts": [
+        "Preserve all values and replication settings.",
+        "Do not generalize these results to the products overall."
+      ]
     },
     {
       "id": 6,
       "name": "comparison-2-frameworks",
       "category": "should-trigger",
       "structure_class": "comparison",
-      "prompt": "What are the key differences between React and Vue across these dimensions: learning curve, ecosystem size, state management approach?",
-      "expected": "2-column comparison (table or side-by-side)"
+      "prompt": "Compare two prototypes from our fictional team study. React: onboarding 5 days, 12 reusable internal components, state in a reducer. Vue: onboarding 3 days, 8 reusable internal components, state in a store. Use only these facts; they do not establish overall framework quality.",
+      "comprehension_question": "Which prototype had faster onboarding, and by how much?",
+      "answer_key": "Vue, by 2 days.",
+      "required_facts": [
+        "Preserve all six measured/described properties.",
+        "Do not claim ecosystem-wide superiority."
+      ]
     },
     {
       "id": 7,
       "name": "status-multi-component",
       "category": "should-trigger",
       "structure_class": "status",
-      "prompt": "Give me a status snapshot of a fictional release: API service is healthy, web app is degraded, mobile app is healthy, payment service is down, search is healthy, analytics is healthy, CDN is healthy.",
-      "expected": "ASCII frame block or aligned status list with 7 items"
+      "prompt": "Summarize this fictional release snapshot: API healthy; web degraded; mobile healthy; payment down; search healthy; analytics healthy; CDN healthy. Highlight which components need attention without inventing causes.",
+      "comprehension_question": "Which two components need attention?",
+      "answer_key": "Web is degraded; payment is down.",
+      "required_facts": [
+        "Account for all seven components.",
+        "Do not invent causes, owners, or recovery times."
+      ]
     },
     {
       "id": 8,
       "name": "priority-bugs",
       "category": "should-trigger",
       "structure_class": "priority",
-      "prompt": "Rank these 5 incoming bugs by severity for me: data loss in checkout, broken email link, typo in footer, slow image loading on settings page, accessibility regression in nav.",
-      "expected": "Priority scale (▲ high / ▼ low) or numbered ordering with severity markers"
+      "prompt": "Rank these bugs under this explicit policy: confirmed data loss first, inability to navigate with a keyboard second, broken noncritical email link third, slow settings-page images fourth, footer typo fifth. The incoming bugs are footer typo, checkout data loss, slow settings images, keyboard navigation blocked, and broken noncritical email link.",
+      "comprehension_question": "Which bug ranks immediately after data loss?",
+      "answer_key": "Keyboard navigation blocked.",
+      "required_facts": [
+        "Follow the supplied policy exactly.",
+        "Do not invent user counts or business impact."
+      ]
     },
     {
       "id": 9,
       "name": "state-machine-order",
       "category": "should-trigger",
       "structure_class": "state-machine",
-      "prompt": "Describe the state machine of an e-commerce order: from cart → placed → paid → shipped → delivered, with possible cancellation.",
-      "expected": "States with labelled transitions (arrows)"
+      "prompt": "Explain this order state machine using only these transitions: cart → placed on submit; placed → paid on successful payment; paid → shipped on dispatch; shipped → delivered on receipt. Cancellation is allowed from placed or paid and ends in cancelled. There are no other transitions.",
+      "comprehension_question": "Can a shipped order be cancelled under these rules?",
+      "answer_key": "No; cancellation is available only from placed or paid.",
+      "required_facts": [
+        "Preserve the five main states and cancelled terminal state.",
+        "Label triggers accurately.",
+        "Do not add cancellation from cart or shipped."
+      ]
     },
     {
       "id": 10,
       "name": "branching-flow-auth",
       "category": "should-trigger",
       "structure_class": "branching-flow",
-      "prompt": "Describe the auth check flow: request comes in, check token, if valid serve, if expired refresh, if missing reject 401.",
-      "expected": "Branching ASCII flow with yes/no paths"
+      "prompt": "Explain this fictional authentication flow: a missing token returns 401; a valid token serves the request; an expired token attempts refresh. Successful refresh serves the request; failed refresh returns 401. Assume these are the only token cases.",
+      "comprehension_question": "What happens when an expired token cannot be refreshed?",
+      "answer_key": "The request receives 401.",
+      "required_facts": [
+        "Include missing, valid, and expired branches.",
+        "Do not make refresh unconditionally successful."
+      ]
     },
     {
       "id": 11,
       "name": "mapping-before-after",
       "category": "should-trigger",
       "structure_class": "mapping",
-      "prompt": "Show me before/after for migrating a monolith to microservices: monolith had auth, billing, notifications in one service; after split into 3 services with shared event bus.",
-      "expected": "Before/after pair grid or two side-by-side blocks"
+      "prompt": "Explain this before/after migration. Before: one service contains auth, billing, and notifications. After: separate auth, billing, and notifications services all connect to one shared event bus. No direction of messages, performance change, or independence guarantee has been specified.",
+      "comprehension_question": "What remains shared after the split?",
+      "answer_key": "The event bus.",
+      "required_facts": [
+        "Preserve all three responsibilities.",
+        "Do not invent message direction, throughput gains, or complete independence."
+      ]
     },
     {
       "id": 12,
       "name": "ru-status-block",
       "category": "should-trigger",
       "structure_class": "status",
-      "prompt": "Дай статус сборки нашего проекта: тесты — зелёные, линт — зелёный, деплой — заблокирован миграцией БД, документация — устарела, коммиты — на ветке staging, CI — простаивает.",
-      "expected": "Russian status block — bullets per language guardrail (cell text long), NOT a 2-col Cyrillic frame"
+      "prompt": "Кратко объясни этот снимок проекта: тесты — зелёные; линт — зелёный; деплой — заблокирован миграцией БД; документация — устарела; коммиты — на ветке staging; CI — простаивает. Не добавляй причины, которых нет в исходных данных.",
+      "comprehension_question": "Что блокирует деплой и известно ли, почему простаивает CI?",
+      "answer_key": "Миграция БД; причина простоя CI не указана.",
+      "required_facts": [
+        "Сохрани все шесть фактов и русский язык.",
+        "Не представляй ветку staging как окружение деплоя."
+      ]
     },
     {
       "id": 13,
       "name": "negative-single-fact",
       "category": "should-not-trigger",
       "structure_class": "none",
-      "prompt": "What's the default port for HTTPS?",
-      "expected": "One-sentence prose answer, no diagram"
+      "prompt": "For this exercise, HTTPS uses its standard default port, 443. What is the port? Answer in one short sentence.",
+      "comprehension_question": "What port is named?",
+      "answer_key": "443.",
+      "required_facts": ["Give the number without a diagram or extra explanation."]
     },
     {
       "id": 14,
       "name": "negative-pure-code",
       "category": "should-not-trigger",
       "structure_class": "none",
-      "prompt": "Write a Python one-liner that reverses a string.",
-      "expected": "Code block only, no diagram"
+      "prompt": "Write only a Python expression that reverses a string variable named s using slicing. No prose or diagram.",
+      "comprehension_question": "Does the expression reverse s?",
+      "answer_key": "s[::-1] or a semantically equivalent slicing expression.",
+      "required_facts": [
+        "Output only the expression, optionally in a code fence.",
+        "Do not add a diagram or explanation."
+      ]
     },
     {
       "id": 15,
       "name": "negative-prose-explanation",
       "category": "should-not-trigger",
       "structure_class": "none",
-      "prompt": "Explain in plain prose why TCP uses a 3-way handshake. Just narrative paragraphs, no diagrams or lists.",
-      "expected": "Pure prose paragraphs, NO diagram (user explicitly opted out)"
+      "prompt": "In this simplified TCP example, A sends SYN with its initial sequence number, B sends SYN-ACK acknowledging A and giving B’s initial sequence number, then A acknowledges B with ACK. Explain why the exchange lets each side confirm the other’s sequence number. Use narrative prose only, no diagrams or lists.",
+      "comprehension_question": "Which message acknowledges B’s initial sequence number?",
+      "answer_key": "The final ACK from A.",
+      "required_facts": [
+        "Preserve the message order and acknowledgements.",
+        "Use only narrative prose; no diagram, table, or list."
+      ]
     },
     {
       "id": 16,
       "name": "negative-short-list",
       "category": "should-not-trigger",
       "structure_class": "none",
-      "prompt": "Give me 3 popular Linux distributions.",
-      "expected": "Simple list or inline answer — too short for a diagram (no real structure)"
+      "prompt": "List exactly these three Linux distributions, with no additional information: Debian, Fedora, Ubuntu.",
+      "comprehension_question": "Are all three requested names present?",
+      "answer_key": "Debian, Fedora, Ubuntu; no fourth item.",
+      "required_facts": [
+        "A short list or inline answer is sufficient.",
+        "No diagram or commentary."
+      ]
     },
     {
       "id": 17,
       "name": "negative-single-recommendation",
       "category": "should-not-trigger",
       "structure_class": "none",
-      "prompt": "Should I use tabs or spaces for indenting Python? Just give me a recommendation.",
-      "expected": "1-2 sentence answer, no diagram"
+      "prompt": "Our Python project requires four spaces for indentation. Should I use tabs or spaces here? Give only a one-sentence recommendation based on that rule.",
+      "comprehension_question": "Which indentation does this project require?",
+      "answer_key": "Four spaces.",
+      "required_facts": ["Follow the supplied project rule.", "No comparison table or diagram."]
     },
     {
       "id": 18,
       "name": "negative-question-back",
       "category": "should-not-trigger",
       "structure_class": "none",
-      "prompt": "I want to redesign my billing page but I'm not sure where to start. What would you ask me first?",
-      "expected": "Conversational question(s) back to user, no diagram"
+      "prompt": "I want to redesign a billing page, but I have not said what is wrong or who uses it. Ask one focused question that would help identify the problem. Do not propose a design yet.",
+      "comprehension_question": "Does the reply ask about the missing problem or user context?",
+      "answer_key": "One focused question about the problem, intended users, or their difficulty.",
+      "required_facts": [
+        "Ask one question.",
+        "Do not invent a diagnosis, propose a design, or draw a diagram."
+      ]
     },
     {
       "id": 19,
       "name": "negative-greeting",
       "category": "should-not-trigger",
       "structure_class": "none",
-      "prompt": "Hey! How's it going?",
-      "expected": "Brief conversational reply, no diagram"
+      "prompt": "Hey! How’s it going? Reply briefly.",
+      "comprehension_question": "Is this an ordinary conversational response?",
+      "answer_key": "A brief greeting or conversational acknowledgement.",
+      "required_facts": ["No diagram, workflow, or unsolicited explanation."]
     },
     {
       "id": 20,
       "name": "negative-definition",
       "category": "should-not-trigger",
       "structure_class": "none",
-      "prompt": "What does the term 'idempotent' mean in HTTP context?",
-      "expected": "Definition in 1-3 sentences, no diagram"
+      "prompt": "For this exercise, idempotent means that repeating the same request has the same intended server-side effect as making it once; response contents may differ. Define idempotent in this HTTP context in 1–2 sentences.",
+      "comprehension_question": "Must repeated responses have identical contents?",
+      "answer_key": "No; the intended server-side effect is what stays the same.",
+      "required_facts": [
+        "Preserve the distinction between effect and response.",
+        "No diagram or unnecessary examples."
+      ]
     }
-  ]
+  ],
+  "protocol_version": 1
 }

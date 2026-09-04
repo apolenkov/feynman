@@ -6,29 +6,60 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Run checks and build without publishing to npm"
+        description: 'Run checks and build without publishing to npm'
         required: true
         default: true
         type: boolean
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
+  rehearsal:
+    name: Release rehearsal
+    if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Use pinned npm for release rehearsal
+        run: npm install --global npm@12.0.2
+      - name: Install dependencies
+        run: npm ci
+      - name: Run release checks
+        run: npm run ci
+      - name: Dry-run publish
+        run: npm publish "./$(cat dist/TARBALL.txt)" --access public --dry-run --ignore-scripts
+
   publish:
     name: Build and publish
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           fetch-depth: 0
           fetch-tags: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: npm
@@ -36,7 +67,7 @@ jobs:
 
       - name: Upgrade npm for Trusted Publishing
         run: |
-          npm install --global npm@latest
+          npm install --global npm@12.0.2
           npm --version
 
       - name: Install dependencies
@@ -64,10 +95,11 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog notes
+        env:
+          VERSION: ${{ steps.release_metadata.outputs.package_version }}
+          CURRENT_TAG: ${{ steps.release_metadata.outputs.current_tag }}
+          PREVIOUS_TAG: ${{ steps.release_metadata.outputs.previous_tag }}
         run: |
-          VERSION='${{ steps.release_metadata.outputs.package_version }}'
-          CURRENT_TAG='${{ steps.release_metadata.outputs.current_tag }}'
-          PREVIOUS_TAG='${{ steps.release_metadata.outputs.previous_tag }}'
           CHANGELOG_SOURCE="$RUNNER_TEMP/changelog-source.md"
 
           if git cat-file -e "$CURRENT_TAG:CHANGELOG.md" 2>/dev/null; then
@@ -97,11 +129,8 @@ jobs:
 
           cat "$RUNNER_TEMP/release-notes.md"
 
-      - name: Build package artifact
-        run: npm run build
-
       - name: Upload package artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: npm-package
           path: dist/*.tgz
@@ -137,8 +166,8 @@ jobs:
         if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release_metadata.outputs.tag }}
         run: |
-          TAG="${{ steps.release_metadata.outputs.tag }}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
           else
@@ -177,7 +206,3 @@ jobs:
           PACKAGE_VERSION: ${{ steps.release_metadata.outputs.package_version }}
         run: |
           npm run test:published
-
-      - name: Dry-run publish
-        if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true
-        run: npm publish "./$(cat dist/TARBALL.txt)" --access public --dry-run --ignore-scripts

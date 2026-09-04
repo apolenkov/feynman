@@ -76,7 +76,9 @@ try {
   const fullName = `${packageName}@${packageVersion}`;
   const publishedVersion = npmViewVersion(fullName, npmEnv);
   if (publishedVersion !== packageVersion) {
-    throw new Error(`published version mismatch: expected ${packageVersion}, got ${publishedVersion}`);
+    throw new Error(
+      `published version mismatch: expected ${packageVersion}, got ${publishedVersion}`,
+    );
   }
 
   const projectDir = path.join(workDir, 'project');
@@ -84,25 +86,36 @@ try {
   fs.mkdirSync(projectDir, { recursive: true });
   fs.mkdirSync(homeDir, { recursive: true });
 
-  run('npm', [
-    'install',
-    '--prefix',
-    projectDir,
-    fullName,
-    '--no-save',
-    '--no-audit',
-    '--no-fund',
-    '--ignore-scripts',
-  ], { env: npmEnv });
+  run(
+    'npm',
+    [
+      'install',
+      '--prefix',
+      projectDir,
+      fullName,
+      '--no-save',
+      '--no-audit',
+      '--no-fund',
+      '--ignore-scripts',
+    ],
+    { env: npmEnv },
+  );
 
-  const bin: string = path.join(projectDir, 'node_modules', '.bin', process.platform === 'win32' ? 'feynman.cmd' : 'feynman');
+  const bin: string = path.join(
+    projectDir,
+    'node_modules',
+    '.bin',
+    process.platform === 'win32' ? 'feynman.cmd' : 'feynman',
+  );
   if (!fs.existsSync(bin)) {
     throw new Error(`feynman binary not found after install: ${bin}`);
   }
 
   const version = run(bin, ['version'], { env: { HOME: homeDir } }).trim();
   if (version !== packageVersion) {
-    throw new Error(`installed package version mismatch: expected ${packageVersion}, got ${version}`);
+    throw new Error(
+      `installed package version mismatch: expected ${packageVersion}, got ${version}`,
+    );
   }
 
   run(bin, ['install', '--force'], { env: { HOME: homeDir } });

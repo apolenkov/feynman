@@ -6,10 +6,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const ROOT      = path.resolve(import.meta.dirname, '..');
-const DIST      = path.join(ROOT, 'dist');
+const ROOT = path.resolve(import.meta.dirname, '..');
+const DIST = path.join(ROOT, 'dist');
 const BUILD_DIR = path.join(ROOT, '.build');
-const NPM_CACHE: string = process.env['FEYNMAN_NPM_CACHE'] || path.join(os.tmpdir(), 'npm-cache-feynman');
+const NPM_CACHE: string =
+  process.env['FEYNMAN_NPM_CACHE'] || path.join(os.tmpdir(), 'npm-cache-feynman');
 
 interface PackedTarball {
   filename: string;
@@ -45,7 +46,9 @@ function parsePackedTarball(output: string): PackedTarball {
 // --- Step 1: compile .ts → .js ---
 fs.rmSync(BUILD_DIR, { recursive: true, force: true });
 const tscResult = spawnSync('npx', ['tsc', '--project', path.join(ROOT, 'tsconfig.build.json')], {
-  cwd: ROOT, encoding: 'utf8', env: { ...process.env },
+  cwd: ROOT,
+  encoding: 'utf8',
+  env: { ...process.env },
 });
 if (tscResult.status !== 0) {
   if (tscResult.stdout) process.stderr.write(tscResult.stdout);
@@ -74,8 +77,17 @@ for (const dir of ['hooks', 'bin', 'lib']) {
 
 // --- Step 4: copy static package files ---
 const staticItems = [
-  'rules', 'docs', 'examples', '.agents', 'plugins',
-  'LICENSE', 'README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'SECURITY.md', 'PRIVACY.md',
+  'rules',
+  'docs',
+  'examples',
+  '.agents',
+  'plugins',
+  'LICENSE',
+  'README.md',
+  'CHANGELOG.md',
+  'CONTRIBUTING.md',
+  'SECURITY.md',
+  'PRIVACY.md',
 ];
 for (const item of staticItems) {
   const src = path.join(ROOT, item);
@@ -86,18 +98,24 @@ for (const item of staticItems) {
 }
 
 // --- Step 5: write modified package.json (.ts → .js in bin) ---
-const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as Record<string, unknown>;
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as Record<
+  string,
+  unknown
+>;
 const bin = pkg['bin'] as Record<string, string>;
-pkg['bin'] = Object.fromEntries(Object.entries(bin).map(([k, v]) => [k, v.replace(/\.ts$/, '.js')]));
+pkg['bin'] = Object.fromEntries(
+  Object.entries(bin).map(([k, v]) => [k, v.replace(/\.ts$/, '.js')]),
+);
 if (typeof pkg['main'] === 'string') pkg['main'] = pkg['main'].replace(/\.ts$/, '.js');
 fs.writeFileSync(path.join(STAGING, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
 
 // --- Step 6: rewrite hook command paths (.ts → .js) in JSON and sh files ---
 function rewriteTs(src: string, dest: string): void {
-  const content = fs.readFileSync(src, 'utf8')
+  const content = fs
+    .readFileSync(src, 'utf8')
     .replace(/feynman-session-start\.ts/g, 'feynman-session-start.js')
-    .replace(/feynman-lint\.ts/g,         'feynman-lint.js')
-    .replace(/bin\/feynman\.ts/g,         'bin/feynman.js');
+    .replace(/feynman-lint\.ts/g, 'feynman-lint.js')
+    .replace(/bin\/feynman\.ts/g, 'bin/feynman.js');
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.writeFileSync(dest, content);
 }
@@ -120,7 +138,7 @@ const result = spawnSync('npm', ['pack', '--pack-destination', DIST, '--json'], 
 });
 
 fs.rmSync(BUILD_DIR, { recursive: true, force: true });
-fs.rmSync(STAGING,   { recursive: true, force: true });
+fs.rmSync(STAGING, { recursive: true, force: true });
 
 if (result.status !== 0) {
   if (result.stdout) process.stderr.write(result.stdout);
@@ -132,7 +150,9 @@ let packed: PackedTarball;
 try {
   packed = parsePackedTarball(result.stdout);
 } catch (error) {
-  process.stderr.write(`failed to parse npm pack output: ${(error as Error).message}\n${result.stdout}\n`);
+  process.stderr.write(
+    `failed to parse npm pack output: ${(error as Error).message}\n${result.stdout}\n`,
+  );
   process.exit(1);
 }
 
@@ -143,4 +163,6 @@ if (!fs.existsSync(tarball)) {
 }
 
 fs.writeFileSync(path.join(DIST, 'TARBALL.txt'), path.relative(ROOT, tarball) + '\n');
-console.log(`built ${path.relative(ROOT, tarball)} (${packed.size} bytes, ${packed.entryCount} files)`);
+console.log(
+  `built ${path.relative(ROOT, tarball)} (${packed.size} bytes, ${packed.entryCount} files)`,
+);

@@ -70,7 +70,7 @@ ${c.bold('Usage:')}
 
 ${c.bold('Options:')}
   --out    Output folder (default: ./feynman-package)
-  --force  Recreate output folder if it exists
+  --force  Recreate an output folder previously created by Feynman
   --help   Show this help
 `;
 

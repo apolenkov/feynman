@@ -95,9 +95,7 @@ export function main(argv = process.argv.slice(2)): void {
   // --fix mode: read file, run autofix, write back.
   if (useFix) {
     if (useStdin || filePath === null) {
-      process.stderr.write(
-        'feynman-lint: --fix requires a file path (not stdin)\n',
-      );
+      process.stderr.write('feynman-lint: --fix requires a file path (not stdin)\n');
       process.exit(2);
     }
     let before: string;
@@ -164,7 +162,7 @@ export function main(argv = process.argv.slice(2)): void {
     }
 
     // gcc mode
-    const isTTY = process.stdout.isTTY === true;
+    const isTTY = process.stdout.isTTY;
     const output = format(issues, 'gcc', displayName, isTTY);
 
     if (explain !== null && explain.length > 0) {
@@ -187,10 +185,8 @@ export function main(argv = process.argv.slice(2)): void {
       const errCount = issues.filter((i) => i.severity === 'error').length;
       const warnCount = issues.filter((i) => i.severity === 'warn').length;
       const parts: string[] = [];
-      if (errCount > 0)
-        parts.push(`${errCount} error${errCount !== 1 ? 's' : ''}`);
-      if (warnCount > 0)
-        parts.push(`${warnCount} warning${warnCount !== 1 ? 's' : ''}`);
+      if (errCount > 0) parts.push(`${errCount} error${errCount !== 1 ? 's' : ''}`);
+      if (warnCount > 0) parts.push(`${warnCount} warning${warnCount !== 1 ? 's' : ''}`);
       process.stderr.write(`${displayName}: ${parts.join(', ')}\n`);
       process.exit(1);
     } else {
@@ -199,7 +195,7 @@ export function main(argv = process.argv.slice(2)): void {
   }
 
   // Read input
-  if (useStdin) {
+  if (useStdin || filePath === null) {
     let buf = '';
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', (chunk: string) => {
@@ -209,9 +205,9 @@ export function main(argv = process.argv.slice(2)): void {
       run(buf, '<stdin>');
     });
   } else {
-    const absPath = path.resolve(filePath!);
+    const absPath = path.resolve(filePath);
     if (!fs.existsSync(absPath)) {
-      process.stderr.write(`feynman-lint: file not found: ${filePath!}\n`);
+      process.stderr.write(`feynman-lint: file not found: ${filePath}\n`);
       process.exit(2);
     }
     let markdown: string;
@@ -219,11 +215,11 @@ export function main(argv = process.argv.slice(2)): void {
       markdown = fs.readFileSync(absPath, 'utf8');
     } catch (e) {
       process.stderr.write(
-        `feynman-lint: cannot read file: ${filePath!}: ${(e as NodeJS.ErrnoException).message}\n`,
+        `feynman-lint: cannot read file: ${filePath}: ${(e as NodeJS.ErrnoException).message}\n`,
       );
       process.exit(2);
     }
-    run(markdown, filePath!);
+    run(markdown, filePath);
   }
 }
 

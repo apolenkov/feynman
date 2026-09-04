@@ -14,6 +14,22 @@ npm run ci
 Use Node.js 22.18 or newer. The working tree must be clean before the version
 bump.
 
+## Package reproducibility
+
+Run the package check after `npm ci` and before publishing:
+
+```bash
+node scripts/check-reproducibility.ts
+```
+
+It runs `scripts/build-package.ts` twice in sequence, keeps the second tarball
+in `dist/`, and accepts only byte-identical package bytes. It prints the
+retained tarball's SHA-256. Run it in a worktree where no user, editor, or
+process changes source files, lockfiles, or installed dependencies until it
+finishes. The checker fingerprints the workspace before and after each build,
+excluding its generated outputs; concurrent changes that are reverted before a
+snapshot cannot be detected.
+
 ## Version and notes
 
 1. Curate the top `[Unreleased]` section in `CHANGELOG.md`.
@@ -42,8 +58,16 @@ The release workflow checks out the tag, runs the full CI/build gate, uploads
 the package artifact, and publishes it through npm Trusted Publishing (GitHub
 OIDC). It then verifies registry propagation and runs the published-package
 smoke test. The workflow has the required `id-token: write` permission and
-does not receive an npm publish token. It upgrades npm to the current release
-before publishing; npm 11.5.1 or newer is required for Trusted Publishing.
+does not receive an npm publish token. Both publication and rehearsal use
+pinned npm 12.0.2; review and verify a new npm version before changing this pin.
+npm 11.5.1 or newer is required for Trusted Publishing.
+
+Workflow permissions default to `contents: read`. Only the publishing job gets
+repository write and OIDC permissions; `dry_run=true` runs a separate read-only
+job. Release runs are serialized, and checkout does not persist Git credentials.
+The exact artifact built and smoke-tested by CI is uploaded and published
+without rebuilding it afterward. Third-party actions are pinned to full commit
+SHAs verified against their official repositories; Dependabot proposes updates.
 
 ### One-time npm configuration
 
@@ -61,6 +85,9 @@ chat. After the first successful OIDC release, remove the obsolete GitHub
 repository secret named `NPM_TOKEN`.
 
 For a non-publishing rehearsal, use the workflow's `dry_run=true` dispatch.
+Validate workflow syntax locally with `actionlint` before changing the release
+flow. A local check cannot prove registry permissions or OIDC publication;
+retain evidence from an authorized GitHub run for those claims.
 
 ## Post-release verification
 

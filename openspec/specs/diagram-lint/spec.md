@@ -188,8 +188,9 @@ Severity of both L08 and L09: **error**.
 
 The linter SHALL report a warning (L10) for any word-token that contains both Cyrillic
 letters (`А–Я`, `а–я`, `Ё`, `ё`) and Latin letters (`A–Z`, `a–z`). Hyphenated tokens,
-numeric-suffixed identifiers, and tokens matching the package name, keywords, or `bin`
-field from `package.json` are whitelisted and SHALL NOT be flagged.
+numeric-suffixed identifiers, and the published package name, keywords, or `bin`
+names SHALL NOT be flagged. Package identifiers use Latin script; tests SHALL
+verify their acceptance without filesystem access from the lint core.
 Severity: **warn**.
 
 #### Scenario: pure-Cyrillic token
@@ -324,29 +325,28 @@ treats as a frame SHALL be a frame to autofix, and vice versa.
 A frame's inner rows for this purpose are the fully-bordered `│ … │` lines
 between the opening `┌─…─┐` row and the matching closing `└─…─┘` row at the same
 indent; the closer is the first such row found scanning forward, even when
-non-inner lines (a blank line or stray prose) appear between. The aligned frame
-is rebuilt from its `│ … │` rows only, so any non-inner line between the opener
-and closer — blank or text — is collapsed away and does not survive in the
-output. The scan is bounded to the surrounding non-fence segment: a frame never
+non-inner lines (a blank line or stray prose) appear between. Empty non-inner
+lines may be collapsed during alignment. If any non-empty line cannot be
+classified as an inner row, autofix SHALL preserve its content and skip frame
+alignment and conversion; it SHALL NOT delete text to make a valid frame.
+The scan is bounded to the surrounding non-fence segment: a frame never
 spans a ` ``` ` fence boundary, so fenced sample frames are left untouched, the
 same way the linter only ever sees one fence-free block at a time.
 
 #### Scenario: frame with a non-bordered inner line is still aligned
 
-- **WHEN** a `┌─…─┐` frame contains an inner line that is not a `│ … │` row (for
-  example a blank line) before its closing `└─…─┘` row
+- **WHEN** a `┌─…─┐` frame contains a blank line before its closing `└─…─┘` row
 - **THEN** autofix treats the block as one frame, finds the closer past that
   line, and aligns the frame's `│ … │` inner rows to the opening row's width;
   the non-bordered line is collapsed and does not appear in the output
 
-#### Scenario: a row missing its right border is collapsed, not bordered
+#### Scenario: a row missing its right border is preserved
 
 - **WHEN** a `┌─…─┐` frame contains a line that starts with `│` but has no
   closing `│` (a runaway row)
-- **THEN** autofix does not treat that line as an inner row — matching the
-  linter's frame detection — so it is not given a right border; like any other
-  non-`│ … │` hole it is collapsed away and does not survive in the aligned
-  output
+- **THEN** autofix preserves the line and skips alignment and conversion of
+  this frame, leaving the ambiguous structure available for manual repair
+- **AND** this holds for L11/L15 conversion and explicitly processed fences
 
 #### Scenario: a frame is not detected across a fence boundary
 

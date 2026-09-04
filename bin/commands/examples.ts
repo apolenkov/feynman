@@ -16,7 +16,8 @@ const EXAMPLES_DIR = path.resolve(import.meta.dirname, '..', '..', 'examples');
 function examplesIndex(): ExampleEntry[] {
   if (!fs.existsSync(EXAMPLES_DIR)) return [];
 
-  return fs.readdirSync(EXAMPLES_DIR)
+  return fs
+    .readdirSync(EXAMPLES_DIR)
     .filter((name) => name.endsWith('.md'))
     .sort()
     .map((name) => {
@@ -92,7 +93,9 @@ export function cmdExamples(args: string[]): void {
 
   if (random) {
     const entry = entries[Math.floor(Math.random() * entries.length)];
-    if (!entry) { process.exit(0); }
+    if (!entry) {
+      process.exit(0);
+    }
     const content = fs.readFileSync(entry.path, 'utf8');
     console.log(`\n[${entry.name}] ${entry.title}\n`);
     console.log('Question:');

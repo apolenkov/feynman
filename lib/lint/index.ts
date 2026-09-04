@@ -10,12 +10,12 @@ import type { Issue, ASTNode } from './rules.ts';
 export type { Issue } from './rules.ts';
 
 export interface LintOptions {
-  rules?: string[];
+  readonly rules?: readonly string[];
 }
 
 export interface LintResult {
-  issues: Issue[];
-  passed: boolean;
+  readonly issues: readonly Issue[];
+  readonly passed: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -26,22 +26,23 @@ export interface LintResult {
 export type RuleScope = 'pernode' | 'fulltext';
 
 export interface RuleEntry {
-  id: string;
-  scope: RuleScope;
-  fn: (node: ASTNode, fullText: string) => Issue[];
-  description: string;
+  readonly id: string;
+  readonly scope: RuleScope;
+  readonly fn: (node: ASTNode, fullText: string) => Issue[];
+  readonly description: string;
 }
 
 /**
  * Canonical registry of all 15 lint rules (L01–L15).
  * Descriptions are part of the CLI's stable diagnostic output.
  */
-export const RULE_REGISTRY: readonly RuleEntry[] = [
+const ruleEntries: readonly RuleEntry[] = [
   {
     id: 'L01',
     scope: 'pernode',
     fn: (node) => rules.L01_box_closure(node),
-    description: 'Box closure: every ┌─...─┐ opening must have a matching └─...─┘ at the same column',
+    description:
+      'Box closure: every ┌─...─┐ opening must have a matching └─...─┘ at the same column',
   },
   {
     id: 'L02',
@@ -65,7 +66,8 @@ export const RULE_REGISTRY: readonly RuleEntry[] = [
     id: 'L05',
     scope: 'pernode',
     fn: (node) => rules.L05_flow_integrity(node),
-    description: 'Flow integrity: two [Box] tokens on the same line must have an arrow between them',
+    description:
+      'Flow integrity: two [Box] tokens on the same line must have an arrow between them',
   },
   {
     id: 'L06',
@@ -77,7 +79,8 @@ export const RULE_REGISTRY: readonly RuleEntry[] = [
     id: 'L07',
     scope: 'fulltext',
     fn: (_node, fullText) => rules.L07_no_mermaid_mix(null, fullText),
-    description: 'Mermaid+ASCII mix: use either Mermaid or ASCII diagrams, not both in the same response',
+    description:
+      'Mermaid+ASCII mix: use either Mermaid or ASCII diagrams, not both in the same response',
   },
   {
     id: 'L08',
@@ -89,7 +92,8 @@ export const RULE_REGISTRY: readonly RuleEntry[] = [
     id: 'L09',
     scope: 'pernode',
     fn: (node) => rules.L09_right_edge_alignment(node),
-    description: 'Right-edge alignment: every inner │ and bottom ┘ must land at the same visual column as the top ┐',
+    description:
+      'Right-edge alignment: every inner │ and bottom ┘ must land at the same visual column as the top ┐',
   },
   {
     id: 'L10',
@@ -107,35 +111,43 @@ export const RULE_REGISTRY: readonly RuleEntry[] = [
     id: 'L12',
     scope: 'pernode',
     fn: (node) => rules.L12_token_budget(node),
-    description: 'Token budget: padding-dominated frame (padding > content) — consider a lighter visual',
+    description:
+      'Token budget: padding-dominated frame (padding > content) — consider a lighter visual',
   },
   {
     id: 'L13',
     scope: 'pernode',
     fn: (node) => rules.L13_double_wrap(node),
-    description: 'Double wrap: tree inside a frame — tree indentation already conveys hierarchy; drop the frame',
+    description:
+      'Double wrap: tree inside a frame — tree indentation already conveys hierarchy; drop the frame',
   },
   {
     id: 'L14',
     scope: 'pernode',
     fn: (node, fullText) => rules.L14_blank_line_separation(node, fullText),
-    description: 'Blank-line separation: fenced diagram blocks should have a blank line before and after',
+    description:
+      'Blank-line separation: fenced diagram blocks should have a blank line before and after',
   },
   {
     id: 'L15',
     scope: 'pernode',
     fn: (node) => rules.L15_homogeneous_frame(node),
-    description: 'Homogeneous frame: frame wraps uniform content (bullets/kv/prose) — consider plain format',
+    description:
+      'Homogeneous frame: frame wraps uniform content (bullets/kv/prose) — consider plain format',
   },
 ];
 
+export const RULE_REGISTRY: readonly RuleEntry[] = Object.freeze(
+  ruleEntries.map((entry) => Object.freeze(entry)),
+);
+
 /** Flat map from rule id → description, derived from RULE_REGISTRY. */
-export const RULE_DESCRIPTIONS: Record<string, string> = Object.fromEntries(
-  RULE_REGISTRY.map(r => [r.id, r.description])
+export const RULE_DESCRIPTIONS: Readonly<Record<string, string>> = Object.freeze(
+  Object.fromEntries(RULE_REGISTRY.map((r) => [r.id, r.description])),
 );
 
 /** Ordered list of all rule IDs, derived from RULE_REGISTRY (self-maintaining). */
-export const RULE_IDS: readonly string[] = RULE_REGISTRY.map(r => r.id);
+export const RULE_IDS: readonly string[] = Object.freeze(RULE_REGISTRY.map((r) => r.id));
 
 // ---------------------------------------------------------------------------
 
@@ -188,11 +200,9 @@ export function lint(markdown: string, options?: LintOptions): LintResult {
   // Sort into source order (line, then column, then rule id) so output is
   // deterministic and reads top-to-bottom regardless of registry dispatch
   // order. Array.prototype.sort is stable, so equal keys keep insertion order.
-  allIssues.sort((a, b) =>
-    a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule)
-  );
+  allIssues.sort((a, b) => a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
 
-  const errorCount = allIssues.filter(i => i.severity === 'error').length;
+  const errorCount = allIssues.filter((i) => i.severity === 'error').length;
   const passed = errorCount === 0;
 
   return { issues: allIssues, passed };
@@ -206,7 +216,12 @@ export function lint(markdown: string, options?: LintOptions): LintResult {
  * @param {boolean} [useColor] - ANSI color for TTY
  * @returns {string}
  */
-export function format(issues: Issue[], mode: 'gcc' | 'json', filename?: string, useColor?: boolean): string {
+export function format(
+  issues: readonly Issue[],
+  mode: 'gcc' | 'json',
+  filename?: string,
+  useColor?: boolean,
+): string {
   if (mode === 'json') {
     return JSON.stringify(issues, null, 2);
   }
@@ -214,16 +229,18 @@ export function format(issues: Issue[], mode: 'gcc' | 'json', filename?: string,
   // gcc mode: <file>:<line>:<col>: L0X severity message
   if (!issues || issues.length === 0) return '';
 
-  const RESET  = useColor ? '\x1b[0m'  : '';
-  const RED    = useColor ? '\x1b[31m' : '';
+  const RESET = useColor ? '\x1b[0m' : '';
+  const RED = useColor ? '\x1b[31m' : '';
   const YELLOW = useColor ? '\x1b[33m' : '';
-  const BOLD   = useColor ? '\x1b[1m'  : '';
+  const BOLD = useColor ? '\x1b[1m' : '';
 
   const file = filename || '<input>';
 
-  return issues.map(iss => {
-    const color = iss.severity === 'error' ? RED : YELLOW;
-    const sev = iss.severity === 'error' ? 'error' : 'warn';
-    return `${file}:${iss.line}:${iss.column}: ${color}${BOLD}${iss.rule} ${sev}${RESET} ${iss.message}`;
-  }).join('\n');
+  return issues
+    .map((iss) => {
+      const color = iss.severity === 'error' ? RED : YELLOW;
+      const sev = iss.severity === 'error' ? 'error' : 'warn';
+      return `${file}:${iss.line}:${iss.column}: ${color}${BOLD}${iss.rule} ${sev}${RESET} ${iss.message}`;
+    })
+    .join('\n');
 }

@@ -25,9 +25,7 @@
     "longDescription": "Feynman helps Codex make flows, hierarchies, comparisons, priorities, and status summaries immediately readable with concise ASCII diagrams.",
     "developerName": "apolenkov",
     "category": "Productivity",
-    "capabilities": [
-      "Interactive"
-    ],
+    "capabilities": ["Interactive"],
     "websiteURL": "https://github.com/apolenkov/feynman",
     "privacyPolicyURL": "https://github.com/apolenkov/feynman/blob/main/PRIVACY.md",
     "termsOfServiceURL": "https://github.com/apolenkov/feynman/blob/main/LICENSE",

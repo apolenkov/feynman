@@ -10,8 +10,13 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const pkg = require(path.join(ROOT, 'package.json')) as { version: string; name: string; files?: string[] };
-const NPM_CACHE: string = process.env['FEYNMAN_NPM_CACHE'] || path.join(os.tmpdir(), 'npm-cache-feynman');
+const pkg = require(path.join(ROOT, 'package.json')) as {
+  version: string;
+  name: string;
+  files?: string[];
+};
+const NPM_CACHE: string =
+  process.env['FEYNMAN_NPM_CACHE'] || path.join(os.tmpdir(), 'npm-cache-feynman');
 
 function isolatedNpmEnv(root: string): NodeJS.ProcessEnv {
   // Isolate both HOME and npm's user config so a developer's global npm policy
@@ -65,14 +70,22 @@ function binPath(projectDir: string, name: string): string {
 }
 
 function readJson(filePath: string): Record<string, unknown> {
-  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  const value: unknown = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`Expected JSON object: ${filePath}`);
+  }
+  return value as Record<string, unknown>;
 }
 
 function runtimeConfigPath(homeDir: string): string {
   return path.join(homeDir, '.codex', 'hooks.json');
 }
 
-function findHookCommand(config: Record<string, unknown>, eventName: string, scriptName: string): string {
+function findHookCommand(
+  config: Record<string, unknown>,
+  eventName: string,
+  scriptName: string,
+): string {
   const hooks = config['hooks'] as Record<string, unknown[]> | undefined;
   const groups = (hooks && hooks[eventName]) || [];
   for (const group of groups as Array<{ hooks?: Array<{ command?: string }> }>) {
@@ -134,12 +147,12 @@ function verifyTarballManifest(tarball: string, filesField: string[]): void {
   const result = spawnSync('tar', ['-tzf', tarball], { encoding: 'utf8' });
   if (result.status !== 0) throw new Error('failed to list tarball contents');
   const entries = new Set(
-    result.stdout.split('\n').map(e => e.replace(/^package\//, '').replace(/\/$/, '')),
+    result.stdout.split('\n').map((e) => e.replace(/^package\//, '').replace(/\/$/, '')),
   );
   for (const entry of filesField) {
     const name = entry.replace(/\/$/, '');
     if (entry.endsWith('/')) {
-      if (![...entries].some(e => e === name || e.startsWith(name + '/'))) {
+      if (![...entries].some((e) => e === name || e.startsWith(name + '/'))) {
         throw new Error(`tarball missing files[] directory: ${entry}`);
       }
     } else {
@@ -160,21 +173,32 @@ function readTarballEntry(tarball: string, entry: string): string {
 
 /** Verify the installable artifact, not merely the source-tree plugin files. */
 function verifyNativePlugin(tarball: string): void {
-  const manifest = JSON.parse(readTarballEntry(tarball, 'plugins/feynman/.codex-plugin/plugin.json')) as Record<string, unknown>;
+  const manifest = JSON.parse(
+    readTarballEntry(tarball, 'plugins/feynman/.codex-plugin/plugin.json'),
+  ) as Record<string, unknown>;
   const interfaceMeta = manifest['interface'];
   if (
     manifest['name'] !== 'feynman' ||
     manifest['version'] !== pkg.version ||
     manifest['skills'] !== './skills/' ||
-    typeof interfaceMeta !== 'object' || interfaceMeta === null || Array.isArray(interfaceMeta) ||
+    typeof interfaceMeta !== 'object' ||
+    interfaceMeta === null ||
+    Array.isArray(interfaceMeta) ||
     (interfaceMeta as Record<string, unknown>)['brandColor'] !== '#2563EB'
   ) {
     throw new Error('packed native Codex plugin manifest is incomplete or out of sync');
   }
 
   const skill = readTarballEntry(tarball, 'plugins/feynman/skills/feynman/SKILL.md');
-  if (!/npx -y @albinocrabs\/feynman@latest state/.test(skill)) {
-    throw new Error('packed native Codex skill lacks its self-contained npx state bridge');
+  const settings = readTarballEntry(
+    tarball,
+    'plugins/feynman/skills/feynman/references/settings.md',
+  );
+  if (
+    !/\]\(references\/settings\.md\)/.test(skill) ||
+    !/npx -y @albinocrabs\/feynman@latest state/.test(settings)
+  ) {
+    throw new Error('packed native Codex skill lacks its linked CLI settings reference');
   }
   if (/disable-model-invocation/i.test(skill)) {
     throw new Error('packed native Codex skill contains non-discoverable metadata');
@@ -191,7 +215,9 @@ if (!fs.existsSync(tarballTxt)) {
 }
 const expectedTarball = path.join(ROOT, fs.readFileSync(tarballTxt, 'utf8').trim());
 if (!fs.existsSync(expectedTarball)) {
-  process.stderr.write(`pre-built tarball not found: ${expectedTarball}\nRun 'npm run build' first.\n`);
+  process.stderr.write(
+    `pre-built tarball not found: ${expectedTarball}\nRun 'npm run build' first.\n`,
+  );
   process.exit(1);
 }
 
@@ -223,7 +249,8 @@ try {
   run(feynman, ['install', '--force'], { env: { HOME: homeDir } });
 
   const codexDoctor = run(feynman, ['doctor'], { env: { HOME: homeDir } });
-  if (!codexDoctor.includes('Status: OK')) throw new Error('Codex doctor smoke failed for packed install');
+  if (!codexDoctor.includes('Status: OK'))
+    throw new Error('Codex doctor smoke failed for packed install');
   verifyInstalledHooks(homeDir);
 
   const lintOut = run(lint, ['--json', path.join(ROOT, 'tests', 'fixtures', 'valid-flow.md')]);
