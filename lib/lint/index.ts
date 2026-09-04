@@ -25,12 +25,22 @@ export interface LintResult {
 
 export type RuleScope = 'pernode' | 'fulltext';
 
-export interface RuleEntry {
+interface RuleEntryBase {
   readonly id: string;
-  readonly scope: RuleScope;
-  readonly fn: (node: ASTNode, fullText: string) => Issue[];
   readonly description: string;
 }
+
+export interface PerNodeRuleEntry extends RuleEntryBase {
+  readonly scope: 'pernode';
+  readonly fn: (node: ASTNode, fullText: string) => readonly Issue[];
+}
+
+export interface FullTextRuleEntry extends RuleEntryBase {
+  readonly scope: 'fulltext';
+  readonly fn: (fullText: string) => readonly Issue[];
+}
+
+export type RuleEntry = PerNodeRuleEntry | FullTextRuleEntry;
 
 /**
  * Canonical registry of all 15 lint rules (L01–L15).
@@ -78,7 +88,7 @@ const ruleEntries: readonly RuleEntry[] = [
   {
     id: 'L07',
     scope: 'fulltext',
-    fn: (_node, fullText) => rules.L07_no_mermaid_mix(null, fullText),
+    fn: (fullText) => rules.L07_no_mermaid_mix(fullText),
     description:
       'Mermaid+ASCII mix: use either Mermaid or ASCII diagrams, not both in the same response',
   },
@@ -98,7 +108,7 @@ const ruleEntries: readonly RuleEntry[] = [
   {
     id: 'L10',
     scope: 'fulltext',
-    fn: (_node, fullText) => rules.L10_mixed_script(fullText),
+    fn: (fullText) => rules.L10_mixed_script(fullText),
     description: 'Mixed-script: avoid mixing Cyrillic and Latin characters within a single token',
   },
   {
@@ -157,55 +167,55 @@ export const RULE_IDS: readonly string[] = Object.freeze(RULE_REGISTRY.map((r) =
  * @param {LintOptions} [options] - optional rule filter
  * @returns {LintResult}
  */
-export function lint(markdown: string, options?: LintOptions): LintResult {
+export function lint(markdown: unknown, options?: LintOptions): LintResult {
   if (typeof markdown !== 'string') {
     return { issues: [], passed: true };
   }
 
-  const enabledRules = (options && options.rules) || null;
-
-  function isEnabled(ruleId: string): boolean {
-    if (!enabledRules) return true;
-    return enabledRules.includes(ruleId);
-  }
+  const enabledRules = options?.rules;
 
   const ast = parse(markdown);
-  const allIssues: Issue[] = [];
+  const executionFailure = (entry: RuleEntry, line: number, error: unknown): Issue => ({
+    rule: entry.id,
+    severity: 'error',
+    line,
+    column: 1,
+    message: `Rule execution failed: ${error instanceof Error ? error.message : String(error)}`,
+  });
 
-  // Dispatch via the registry — pernode rules run for each AST node;
-  // fulltext rules run once on the full markdown string.
-  for (const entry of RULE_REGISTRY) {
-    if (!isEnabled(entry.id)) continue;
-
-    if (entry.scope === 'pernode') {
-      for (const node of ast) {
-        try {
-          const nodeIssues = entry.fn(node, markdown);
-          if (Array.isArray(nodeIssues)) allIssues.push(...nodeIssues);
-        } catch (_) {
-          // Rule threw — skip silently (never crash linter)
-        }
-      }
-    } else {
-      // fulltext: pass a dummy empty node as first arg; fn uses fullText arg
-      try {
-        const fulltextIssues = entry.fn({} as ASTNode, markdown);
-        if (Array.isArray(fulltextIssues)) allIssues.push(...fulltextIssues);
-      } catch (_) {
-        // Skip silently
-      }
+  const runPerNode = (entry: PerNodeRuleEntry, node: ASTNode): readonly Issue[] => {
+    try {
+      return entry.fn(node, markdown);
+    } catch (error: unknown) {
+      return [executionFailure(entry, node.startLine, error)];
     }
-  }
+  };
+
+  const runFullText = (entry: FullTextRuleEntry): readonly Issue[] => {
+    try {
+      return entry.fn(markdown);
+    } catch (error: unknown) {
+      return [executionFailure(entry, 1, error)];
+    }
+  };
+
+  const allIssues = RULE_REGISTRY.filter(
+    (entry) => enabledRules === undefined || enabledRules.includes(entry.id),
+  ).flatMap((entry) =>
+    entry.scope === 'pernode' ? ast.flatMap((node) => runPerNode(entry, node)) : runFullText(entry),
+  );
 
   // Sort into source order (line, then column, then rule id) so output is
   // deterministic and reads top-to-bottom regardless of registry dispatch
-  // order. Array.prototype.sort is stable, so equal keys keep insertion order.
-  allIssues.sort((a, b) => a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule));
+  // order. Array.prototype.toSorted is stable, so equal keys keep insertion order.
+  const sortedIssues = allIssues.toSorted(
+    (a, b) => a.line - b.line || a.column - b.column || a.rule.localeCompare(b.rule),
+  );
 
-  const errorCount = allIssues.filter((i) => i.severity === 'error').length;
+  const errorCount = sortedIssues.filter((i) => i.severity === 'error').length;
   const passed = errorCount === 0;
 
-  return { issues: allIssues, passed };
+  return { issues: sortedIssues, passed };
 }
 
 /**
@@ -227,14 +237,14 @@ export function format(
   }
 
   // gcc mode: <file>:<line>:<col>: L0X severity message
-  if (!issues || issues.length === 0) return '';
+  if (issues.length === 0) return '';
 
-  const RESET = useColor ? '\x1b[0m' : '';
-  const RED = useColor ? '\x1b[31m' : '';
-  const YELLOW = useColor ? '\x1b[33m' : '';
-  const BOLD = useColor ? '\x1b[1m' : '';
+  const RESET = useColor === true ? '\x1b[0m' : '';
+  const RED = useColor === true ? '\x1b[31m' : '';
+  const YELLOW = useColor === true ? '\x1b[33m' : '';
+  const BOLD = useColor === true ? '\x1b[1m' : '';
 
-  const file = filename || '<input>';
+  const file = filename ?? '<input>';
 
   return issues
     .map((iss) => {

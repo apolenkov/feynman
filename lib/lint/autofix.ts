@@ -9,11 +9,9 @@ import { nextFrame } from './frames.ts';
 // Strip indent prefix and the outer │ chars from an inner line. Returns the
 // raw cell content without trailing space.
 function unwrapInner(line: string, indent: string): string {
-  let s = line;
-  if (indent && s.startsWith(indent)) s = s.slice(indent.length);
+  const withoutIndent = indent && line.startsWith(indent) ? line.slice(indent.length) : line;
   // Drop leading │ and trailing │ (the latter may have padding before it).
-  s = s.replace(/^│/, '').replace(/\s*│\s*$/, '');
-  return s;
+  return withoutIndent.replace(/^│/, '').replace(/\s*│\s*$/, '');
 }
 
 export interface FrameNodeFull {
@@ -24,26 +22,37 @@ export interface FrameNodeFull {
   readonly indent: string;
 }
 
+function titleFromTop(top: string): string | null {
+  const left = top.indexOf('┌');
+  const right = top.lastIndexOf('┐');
+  if (left === -1 || right <= left) return null;
+  const topInner = top.slice(left + 1, right);
+  if (/^─+$/.test(topInner)) return null;
+  const title = topInner.replace(/^─+/, '').replace(/─+$/, '').trim();
+  return title.length === 0 ? null : title;
+}
+
 export function autofixFrame(node: FrameNodeFull): string {
-  const indent = node.indent || '';
+  const indent = node.indent;
   const inner = node.inner.map((line) => unwrapInner(line, indent));
   // Compute target inner width using full topInner visual width so titled tops
   // like `┌─ Title ─┐` don't collapse to a dash-count that ignores the title.
   const topInner = node.top.slice(node.top.indexOf('┌') + 1, node.top.lastIndexOf('┐'));
   const topWidth = visualWidth(topInner);
-  const W = Math.max(1, topWidth, ...inner.map(visualWidth));
-  const dash = '─'.repeat(W);
   // Rebuild top bar: preserve title when present (Pattern D — titled top).
-  const titleMatch = topInner.match(/^─+\s+(.+?)\s+─+$/);
-  const title = titleMatch ? titleMatch[1] : null;
-  let top: string;
-  if (title) {
-    const titleSegment = `─ ${title} `;
-    const remainingDashes = '─'.repeat(Math.max(1, W - visualWidth(titleSegment)));
-    top = indent + '┌' + titleSegment + remainingDashes + '┐';
-  } else {
-    top = indent + '┌' + dash + '┐';
-  }
+  const title = titleFromTop(node.top);
+  const titleSegment = title === null ? null : `─ ${title} `;
+  const W = Math.max(
+    1,
+    topWidth,
+    titleSegment === null ? 0 : visualWidth(titleSegment) + 1,
+    ...inner.map(visualWidth),
+  );
+  const dash = '─'.repeat(W);
+  const top =
+    titleSegment !== null
+      ? indent + '┌' + titleSegment + '─'.repeat(Math.max(1, W - visualWidth(titleSegment))) + '┐'
+      : indent + '┌' + dash + '┐';
   const bot = indent + '└' + dash + '┘';
   const fixed = inner.map((content) => {
     const pad = ' '.repeat(Math.max(0, W - visualWidth(content)));
@@ -60,6 +69,10 @@ export function autofixFrame(node: FrameNodeFull): string {
 type RowKind =
   { kind: 'pattern'; label: string; state: string } | { kind: 'bullet'; content: string };
 
+function frameTitle(node: FrameNodeFull): string | null {
+  return titleFromTop(node.top);
+}
+
 /**
  * Convert a frame node (≤5 inner lines, no tree, no embedded table) to a
  * dot-leader list. Each inner line becomes one row:
@@ -70,7 +83,7 @@ type RowKind =
  * @returns {string}
  */
 export function autofixFrameToDotLeader(node: FrameNodeFull): string {
-  const indent = node.indent || '';
+  const indent = node.indent;
   const stripped = node.inner.map((line) => unwrapInner(line, indent).trim());
 
   // Classify each row: pattern (label + state) or free-form
@@ -78,24 +91,29 @@ export function autofixFrameToDotLeader(node: FrameNodeFull): string {
     // Match trailing STATE marker.
     const re = new RegExp(STATE_MARKER_RE.source, STATE_MARKER_RE.flags);
     const stateMatch = content.match(re);
-    if (!stateMatch) return { kind: 'bullet' as const, content };
-    const state = stateMatch[0].trim();
-    const stateIdx = content.lastIndexOf(state);
+    if (!stateMatch) return { kind: 'bullet', content };
+    const matchedState = stateMatch[0].trim();
+    const glyphIndex = content.search(/[✓✗◐⌛→←]/u);
+    const stateIdx = glyphIndex === -1 ? content.lastIndexOf(matchedState) : glyphIndex;
+    const state = content.slice(stateIdx).trim();
     // Label = everything before state, with trailing dots/whitespace stripped.
     const label = content.slice(0, stateIdx).replace(/[\s.]+$/, '');
-    if (!label) return { kind: 'bullet' as const, content };
-    return { kind: 'pattern' as const, label, state };
+    if (!label) return { kind: 'bullet', content };
+    return { kind: 'pattern', label, state };
   });
 
   // Mixed mode: if ANY row is bullet, emit ALL as bullets.
   const allPattern = rows.every((r) => r.kind === 'pattern');
+  const title = frameTitle(node);
+  const titleLine = title === null ? [] : [indent + title];
   if (!allPattern) {
-    return rows
-      .map((r) => {
+    return [
+      ...titleLine,
+      ...rows.map((r) => {
         const text = r.kind === 'pattern' ? `${r.label} ${r.state}` : r.content;
         return indent + '- ' + text;
-      })
-      .join('\n');
+      }),
+    ].join('\n');
   }
 
   // Dot-leader mode (D-09-04-01: auto-detect, cap at 80).
@@ -104,7 +122,7 @@ export function autofixFrameToDotLeader(node: FrameNodeFull): string {
   // space, then the state. Result: all rows have equal dot-counts AND the
   // state column is aligned. State width may differ across rows, so total row
   // width can differ — that is fine and matches conventional dot-leader.
-  const patternRows = rows as Array<{ kind: 'pattern'; label: string; state: string }>;
+  const patternRows: readonly Extract<RowKind, { kind: 'pattern' }>[] = rows;
   const labelMax = Math.max(...patternRows.map((r) => visualWidth(r.label)));
   const stateMax = Math.max(...patternRows.map((r) => visualWidth(r.state)));
   const indentW = visualWidth(indent);
@@ -114,14 +132,15 @@ export function autofixFrameToDotLeader(node: FrameNodeFull): string {
   const maxRowW = Math.min(80 - indentW, Math.max(wantW, labelMax + stateMax + 6));
   const dotsCount = Math.max(3, maxRowW - labelMax - stateMax - 2);
 
-  return patternRows
-    .map((r) => {
+  return [
+    ...titleLine,
+    ...patternRows.map((r) => {
       const labelW = visualWidth(r.label);
       const labelPad = ' '.repeat(Math.max(0, labelMax - labelW));
       const dots = '.'.repeat(dotsCount);
       return indent + r.label + labelPad + ' ' + dots + ' ' + r.state;
-    })
-    .join('\n');
+    }),
+  ].join('\n');
 }
 
 // Eligibility check for L11 dot-leader autofix. Matches L11_overdecoration
@@ -130,7 +149,7 @@ function isL11Eligible(inner: readonly string[]): boolean {
   const n = inner.length;
   if (n < 1 || n > 5) return false;
   if (inner.some((l) => /[├└]──/.test(l))) return false; // nested tree
-  if (inner.some((l) => (l.match(/│/g) || []).length >= 3)) return false; // embedded table
+  if (inner.some((l) => (l.match(/│/g) ?? []).length >= 3)) return false; // embedded table
   return true;
 }
 
@@ -153,11 +172,11 @@ export interface AutofixOptions {
 
 type FrameContentType = 'kv' | 'bullet' | 'prose' | 'status' | 'complex';
 
-function detectFrameContentType(stripped: string[]): FrameContentType {
+function detectFrameContentType(stripped: readonly string[]): FrameContentType {
   if (stripped.length === 0) return 'complex';
   // Complex guards first
   if (stripped.some((l) => /[├└]──/.test(l))) return 'complex';
-  if (stripped.some((l) => (l.match(/│/g) || []).length >= 2)) return 'complex';
+  if (stripped.some((l) => (l.match(/│/g) ?? []).length >= 2)) return 'complex';
   if (stripped.some((l) => /─→|→|──>|-->/.test(l))) return 'complex';
   // Status markers (let L11 handle)
   const stateRe = new RegExp(STATE_MARKER_RE.source, STATE_MARKER_RE.flags);
@@ -172,28 +191,21 @@ function detectFrameContentType(stripped: string[]): FrameContentType {
 }
 
 export function autofixFrameToPlain(node: FrameNodeFull): string {
-  const indent = node.indent || '';
+  const indent = node.indent;
   const stripped = node.inner.map((l) => unwrapInner(l, indent).trim());
   // Require ≥2 inner lines — single-item frames are too ambiguous to convert.
   if (stripped.length < 2) return autofixFrame(node);
   const type = detectFrameContentType(stripped);
   if (type === 'complex' || type === 'status') return autofixFrame(node);
 
-  const topInner = node.top.slice(node.top.indexOf('┌') + 1, node.top.lastIndexOf('┐'));
-  const titleMatch = topInner.match(/^─+\s+(.+?)\s+─+$/);
-  const title = titleMatch ? titleMatch[1] : null;
+  const title = frameTitle(node);
 
-  const out: string[] = [];
-  if (title) out.push(indent + title);
-  for (const line of stripped) {
-    if (type === 'bullet') {
-      const content = line.replace(/^[-•*◦▸▹·]\s*/, '');
-      out.push(indent + '- ' + content);
-    } else {
-      out.push(indent + line);
-    }
-  }
-  return out.join('\n');
+  const titleLine = title === null ? [] : [indent + title];
+  const contentLines = stripped.map((line) => {
+    const content = type === 'bullet' ? line.replace(/^[-•*◦▸▹·]\s*/, '') : line;
+    return type === 'bullet' ? indent + '- ' + content : indent + content;
+  });
+  return [...titleLine, ...contentLines].join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -206,21 +218,22 @@ export function autofixFrameToPlain(node: FrameNodeFull): string {
 const ARROW_RE = /─→|→|──>|-->/;
 
 function hasExactlyOneArrow(line: string): boolean {
-  return (line.match(/─→|→|──>|-->/g) || []).length === 1;
+  return (line.match(/─→|→|──>|-->/g) ?? []).length === 1;
 }
 
 function arrowColPos(line: string): number {
-  const m = line.match(/─→|→|──>|-->/);
-  return m && m.index !== undefined ? visualWidth(line.slice(0, m.index)) : -1;
+  const m = /─→|→|──>|-->/.exec(line);
+  return m?.index !== undefined ? visualWidth(line.slice(0, m.index)) : -1;
 }
 
 // Build a set of line indices that should be skipped for new-pattern fixes:
 // fenced-block lines (when processFenced=false) and frame border/inner lines.
-function buildSkipSet(lines: string[], processFenced: boolean): Set<number> {
+function buildSkipSet(lines: readonly string[], processFenced: boolean): ReadonlySet<number> {
   const skip = new Set<number>();
   let inFence = false;
   for (let i = 0; i < lines.length; i++) {
-    const l = lines[i]!;
+    const l = lines[i];
+    if (l === undefined) break;
     if (/^\s*```/.test(l)) {
       inFence = !inFence;
       skip.add(i);
@@ -243,12 +256,18 @@ function detectAndFixArrows(text: string, processFenced: boolean): string {
   const result = [...lines];
   let i = 0;
   while (i < n) {
-    if (skip.has(i) || !hasExactlyOneArrow(lines[i]!)) {
+    const line = lines[i];
+    if (line === undefined) break;
+    if (skip.has(i) || !hasExactlyOneArrow(line)) {
       i++;
       continue;
     }
     let j = i + 1;
-    while (j < n && !skip.has(j) && hasExactlyOneArrow(lines[j]!)) j++;
+    while (j < n && !skip.has(j)) {
+      const candidate = lines[j];
+      if (candidate === undefined || !hasExactlyOneArrow(candidate)) break;
+      j++;
+    }
     const regionEnd = j - 1;
     if (regionEnd - i >= 1) {
       const regionLines = lines.slice(i, regionEnd + 1);
@@ -257,13 +276,15 @@ function detectAndFixArrows(text: string, processFenced: boolean): string {
       const maxPos = Math.max(...positions);
       if (maxPos - minPos <= 3) {
         const parts = regionLines.map((l) => {
-          const m = l.match(/─→|→|──>|-->/);
-          if (!m || m.index === undefined) return { left: l, rest: '' };
+          const m = /─→|→|──>|-->/.exec(l);
+          if (m?.index === undefined) return { left: l, rest: '' };
           return { left: l.slice(0, m.index).trimEnd(), rest: l.slice(m.index) };
         });
         const maxLeft = Math.max(...parts.map((p) => visualWidth(p.left)));
         for (let k = 0; k < parts.length; k++) {
-          const { left, rest } = parts[k]!;
+          const part = parts[k];
+          if (part === undefined) break;
+          const { left, rest } = part;
           const pad = ' '.repeat(maxLeft - visualWidth(left));
           result[i + k] = left + pad + ' ' + rest;
         }
@@ -287,12 +308,12 @@ function detectAndFixArrows(text: string, processFenced: boolean): string {
 const JUNCTION_RE = /──[┐┤┘]/;
 
 function hasExactlyOneJunction(line: string): boolean {
-  return (line.match(/──[┐┤┘]/g) || []).length === 1;
+  return (line.match(/──[┐┤┘]/g) ?? []).length === 1;
 }
 
 function junctionColPos(line: string): number {
-  const m = line.match(/──[┐┤┘]/);
-  return m && m.index !== undefined ? visualWidth(line.slice(0, m.index)) : -1;
+  const m = /──[┐┤┘]/.exec(line);
+  return m?.index !== undefined ? visualWidth(line.slice(0, m.index)) : -1;
 }
 
 function detectAndFixJunctions(text: string, processFenced: boolean): string {
@@ -303,12 +324,18 @@ function detectAndFixJunctions(text: string, processFenced: boolean): string {
   const result = [...lines];
   let i = 0;
   while (i < n) {
-    if (skip.has(i) || !hasExactlyOneJunction(lines[i]!)) {
+    const line = lines[i];
+    if (line === undefined) break;
+    if (skip.has(i) || !hasExactlyOneJunction(line)) {
       i++;
       continue;
     }
     let j = i + 1;
-    while (j < n && !skip.has(j) && hasExactlyOneJunction(lines[j]!)) j++;
+    while (j < n && !skip.has(j)) {
+      const candidate = lines[j];
+      if (candidate === undefined || !hasExactlyOneJunction(candidate)) break;
+      j++;
+    }
     const regionEnd = j - 1;
     if (regionEnd - i >= 1) {
       const regionLines = lines.slice(i, regionEnd + 1);
@@ -317,13 +344,15 @@ function detectAndFixJunctions(text: string, processFenced: boolean): string {
       const maxPos = Math.max(...positions);
       if (maxPos - minPos <= 3) {
         const parts = regionLines.map((l) => {
-          const m = l.match(/──[┐┤┘]/);
-          if (!m || m.index === undefined) return { left: l, rest: '' };
+          const m = /──[┐┤┘]/.exec(l);
+          if (m?.index === undefined) return { left: l, rest: '' };
           return { left: l.slice(0, m.index).trimEnd(), rest: l.slice(m.index) };
         });
         const maxLeft = Math.max(...parts.map((p) => visualWidth(p.left)));
         for (let k = 0; k < parts.length; k++) {
-          const { left, rest } = parts[k]!;
+          const part = parts[k];
+          if (part === undefined) break;
+          const { left, rest } = part;
           const pad = ' '.repeat(maxLeft - visualWidth(left));
           result[i + k] = left + pad + ' ' + rest;
         }
@@ -350,18 +379,17 @@ function isSeparatorLine(line: string): boolean {
 }
 
 function detectAndFixSeparators(text: string, processFenced: boolean): string {
-  if (text.indexOf('─') === -1) return text;
+  if (!text.includes('─')) return text;
   const lines = text.split('\n');
   const skip = buildSkipSet(lines, processFenced);
-  const sepIndices: number[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (!skip.has(i) && isSeparatorLine(lines[i]!)) sepIndices.push(i);
-  }
+  const sepIndices = lines.flatMap((line, index) =>
+    !skip.has(index) && isSeparatorLine(line) ? [index] : [],
+  );
   if (sepIndices.length < 2) return text;
-  const maxLen = Math.max(...sepIndices.map((i) => visualWidth(lines[i]!.trim())));
+  const maxLen = Math.max(...sepIndices.map((i) => visualWidth(lines[i]?.trim() ?? '')));
   const result = [...lines];
   for (const i of sepIndices) {
-    const indent = (lines[i]!.match(/^(\s*)/) || ['', ''])[1]!;
+    const indent = lines[i]?.match(/^(\s*)/)?.[1] ?? '';
     result[i] = indent + '─'.repeat(maxLen);
   }
   return result.join('\n');
@@ -370,9 +398,10 @@ function detectAndFixSeparators(text: string, processFenced: boolean): string {
 // Index of the next ``` fence line at or after `from`, or lines.length if none.
 // Used to bound frame detection to one fence-free segment so a frame can never
 // span a ``` boundary — fenced blocks are out of scope by default.
-function nextFenceLine(lines: string[], from: number): number {
+function nextFenceLine(lines: readonly string[], from: number): number {
   for (let k = from; k < lines.length; k++) {
-    if (/^\s*```/.test(lines[k]!)) return k;
+    const line = lines[k];
+    if (line !== undefined && /^\s*```/.test(line)) return k;
   }
   return lines.length;
 }
@@ -394,21 +423,22 @@ function nextFenceLine(lines: string[], from: number): number {
 // @param {string} text
 // @param {AutofixOptions} [opts]
 export function autofix(text: string, opts?: AutofixOptions): string {
-  const processFenced = !!(opts && opts.processFenced);
-  const convertL11 = !!(opts && opts.convertL11);
-  const convertL15 = !!(opts && opts.convertL15);
+  const processFenced = opts?.processFenced === true;
+  const convertL11 = opts?.convertL11 === true;
+  const convertL15 = opts?.convertL15 === true;
   if (!text) return text;
-  const hasFrames = text.indexOf('┌') !== -1;
+  const hasFrames = text.includes('┌');
   const hasArrows = ARROW_RE.test(text);
   const hasJunctions = JUNCTION_RE.test(text);
-  const hasSeps = text.indexOf('─') !== -1;
+  const hasSeps = text.includes('─');
   if (!hasFrames && !hasArrows && !hasJunctions && !hasSeps) return text;
   const lines = text.split('\n');
   const out: string[] = [];
   let i = 0;
   let inFence = false;
   while (i < lines.length) {
-    const line = lines[i]!;
+    const line = lines[i];
+    if (line === undefined) break;
     // Fenced code block toggle — opt-out by default to preserve author intent.
     if (/^\s*```/.test(line)) {
       inFence = !inFence;
@@ -421,7 +451,7 @@ export function autofix(text: string, opts?: AutofixOptions): string {
       i++;
       continue;
     }
-    const topMatch = line.match(/^(\s*)┌─[^┌\n]*┐\s*$/);
+    const topMatch = /^(\s*)┌─[^┌\n]*┐\s*$/.exec(line);
     if (!topMatch) {
       out.push(line);
       i++;
@@ -453,15 +483,18 @@ export function autofix(text: string, opts?: AutofixOptions): string {
     }
     if (inner.length === 0) {
       out.push(line);
-      out.push(lines[closeLi]!);
+      const bottom = lines[closeLi];
+      if (bottom !== undefined) out.push(bottom);
       i = closeLi + 1;
       continue;
     }
+    const bottom = lines[closeLi];
+    if (bottom === undefined) break;
     const node: FrameNodeFull = {
       kind: 'frame',
       top: line,
       inner,
-      bottom: lines[closeLi]!,
+      bottom,
       indent,
     };
     // Dispatch priority: L15 (plain) > L11 (dot-leader) > alignment.
@@ -483,10 +516,9 @@ export function autofix(text: string, opts?: AutofixOptions): string {
     }
     i = closeLi + 1;
   }
-  let result = detectAndFixArrows(out.join('\n'), processFenced);
-  result = detectAndFixJunctions(result, processFenced);
-  result = detectAndFixSeparators(result, processFenced);
-  return result;
+  const arrowsFixed = detectAndFixArrows(out.join('\n'), processFenced);
+  const junctionsFixed = detectAndFixJunctions(arrowsFixed, processFenced);
+  return detectAndFixSeparators(junctionsFixed, processFenced);
 }
 
 // Re-export visualWidth for backward compatibility (autofix.js exported it)

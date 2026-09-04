@@ -4,8 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  assertCompleteCoverageScope,
   assertMinimumCoverage,
   coverageScope,
+  coverageSourceFiles,
   lineCoverage,
   productionSourceFiles,
 } from '../scripts/check-coverage.ts';
@@ -50,6 +52,22 @@ describe('coverage gate', () => {
     assert.throws(() => lineCoverage('DA:1,1\n'), /appears before SF/);
   });
 
+  it('scans a long ordered LCOV report without losing record totals or cursor position', () => {
+    const records = Array.from(
+      { length: 750 },
+      (_, index) => `SF:file-${index}.ts\nLF:4\nLH:${index % 5}\nend_of_record`,
+    );
+    assert.deepEqual(lineCoverage(records.join('\n')), {
+      hit: 1_500,
+      found: 3_000,
+      percentage: 50,
+    });
+    assert.throws(
+      () => lineCoverage(`${records.join('\n')}\nSF:file-750.ts\nLF:4\nLH:2\n`),
+      /record for file-750\.ts is missing end_of_record/,
+    );
+  });
+
   it('reports every first-party TypeScript file that is absent from LCOV', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-coverage-'));
     try {
@@ -59,6 +77,7 @@ describe('coverage gate', () => {
         fs.writeFileSync(target, 'export {};\n');
       }
       fs.writeFileSync(path.join(root, 'bin', 'ignored.js'), 'export {};\n');
+      fs.writeFileSync(path.join(root, 'eslint.config.mjs'), 'export default [];\n');
       fs.mkdirSync(path.join(root, 'lib', 'nested'), { recursive: true });
       fs.writeFileSync(path.join(root, 'lib', 'nested', 'child.ts'), 'export {};\n');
 
@@ -70,6 +89,14 @@ describe('coverage gate', () => {
         'scripts/tool.ts',
       ]);
       assert.deepEqual(productionSourceFiles(path.join(root, 'missing')), []);
+      assert.deepEqual(coverageSourceFiles(root), [
+        'bin/entry.ts',
+        'eslint.config.mjs',
+        'hooks/start.ts',
+        'lib/core.ts',
+        'lib/nested/child.ts',
+        'scripts/tool.ts',
+      ]);
       assert.deepEqual(
         coverageScope(
           'SF:bin/entry.ts\nLF:1\nLH:1\nend_of_record\nSF:eslint.config.mjs\nLF:1\nLH:1\nend_of_record\n',
@@ -77,27 +104,48 @@ describe('coverage gate', () => {
         ),
         {
           coverage: { hit: 2, found: 2, percentage: 100 },
-          productionFiles: [
+          coverageFiles: [
             'bin/entry.ts',
+            'eslint.config.mjs',
             'hooks/start.ts',
             'lib/core.ts',
             'lib/nested/child.ts',
             'scripts/tool.ts',
           ],
           lcovFiles: ['bin/entry.ts', 'eslint.config.mjs'],
-          missingProductionFiles: [
+          missingCoverageFiles: [
             'hooks/start.ts',
             'lib/core.ts',
             'lib/nested/child.ts',
             'scripts/tool.ts',
           ],
-          lcovFilesOutsideProductionInventory: ['eslint.config.mjs'],
+          lcovFilesOutsideCoverageInventory: [],
         },
       );
       assert.deepEqual(
         coverageScope('SF:../outside.ts\nLF:1\nLH:1\nend_of_record\n', root).lcovFiles,
         ['../outside.ts'],
       );
+
+      const completeLcov = coverageSourceFiles(root)
+        .map((file) => `SF:${file}\nLF:20\nLH:19\nend_of_record`)
+        .join('\n');
+      assert.throws(() => {
+        assertCompleteCoverageScope(
+          coverageScope('SF:bin/entry.ts\nLF:1\nLH:1\nend_of_record\n', root),
+        );
+      }, /coverage sources absent from LCOV: eslint\.config\.mjs, hooks\/start\.ts, lib\/core\.ts, lib\/nested\/child\.ts, scripts\/tool\.ts/);
+      assert.throws(() => {
+        assertCompleteCoverageScope(
+          coverageScope(`${completeLcov}\nSF:other.config.mjs\nLF:1\nLH:1\nend_of_record\n`, root),
+        );
+      }, /LCOV records outside coverage inventory: other\.config\.mjs/);
+      assert.doesNotThrow(() => {
+        const scope = coverageScope(completeLcov, root);
+        assertCompleteCoverageScope(scope);
+        assert.equal(scope.coverage.percentage, 95);
+        assertMinimumCoverage(scope.coverage);
+      });
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

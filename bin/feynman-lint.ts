@@ -13,7 +13,8 @@ import path from 'node:path';
 import { lint, format } from '../lib/lint/index.ts';
 import { autofix } from '../lib/lint/autofix.ts';
 import { estimateFrameCost, type FrameCost } from '../lib/lint/rules.ts';
-import { nextFrame } from '../lib/lint/frames.ts';
+import { iterateFrames } from '../lib/lint/frames.ts';
+import { atomicWrite } from './adapters/fs.ts';
 
 const USAGE = `Usage: feynman-lint <file.md>
        feynman-lint -          (read from stdin)
@@ -37,111 +38,204 @@ Exit codes:
 `;
 
 interface ExplainEntry {
-  line: number;
-  cost: FrameCost;
+  readonly line: number;
+  readonly cost: FrameCost;
 }
 
-// Parse arguments. Exporting the entrypoint keeps the CLI testable without
-// spawning a second process (which Node's coverage collector cannot merge).
-export function main(argv = process.argv.slice(2)): void {
-  let useJson = false;
-  let useStrict = false;
-  let useFix = false;
-  let useExplain = false;
-  let filePath: string | null = null;
-  let useStdin = false;
+interface LintArguments {
+  readonly useJson: boolean;
+  readonly useStrict: boolean;
+  readonly useFix: boolean;
+  readonly useExplain: boolean;
+  readonly filePath: string | null;
+  readonly useStdin: boolean;
+}
 
-  for (const arg of argv) {
-    if (arg === '--json') {
-      useJson = true;
-      continue;
+interface LintInputFile {
+  readonly kind: 'file';
+  readonly path: string;
+}
+
+interface LintInputStdin {
+  readonly kind: 'stdin';
+}
+
+interface ParsedLintArguments {
+  readonly kind: 'lint';
+  readonly useJson: boolean;
+  readonly useStrict: boolean;
+  readonly useExplain: boolean;
+  readonly input: LintInputFile | LintInputStdin;
+}
+
+interface ParsedFixArguments {
+  readonly kind: 'fix';
+  readonly filePath: string;
+}
+
+interface HelpArguments {
+  readonly kind: 'help';
+}
+
+interface InvalidArguments {
+  readonly kind: 'error';
+  readonly message: string;
+}
+
+export type ArgumentParseResult =
+  ParsedLintArguments | ParsedFixArguments | HelpArguments | InvalidArguments;
+
+const DEFAULT_ARGUMENTS: LintArguments = {
+  useJson: false,
+  useStrict: false,
+  useFix: false,
+  useExplain: false,
+  filePath: null,
+  useStdin: false,
+};
+
+type ScanResult = LintArguments | HelpArguments | InvalidArguments;
+
+function isTerminal(result: ScanResult): result is HelpArguments | InvalidArguments {
+  return 'kind' in result;
+}
+
+export function parseArguments(argv: readonly string[]): ArgumentParseResult {
+  const scanned = argv.reduce<ScanResult>((current, arg) => {
+    if (isTerminal(current)) return current;
+    if (arg === '--json') return { ...current, useJson: true };
+    if (arg === '--strict') return { ...current, useStrict: true };
+    if (arg === '--fix') return { ...current, useFix: true };
+    if (arg === '--explain') return { ...current, useExplain: true };
+    if (arg === '--help') return { kind: 'help' };
+    if (arg === '-') return { ...current, useStdin: true };
+    if (arg.startsWith('-')) {
+      return {
+        kind: 'error',
+        message: `feynman-lint: unknown flag '${arg}'\n${USAGE}`,
+      };
     }
-    if (arg === '--strict') {
-      useStrict = true;
-      continue;
+    if (current.filePath !== null) {
+      return {
+        kind: 'error',
+        message: `feynman-lint: too many file arguments\n${USAGE}`,
+      };
     }
-    if (arg === '--fix') {
-      useFix = true;
-      continue;
+    return { ...current, filePath: arg };
+  }, DEFAULT_ARGUMENTS);
+
+  if (isTerminal(scanned)) return scanned;
+  if (scanned.filePath === null) {
+    if (!scanned.useStdin) return { kind: 'error', message: USAGE };
+    if (!scanned.useFix) {
+      return {
+        kind: 'lint',
+        useJson: scanned.useJson,
+        useStrict: scanned.useStrict,
+        useExplain: scanned.useExplain,
+        input: { kind: 'stdin' },
+      };
     }
-    if (arg === '--explain') {
-      useExplain = true;
-      continue;
-    }
-    if (arg === '--help') {
-      process.stdout.write(USAGE);
-      process.exit(0);
-    }
-    if (arg === '-') {
-      useStdin = true;
-      continue;
-    }
-    if (arg.startsWith('-') && arg !== '-') {
-      process.stderr.write(`feynman-lint: unknown flag '${arg}'\n${USAGE}`);
-      process.exit(2);
-    }
-    if (filePath !== null) {
-      process.stderr.write(`feynman-lint: too many file arguments\n${USAGE}`);
-      process.exit(2);
-    }
-    filePath = arg;
+    return {
+      kind: 'error',
+      message: 'feynman-lint: --fix requires a file path (not stdin)\n',
+    };
   }
+  if (scanned.useFix && scanned.useStdin) {
+    return {
+      kind: 'error',
+      message: 'feynman-lint: --fix requires a file path (not stdin)\n',
+    };
+  }
+  if (scanned.useFix) return { kind: 'fix', filePath: scanned.filePath };
+  return {
+    kind: 'lint',
+    useJson: scanned.useJson,
+    useStrict: scanned.useStrict,
+    useExplain: scanned.useExplain,
+    input: scanned.useStdin ? { kind: 'stdin' } : { kind: 'file', path: scanned.filePath },
+  };
+}
 
-  if (filePath === null && !useStdin) {
-    process.stderr.write(USAGE);
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+type TextFileRead =
+  | { readonly kind: 'contents'; readonly text: string }
+  | { readonly kind: 'error'; readonly message: string };
+
+function readTextFile(filePath: string): TextFileRead {
+  try {
+    return { kind: 'contents', text: fs.readFileSync(filePath, 'utf8') };
+  } catch (error) {
+    return { kind: 'error', message: getErrorMessage(error) };
+  }
+}
+
+function readStdin(onEnd: (contents: string) => void): void {
+  let inputBuffer = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (chunk: string) => {
+    inputBuffer += chunk;
+  });
+  process.stdin.on('end', () => {
+    onEnd(inputBuffer);
+  });
+}
+
+// Exporting the entrypoint keeps the CLI testable without spawning a second
+// process (which Node's coverage collector cannot merge).
+export function main(argv: readonly string[] = process.argv.slice(2)): void {
+  const parsed = parseArguments(argv);
+  if (parsed.kind === 'help') {
+    process.stdout.write(USAGE);
+    process.exit(0);
+  }
+  if (parsed.kind === 'error') {
+    process.stderr.write(parsed.message);
     process.exit(2);
   }
-
   // --fix mode: read file, run autofix, write back.
-  if (useFix) {
-    if (useStdin || filePath === null) {
-      process.stderr.write('feynman-lint: --fix requires a file path (not stdin)\n');
+  if (parsed.kind === 'fix') {
+    const { filePath } = parsed;
+    const read = readTextFile(filePath);
+    if (read.kind === 'error') {
+      process.stderr.write(`feynman-lint: cannot read ${filePath}: ${read.message}\n`);
       process.exit(2);
     }
-    let before: string;
-    try {
-      before = fs.readFileSync(filePath, 'utf8');
-    } catch (e) {
-      process.stderr.write(
-        `feynman-lint: cannot read ${filePath}: ${(e as NodeJS.ErrnoException).message}\n`,
-      );
-      process.exit(2);
-    }
+    const before = read.text;
     const after = autofix(before, {
       processFenced: true,
       convertL11: true,
       convertL15: true,
     });
     if (after !== before) {
-      fs.writeFileSync(filePath, after);
+      try {
+        atomicWrite(filePath, after);
+      } catch (error) {
+        process.stderr.write(`feynman-lint: cannot write ${filePath}: ${getErrorMessage(error)}\n`);
+        process.exit(2);
+      }
     }
     process.exit(0);
   }
 
+  const { useJson, useStrict, useExplain, input } = parsed;
+
   function explainFrames(text: string): ExplainEntry[] {
-    if (!text || !text.includes('┌')) return [];
+    if (!text.includes('┌')) return [];
     const lines = text.split('\n');
-    const out: ExplainEntry[] = [];
-    let i = 0;
-    while (i < lines.length) {
-      const frame = nextFrame(lines, i);
-      if (!frame) break;
-
-      const { topLi, closeLi, inner } = frame;
-      if (closeLi === -1) {
-        i = topLi + 1;
-        continue;
-      }
-
-      const cost = estimateFrameCost({
-        top: lines[topLi] ?? '',
-        inner,
-        bottom: lines[closeLi] ?? '',
-      });
-      out.push({ line: topLi + 1, cost });
-      i = closeLi + 1;
-    }
-    return out;
+    return Array.from(iterateFrames(lines))
+      .filter(({ closeLi }) => closeLi >= 0)
+      .map(({ topLi, closeLi, inner }) => ({
+        line: topLi + 1,
+        cost: estimateFrameCost({
+          top: lines[topLi] ?? '',
+          inner,
+          bottom: lines[closeLi] ?? '',
+        }),
+      }));
   }
 
   function run(markdown: string, displayName: string): void {
@@ -150,12 +244,12 @@ export function main(argv = process.argv.slice(2)): void {
     const explain = useExplain ? explainFrames(markdown) : null;
 
     if (useJson) {
-      const out: Record<string, unknown> = {
+      const out = {
         file: displayName,
         passed: useStrict ? issues.length === 0 : result.passed,
         issues,
+        ...(explain === null ? {} : { explain }),
       };
-      if (explain !== null) out['explain'] = explain;
       process.stdout.write(JSON.stringify(out, null, 2) + '\n');
       const failed = useStrict ? issues.length > 0 : !result.passed;
       process.exit(failed ? 1 : 0);
@@ -184,9 +278,10 @@ export function main(argv = process.argv.slice(2)): void {
     if (failed) {
       const errCount = issues.filter((i) => i.severity === 'error').length;
       const warnCount = issues.filter((i) => i.severity === 'warn').length;
-      const parts: string[] = [];
-      if (errCount > 0) parts.push(`${errCount} error${errCount !== 1 ? 's' : ''}`);
-      if (warnCount > 0) parts.push(`${warnCount} warning${warnCount !== 1 ? 's' : ''}`);
+      const parts = [
+        errCount > 0 ? `${errCount} error${errCount !== 1 ? 's' : ''}` : null,
+        warnCount > 0 ? `${warnCount} warning${warnCount !== 1 ? 's' : ''}` : null,
+      ].filter((part): part is string => part !== null);
       process.stderr.write(`${displayName}: ${parts.join(', ')}\n`);
       process.exit(1);
     } else {
@@ -195,31 +290,23 @@ export function main(argv = process.argv.slice(2)): void {
   }
 
   // Read input
-  if (useStdin || filePath === null) {
-    let buf = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk: string) => {
-      buf += chunk;
-    });
-    process.stdin.on('end', () => {
-      run(buf, '<stdin>');
+  if (input.kind === 'stdin') {
+    readStdin((contents) => {
+      run(contents, '<stdin>');
     });
   } else {
+    const filePath = input.path;
     const absPath = path.resolve(filePath);
     if (!fs.existsSync(absPath)) {
       process.stderr.write(`feynman-lint: file not found: ${filePath}\n`);
       process.exit(2);
     }
-    let markdown: string;
-    try {
-      markdown = fs.readFileSync(absPath, 'utf8');
-    } catch (e) {
-      process.stderr.write(
-        `feynman-lint: cannot read file: ${filePath}: ${(e as NodeJS.ErrnoException).message}\n`,
-      );
+    const read = readTextFile(absPath);
+    if (read.kind === 'error') {
+      process.stderr.write(`feynman-lint: cannot read file: ${filePath}: ${read.message}\n`);
       process.exit(2);
     }
-    run(markdown, filePath);
+    run(read.text, filePath);
   }
 }
 

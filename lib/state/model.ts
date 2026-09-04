@@ -28,11 +28,15 @@ export const OUTPUT_STYLE_SUFFIX: Readonly<Partial<Record<OutputStyle, string>>>
 });
 
 export function isIntensity(value: unknown): value is Intensity {
-  return typeof value === 'string' && (INTENSITIES as readonly string[]).includes(value);
+  return INTENSITIES.some((intensity) => intensity === value);
 }
 
 export function isOutputStyle(value: unknown): value is OutputStyle {
-  return typeof value === 'string' && (OUTPUT_STYLES as readonly string[]).includes(value);
+  return OUTPUT_STYLES.some((style) => style === value);
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function nonNegativeInteger(value: unknown): number | null {
@@ -41,10 +45,7 @@ function nonNegativeInteger(value: unknown): number | null {
 
 /** Convert arbitrary JSON into the one safe state shape used by the runtime. */
 export function normalizeState(raw: unknown): FeynmanState {
-  const record =
-    typeof raw === 'object' && raw !== null && !Array.isArray(raw)
-      ? (raw as Record<string, unknown>)
-      : {};
+  const record = isRecord(raw) ? raw : {};
   return {
     enabled: typeof record['enabled'] === 'boolean' ? record['enabled'] : DEFAULT_STATE.enabled,
     intensity: isIntensity(record['intensity']) ? record['intensity'] : DEFAULT_STATE.intensity,
@@ -62,5 +63,5 @@ export function normalizeState(raw: unknown): FeynmanState {
 export function applyOutputStyle(rulesText: string, outputStyle: unknown): string {
   const styleValue = isOutputStyle(outputStyle) ? outputStyle : 'full';
   const styleSuffix = OUTPUT_STYLE_SUFFIX[styleValue];
-  return styleSuffix ? rulesText + styleSuffix : rulesText;
+  return rulesText + (styleSuffix ?? '');
 }

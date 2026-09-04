@@ -8,6 +8,13 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  assertDefined,
+  assertRecord,
+  assertString,
+  assertUnknownArray,
+  parseJsonObject,
+} from './helpers/assertions.ts';
 
 const INSTALL_SH = path.resolve(import.meta.dirname, '..', 'install.sh');
 const REPO_DIR = path.resolve(import.meta.dirname, '..');
@@ -46,11 +53,14 @@ function runInstall(
     });
     return { stdout, stderr: '', status: 0 };
   } catch (e: unknown) {
-    const err = e as { stdout?: string; stderr?: string; status?: number };
+    assertRecord(e);
+    const stdout = e['stdout'];
+    const stderr = e['stderr'];
+    const status = e['status'];
     return {
-      stdout: err.stdout || '',
-      stderr: err.stderr || '',
-      status: err.status || 1,
+      stdout: typeof stdout === 'string' ? stdout : '',
+      stderr: typeof stderr === 'string' ? stderr : '',
+      status: typeof status === 'number' ? status : 1,
     };
   }
 }
@@ -60,7 +70,34 @@ function runInstall(
  */
 function readSettings(tmpHome: string): Record<string, unknown> {
   const settingsPath = path.join(tmpHome, '.codex', 'hooks.json');
-  return JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as Record<string, unknown>;
+  return parseJsonObject(fs.readFileSync(settingsPath, 'utf8'));
+}
+
+interface SessionEntry {
+  commands: string[];
+  matcher?: string;
+}
+
+function sessionEntries(tmpHome: string, allowMissing = false): SessionEntry[] {
+  const hooks = readSettings(tmpHome)['hooks'];
+  if (hooks === undefined && allowMissing) return [];
+  assertRecord(hooks, 'hooks key must exist');
+  const sessionStart = hooks['SessionStart'];
+  assertUnknownArray(sessionStart, 'SessionStart must be array');
+  return sessionStart.map((entry) => {
+    assertRecord(entry);
+    const rawHooks = entry['hooks'];
+    assertUnknownArray(rawHooks);
+    const commands = rawHooks.map((hook) => {
+      assertRecord(hook);
+      const command = hook['command'];
+      assertString(command);
+      return command;
+    });
+    const matcher = entry['matcher'];
+    assert.ok(matcher === undefined || typeof matcher === 'string');
+    return matcher === undefined ? { commands } : { commands, matcher };
+  });
 }
 
 describe('install.sh', () => {
@@ -90,33 +127,22 @@ describe('install.sh', () => {
     });
 
     it('settings.json contains a Codex SessionStart hook', () => {
-      const cfg = readSettings(tmpHome);
-      assert.ok(cfg['hooks'], 'hooks key must exist');
-      const hooks = cfg['hooks'] as Record<string, unknown[]>;
-      assert.ok(Array.isArray(hooks['SessionStart']), 'SessionStart must be array');
-      assert.ok(hooks['SessionStart'].length >= 1, 'at least one session hook entry');
+      assert.ok(sessionEntries(tmpHome).length >= 1, 'at least one session hook entry');
     });
 
     it('SessionStart hook entry points to feynman-session-start with absolute path', () => {
-      const cfg = readSettings(tmpHome);
-      const hooks = cfg['hooks'] as Record<
-        string,
-        { hooks: { command: string }[]; matcher?: string }[]
-      >;
-      const sessionEntry = hooks['SessionStart']!.find(
-        (e) =>
-          e.hooks &&
-          e.hooks.some((h) => h.command && h.command.includes('feynman-session-start.ts')),
+      const sessionEntry = sessionEntries(tmpHome).find((entry) =>
+        entry.commands.some((command) => command.includes('feynman-session-start.ts')),
       );
       assert.ok(sessionEntry, 'feynman-session-start.ts hook entry not found');
-      const sessionHook = sessionEntry.hooks[0]!;
-      assert.ok(
-        sessionHook.command.includes('/'),
-        'session hook command must contain absolute path',
-      );
-      assert.ok(!sessionHook.command.includes('~/'), 'session hook command must not use tilde');
-      assert.ok(sessionEntry.matcher?.includes('compact'), 'matcher must include compact');
-      assert.ok(sessionEntry.matcher?.includes('clear'), 'matcher must include clear');
+      const sessionHook = sessionEntry.commands[0];
+      assertDefined(sessionHook);
+      assert.ok(sessionHook.includes('/'), 'session hook command must contain absolute path');
+      assert.ok(!sessionHook.includes('~/'), 'session hook command must not use tilde');
+      const matcher = sessionEntry.matcher;
+      assertString(matcher);
+      assert.ok(matcher.includes('compact'), 'matcher must include compact');
+      assert.ok(matcher.includes('clear'), 'matcher must include clear');
     });
 
     it('stdout mentions "hook: installed"', () => {
@@ -144,12 +170,8 @@ describe('install.sh', () => {
     });
 
     it('SessionStart hook appears exactly once in settings.json', () => {
-      const cfg = readSettings(tmpHome);
-      const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
-      const sessionHooks = hooks['SessionStart']!.filter(
-        (e) =>
-          e.hooks &&
-          e.hooks.some((h) => h.command && h.command.includes('feynman-session-start.ts')),
+      const sessionHooks = sessionEntries(tmpHome).filter((entry) =>
+        entry.commands.some((command) => command.includes('feynman-session-start.ts')),
       );
       assert.equal(
         sessionHooks.length,
@@ -199,10 +221,8 @@ describe('install.sh', () => {
     });
 
     it('existing Codex SessionStart hook preserved after merge', () => {
-      const cfg = readSettings(tmpHome);
-      const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
-      const existing = (hooks['SessionStart'] ?? []).find(
-        (e) => e.hooks && e.hooks.some((h) => h.command && h.command.includes('codex-hook.js')),
+      const existing = sessionEntries(tmpHome).find((entry) =>
+        entry.commands.some((command) => command.includes('codex-hook.js')),
       );
       assert.ok(
         existing,
@@ -211,12 +231,8 @@ describe('install.sh', () => {
     });
 
     it('adds exactly one Feynman SessionStart hook', () => {
-      const cfg = readSettings(tmpHome);
-      const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
-      const feynman = (hooks['SessionStart'] ?? []).filter(
-        (e) =>
-          e.hooks &&
-          e.hooks.some((h) => h.command && h.command.includes('feynman-session-start.ts')),
+      const feynman = sessionEntries(tmpHome).filter((entry) =>
+        entry.commands.some((command) => command.includes('feynman-session-start.ts')),
       );
       assert.equal(feynman.length, 1, 'feynman must add one SessionStart hook');
     });
@@ -231,19 +247,14 @@ describe('install.sh', () => {
     });
 
     it('preserves unrelated Codex hook groups', () => {
-      const cfg = readSettings(tmpHome);
-      const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
+      const entries = sessionEntries(tmpHome);
       assert.equal(
-        (hooks['SessionStart'] ?? []).filter((entry) =>
-          entry.hooks?.some((hook) => hook.command.includes('codex-hook.js')),
+        entries.filter((entry) =>
+          entry.commands.some((command) => command.includes('codex-hook.js')),
         ).length,
         1,
       );
-      assert.equal(
-        hooks['SessionStart']!.length,
-        2,
-        'unrelated and Feynman SessionStart groups must both remain',
-      );
+      assert.equal(entries.length, 2, 'unrelated and Feynman SessionStart groups must both remain');
     });
   });
 
@@ -268,13 +279,8 @@ describe('install.sh', () => {
             cwd: REPO_DIR,
           });
           // After uninstall, feynman hook should be removed from settings
-          const cfg = readSettings(tmpHome);
-          const hooks = cfg['hooks'] as
-            Record<string, { hooks: { command: string }[] }[]> | undefined;
-          const feynmanSession = (hooks?.['SessionStart'] || []).find(
-            (e) =>
-              e.hooks &&
-              e.hooks.some((h) => h.command && h.command.includes('feynman-session-start.ts')),
+          const feynmanSession = sessionEntries(tmpHome, true).find((entry) =>
+            entry.commands.some((command) => command.includes('feynman-session-start.ts')),
           );
           assert.equal(
             feynmanSession,

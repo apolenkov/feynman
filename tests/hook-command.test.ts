@@ -5,6 +5,7 @@ import {
   isSessionStartHookCommand,
   isFeynmanHookCommand,
 } from '../bin/adapters/codex-config.ts';
+import { assertDefined } from './helpers/assertions.ts';
 
 it('recognizes literal node script arguments without shell evaluation', () => {
   for (const [command, expected] of [
@@ -24,7 +25,8 @@ it('recognizes literal node script arguments without shell evaluation', () => {
     ['node "/tmp/a\\$b/feynman-session-start.ts"', '/tmp/a$b/feynman-session-start.ts'],
     ['node /tmp/a\\\nb/feynman-session-start.ts', '/tmp/ab/feynman-session-start.ts'],
   ]) {
-    assert.ok(command && expected);
+    assertDefined(command);
+    assertDefined(expected);
     assert.equal(extractHookScriptPath(command, 'feynman-session-start.ts'), expected);
     assert.equal(isSessionStartHookCommand(command), true);
   }

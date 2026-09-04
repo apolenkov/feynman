@@ -9,17 +9,46 @@ import { createRequire } from 'node:module';
 
 import { lint, format, RULE_IDS } from '../lib/lint/index.ts';
 import { parse } from '../lib/lint/parser.ts';
-import { estimateFrameCost } from '../lib/lint/rules.ts';
+import { estimateFrameCost, L10_mixed_script } from '../lib/lint/rules.ts';
 import { lastVisualColumnOf, firstVisualColumnOf } from '../lib/lint/width.ts';
 
 const require = createRequire(import.meta.url);
-const cases = require(path.resolve(import.meta.dirname, 'lint-cases.json')) as Array<{
-  name: string;
-  input: string;
-  expected: string;
-  rule: string;
-  expected_issues?: Array<{ rule?: string; line?: number }>;
-}>;
+interface LintCase {
+  readonly name: string;
+  readonly input: string;
+  readonly expected: string;
+  readonly rule: string;
+  readonly expected_issues?: readonly { readonly rule?: string; readonly line?: number }[];
+}
+
+function isLintCaseArray(value: unknown): value is readonly LintCase[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (item: unknown) =>
+        typeof item === 'object' &&
+        item !== null &&
+        'name' in item &&
+        typeof item.name === 'string' &&
+        'input' in item &&
+        typeof item.input === 'string' &&
+        'expected' in item &&
+        typeof item.expected === 'string' &&
+        'rule' in item &&
+        typeof item.rule === 'string',
+    )
+  );
+}
+
+function required<T>(values: readonly T[]): T {
+  const value = values[0];
+  assert.ok(value !== undefined, 'expected at least one value');
+  return value;
+}
+
+const loadedCases: unknown = require(path.resolve(import.meta.dirname, 'lint-cases.json'));
+if (!isLintCaseArray(loadedCases)) throw new TypeError('invalid lint-cases.json');
+const cases = loadedCases;
 
 // ---------------------------------------------------------------------------
 // Golden cases from lint-cases.json
@@ -51,9 +80,9 @@ describe('Golden cases (lint-cases.json)', () => {
             `Expected fail with rule '${tc.rule}' but got no matching issues. All issues: ${JSON.stringify(result.issues)}`,
           );
 
-          if (tc.expected_issues) {
+          if (tc.expected_issues !== undefined) {
             for (const exp of tc.expected_issues) {
-              if (exp.rule) {
+              if (exp.rule !== undefined) {
                 const found = result.issues.some((i) => i.rule === exp.rule);
                 assert.ok(found, `Expected issue with rule '${exp.rule}' not found`);
               }
@@ -101,6 +130,34 @@ describe('Rule coverage: each rule has ≥1 pass and ≥1 fail case', () => {
 // L01 — Box closure: direct unit tests
 // ---------------------------------------------------------------------------
 describe('L01 box closure — unit tests', () => {
+  for (const [label, top, middle, bottom] of [
+    ['CJK', '┌─ 中 ─┐', '│      │', '└──────┘'],
+    ['combining mark', '┌─ e\u0301 ─┐', '│     │', '└─────┘'],
+    ['emoji', '┌─ 😀 ─┐', '│      │', '└──────┘'],
+  ] as const) {
+    it(`uses visual columns for ${label} content`, () => {
+      const result = lint(`\`\`\`\n${top}\n${middle}\n${bottom}\n\`\`\``);
+      const alignmentIssues = result.issues.filter(({ rule }) =>
+        ['L01', 'L08', 'L09'].includes(rule),
+      );
+      assert.deepEqual(alignmentIssues, []);
+    });
+  }
+
+  it('still detects a visually shifted Unicode frame corner', () => {
+    const result = lint('```\n┌─ 中 ─┐\n│       │\n └───────┘\n```');
+    assert.ok(result.issues.some(({ rule }) => rule === 'L01'));
+  });
+
+  it('keeps L01 diagnostic coordinates as source offsets while matching display columns', () => {
+    for (const prefix of ['中', 'e\u0301', '😀', '\u001b[31m']) {
+      const result = lint(`\`\`\`\n${prefix}┌─┐\n\`\`\``, { rules: ['L01'] });
+      const left = result.issues.find((entry) => entry.message.includes("'┌'"));
+      assert.equal(left?.column, prefix.length + 1, prefix);
+      assert.equal(left.line, 2);
+    }
+  });
+
   it('unclosed ┌ detected', () => {
     const md = '```\n┌─ Status ─┐\n│  item    │\n```';
     const result = lint(md);
@@ -137,6 +194,25 @@ describe('L01 box closure — unit tests', () => {
   });
 });
 
+describe('L10 mixed script — AST coordinates', () => {
+  it('checks AST content with the same result and preserves its source line', () => {
+    const textIssue = required(L10_mixed_script('tеst'));
+    const astIssue = required(
+      L10_mixed_script({
+        type: 'diagram',
+        content: 'clean\ntеst',
+        startLine: 12,
+        endLine: 13,
+        indent: 0,
+      }),
+    );
+
+    assert.equal(textIssue.token, astIssue.token);
+    assert.equal(astIssue.line, 13);
+    assert.equal(astIssue.column, 1);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // L02 — Tree chars: direct unit tests
 // ---------------------------------------------------------------------------
@@ -160,7 +236,7 @@ describe('L02 tree chars — unit tests', () => {
     const result = lint(md);
     const l02 = result.issues.filter((i) => i.rule === 'L02');
     assert.ok(l02.length >= 1);
-    assert.ok(l02[0]!.message.includes('└──'), 'message should reference └──');
+    assert.ok(required(l02).message.includes('└──'), 'message should reference └──');
   });
 
   it('sibling at shallower indent level — exercises shallower-branch in L02', () => {
@@ -208,7 +284,8 @@ describe('L03 arrow style — unit tests', () => {
     const l03 = result.issues.filter((i) => i.rule === 'L03');
     assert.ok(l03.length >= 1);
     // Message should name the conflicting styles
-    assert.ok(l03[0]!.message.includes('-->') || l03[0]!.message.includes('→'));
+    const issue = required(l03);
+    assert.ok(issue.message.includes('-->') || issue.message.includes('→'));
   });
 
   // --- seq-msg family ---
@@ -266,7 +343,7 @@ describe('L04 column widths — unit tests', () => {
     const result = lint(md);
     const l04 = result.issues.filter((i) => i.rule === 'L04');
     assert.ok(l04.length >= 1);
-    assert.ok(/column/i.test(l04[0]!.message));
+    assert.match(required(l04).message, /column/i);
   });
 
   it('escaped pipe inside a cell is not a column boundary', () => {
@@ -347,7 +424,7 @@ describe('L06 priority scale — unit tests', () => {
     const result = lint(md);
     const l06 = result.issues.filter((i) => i.rule === 'L06');
     assert.ok(l06.length >= 1);
-    assert.equal(l06[0]!.severity, 'warn');
+    assert.equal(required(l06).severity, 'warn');
   });
 
   it('▼ without ▲ flagged as warn', () => {
@@ -355,7 +432,7 @@ describe('L06 priority scale — unit tests', () => {
     const result = lint(md);
     const l06 = result.issues.filter((i) => i.rule === 'L06');
     assert.ok(l06.length >= 1);
-    assert.equal(l06[0]!.severity, 'warn');
+    assert.equal(required(l06).severity, 'warn');
   });
 
   it('neither ▲ nor ▼ passes', () => {
@@ -439,7 +516,7 @@ describe('L08 frame width — unit tests', () => {
     const result = lint(md);
     const l08 = result.issues.filter((i) => i.rule === 'L08');
     assert.ok(l08.length >= 1);
-    assert.ok(/width/i.test(l08[0]!.message));
+    assert.match(required(l08).message, /width/i);
   });
 
   it('multibyte box-drawing chars: width computed as 1 per char', () => {
@@ -482,9 +559,10 @@ describe('L11 overdecoration — unit tests', () => {
     const result = lint(md);
     const l11 = result.issues.filter((i) => i.rule === 'L11');
     assert.ok(l11.length >= 1, 'should detect overdecoration');
-    assert.equal(l11[0]!.severity, 'warn');
-    assert.match(l11[0]!.message, /5 items/);
-    assert.match(l11[0]!.message, /saves ~\d+ chars/);
+    const issue = required(l11);
+    assert.equal(issue.severity, 'warn');
+    assert.match(issue.message, /5 items/);
+    assert.match(issue.message, /saves ~\d+ chars/);
   });
 
   it('frame with 6 inner lines NOT flagged (boundary)', () => {
@@ -513,7 +591,7 @@ describe('L11 overdecoration — unit tests', () => {
     const result = lint(md);
     const l11 = result.issues.filter((i) => i.rule === 'L11');
     assert.equal(l11.length, 1);
-    assert.match(l11[0]!.message, /1 items/);
+    assert.match(required(l11).message, /1 items/);
   });
 
   it('no frame, no L11 fire', () => {
@@ -548,7 +626,7 @@ describe('L12 token-budget — unit tests', () => {
     const result = lint(md);
     const l12 = result.issues.filter((i) => i.rule === 'L12');
     assert.ok(l12.length >= 1);
-    assert.equal(l12[0]!.severity, 'warn');
+    assert.equal(required(l12).severity, 'warn');
   });
 
   it('content-dominated frame NOT flagged', () => {
@@ -576,7 +654,7 @@ describe('L13 double-wrap — unit tests', () => {
     const result = lint(md);
     const l13 = result.issues.filter((i) => i.rule === 'L13');
     assert.ok(l13.length >= 1);
-    assert.equal(l13[0]!.severity, 'warn');
+    assert.equal(required(l13).severity, 'warn');
   });
 
   it('bare tree (no frame) NOT flagged', () => {
@@ -614,7 +692,7 @@ describe('A01 regression — titled frames caught by L11/L12/L13', () => {
     const result = lint(md);
     const l13 = result.issues.filter((i) => i.rule === 'L13');
     assert.ok(l13.length >= 1, 'titled frame with tree must be caught by L13');
-    assert.equal(l13[0]!.severity, 'warn');
+    assert.equal(required(l13).severity, 'warn');
   });
 
   it('titled frame with ≤5 items is caught by L11 (not invisible)', () => {
@@ -623,7 +701,7 @@ describe('A01 regression — titled frames caught by L11/L12/L13', () => {
     const result = lint(md);
     const l11 = result.issues.filter((i) => i.rule === 'L11');
     assert.ok(l11.length >= 1, 'titled frame with 3 items must be caught by L11');
-    assert.equal(l11[0]!.severity, 'warn');
+    assert.equal(required(l11).severity, 'warn');
   });
 
   it('titled frame with padding-dominated content is caught by L12 (not invisible)', () => {
@@ -632,7 +710,7 @@ describe('A01 regression — titled frames caught by L11/L12/L13', () => {
     const result = lint(md);
     const l12 = result.issues.filter((i) => i.rule === 'L12');
     assert.ok(l12.length >= 1, 'titled frame with wide padding must be caught by L12');
-    assert.equal(l12[0]!.severity, 'warn');
+    assert.equal(required(l12).severity, 'warn');
   });
 });
 
@@ -646,8 +724,9 @@ describe('L15 homogeneous frame — unit tests', () => {
     const result = lint(md);
     const l15 = result.issues.filter((i) => i.rule === 'L15');
     assert.ok(l15.length >= 1, 'kv frame should be flagged by L15');
-    assert.equal(l15[0]!.severity, 'warn');
-    assert.ok(/kv/.test(l15[0]!.message));
+    const issue = required(l15);
+    assert.equal(issue.severity, 'warn');
+    assert.ok(issue.message.includes('kv'));
   });
 
   it('frame wrapping bullets flagged', () => {
@@ -656,7 +735,7 @@ describe('L15 homogeneous frame — unit tests', () => {
     const result = lint(md);
     const l15 = result.issues.filter((i) => i.rule === 'L15');
     assert.ok(l15.length >= 1, 'bullet frame should be flagged by L15');
-    assert.ok(/bullet/.test(l15[0]!.message));
+    assert.ok(required(l15).message.includes('bullet'));
   });
 
   it('frame with arrow-bearing content NOT flagged by L15 (complex guard)', () => {
@@ -688,7 +767,7 @@ describe('L15 homogeneous frame — unit tests', () => {
     const result = lint(md);
     const l15 = result.issues.filter((i) => i.rule === 'L15');
     assert.ok(l15.length >= 1, 'titled frame wrapping prose should be flagged by L15');
-    assert.ok(/prose/.test(l15[0]!.message));
+    assert.ok(required(l15).message.includes('prose'));
   });
 });
 
@@ -748,9 +827,9 @@ describe('lint() API contract', () => {
   });
 
   it('non-string input returns passed=true with no issues', () => {
-    const r1 = lint(null as unknown as string);
-    const r2 = lint(undefined as unknown as string);
-    const r3 = lint(42 as unknown as string);
+    const r1 = lint(null);
+    const r2 = lint(undefined);
+    const r3 = lint(42);
     for (const r of [r1, r2, r3]) {
       assert.equal(r.passed, true);
       assert.equal(r.issues.length, 0);
@@ -820,6 +899,12 @@ describe('width.ts — ANSI escape handling in column search', () => {
     // 'z' never appears in 'abc'; loop exhausts → return -1 (line 114)
     assert.equal(firstVisualColumnOf('abc', 'z'), -1);
   });
+
+  it('first/lastVisualColumnOf retain zero-width targets at the current column', () => {
+    const line = '\u0301a\u0301b\u0301';
+    assert.equal(firstVisualColumnOf(line, '\u0301'), 0);
+    assert.equal(lastVisualColumnOf(line, '\u0301'), 2);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -837,8 +922,9 @@ describe('L14 blank-line separation — unit tests', () => {
     const result = lint(md);
     const l14 = result.issues.filter((i) => i.rule === 'L14');
     assert.ok(l14.length >= 1, 'should detect missing blank line before fence');
-    assert.equal(l14[0]!.severity, 'warn');
-    assert.ok(l14[0]!.message.includes('blank line'));
+    const issue = required(l14);
+    assert.equal(issue.severity, 'warn');
+    assert.ok(issue.message.includes('blank line'));
   });
 
   it('prose line directly after closing fence: L14 warn', () => {
@@ -846,7 +932,7 @@ describe('L14 blank-line separation — unit tests', () => {
     const result = lint(md);
     const l14 = result.issues.filter((i) => i.rule === 'L14');
     assert.ok(l14.length >= 1, 'should detect missing blank line after fence');
-    assert.equal(l14[0]!.severity, 'warn');
+    assert.equal(required(l14).severity, 'warn');
   });
 
   it('both sides missing blank line: two L14 warns', () => {
@@ -908,7 +994,8 @@ describe('L14 blank-line separation — unit tests', () => {
     const result = lint(md);
     const l14 = result.issues.filter((i) => i.rule === 'L14');
     assert.ok(l14.length >= 1);
-    assert.ok(l14[0]!.suggestion !== undefined && l14[0]!.suggestion.length > 0);
+    const suggestion = required(l14).suggestion;
+    assert.ok(suggestion !== undefined && suggestion.length > 0);
   });
 });
 

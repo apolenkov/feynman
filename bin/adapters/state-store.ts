@@ -24,7 +24,17 @@ export function statePaths(rootDir: string): StatePaths {
 }
 
 export function flagContent(state: FeynmanState): string {
-  return state.intensity || DEFAULT_STATE.intensity;
+  return state.intensity;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function errorCode(error: unknown): string | undefined {
+  return error instanceof Error && 'code' in error && typeof error.code === 'string'
+    ? error.code
+    : undefined;
 }
 
 /** Read JSON without trusting it; normalize it before making a state decision. */
@@ -32,8 +42,8 @@ export function readState(rootDir: string): Record<string, unknown> | null {
   const { statePath, injectionsPath } = statePaths(rootDir);
   try {
     const parsed: unknown = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
-    const state = parsed as Record<string, unknown>;
+    if (!isRecord(parsed)) return null;
+    const state = parsed;
     try {
       const text = fs.readFileSync(injectionsPath, 'utf8').trim();
       const injections = Number(text);
@@ -66,7 +76,7 @@ export function removeActiveFlag(rootDir: string): void {
   try {
     fs.unlinkSync(statePaths(rootDir).flagPath);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    if (errorCode(error) !== 'ENOENT') throw error;
   }
 }
 

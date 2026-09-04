@@ -1,11 +1,11 @@
-import { createRequire } from 'node:module';
+import path from 'node:path';
 import { VERSION_HELP } from '../cli/help.ts';
+import { readPackageMetadata } from '../adapters/package-metadata.ts';
 
-const require = createRequire(import.meta.url);
-const PKG = require('../../package.json') as { version: string; name: string };
+const PKG = readPackageMetadata(path.resolve(import.meta.dirname, '..', '..', 'package.json'));
 const VERSION = PKG.version;
 
-export function cmdVersion(args: string[]): void {
+export function cmdVersion(args: readonly string[]): void {
   if (args.includes('--help')) {
     console.log(VERSION_HELP);
     process.exit(0);

@@ -1,110 +1,194 @@
 #!/usr/bin/env node
-// scripts/feynman-highlight.ts — apply highlight convention to rules/feynman-contract.md.
-// Adds: **markdown bold** for key nouns/verbs in prose, plus ▲▼ priority and
-// ✓ ✗ ⌛ status markers for terminal contrast.
-//
-// Idempotent: detects existing marker line and skips if present. Verifies the
-// 4480-byte budget after the edit.
-//
-// Usage:
-//   node scripts/feynman-highlight.ts              apply
-//   node scripts/feynman-highlight.ts --dry-run    print proposed edits, no write
-//   node scripts/feynman-highlight.ts --revert     remove highlight lines
+// Apply or remove the highlight convention in rules/feynman-contract.md.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { atomicWrite } from '../bin/adapters/fs.ts';
 
-const ROOT = path.resolve(import.meta.dirname, '..');
-const RULES = path.join(ROOT, 'rules', 'feynman-contract.md');
+const DEFAULT_ROOT = path.resolve(import.meta.dirname, '..');
+const RULES_RELATIVE_PATH = path.join('rules', 'feynman-contract.md');
 const BUDGET = 4480;
-
 const MARKER_LINE = '**bold** keys; ▲▼ priority; ✓✗ status.';
 
-const args: string[] = process.argv.slice(2);
-const dryRun: boolean = args.includes('--dry-run');
-const revert: boolean = args.includes('--revert');
-
-function loadRules(): string {
-  return fs.readFileSync(RULES, 'utf8');
+export interface HighlightOptions {
+  readonly dryRun: boolean;
+  readonly operation: 'apply' | 'revert';
 }
 
-interface HighlightResult {
-  text: string;
-  added: number;
-  note: string;
+export interface HighlightResult {
+  readonly text: string;
+  readonly added: number;
+  readonly note: string;
 }
 
-function applyHighlight(text: string): HighlightResult {
+export interface HighlightEnvironment {
+  readonly root: string;
+  readonly readFile: (filePath: string) => string;
+  readonly writeFile: (filePath: string, contents: string) => void;
+  readonly runTests: () => void;
+  readonly log: (message: string) => void;
+}
+
+export interface HighlightCommandResult {
+  readonly status: number | null;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly error: Error | undefined;
+  readonly signal: NodeJS.Signals | null;
+}
+
+export type HighlightTestRunner = (root: string) => HighlightCommandResult;
+
+export function parseHighlightArguments(argv: readonly string[]): HighlightOptions {
+  return {
+    dryRun: argv.includes('--dry-run'),
+    operation: argv.includes('--revert') ? 'revert' : 'apply',
+  };
+}
+
+export function applyHighlight(text: string): HighlightResult {
   if (text.includes(MARKER_LINE)) {
     return { text, added: 0, note: 'marker line already present — no change' };
   }
-  // Insert the marker as a new line at the end of each <contract> block,
-  // before the closing tag. Single insertion per block.
-  let added = 0;
-  const updated = text.replace(/(<\/contract>)/g, (_m: string) => {
-    added += 1;
-    return `${MARKER_LINE}\n${_m}`;
-  });
-  return { text: updated, added, note: `added marker to ${added} <contract> blocks` };
+  const contractCount = Array.from(text.matchAll(/<\/contract>/g)).length;
+  return {
+    text: text.replace(/<\/contract>/g, `${MARKER_LINE}\n</contract>`),
+    added: contractCount,
+    note: `added marker to ${contractCount} <contract> blocks`,
+  };
 }
 
-function revertHighlight(text: string): HighlightResult {
+export function revertHighlight(text: string): HighlightResult {
   const escaped = MARKER_LINE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp(`${escaped}\\n`, 'g');
-  const removed = (text.match(re) || []).length;
-  return { text: text.replace(re, ''), added: -removed, note: `removed ${removed} marker lines` };
+  const markerPattern = new RegExp(`${escaped}\\n`, 'g');
+  const removed = Array.from(text.matchAll(markerPattern)).length;
+  return {
+    text: text.replace(markerPattern, ''),
+    added: -removed,
+    note: `removed ${removed} marker lines`,
+  };
 }
 
-function checkBudget(text: string, label: string): number {
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function checkBudget(text: string, label: string, log: (message: string) => void): number {
   const size = Buffer.byteLength(text, 'utf8');
-  console.log(`  ${label}: ${size} bytes (budget ≤${BUDGET}, slack ${BUDGET - size})`);
-  if (size > BUDGET) {
-    throw new Error(`size ${size} exceeds budget ${BUDGET} — refusing to write`);
-  }
+  log(`  ${label}: ${size} bytes (budget ≤${BUDGET}, slack ${BUDGET - size})`);
+  if (size > BUDGET) throw new Error(`size ${size} exceeds budget ${BUDGET} — refusing to write`);
   return size;
 }
 
-function runTests(): void {
-  const r = spawnSync('npm', ['test', '--silent'], { cwd: ROOT, encoding: 'utf8' });
-  if (r.status !== 0) {
-    process.stderr.write(r.stderr || r.stdout || '');
-    throw new Error('npm test failed after edit — reverting');
-  }
-}
+export function executeHighlight(
+  options: HighlightOptions,
+  environment: HighlightEnvironment,
+): void {
+  const rulesPath = path.join(environment.root, RULES_RELATIVE_PATH);
+  const original = environment.readFile(rulesPath);
+  checkBudget(original, 'before', environment.log);
+  const result =
+    options.operation === 'revert' ? revertHighlight(original) : applyHighlight(original);
+  environment.log(`  ${result.note}`);
 
-function main(): void {
-  const original = loadRules();
-  checkBudget(original, 'before');
-
-  const op = revert ? revertHighlight : applyHighlight;
-  const { text, added, note } = op(original);
-  console.log(`  ${note}`);
-
-  if (text === original) {
-    console.log('no changes needed');
+  if (result.text === original) {
+    environment.log('no changes needed');
     return;
   }
-
-  checkBudget(text, 'after');
-
-  if (dryRun) {
-    console.log(
-      `  dry-run — not writing. ${added > 0 ? '+' : ''}${added} marker line(s) ${revert ? 'would be removed' : 'would be added'}.`,
+  checkBudget(result.text, 'after', environment.log);
+  if (options.dryRun) {
+    environment.log(
+      `  dry-run — not writing. ${result.added > 0 ? '+' : ''}${result.added} marker line(s) ${options.operation === 'revert' ? 'would be removed' : 'would be added'}.`,
     );
     return;
   }
 
-  fs.writeFileSync(RULES, text);
-  console.log(`  wrote ${RULES}`);
-
-  runTests();
-  console.log('  npm test: pass');
+  environment.writeFile(rulesPath, result.text);
+  environment.log(`  wrote ${rulesPath}`);
+  try {
+    environment.runTests();
+  } catch (testError) {
+    try {
+      environment.writeFile(rulesPath, original);
+    } catch (restoreError) {
+      throw new Error(
+        `${errorMessage(testError)}; failed to restore ${rulesPath}: ${errorMessage(restoreError)}`,
+      );
+    }
+    throw testError;
+  }
+  environment.log('  npm test: pass');
 }
 
-try {
-  main();
-} catch (e) {
-  console.error('error:', (e as Error).message);
-  process.exit(1);
+export function runSystemTestCommand(
+  command: string,
+  args: readonly string[],
+  root: string,
+): HighlightCommandResult {
+  const result = spawnSync(command, args, { cwd: root, encoding: 'utf8' });
+  return {
+    status: result.status,
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
+    error: result.error,
+    signal: result.signal,
+  };
 }
+
+function systemTestRunner(root: string): HighlightCommandResult {
+  return runSystemTestCommand('npm', ['test', '--silent'], root);
+}
+
+function processFailure(result: HighlightCommandResult): string | null {
+  if (result.error !== undefined) return result.error.message;
+  if (result.signal !== null) return `terminated by signal ${result.signal}`;
+  if (result.status !== 0) return `exit ${result.status ?? 'unavailable'}`;
+  return null;
+}
+
+export function createHighlightEnvironment(
+  root: string,
+  testRunner: HighlightTestRunner = systemTestRunner,
+): HighlightEnvironment {
+  return {
+    root,
+    readFile: (filePath) => fs.readFileSync(filePath, 'utf8'),
+    writeFile: (filePath, contents) => {
+      atomicWrite(filePath, contents);
+    },
+    runTests: () => {
+      const result = testRunner(root);
+      const failure = processFailure(result);
+      if (failure !== null) {
+        process.stderr.write(result.stderr || result.stdout || '');
+        throw new Error(`npm test failed after edit — reverting (${failure})`);
+      }
+    },
+    log: (message) => {
+      console.log(message);
+    },
+  };
+}
+
+export function highlightExitCode(
+  argv: readonly string[] = process.argv.slice(2),
+  environment: HighlightEnvironment = createHighlightEnvironment(DEFAULT_ROOT),
+): number {
+  try {
+    executeHighlight(parseHighlightArguments(argv), environment);
+    return 0;
+  } catch (error) {
+    console.error('error:', errorMessage(error));
+    return 1;
+  }
+}
+
+export function highlightMain(
+  argv: readonly string[] = process.argv.slice(2),
+  environment: HighlightEnvironment = createHighlightEnvironment(DEFAULT_ROOT),
+): void {
+  process.exitCode = highlightExitCode(argv, environment);
+}
+
+if (import.meta.main) highlightMain();

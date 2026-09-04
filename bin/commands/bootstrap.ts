@@ -1,12 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createRequire } from 'node:module';
 import { BOOTSTRAP_HELP } from '../cli/help.ts';
 import { ensureDir, copyDirectory, copyFileIfExists, copyMarkdownDir } from '../adapters/fs.ts';
+import { readPackageMetadata } from '../adapters/package-metadata.ts';
 
-const require = createRequire(import.meta.url);
-const PKG = require('../../package.json') as { version: string; name: string };
+const PKG = readPackageMetadata(path.resolve(import.meta.dirname, '..', '..', 'package.json'));
 const VERSION = PKG.version;
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..', '..');
@@ -19,58 +18,72 @@ const CODEX_PLUGIN_DIR = path.resolve(ROOT_DIR, 'plugins', 'feynman');
 const DEFAULT_BOOTSTRAP_DIR = 'feynman-package';
 const PACKAGE_JSON = path.resolve(ROOT_DIR, 'package.json');
 
-export function cmdBootstrap(args: string[]): void {
-  if (args.includes('--help') || args.includes('-h')) {
+export type BootstrapArguments =
+  | { readonly kind: 'help' }
+  | { readonly kind: 'error'; readonly messages: readonly string[] }
+  | { readonly kind: 'run'; readonly out: string; readonly force: boolean };
+
+function isOutValue(args: readonly string[], index: number): boolean {
+  const value = args[index + 1];
+  return value !== undefined && value !== '' && !value.startsWith('-');
+}
+
+export function parseBootstrapArguments(args: readonly string[], cwd: string): BootstrapArguments {
+  if (args.includes('--help') || args.includes('-h')) return { kind: 'help' };
+
+  const malformedIndex = args.findIndex(
+    (arg, index) =>
+      (arg === '--out' && !isOutValue(args, index)) ||
+      (arg.startsWith('--out=') && arg.length === '--out='.length),
+  );
+  if (malformedIndex !== -1) {
+    return {
+      kind: 'error',
+      messages: [
+        args[malformedIndex] === '--out'
+          ? 'feynman bootstrap: --out requires a value'
+          : 'feynman bootstrap: invalid --out argument',
+      ],
+    };
+  }
+
+  const outputValues = args.flatMap((arg, index) => {
+    if (arg === '--out') return isOutValue(args, index) ? [args[index + 1]] : [];
+    return arg.startsWith('--out=') ? [arg.slice('--out='.length)] : [];
+  });
+  const unknown = args.filter((arg, index) => {
+    const consumedAsOutValue = index > 0 && args[index - 1] === '--out';
+    return arg !== '--force' && arg !== '--out' && !arg.startsWith('--out=') && !consumedAsOutValue;
+  });
+  if (unknown.length > 0) {
+    return {
+      kind: 'error',
+      messages: [
+        `feynman bootstrap: unexpected arguments "${unknown.join(' ')}"`,
+        'Run `feynman bootstrap --help` for usage.',
+      ],
+    };
+  }
+  return {
+    kind: 'run',
+    out: path.resolve(cwd, outputValues.at(-1) ?? DEFAULT_BOOTSTRAP_DIR),
+    force: args.includes('--force'),
+  };
+}
+
+export function cmdBootstrap(args: readonly string[]): void {
+  const parsed = parseBootstrapArguments(args, process.cwd());
+  if (parsed.kind === 'help') {
     console.log(BOOTSTRAP_HELP);
     process.exit(0);
   }
-
-  let out = path.resolve(process.cwd(), DEFAULT_BOOTSTRAP_DIR);
-  let force = false;
-  const unknown: string[] = [];
-
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i] ?? '';
-
-    if (arg === '--force') {
-      force = true;
-      continue;
-    }
-
-    if (arg === '--out') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('-')) {
-        console.error('feynman bootstrap: --out requires a value');
-        process.exit(2);
-      }
-      out = path.resolve(process.cwd(), value);
-      i += 1;
-      continue;
-    }
-
-    if (arg.startsWith('--out=')) {
-      const value = arg.slice('--out='.length);
-      if (!value) {
-        console.error('feynman bootstrap: invalid --out argument');
-        process.exit(2);
-      }
-      out = path.resolve(process.cwd(), value);
-      continue;
-    }
-
-    if (arg.startsWith('-')) {
-      unknown.push(arg);
-      continue;
-    }
-
-    unknown.push(arg);
-  }
-
-  if (unknown.length > 0) {
-    console.error(`feynman bootstrap: unexpected arguments "${unknown.join(' ')}"`);
-    console.error('Run `feynman bootstrap --help` for usage.');
+  if (parsed.kind === 'error') {
+    parsed.messages.forEach((message) => {
+      console.error(message);
+    });
     process.exit(2);
   }
+  const { out, force } = parsed;
 
   if (fs.existsSync(out) && !force) {
     console.log(`feynman bootstrap: output already exists at ${out}`);
@@ -90,20 +103,7 @@ export function cmdBootstrap(args: string[]): void {
         (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative))
       );
     });
-    let owned = false;
-    try {
-      const marker: unknown = JSON.parse(
-        fs.readFileSync(path.join(out, 'feynman-bootstrap.json'), 'utf8'),
-      );
-      owned =
-        typeof marker === 'object' &&
-        marker !== null &&
-        'outputDir' in marker &&
-        typeof marker.outputDir === 'string' &&
-        path.resolve(marker.outputDir) === out;
-    } catch {
-      /* Missing or invalid ownership metadata is not permission to delete. */
-    }
+    const owned = ownsBootstrapDirectory(out);
     if (fs.lstatSync(out).isSymbolicLink() || containsProtectedPath || !owned) {
       console.error(
         'feynman bootstrap: refusing to replace an unowned, symlinked, or protected directory',
@@ -146,7 +146,7 @@ export function cmdBootstrap(args: string[]): void {
     ) + '\n',
   );
 
-  const total = Object.values(counts).reduce((sum, count) => sum + (count ?? 0), 1);
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 1);
   console.log('');
   console.log('┌─ feynman bootstrap ────────────────────────────────────────┐');
   console.log(`│ output:   ${out}`);
@@ -159,4 +159,21 @@ export function cmdBootstrap(args: string[]): void {
   console.log(`│ files:    ${total}`);
   console.log('└───────────────────────────────────────────────────────────┘');
   process.exit(0);
+}
+
+function ownsBootstrapDirectory(out: string): boolean {
+  try {
+    const marker: unknown = JSON.parse(
+      fs.readFileSync(path.join(out, 'feynman-bootstrap.json'), 'utf8'),
+    );
+    return (
+      typeof marker === 'object' &&
+      marker !== null &&
+      'outputDir' in marker &&
+      typeof marker.outputDir === 'string' &&
+      path.resolve(marker.outputDir) === out
+    );
+  } catch {
+    return false;
+  }
 }

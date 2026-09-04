@@ -1,16 +1,14 @@
 // bin/cli/ansi.ts — ANSI colour helpers
 
-interface Color {
-  (s: string): string;
-}
+type Color = (s: string) => string;
 interface ColorMap {
-  bold: Color;
-  green: Color;
-  red: Color;
-  dim: Color;
+  readonly bold: Color;
+  readonly green: Color;
+  readonly red: Color;
+  readonly dim: Color;
 }
 
-const NO_COLOR = !!process.env['NO_COLOR'];
+const NO_COLOR = process.env['NO_COLOR'] !== undefined;
 
 export const c: ColorMap = {
   bold: (s: string) => (NO_COLOR ? s : `\x1b[1m${s}\x1b[0m`),

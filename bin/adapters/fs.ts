@@ -39,45 +39,33 @@ export function copyFileIfExists(src: string, dest: string): boolean {
 
 export function copyMarkdownDir(src: string, dest: string): number {
   if (!fs.existsSync(src)) return 0;
-  let copied = 0;
-  for (const entry of fs
+  return fs
     .readdirSync(src, { withFileTypes: true })
-    .sort((a, b) => a.name.localeCompare(b.name))) {
-    const sourcePath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-
-    if (entry.isDirectory()) {
-      copied += copyMarkdownDir(sourcePath, destPath);
-      continue;
-    }
-
-    if (!entry.isFile() || !entry.name.endsWith('.md')) {
-      continue;
-    }
-
-    ensureDir(path.dirname(destPath));
-    fs.copyFileSync(sourcePath, destPath);
-    copied += 1;
-  }
-  return copied;
+    .toSorted((a, b) => a.name.localeCompare(b.name))
+    .reduce((copied, entry) => {
+      const sourcePath = path.join(src, entry.name);
+      const destPath = path.join(dest, entry.name);
+      if (entry.isDirectory()) return copied + copyMarkdownDir(sourcePath, destPath);
+      if (!entry.isFile() || !entry.name.endsWith('.md')) return copied;
+      ensureDir(path.dirname(destPath));
+      fs.copyFileSync(sourcePath, destPath);
+      return copied + 1;
+    }, 0);
 }
 
 /** Copy every regular file in a directory tree and return the copied-file count. */
 export function copyDirectory(src: string, dest: string): number {
   if (!fs.existsSync(src)) return 0;
-  let copied = 0;
-  for (const entry of fs
+  return fs
     .readdirSync(src, { withFileTypes: true })
-    .sort((a, b) => a.name.localeCompare(b.name))) {
-    const sourcePath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      copied += copyDirectory(sourcePath, destPath);
-    } else if (entry.isFile()) {
+    .toSorted((a, b) => a.name.localeCompare(b.name))
+    .reduce((copied, entry) => {
+      const sourcePath = path.join(src, entry.name);
+      const destPath = path.join(dest, entry.name);
+      if (entry.isDirectory()) return copied + copyDirectory(sourcePath, destPath);
+      if (!entry.isFile()) return copied;
       ensureDir(path.dirname(destPath));
       fs.copyFileSync(sourcePath, destPath);
-      copied += 1;
-    }
-  }
-  return copied;
+      return copied + 1;
+    }, 0);
 }

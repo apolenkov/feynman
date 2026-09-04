@@ -3,8 +3,8 @@
 // Issue: {rule, severity, line, column, message, suggestion?}
 // Zero deps. ESM only.
 
-import { visualWidth, firstVisualColumnOf, lastVisualColumnOf } from './width.ts';
-import { nextFrame } from './frames.ts';
+import { visualCharacters, visualWidth, firstVisualColumnOf, lastVisualColumnOf } from './width.ts';
+import { iterateFrames } from './frames.ts';
 import { STATE_MARKER_RE } from './markers.ts';
 
 export interface Issue {
@@ -43,7 +43,14 @@ function issue(
   message: string,
   suggestion?: string,
 ): Issue {
-  return { rule, severity, line, column, message, ...(suggestion ? { suggestion } : {}) };
+  return {
+    rule,
+    severity,
+    line,
+    column,
+    message,
+    ...(suggestion === undefined || suggestion.length === 0 ? {} : { suggestion }),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +60,7 @@ function issue(
 // Vertical │ chars must align between top and bottom.
 // ---------------------------------------------------------------------------
 export function L01_box_closure(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (!ast.content) return [];
 
   const lines = ast.content.split('\n');
   // Don't run on diagrams with no box chars
@@ -61,7 +68,6 @@ export function L01_box_closure(ast: ASTNode): Issue[] {
     return [];
   }
 
-  const issues: Issue[] = [];
   const baseLineNum = ast.startLine;
 
   // Find all top-left corners (┌) and their columns
@@ -69,91 +75,86 @@ export function L01_box_closure(ast: ASTNode): Issue[] {
   // We track "open" top corners and look for matching bottoms
 
   // Collect positions of each corner type
-  const topLefts: Array<{ line: number; col: number; charIdx: number }> = [];
-  const topRights: Array<{ line: number; col: number; charIdx: number }> = [];
-  const botLefts: Array<{ line: number; col: number; charIdx: number }> = [];
-  const botRights: Array<{ line: number; col: number; charIdx: number }> = [];
-
-  for (let li = 0; li < lines.length; li++) {
-    const ln = lines[li]!;
-    for (let ci = 0; ci < ln.length; ci++) {
-      const ch = ln[ci]!;
-      if (ch === '┌') topLefts.push({ line: baseLineNum + li, col: ci + 1, charIdx: ci });
-      else if (ch === '┐') topRights.push({ line: baseLineNum + li, col: ci + 1, charIdx: ci });
-      else if (ch === '└') botLefts.push({ line: baseLineNum + li, col: ci + 1, charIdx: ci });
-      else if (ch === '┘') botRights.push({ line: baseLineNum + li, col: ci + 1, charIdx: ci });
-    }
-  }
+  const corners = lines.flatMap((line, lineIndex) =>
+    visualCharacters(line)
+      .filter(({ character }) => /[┌┐└┘]/u.test(character))
+      .map(({ character, column, sourceColumn }) => ({
+        character,
+        line: baseLineNum + lineIndex,
+        visualCol: column,
+        col: sourceColumn,
+      })),
+  );
+  const topLefts = corners.filter(({ character }) => character === '┌');
+  const topRights = corners.filter(({ character }) => character === '┐');
+  const botLefts = corners.filter(({ character }) => character === '└');
+  const botRights = corners.filter(({ character }) => character === '┘');
 
   // Check: every ┌ must have a └ at the same column
-  for (const tl of topLefts) {
-    const match = botLefts.find((bl) => bl.col === tl.col && bl.line > tl.line);
-    if (!match) {
-      issues.push(
-        issue(
-          'L01',
-          'error',
-          tl.line,
-          tl.col,
-          `Unclosed box: '┌' at line ${tl.line}, col ${tl.col} has no matching '└' at same column`,
-          'Add a closing └ at the same column position',
-        ),
-      );
-    }
-  }
+  const unclosedLeftIssues = topLefts.flatMap((tl) =>
+    botLefts.some((bl) => bl.visualCol === tl.visualCol && bl.line > tl.line)
+      ? []
+      : [
+          issue(
+            'L01',
+            'error',
+            tl.line,
+            tl.col,
+            `Unclosed box: '┌' at line ${tl.line}, col ${tl.col} has no matching '└' at same column`,
+            'Add a closing └ at the same column position',
+          ),
+        ],
+  );
 
   // Check: every └ must have a ┌ at the same column
-  for (const bl of botLefts) {
-    const match = topLefts.find((tl) => tl.col === bl.col && tl.line < bl.line);
-    if (!match) {
-      issues.push(
-        issue(
-          'L01',
-          'error',
-          bl.line,
-          bl.col,
-          `Orphan closing '└' at line ${bl.line}, col ${bl.col} has no matching '┌' at same column`,
-          'Add an opening ┌ at the same column position',
-        ),
-      );
-    }
-  }
+  const orphanLeftIssues = botLefts.flatMap((bl) =>
+    topLefts.some((tl) => tl.visualCol === bl.visualCol && tl.line < bl.line)
+      ? []
+      : [
+          issue(
+            'L01',
+            'error',
+            bl.line,
+            bl.col,
+            `Orphan closing '└' at line ${bl.line}, col ${bl.col} has no matching '┌' at same column`,
+            'Add an opening ┌ at the same column position',
+          ),
+        ],
+  );
 
   // Check: every ┐ must have a ┘ at the same column
-  for (const tr of topRights) {
-    const match = botRights.find((br) => br.col === tr.col && br.line > tr.line);
-    if (!match) {
-      issues.push(
-        issue(
-          'L01',
-          'error',
-          tr.line,
-          tr.col,
-          `Unclosed box: '┐' at line ${tr.line}, col ${tr.col} has no matching '┘' at same column`,
-          'Add a closing ┘ at the same column position',
-        ),
-      );
-    }
-  }
+  const unclosedRightIssues = topRights.flatMap((tr) =>
+    botRights.some((br) => br.visualCol === tr.visualCol && br.line > tr.line)
+      ? []
+      : [
+          issue(
+            'L01',
+            'error',
+            tr.line,
+            tr.col,
+            `Unclosed box: '┐' at line ${tr.line}, col ${tr.col} has no matching '┘' at same column`,
+            'Add a closing ┘ at the same column position',
+          ),
+        ],
+  );
 
   // Check: every ┘ must have a ┐ at the same column
-  for (const br of botRights) {
-    const match = topRights.find((tr) => tr.col === br.col && tr.line < br.line);
-    if (!match) {
-      issues.push(
-        issue(
-          'L01',
-          'error',
-          br.line,
-          br.col,
-          `Orphan closing '┘' at line ${br.line}, col ${br.col} has no matching '┐' at same column`,
-          'Add an opening ┐ at the same column position',
-        ),
-      );
-    }
-  }
+  const orphanRightIssues = botRights.flatMap((br) =>
+    topRights.some((tr) => tr.visualCol === br.visualCol && tr.line < br.line)
+      ? []
+      : [
+          issue(
+            'L01',
+            'error',
+            br.line,
+            br.col,
+            `Orphan closing '┘' at line ${br.line}, col ${br.col} has no matching '┐' at same column`,
+            'Add an opening ┐ at the same column position',
+          ),
+        ],
+  );
 
-  return issues;
+  return [...unclosedLeftIssues, ...orphanLeftIssues, ...unclosedRightIssues, ...orphanRightIssues];
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +164,7 @@ export function L01_box_closure(ast: ASTNode): Issue[] {
 // (i.e. ├── is used as the last item in its group)
 // ---------------------------------------------------------------------------
 export function L02_tree_chars(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
 
   const content = ast.content;
   // Skip if no tree chars at all
@@ -173,11 +174,9 @@ export function L02_tree_chars(ast: ASTNode): Issue[] {
   const issues: Issue[] = [];
   const baseLineNum = ast.startLine;
 
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li]!;
-
+  for (const [li, line] of lines.entries()) {
     // Check for ├── lines
-    const miteeMatch = line.match(/^(\s*(?:│\s*)*)├──/);
+    const miteeMatch = /^(\s*(?:│\s*)*)├──/.exec(line);
     if (!miteeMatch) continue;
 
     // This line uses ├──. Now check if it should be └──.
@@ -189,7 +188,7 @@ export function L02_tree_chars(ast: ASTNode): Issue[] {
     // Look for subsequent sibling lines: same prefix + (├── or └──)
     let hasNextSibling = false;
     for (let lj = li + 1; lj < lines.length; lj++) {
-      const next = lines[lj]!;
+      const next = lines[lj] ?? '';
       if (next.trim() === '') break; // blank line ends the block
 
       // A sibling would start with same prefix then ├── or └──
@@ -241,7 +240,7 @@ export function L02_tree_chars(ast: ASTNode): Issue[] {
 // Mixing seq-msg with flow arrows (e.g. -->) IS flagged as mixed styles;
 // the two families represent fundamentally different diagram idioms.
 // ---------------------------------------------------------------------------
-const ARROW_PATTERNS: Array<{ name: string; re: RegExp }> = [
+const ARROW_PATTERNS: { name: string; re: RegExp }[] = [
   // seq-msg family: -->> first (return), then ->> (sync call, not tail of -->>)
   { name: 'seq-msg', re: /-->>/ },
   { name: 'seq-msg', re: /(?<!-)->>/ }, // ->> not preceded by - (so it isn't the tail of -->>)
@@ -256,7 +255,7 @@ const ARROW_PATTERNS: Array<{ name: string; re: RegExp }> = [
 ];
 
 export function L03_arrow_style(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
 
   const content = ast.content;
   const lines = content.split('\n');
@@ -265,8 +264,7 @@ export function L03_arrow_style(ast: ASTNode): Issue[] {
   // Collect which arrow styles appear and on which lines
   const found = new Map<string, number>(); // style name -> first line number (1-based relative to doc)
 
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li]!;
+  for (const [li, line] of lines.entries()) {
     const docLine = baseLineNum + li;
 
     for (const { name, re } of ARROW_PATTERNS) {
@@ -280,12 +278,10 @@ export function L03_arrow_style(ast: ASTNode): Issue[] {
 
   // Multiple styles found — report on the second+ style
   const styles = [...found.entries()];
-  const firstStyle = styles[0]![0];
-  const issues: Issue[] = [];
-
-  for (let si = 1; si < styles.length; si++) {
-    const [name, lineNum] = styles[si]!;
-    issues.push(
+  const firstStyle = styles[0]?.[0] ?? '';
+  return styles
+    .slice(1)
+    .map(([name, lineNum]) =>
       issue(
         'L03',
         'error',
@@ -295,9 +291,6 @@ export function L03_arrow_style(ast: ASTNode): Issue[] {
         `Use a single arrow style throughout the diagram (e.g. '${firstStyle}' only)`,
       ),
     );
-  }
-
-  return issues;
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +299,7 @@ export function L03_arrow_style(ast: ASTNode): Issue[] {
 // Separator |---|---| must match column count
 // ---------------------------------------------------------------------------
 export function L04_column_widths(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
 
   const content = ast.content;
   if (!content.includes('|')) return [];
@@ -317,19 +310,14 @@ export function L04_column_widths(ast: ASTNode): Issue[] {
   // Find table-like rows: lines starting with | AND that look like markdown table rows
   // Exclude lines that are just diagram connectors (| as vertical bar in flow diagrams)
   // A proper table row: starts with |, has at least one cell with a word char, multiple pipes
-  const tableLines: Array<{ li: number; line: string }> = [];
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li]!;
-    // Must start with optional whitespace then |
-    if (!/^\s*\|/.test(line)) continue;
-    // Must have at least 2 pipe chars (i.e. at least one cell between them)
-    const pipeCount = (line.match(/\|/g) || []).length;
-    if (pipeCount < 2) continue;
-    // Must contain at least one word char (not just dashes/spaces) OR be a separator row
-    if (/\w/.test(line) || /^\s*\|[\s\-|:]+\|\s*$/.test(line)) {
-      tableLines.push({ li, line });
-    }
-  }
+  const tableLines = lines.flatMap((line, li) => {
+    const pipeCount = (line.match(/\|/g) ?? []).length;
+    const isTableRow =
+      /^\s*\|/.test(line) &&
+      pipeCount >= 2 &&
+      (/\w/.test(line) || /^\s*\|[\s\-|:]+\|\s*$/.test(line));
+    return isTableRow ? [{ li, line }] : [];
+  });
 
   if (tableLines.length < 2) return [];
 
@@ -340,10 +328,8 @@ export function L04_column_widths(ast: ASTNode): Issue[] {
     // tables as malformed.
     const parts = line.split(/(?<!\\)\|/);
     // Remove leading/trailing empty strings from the outer pipes
-    let start = 0;
-    let end = parts.length;
-    if (parts[0]!.trim() === '') start = 1;
-    if (parts[parts.length - 1]!.trim() === '') end = parts.length - 1;
+    const start = (parts[0] ?? '').trim() === '' ? 1 : 0;
+    const end = (parts.at(-1) ?? '').trim() === '' ? parts.length - 1 : parts.length;
     return end - start;
   }
 
@@ -352,34 +338,26 @@ export function L04_column_widths(ast: ASTNode): Issue[] {
     return /^\s*\|[\s\-|:]+\|?\s*$/.test(line);
   }
 
-  let refCols: number | null = null;
-  const issues: Issue[] = [];
+  const referenceIndex = tableLines.findIndex(({ line }) => !isSeparatorRow(line));
+  const reference = tableLines[referenceIndex];
+  if (reference === undefined) return [];
+  const refCols = countCols(reference.line);
 
-  for (const { li, line } of tableLines) {
-    const docLine = baseLineNum + li;
+  return tableLines.slice(referenceIndex + 1).flatMap(({ li, line }) => {
     const cols = countCols(line);
-
-    if (refCols === null && !isSeparatorRow(line)) {
-      refCols = cols;
-      continue;
-    }
-
-    if (refCols !== null && cols !== refCols) {
-      const what = isSeparatorRow(line) ? 'separator' : 'row';
-      issues.push(
-        issue(
-          'L04',
-          'error',
-          docLine,
-          1,
-          `Table ${what} has ${cols} columns but header has ${refCols} columns`,
-          `Ensure all table rows and separators have ${refCols} columns`,
-        ),
-      );
-    }
-  }
-
-  return issues;
+    if (cols === refCols) return [];
+    const what = isSeparatorRow(line) ? 'separator' : 'row';
+    return [
+      issue(
+        'L04',
+        'error',
+        baseLineNum + li,
+        1,
+        `Table ${what} has ${cols} columns but header has ${refCols} columns`,
+        `Ensure all table rows and separators have ${refCols} columns`,
+      ),
+    ];
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -393,54 +371,47 @@ const BOX_RE = /\[[^\]]+\]/g;
 const ARROW_RE = /-->>|->>|-->|→|─→|──>/;
 
 export function L05_flow_integrity(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
 
   const content = ast.content;
   if (!content.includes('[')) return [];
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues: Issue[] = [];
-
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li]!;
+  return lines.flatMap((line, li) => {
     const boxes = [...line.matchAll(BOX_RE)];
 
-    if (boxes.length < 2) continue;
+    if (boxes.length < 2) return [];
 
     // Check between each consecutive pair of boxes
-    let hasViolation = false;
-    for (let bi = 0; bi < boxes.length - 1; bi++) {
-      const curEnd = boxes[bi]!.index + boxes[bi]![0].length;
-      const nextStart = boxes[bi + 1]!.index;
+    const hasViolation = boxes.slice(0, -1).some((currentBox, bi) => {
+      const nextBox = boxes[bi + 1];
+      if (nextBox === undefined) return false;
+      const curEnd = currentBox.index + currentBox[0].length;
+      const nextStart = nextBox.index;
       const between = line.slice(curEnd, nextStart);
 
       // If between region is pure whitespace (≥3 spaces), treat as parallel layout (not connected)
       // Parallel layout means boxes are in separate columns, not sequentially connected
-      if (/^\s{3,}$/.test(between)) continue;
+      if (/^\s{3,}$/.test(between)) return false;
 
       // Between region has content but no arrow — violation
-      if (!ARROW_RE.test(between)) {
-        hasViolation = true;
-        break;
-      }
-    }
+      return !ARROW_RE.test(between);
+    });
 
-    if (hasViolation) {
-      issues.push(
-        issue(
-          'L05',
-          'error',
-          baseLineNum + li,
-          boxes[0]!.index + 1,
-          `${boxes.length} boxes on same line with no arrow between them: ${boxes.map((m) => m[0]).join(', ')}`,
-          `Add an arrow (-->, →) between consecutive boxes`,
-        ),
-      );
-    }
-  }
-
-  return issues;
+    return hasViolation
+      ? [
+          issue(
+            'L05',
+            'error',
+            baseLineNum + li,
+            (boxes[0]?.index ?? 0) + 1,
+            `${boxes.length} boxes on same line with no arrow between them: ${boxes.map((m) => m[0]).join(', ')}`,
+            `Add an arrow (-->, →) between consecutive boxes`,
+          ),
+        ]
+      : [];
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -448,7 +419,7 @@ export function L05_flow_integrity(ast: ASTNode): Issue[] {
 // If ▲ appears, ▼ must also appear (and vice versa)
 // ---------------------------------------------------------------------------
 export function L06_priority_scale(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
 
   const content = ast.content;
   const hasUp = /^[\s]*▲\s+\S/m.test(content);
@@ -458,42 +429,38 @@ export function L06_priority_scale(ast: ASTNode): Issue[] {
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues: Issue[] = [];
-
   // Find the line with the existing marker
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li]!;
-    const upMatch = line.match(/^(\s*)▲\s+\S/);
-    if (hasUp && upMatch) {
-      issues.push(
-        issue(
-          'L06',
-          'warn',
-          baseLineNum + li,
-          upMatch[1]!.length + 1,
-          `Priority scale has '▲' but missing '▼' — scales require both ends`,
-          `Add a '▼' marker to indicate the low end of the priority scale`,
-        ),
-      );
-      break;
-    }
-    const downMatch = line.match(/^(\s*)▼\s+\S/);
-    if (hasDown && downMatch) {
-      issues.push(
-        issue(
-          'L06',
-          'warn',
-          baseLineNum + li,
-          downMatch[1]!.length + 1,
-          `Priority scale has '▼' but missing '▲' — scales require both ends`,
-          `Add a '▲' marker to indicate the high end of the priority scale`,
-        ),
-      );
-      break;
-    }
-  }
-
-  return issues;
+  return lines
+    .flatMap((line, li) => {
+      const upMatch = /^(\s*)▲\s+\S/.exec(line);
+      if (hasUp && upMatch) {
+        return [
+          issue(
+            'L06',
+            'warn',
+            baseLineNum + li,
+            (upMatch[1] ?? '').length + 1,
+            `Priority scale has '▲' but missing '▼' — scales require both ends`,
+            `Add a '▼' marker to indicate the low end of the priority scale`,
+          ),
+        ];
+      }
+      const downMatch = /^(\s*)▼\s+\S/.exec(line);
+      if (hasDown && downMatch) {
+        return [
+          issue(
+            'L06',
+            'warn',
+            baseLineNum + li,
+            (downMatch[1] ?? '').length + 1,
+            `Priority scale has '▼' but missing '▲' — scales require both ends`,
+            `Add a '▲' marker to indicate the high end of the priority scale`,
+          ),
+        ];
+      }
+      return [];
+    })
+    .slice(0, 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -501,8 +468,7 @@ export function L06_priority_scale(ast: ASTNode): Issue[] {
 // If ``` mermaid ``` block exists alongside ASCII diagram, flag.
 // This rule operates on fullText, not a single AST node.
 // ---------------------------------------------------------------------------
-export function L07_no_mermaid_mix(_ast: ASTNode | null, fullText: string): Issue[] {
-  // _ast may be null when called for full-text check
+export function L07_no_mermaid_mix(fullText: string): Issue[] {
   if (!fullText) return [];
 
   // Mermaid must be a real opening fence at the start of a line — not a
@@ -538,7 +504,7 @@ export function L07_no_mermaid_mix(_ast: ASTNode | null, fullText: string): Issu
 // All rows inside ┌─...─┐ frame have consistent display width
 // ---------------------------------------------------------------------------
 export function L08_frame_width(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
 
   const content = ast.content;
   if (!content.includes('┌')) return [];
@@ -611,7 +577,7 @@ export function L08_frame_width(ast: ASTNode): Issue[] {
 // count as 2 cols (shared with L08 via lib/lint/width.ts).
 // ---------------------------------------------------------------------------
 export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
   const content = ast.content;
   if (!content.includes('┌')) return [];
 
@@ -621,7 +587,7 @@ export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
 
   let li = 0;
   while (li < lines.length) {
-    const topLine = lines[li]!;
+    const topLine = lines[li] ?? '';
     // A frame opens on a line that contains both ┌ and ┐
     if (topLine.includes('┌') && topLine.includes('┐')) {
       const anchorTopCol = firstVisualColumnOf(topLine, '┌');
@@ -632,7 +598,7 @@ export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
       // visual column as ┌ AND the line contains ┘.
       let closeLi = -1;
       for (let lj = li + 1; lj < lines.length; lj++) {
-        const candidate = lines[lj]!;
+        const candidate = lines[lj] ?? '';
         if (!candidate.includes('└') || !candidate.includes('┘')) continue;
         const candidateLeftCol = firstVisualColumnOf(candidate, '└');
         if (candidateLeftCol === anchorTopCol) {
@@ -649,7 +615,7 @@ export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
 
       // Inner rows: strictly between top and close
       for (let lj = li + 1; lj < closeLi; lj++) {
-        const innerLine = lines[lj]!;
+        const innerLine = lines[lj] ?? '';
         if (!innerLine.includes('│')) continue; // skip decorative gap lines
         const actualCol = lastVisualColumnOf(innerLine, '│');
         if (actualCol !== anchorCol) {
@@ -667,7 +633,7 @@ export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
       }
 
       // Bottom corner: ┘ column must match anchorCol
-      const closeLine = lines[closeLi]!;
+      const closeLine = lines[closeLi] ?? '';
       const actualBotCol = lastVisualColumnOf(closeLine, '┘');
       if (actualBotCol !== anchorCol) {
         issues.push(
@@ -702,39 +668,35 @@ export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
 export function L10_mixed_script(textOrAst: string | ASTNode | null | undefined): Issue[] {
   // Accept both raw text and AST shapes — most callers in this file pass the
   // AST that the harness built; some pass plain text via fixtures harness.
-  const text =
-    typeof textOrAst === 'string'
-      ? textOrAst
-      : ((textOrAst as { text?: string } | null | undefined)?.text ?? '');
-  const issues: Issue[] = [];
+  const text = typeof textOrAst === 'string' ? textOrAst : (textOrAst?.content ?? '');
+  const lineOffset = typeof textOrAst === 'string' ? 0 : (textOrAst?.startLine ?? 1) - 1;
   const lines = text.split('\n');
   // Word = run of letters/digits/_/-, including Cyrillic via \p{L}.
   const tokenRe = /[\p{L}\p{N}_-]+/gu;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? '';
-    let m: RegExpExecArray | null;
-    while ((m = tokenRe.exec(line)) !== null) {
+  return lines.flatMap((line, i) =>
+    Array.from(line.matchAll(tokenRe)).flatMap((m) => {
       const token = m[0];
       // Hyphenated kebab tokens are project identifiers (worktree-agent-X,
       // gsd-sdk, etc.) — whitelist regardless of script.
-      if (token.includes('-')) continue;
+      if (token.includes('-')) return [];
       // Numeric-suffixed alpha (foo123) — code identifier, whitelist.
-      if (/^[A-Za-zА-Яа-яЁё]+\d+$/.test(token)) continue;
+      if (/^[A-Za-zА-Яа-яЁё]+\d+$/.test(token)) return [];
       const hasCyr = /[А-Яа-яЁё]/.test(token);
       const hasLat = /[A-Za-z]/.test(token);
-      if (hasCyr && hasLat) {
-        issues.push({
-          rule: 'L10',
-          line: i + 1,
-          column: m.index + 1,
-          severity: 'warn',
-          token,
-          message: `mixed-script token: ${token}`,
-        });
-      }
-    }
-  }
-  return issues;
+      return hasCyr && hasLat
+        ? [
+            {
+              rule: 'L10',
+              line: lineOffset + i + 1,
+              column: m.index + 1,
+              severity: 'warn',
+              token,
+              message: `mixed-script token: ${token}`,
+            },
+          ]
+        : [];
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -744,65 +706,55 @@ export function L10_mixed_script(textOrAst: string | ASTNode | null | undefined)
 // embedded table column (≥3 │ chars on a single inner line) inside the frame.
 // ---------------------------------------------------------------------------
 export function L11_overdecoration(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
   const content = ast.content;
   if (!content.includes('┌')) return [];
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues: Issue[] = [];
 
-  let li = 0;
-  while (li < lines.length) {
-    const frame = nextFrame(lines, li);
-    if (!frame) break;
-
+  return Array.from(iterateFrames(lines)).flatMap((frame) => {
     const { topLi, closeLi, indent, inner } = frame;
-    const top = lines[topLi]!;
+    const top = lines[topLi] ?? '';
 
-    if (closeLi === -1) {
-      li = topLi + 1;
-      continue;
-    }
+    if (closeLi === -1) return [];
 
     const innerCount = inner.length;
-    if (innerCount >= 1 && innerCount <= 5) {
-      // Whitelist: nested tree (any ├── or └── in inner content).
-      const hasTree = inner.some((l) => /[├└]──/.test(l));
-      // Whitelist: embedded table column — ≥3 │ chars on a single inner line
-      // (outer pair + at least one embedded column separator).
-      const hasEmbeddedTable = inner.some((l) => (l.match(/│/g) || []).length >= 3);
+    if (innerCount < 1 || innerCount > 5) return [];
 
-      if (!hasTree && !hasEmbeddedTable) {
-        // Token-savings estimate (chars saved by dot-leader form).
-        const frameChars =
-          visualWidth(top) +
-          visualWidth(lines[closeLi]) +
-          inner.reduce((acc, l) => acc + visualWidth(l), 0);
-        const dotLeaderChars = inner.reduce((acc, l) => {
-          const stripped = l
+    const hasTree = inner.some((line) => /[├└]──/.test(line));
+    const hasEmbeddedTable = inner.some((line) => (line.match(/│/g) ?? []).length >= 3);
+    if (hasTree || hasEmbeddedTable) return [];
+
+    const frameChars =
+      visualWidth(top) +
+      visualWidth(lines[closeLi]) +
+      inner.reduce((total, line) => total + visualWidth(line), 0);
+    const dotLeaderChars = inner.reduce(
+      (total, line) =>
+        total +
+        visualWidth(
+          line
             .replace(/^\s*│/, '')
             .replace(/\s*│\s*$/, '')
-            .trim();
-          return acc + visualWidth(stripped) + 1;
-        }, 0);
-        const saving = Math.max(0, frameChars - dotLeaderChars);
+            .trim(),
+        ) +
+        1,
+      0,
+    );
+    const saving = Math.max(0, frameChars - dotLeaderChars);
 
-        issues.push(
-          issue(
-            'L11',
-            'warn',
-            baseLineNum + topLi,
-            indent.length + 1,
-            `frame used for ${innerCount} items; consider dot-leader list (saves ~${saving} chars)`,
-            `Replace frame with dot-leader list — see docs/lint-rules.md#l11`,
-          ),
-        );
-      }
-    }
-    li = closeLi + 1;
-  }
-  return issues;
+    return [
+      issue(
+        'L11',
+        'warn',
+        baseLineNum + topLi,
+        indent.length + 1,
+        `frame used for ${innerCount} items; consider dot-leader list (saves ~${saving} chars)`,
+        `Replace frame with dot-leader list — see docs/lint-rules.md#l11`,
+      ),
+    ];
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -834,22 +786,26 @@ export interface FrameNode {
  * @returns {FrameCost}
  */
 export function estimateFrameCost(node: FrameNode): FrameCost {
-  const top = node.top || '';
-  const bottom = node.bottom || '';
-  const inner = node.inner || [];
+  const top = node.top ?? '';
+  const bottom = node.bottom ?? '';
+  const inner = node.inner ?? [];
 
   const border_chars = visualWidth(top) + visualWidth(bottom);
 
-  let content_chars = 0;
-  let inner_chars = 0;
-  for (const ln of inner) {
-    inner_chars += visualWidth(ln);
-    const stripped = ln
-      .replace(/^\s*│/, '')
-      .replace(/\s*│\s*$/, '')
-      .trim();
-    content_chars += visualWidth(stripped);
-  }
+  const { content_chars, inner_chars } = inner.reduce(
+    (totals, line) => ({
+      inner_chars: totals.inner_chars + visualWidth(line),
+      content_chars:
+        totals.content_chars +
+        visualWidth(
+          line
+            .replace(/^\s*│/, '')
+            .replace(/\s*│\s*$/, '')
+            .trim(),
+        ),
+    }),
+    { content_chars: 0, inner_chars: 0 },
+  );
 
   const framing_chars = border_chars + inner_chars;
   const padding_chars = Math.max(0, inner_chars - content_chars);
@@ -867,54 +823,38 @@ export function estimateFrameCost(node: FrameNode): FrameCost {
 }
 
 export function L12_token_budget(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
   const content = ast.content;
   if (!content.includes('┌')) return [];
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues: Issue[] = [];
 
-  let li = 0;
-  while (li < lines.length) {
-    const frame = nextFrame(lines, li);
-    if (!frame) break;
-
+  return Array.from(iterateFrames(lines)).flatMap((frame) => {
     const { topLi, closeLi, indent, inner } = frame;
-    const top = lines[topLi]!;
+    const top = lines[topLi] ?? '';
 
-    if (closeLi === -1) {
-      li = topLi + 1;
-      continue;
-    }
+    if (closeLi === -1) return [];
 
     // Whitelist: tree composition inside frame (consistent with L11)
-    if (inner.some((l) => /[├└]──/.test(l))) {
-      li = closeLi + 1;
-      continue;
-    }
-    if (inner.length === 0) {
-      li = closeLi + 1;
-      continue;
-    }
+    if (inner.some((line) => /[├└]──/.test(line))) return [];
+    if (inner.length === 0) return [];
 
-    const cost = estimateFrameCost({ top, inner, bottom: lines[closeLi]! });
+    const cost = estimateFrameCost({ top, inner, bottom: lines[closeLi] ?? '' });
 
-    if (cost.padding_chars > cost.content_chars) {
-      issues.push(
-        issue(
-          'L12',
-          'warn',
-          baseLineNum + topLi,
-          indent.length + 1,
-          `frame is padding-dominated (padding=${cost.padding_chars} > content=${cost.content_chars}); consider lighter visual`,
-          `Use --explain for full cost breakdown; consider dot-leader or trimmed frame`,
-        ),
-      );
-    }
-    li = closeLi + 1;
-  }
-  return issues;
+    return cost.padding_chars > cost.content_chars
+      ? [
+          issue(
+            'L12',
+            'warn',
+            baseLineNum + topLi,
+            indent.length + 1,
+            `frame is padding-dominated (padding=${cost.padding_chars} > content=${cost.content_chars}); consider lighter visual`,
+            `Use --explain for full cost breakdown; consider dot-leader or trimmed frame`,
+          ),
+        ]
+      : [];
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -923,52 +863,36 @@ export function L12_token_budget(ast: ASTNode): Issue[] {
 // it in a frame adds zero information at full border cost.
 // ---------------------------------------------------------------------------
 export function L13_double_wrap(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
   const content = ast.content;
   if (!content.includes('┌')) return [];
   if (!/[├└]──/.test(content)) return [];
 
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues: Issue[] = [];
 
-  let li = 0;
-  while (li < lines.length) {
-    const frame = nextFrame(lines, li);
-    if (!frame) break;
-
+  return Array.from(iterateFrames(lines)).flatMap((frame) => {
     const { topLi, closeLi, indent } = frame;
 
-    if (closeLi === -1) {
-      li = topLi + 1;
-      continue;
-    }
+    if (closeLi === -1) return [];
 
     // Check all between-lines (not just │-bearing ones) for tree chars,
     // since L13 cares about any line between top and close.
-    let hasTree = false;
-    for (let lj = topLi + 1; lj < closeLi; lj++) {
-      if (/[├└]──/.test(lines[lj]!)) {
-        hasTree = true;
-        break;
-      }
-    }
+    const hasTree = lines.slice(topLi + 1, closeLi).some((line) => /[├└]──/.test(line));
 
-    if (hasTree) {
-      issues.push(
-        issue(
-          'L13',
-          'warn',
-          baseLineNum + topLi,
-          indent.length + 1,
-          `tree inside frame block — the tree already conveys hierarchy; drop the frame`,
-          `Remove the surrounding ┌─...─┐ / └─...─┘ borders; tree indentation suffices`,
-        ),
-      );
-    }
-    li = closeLi + 1;
-  }
-  return issues;
+    return hasTree
+      ? [
+          issue(
+            'L13',
+            'warn',
+            baseLineNum + topLi,
+            indent.length + 1,
+            `tree inside frame block — the tree already conveys hierarchy; drop the frame`,
+            `Remove the surrounding ┌─...─┐ / └─...─┘ borders; tree indentation suffices`,
+          ),
+        ]
+      : [];
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -994,75 +918,57 @@ const DIAGRAM_CHAR_RE = /[┌┐└┘│─├┤┬┴┼]|-->|→|[├└]─
 // Requires ≥2 inner lines to avoid false-positives on single-item wraps.
 // ---------------------------------------------------------------------------
 export function L15_homogeneous_frame(ast: ASTNode): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
   if (!ast.content.includes('┌')) return [];
 
   const lines = ast.content.split('\n');
   const baseLineNum = ast.startLine;
-  const issues: Issue[] = [];
 
-  let li = 0;
-  while (li < lines.length) {
-    const frame = nextFrame(lines, li);
-    if (!frame) break;
-
+  return Array.from(iterateFrames(lines)).flatMap((frame) => {
     const { topLi, closeLi, indent } = frame;
-    const top = lines[topLi]!;
+    const top = lines[topLi] ?? '';
 
-    if (closeLi === -1) {
-      li = topLi + 1;
-      continue;
-    }
+    if (closeLi === -1) return [];
 
     // L15 uses startsWith(indent + '│') for inner collection (leading bar only).
-    const inner: string[] = [];
-    for (let lj = topLi + 1; lj < closeLi; lj++) {
-      const next = lines[lj]!;
-      if (next.startsWith(indent + '│')) inner.push(next);
-    }
+    const inner = lines.slice(topLi + 1, closeLi).filter((line) => line.startsWith(indent + '│'));
 
-    if (inner.length < 2) {
-      li = closeLi + 1;
-      continue;
-    }
+    if (inner.length < 2) return [];
 
     // Strip inner lines to bare content for type detection.
-    const stripped = inner.map((l) => {
-      let s = l;
-      if (indent && s.startsWith(indent)) s = s.slice(indent.length);
-      s = s.replace(/^│/, '').replace(/\s*│\s*$/, '');
-      return s.trim();
-    });
+    const stripped = inner.map((line) =>
+      (indent.length > 0 && line.startsWith(indent) ? line.slice(indent.length) : line)
+        .replace(/^│/, '')
+        .replace(/\s*│\s*$/, '')
+        .trim(),
+    );
 
     // Complex guards — skip (structural frames stay as frames).
     if (stripped.some((l) => /[├└]──/.test(l))) {
-      li = closeLi + 1;
-      continue;
+      return [];
     }
-    if (stripped.some((l) => (l.match(/│/g) || []).length >= 2)) {
-      li = closeLi + 1;
-      continue;
+    if (stripped.some((l) => (l.match(/│/g) ?? []).length >= 2)) {
+      return [];
     }
     if (stripped.some((l) => /─→|→|──>|-->/.test(l))) {
-      li = closeLi + 1;
-      continue;
+      return [];
     }
     // Status frames — let L11 handle.
     if (stripped.every((l) => STATE_MARKER_RE.test(l))) {
-      li = closeLi + 1;
-      continue;
+      return [];
     }
 
     // Detect homogeneous content type.
-    let type: string | null = null;
-    if (stripped.every((l) => /^[-•*◦▸▹·]/.test(l))) type = 'bullet';
-    else if (stripped.every((l) => /^[^:\n]+:\s+\S/.test(l) || /^[^—\n]+—\s+\S/.test(l)))
-      type = 'kv';
-    else if (stripped.every((l) => l.length >= 2 && !/[├└┬┴┼]/.test(l))) type = 'prose';
+    const type = stripped.every((line) => /^[-•*◦▸▹·]/.test(line))
+      ? 'bullet'
+      : stripped.every((line) => /^[^:\n]+:\s+\S/.test(line) || /^[^—\n]+—\s+\S/.test(line))
+        ? 'kv'
+        : stripped.every((line) => line.length >= 2 && !/[├└┬┴┼]/.test(line))
+          ? 'prose'
+          : null;
 
-    if (!type) {
-      li = closeLi + 1;
-      continue;
+    if (type === null) {
+      return [];
     }
 
     // Savings estimate: frame chars vs plain content chars.
@@ -1073,7 +979,7 @@ export function L15_homogeneous_frame(ast: ASTNode): Issue[] {
     const plainChars = stripped.reduce((acc, l) => acc + l.length, 0);
     const saving = Math.max(0, frameChars - plainChars);
 
-    issues.push(
+    return [
       issue(
         'L15',
         'warn',
@@ -1082,14 +988,12 @@ export function L15_homogeneous_frame(ast: ASTNode): Issue[] {
         `frame wraps homogeneous ${type} content; consider plain format (saves ~${saving} chars)`,
         'Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15',
       ),
-    );
-    li = closeLi + 1;
-  }
-  return issues;
+    ];
+  });
 }
 
 export function L14_blank_line_separation(ast: ASTNode, fullText: string): Issue[] {
-  if (!ast || !ast.content) return [];
+  if (ast.content.length === 0) return [];
 
   // Only fire on diagram blocks with actual diagram chars.
   if (!DIAGRAM_CHAR_RE.test(ast.content)) return [];
@@ -1111,54 +1015,55 @@ export function L14_blank_line_separation(ast: ASTNode, fullText: string): Issue
   // For fenced blocks the parser sets endLine to the line index of the closing ```.
   const closeFenceLi = ast.endLine - 1; // 0-indexed
 
-  const issues: Issue[] = [];
-
   // --- Check the line BEFORE the opening fence ---
   const beforeLi = openFenceLi - 1; // 0-indexed
-  if (beforeLi >= 0) {
-    const beforeLine = lines[beforeLi] ?? '';
-    const beforeTrimmed = beforeLine.trim();
-    // Skip if blank, another fence, or a list marker (lenient for list-adjacent).
-    const isBlank = beforeTrimmed === '';
-    const isFence = beforeTrimmed === '```' || beforeTrimmed.startsWith('```');
-    const isListMarker = /^\s*(?:[-*+]|\d+\.)\s/.test(beforeLine);
-    const isHeading = beforeTrimmed.startsWith('#');
-    if (!isBlank && !isFence && !isListMarker && !isHeading) {
-      issues.push(
-        issue(
-          'L14',
-          'warn',
-          openFenceLi + 1, // 1-based line of opening fence
-          1,
-          'diagram block should be separated from surrounding text by a blank line',
-          'add a blank line before the opening ``` fence',
-        ),
-      );
-    }
-  }
+  const beforeIssues = (() => {
+    if (beforeLi < 0) return [];
+    const line = lines[beforeLi] ?? '';
+    const trimmed = line.trim();
+    const isExempt =
+      trimmed === '' ||
+      trimmed.startsWith('```') ||
+      /^\s*(?:[-*+]|\d+\.)\s/.test(line) ||
+      trimmed.startsWith('#');
+    return isExempt
+      ? []
+      : [
+          issue(
+            'L14',
+            'warn',
+            openFenceLi + 1, // 1-based line of opening fence
+            1,
+            'diagram block should be separated from surrounding text by a blank line',
+            'add a blank line before the opening ``` fence',
+          ),
+        ];
+  })();
 
   // --- Check the line AFTER the closing fence ---
   const afterLi = closeFenceLi + 1; // 0-indexed
-  if (afterLi < lines.length) {
-    const afterLine = lines[afterLi] ?? '';
-    const afterTrimmed = afterLine.trim();
-    const isBlank = afterTrimmed === '';
-    const isFence = afterTrimmed === '```' || afterTrimmed.startsWith('```');
-    const isListMarker = /^\s*(?:[-*+]|\d+\.)\s/.test(afterLine);
-    const isHeading = afterTrimmed.startsWith('#');
-    if (!isBlank && !isFence && !isListMarker && !isHeading) {
-      issues.push(
-        issue(
-          'L14',
-          'warn',
-          closeFenceLi + 1, // 1-based line of closing fence
-          1,
-          'diagram block should be separated from surrounding text by a blank line',
-          'add a blank line after the closing ``` fence',
-        ),
-      );
-    }
-  }
+  const afterIssues = (() => {
+    if (afterLi >= lines.length) return [];
+    const line = lines[afterLi] ?? '';
+    const trimmed = line.trim();
+    const isExempt =
+      trimmed === '' ||
+      trimmed.startsWith('```') ||
+      /^\s*(?:[-*+]|\d+\.)\s/.test(line) ||
+      trimmed.startsWith('#');
+    return isExempt
+      ? []
+      : [
+          issue(
+            'L14',
+            'warn',
+            closeFenceLi + 1, // 1-based line of closing fence
+            1,
+            'diagram block should be separated from surrounding text by a blank line',
+            'add a blank line after the closing ``` fence',
+          ),
+        ];
+  })();
 
-  return issues;
+  return [...beforeIssues, ...afterIssues];
 }

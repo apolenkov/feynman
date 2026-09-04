@@ -5,6 +5,12 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  assertRecord,
+  assertString,
+  assertUnknownArray,
+  parseJsonObject,
+} from './helpers/assertions.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const FEYNMAN = path.join(ROOT, 'bin', 'feynman.ts');
@@ -19,7 +25,7 @@ function run(home: string, args: string[]) {
 }
 
 function readJson(file: string): Record<string, unknown> {
-  return JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+  return parseJsonObject(fs.readFileSync(file, 'utf8'));
 }
 
 function runHook(home: string, command: string, input: unknown) {
@@ -35,12 +41,20 @@ function runHook(home: string, command: string, input: unknown) {
 }
 
 function findSessionHook(config: Record<string, unknown>): string {
-  const hooks = config['hooks'] as Record<string, Array<{ hooks: Array<{ command: string }> }>>;
-  for (const group of hooks['SessionStart'] ?? []) {
-    const command = group.hooks.find((hook) =>
-      hook.command.includes('feynman-session-start.ts'),
-    )?.command;
-    if (command) return command;
+  const hooks = config['hooks'];
+  assertRecord(hooks);
+  const groups = hooks['SessionStart'];
+  assertUnknownArray(groups);
+  for (const group of groups) {
+    assertRecord(group);
+    const groupHooks = group['hooks'];
+    assertUnknownArray(groupHooks);
+    for (const hook of groupHooks) {
+      assertRecord(hook);
+      const command = hook['command'];
+      assertString(command);
+      if (command.includes('feynman-session-start.ts')) return command;
+    }
   }
   assert.fail('Codex SessionStart hook command not found');
 }

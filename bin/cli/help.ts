@@ -1,10 +1,10 @@
 // bin/cli/help.ts — all *_HELP strings and cmdHelp
 
-import { createRequire } from 'node:module';
+import path from 'node:path';
 import { c } from './ansi.ts';
+import { readPackageMetadata } from '../adapters/package-metadata.ts';
 
-const require = createRequire(import.meta.url);
-const PKG = require('../../package.json') as { version: string; name: string };
+const PKG = readPackageMetadata(path.resolve(import.meta.dirname, '..', '..', 'package.json'));
 const VERSION = PKG.version;
 
 export const HELP = `${c.bold('feynman')} v${VERSION} — auto-inject ASCII diagram rules into Codex

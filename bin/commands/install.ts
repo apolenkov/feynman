@@ -9,6 +9,7 @@ import {
   removeFeynmanHooks,
   bootstrapState,
   codexConfig,
+  type ValidatedCodexConfig,
 } from '../adapters/codex-config.ts';
 import { sessionStartHookCommand } from '../adapters/codex-hook.ts';
 import { removeActiveFlag } from '../adapters/state-store.ts';
@@ -27,28 +28,37 @@ const SESSION_HOOK_PATH = path.resolve(
   `feynman-session-start${_hookExt}`,
 );
 
-function installCodex(opts: { force: boolean }): { already: boolean } {
-  const cfg = readSettings() as Record<string, Record<string, unknown[]>>;
-  cfg['hooks'] = cfg['hooks'] ?? {};
-  cfg['hooks']['SessionStart'] = cfg['hooks']['SessionStart'] ?? [];
+function withSessionHook(settings: ValidatedCodexConfig): ValidatedCodexConfig {
+  const withoutFeynman = removeFeynmanHooks(settings);
+  const hooks = withoutFeynman.hooks ?? {};
+  return {
+    ...withoutFeynman,
+    hooks: {
+      ...hooks,
+      SessionStart: [
+        ...(hooks['SessionStart'] ?? []),
+        {
+          matcher: 'startup|resume|compact|clear',
+          hooks: [{ type: 'command', command: sessionStartHookCommand(), timeout: 5 }],
+        },
+      ],
+    },
+  };
+}
+
+function installCodex(opts: Readonly<{ force: boolean }>): { readonly already: boolean } {
+  const cfg = readSettings();
   const already = hasFeynmanHook(cfg);
   if (already && !opts.force) {
     bootstrapState();
     return { already: true };
   }
-  removeFeynmanHooks(cfg);
-  cfg['hooks'] = cfg['hooks'] ?? {};
-  cfg['hooks']['SessionStart'] = cfg['hooks']['SessionStart'] ?? [];
-  cfg['hooks']['SessionStart'].push({
-    matcher: 'startup|resume|compact|clear',
-    hooks: [{ type: 'command', command: sessionStartHookCommand(), timeout: 5 }],
-  });
-  writeSettings(cfg);
+  writeSettings(withSessionHook(cfg));
   bootstrapState();
   return { already: false };
 }
 
-export function cmdInstall(opts: { force: boolean }): void {
+export function cmdInstall(opts: Readonly<{ force: boolean }>): void {
   const result = installCodex(opts);
   if (result.already) {
     console.log('hook: already installed (Codex)');
@@ -77,8 +87,7 @@ export function cmdUninstall(): void {
   }
   const cfg = readSettings();
   const hadHook = hasAnyFeynmanHook(cfg);
-  removeFeynmanHooks(cfg);
-  writeSettings(cfg);
+  writeSettings(removeFeynmanHooks(cfg));
   removeActiveFlag(tc.rootDir);
   console.log(
     hadHook

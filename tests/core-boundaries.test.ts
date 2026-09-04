@@ -6,8 +6,53 @@ import { autofixFrame } from '../lib/lint/autofix.ts';
 import { lint, format, RULE_REGISTRY, RULE_IDS, RULE_DESCRIPTIONS } from '../lib/lint/index.ts';
 import { INTENSITIES, OUTPUT_STYLES, DEFAULT_STATE } from '../lib/state/model.ts';
 import { L01_box_closure, L10_mixed_script, estimateFrameCost } from '../lib/lint/rules.ts';
+import { assertRecord, assertUnknownArray, assertString } from './helpers/assertions.ts';
 
 describe('core ownership boundaries', () => {
+  it('rejects representative violations through the effective strict configuration', async () => {
+    const eslint = new ESLint();
+    const sentinels = [
+      ['no-non-null-assertion', 'export const value = [1][0]!;'],
+      ['no-unsafe-type-assertion', 'export const value = JSON.parse("1") as number;'],
+      ['no-unnecessary-condition', 'export const value = true ? 1 : 0;'],
+      [
+        'prefer-nullish-coalescing',
+        'export const value = ("" as string | undefined) || "fallback";',
+      ],
+      ['array-type', 'export const value: Array<string> = [];'],
+      [
+        'strict-boolean-expressions',
+        'export function f(value: boolean | undefined): number { return value ? 1 : 0; }',
+      ],
+      [
+        'switch-exhaustiveness-check',
+        'export function f(value: "a" | "b"): number { switch (value) { case "a": return 1; } return 0; }',
+      ],
+      [
+        'prefer-readonly-parameter-types',
+        'export function f(value: string[]): number { return value.length; }',
+      ],
+    ] as const;
+    for (const [rule, source] of sentinels) {
+      const results = await eslint.lintText(source, { filePath: 'lib/lint/rules.ts' });
+      assert.ok(
+        results
+          .flatMap((result) => result.messages)
+          .some((message) => message.ruleId === `@typescript-eslint/${rule}`),
+        `effective configuration must reject ${rule}`,
+      );
+    }
+    const reassignment = await eslint.lintText(
+      'export function f(value: { key: number }): void { value.key = 2; }',
+      { filePath: 'bin/adapters/state-store.ts' },
+    );
+    assert.ok(
+      reassignment
+        .flatMap((result) => result.messages)
+        .some((message) => message.ruleId === 'no-param-reassign'),
+    );
+  });
+
   it('freezes exported defaults and registries for JavaScript consumers too', () => {
     for (const value of [
       RULE_REGISTRY,
@@ -27,7 +72,7 @@ describe('core ownership boundaries', () => {
     const eslint = new ESLint();
     const filePath = 'tests/core-boundaries.test.ts';
     const registration = await eslint.lintText(
-      "import { it as spec } from 'node:test'; spec('case', () => {});",
+      "import { it as spec } from 'node:test'; import assert from 'node:assert/strict'; spec('case', () => { assert.equal(1, 1); });",
       { filePath },
     );
     assert.deepEqual(
@@ -46,14 +91,15 @@ describe('core ownership boundaries', () => {
   });
 
   it('accepts every published package identifier without reading metadata in the core', () => {
-    const pkg = JSON.parse(
+    const pkg: unknown = JSON.parse(
       fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-    ) as {
-      name: string;
-      keywords: string[];
-      bin: Record<string, string>;
-    };
-    for (const token of [pkg.name, ...pkg.keywords, ...Object.keys(pkg.bin)]) {
+    );
+    assertRecord(pkg);
+    assertString(pkg['name']);
+    assertUnknownArray(pkg['keywords']);
+    assertRecord(pkg['bin']);
+    for (const token of [pkg['name'], ...pkg['keywords'], ...Object.keys(pkg['bin'])]) {
+      assertString(token);
       assert.deepEqual(L10_mixed_script(token), [], token);
     }
   });
@@ -73,7 +119,7 @@ describe('core ownership boundaries', () => {
       const results = await eslint.lintText(source, { filePath: 'lib/lint/rules.ts' });
       const messages = results.flatMap((result) => result.messages);
       assert.ok(
-        messages.some((message) => message.ruleId?.startsWith('no-restricted-')),
+        messages.some((message) => message.ruleId?.startsWith('no-restricted-') === true),
         source,
       );
     }
@@ -85,8 +131,7 @@ describe('core ownership boundaries', () => {
       ['lib/lint/rules.ts', "export * from './width.ts';"],
       ['lib/lint/rules.ts', "export * from '../state/model.ts';"],
       ['bin/adapters/state-store.ts', "import 'node:fs';"],
-    ]) {
-      assert.ok(filePath && source);
+    ] as const) {
       const results = await eslint.lintText(source, { filePath });
       assert.deepEqual(
         results.flatMap((result) => result.messages),

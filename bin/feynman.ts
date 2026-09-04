@@ -20,13 +20,13 @@ import { cmdDoctor } from './commands/doctor.ts';
 import { cmdState } from './commands/state.ts';
 
 /** Dispatch one CLI invocation; exported so all public routes are testable. */
-export function main(argv = process.argv.slice(2)): void {
+export function main(argv: readonly string[] = process.argv.slice(2)): void {
   const sub = argv[0];
   const rest = argv.slice(1);
 
   // Top-level --help / -h / no args
-  if (!sub || sub === 'help' || sub === '--help' || sub === '-h') {
-    if (!sub) {
+  if (sub === undefined || sub === '' || sub === 'help' || sub === '--help' || sub === '-h') {
+    if (sub === undefined || sub === '') {
       // No args → help + exit 2
       console.log(HELP);
       process.exit(2);

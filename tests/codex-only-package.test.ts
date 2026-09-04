@@ -2,6 +2,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  assertRecord,
+  assertString,
+  assertUnknownArray,
+  parseJsonObject,
+} from './helpers/assertions.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 
@@ -45,16 +51,19 @@ function activeTextFiles(rel: string): string[] {
 
 describe('Codex-only package contract', () => {
   it('does not publish legacy adapter metadata', () => {
-    const pkg = JSON.parse(read('package.json')) as {
-      description: string;
-      keywords: string[];
-      files: string[];
-    };
-    const metadata =
-      `${pkg.description}\n${pkg.keywords.join('\n')}\n${pkg.files.join('\n')}`.toLowerCase();
+    const pkg = parseJsonObject(read('package.json'));
+    const description = pkg['description'];
+    const keywords = pkg['keywords'];
+    const files = pkg['files'];
+    assertString(description);
+    assertUnknownArray(keywords);
+    assert.ok(keywords.every((value) => typeof value === 'string'));
+    assertUnknownArray(files);
+    assert.ok(files.every((value) => typeof value === 'string'));
+    const metadata = `${description}\n${keywords.join('\n')}\n${files.join('\n')}`.toLowerCase();
     assert.doesNotMatch(metadata, /claude|opencode/);
-    assert.ok(pkg.files.includes('.agents/'));
-    assert.ok(pkg.files.includes('plugins/'));
+    assert.ok(files.includes('.agents/'));
+    assert.ok(files.includes('plugins/'));
   });
 
   it('keeps release verification on the Codex runtime only', () => {
@@ -67,9 +76,13 @@ describe('Codex-only package contract', () => {
   });
 
   it('publishes the built tarball through an explicit local path', () => {
-    const pkg = JSON.parse(read('package.json')) as { scripts: { release: string } };
+    const pkg = parseJsonObject(read('package.json'));
+    const scripts = pkg['scripts'];
+    assertRecord(scripts);
+    const release = scripts['release'];
+    assertString(release);
     const localTarball = 'npm publish "./$(cat dist/TARBALL.txt)"';
-    assert.ok(pkg.scripts.release.includes(localTarball));
+    assert.ok(release.includes(localTarball));
 
     const releaseWorkflow = read('.github/workflows/release.yml');
     const publishLines = releaseWorkflow
@@ -89,17 +102,21 @@ describe('Codex-only package contract', () => {
   });
 
   it('publishes the native Codex marketplace entry', () => {
-    const marketplace = JSON.parse(read('.agents/plugins/marketplace.json')) as {
-      plugins: Array<{ source: { path: string } }>;
-    };
+    const marketplace = parseJsonObject(read('.agents/plugins/marketplace.json'));
+    const plugins = marketplace['plugins'];
+    assertUnknownArray(plugins);
     assert.deepEqual(
-      marketplace.plugins.map((plugin) => plugin.source.path),
+      plugins.map((plugin) => {
+        assertRecord(plugin);
+        const source = plugin['source'];
+        assertRecord(source);
+        const pluginPath = source['path'];
+        assertString(pluginPath);
+        return pluginPath;
+      }),
       ['./plugins/feynman'],
     );
-    const manifest = JSON.parse(read('plugins/feynman/.codex-plugin/plugin.json')) as Record<
-      string,
-      unknown
-    >;
+    const manifest = parseJsonObject(read('plugins/feynman/.codex-plugin/plugin.json'));
     assert.equal(manifest['skills'], './skills/');
     assert.equal(manifest['hooks'], undefined);
   });

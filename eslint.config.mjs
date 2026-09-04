@@ -1,12 +1,5 @@
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 
-// flat/recommended is an array of 3 config objects:
-//   [0] languageOptions (parser + sourceType)
-//   [1] files: ['**/*.ts', '**/*.tsx', ...] + rules (turn off conflicting ESLint rules)
-//   [2] rules (TS-specific recommended rules)
-// We spread it as-is and prepend an ignores block.
-const recommended = tsPlugin.configs['flat/recommended'];
-
 export default [
   // Ignores
   {
@@ -21,13 +14,11 @@ export default [
     ],
   },
 
-  // Spread the full flat/recommended array (parser + plugins + rules)
-  ...recommended,
-
-  ...tsPlugin.configs['flat/recommended-type-checked'].map((config) => ({
-    ...config,
-    files: ['**/*.ts'],
-  })),
+  // These opinionated presets are part of the recorded project contract.
+  // Lockfile updates must review changes to the effective rule set.
+  ...['flat/strict-type-checked', 'flat/stylistic-type-checked'].flatMap((name) =>
+    tsPlugin.configs[name].map((config) => ({ ...config, files: ['**/*.ts'] })),
+  ),
 
   // Override: restrict linting to project source globs only
   {
@@ -38,6 +29,27 @@ export default [
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
     rules: {
+      'no-param-reassign': ['error', { props: true }],
+      '@typescript-eslint/no-unsafe-type-assertion': 'error',
+      '@typescript-eslint/strict-boolean-expressions': [
+        'error',
+        {
+          allowAny: false,
+          allowString: true,
+          allowNumber: true,
+          allowNullableObject: true,
+          allowNullableBoolean: false,
+          allowNullableString: false,
+          allowNullableNumber: false,
+        },
+      ],
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'error',
+        { considerDefaultExhaustiveForUnions: false, requireDefaultForNonUnion: false },
+      ],
+      '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
+      '@typescript-eslint/prefer-readonly': 'error',
+      '@typescript-eslint/prefer-for-of': 'error',
       '@typescript-eslint/no-confusing-void-expression': 'error',
       '@typescript-eslint/no-misused-spread': 'error',
       '@typescript-eslint/restrict-template-expressions': [
@@ -65,8 +77,8 @@ export default [
     },
   },
   {
-    files: ['bin/**/*.ts', 'hooks/**/*.ts', 'scripts/**/*.ts', 'lib/state/**/*.ts'],
-    rules: { '@typescript-eslint/no-non-null-assertion': 'error' },
+    files: ['bin/**/*.ts', 'hooks/**/*.ts', 'scripts/**/*.ts', 'lib/**/*.ts'],
+    rules: { '@typescript-eslint/explicit-module-boundary-types': 'error' },
   },
   {
     files: ['tests/**/*.ts'],
@@ -89,7 +101,10 @@ export default [
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
     rules: {
-      'no-param-reassign': ['error', { props: true }],
+      '@typescript-eslint/prefer-readonly-parameter-types': [
+        'error',
+        { ignoreInferredTypes: true },
+      ],
       // Core modules can depend only on statically visible sibling core modules.
       'no-restricted-imports': [
         'error',

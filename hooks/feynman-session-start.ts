@@ -11,10 +11,16 @@ import { reconcileState, recordInjection } from '../bin/adapters/state-store.ts'
 
 // state.json / .feynman-active I/O now lives behind the store (ADR-0004), keyed by CLIENT_HOME.
 const HOME = os.homedir();
-const CLIENT_HOME = process.env['FEYNMAN_HOME'] || path.join(HOME, '.codex');
+const configuredHome = process.env['FEYNMAN_HOME'];
+const CLIENT_HOME =
+  configuredHome !== undefined && configuredHome !== ''
+    ? configuredHome
+    : path.join(HOME, '.codex');
+const configuredRulesPath = process.env['FEYNMAN_RULES_PATH'];
 const RULES_PATH =
-  process.env['FEYNMAN_RULES_PATH'] ||
-  path.join(import.meta.dirname, '..', 'rules', 'feynman-contract.md');
+  configuredRulesPath !== undefined && configuredRulesPath !== ''
+    ? configuredRulesPath
+    : path.join(import.meta.dirname, '..', 'rules', 'feynman-contract.md');
 
 function readRules(intensity: string): string {
   const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
@@ -25,12 +31,18 @@ function readRules(intensity: string): string {
   return readRulesForIntensity(rulesContent, intensity);
 }
 
-let input = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (chunk: string) => {
-  input += chunk;
-});
-process.stdin.on('end', () => {
+function readStdin(onEnd: (input: string) => void): void {
+  let inputBuffer = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', (chunk: string) => {
+    inputBuffer += chunk;
+  });
+  process.stdin.on('end', () => {
+    onEnd(inputBuffer);
+  });
+}
+
+function handleSessionStart(input: string): void {
   try {
     if (input.trim()) {
       const data: unknown = JSON.parse(input);
@@ -44,12 +56,12 @@ process.stdin.on('end', () => {
     const { state, active } = reconcileState(CLIENT_HOME);
     if (!active) process.exit(0);
 
-    let rulesText = readRules(state.intensity);
-    if (!rulesText) process.exit(0);
+    const rulesText = readRules(state.intensity);
+    if (rulesText === '') process.exit(0);
 
     // Apply output_style suffix (Phase 10 STYLE-03).
     // Shared helper: invalid values fall back to 'full' (no suffix) for safety.
-    rulesText = applyOutputStyle(rulesText, state.output_style);
+    const styledRules = applyOutputStyle(rulesText, state.output_style);
 
     // Count only successful rule injections. The write is advisory: a read-only
     // state directory must not prevent an otherwise valid SessionStart hook from
@@ -61,8 +73,10 @@ process.stdin.on('end', () => {
     }
 
     // SessionStart accepts plain stdout as context, matching caveman's hook shape.
-    process.stdout.write(rulesText);
+    process.stdout.write(styledRules);
   } catch (_) {
     process.exit(0);
   }
-});
+}
+
+readStdin(handleSessionStart);

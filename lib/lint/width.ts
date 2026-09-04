@@ -1,25 +1,15 @@
 // lib/lint/width.ts — single source of truth for visual-width calculations.
-// Used by rules.ts (L08, L09) and autofix.ts. Zero deps. ESM only.
-//
-// Folded together from rules.js displayWidth (CJK East Asian wide) and
-// autofix.js visualWidth (ANSI strip + combining/ZWJ strip). The unified
-// function is the canonical "how many terminal columns does this string
-// occupy" — used everywhere a frame border must align.
+// Used by rules.ts (L01, L08, L09) and autofix.ts. Zero deps. ESM only.
 
-// ANSI CSI sequences (SGR color codes etc.). Hex-escape ESC to keep the
-// file free of literal control bytes.
-const ANSI_RE = /\x1b\[[0-9;]*m/g;
+const ANSI_AT_START_RE = /^\x1b\[[0-9;]*m/;
+const ZERO_WIDTH_RE = /[\u0300-\u036f\u200b-\u200f\ufeff]/u;
 
-// Zero-width: combining marks (Mn) U+0300..U+036F, zero-width joiners
-// U+200B..U+200F (ZWSP, ZWNJ, ZWJ, LRM, RLM), and BOM U+FEFF.
-const ZERO_WIDTH_RE = /[̀-ͯ​-‏﻿]/g;
-// Non-global twin for single-char membership testing (avoids lastIndex drift).
-const ZERO_WIDTH_TEST_RE = /[̀-ͯ​-‏﻿]/;
+export interface VisualCharacter {
+  readonly character: string;
+  readonly column: number;
+  readonly sourceColumn: number;
+}
 
-// East-Asian Wide / Fullwidth code-point ranges. These render as 2
-// terminal columns in most monospace fonts. Box-drawing chars
-// (U+2500..U+257F) are intentionally NOT in this list — they render as
-// width 1.
 export function isWide(code: number): boolean {
   return (
     (code >= 0x1100 && code <= 0x115f) ||
@@ -41,81 +31,55 @@ export function isWide(code: number): boolean {
   );
 }
 
+/**
+ * Single-pass terminal-column scanner. The local cursor and result buffer are
+ * owned by this call so ANSI sequences and Unicode code points are processed
+ * in linear time without copying the remaining suffix on every character.
+ */
+export function visualCharacters(line: string): readonly VisualCharacter[] {
+  const characters: VisualCharacter[] = [];
+  let column = 0;
+  let offset = 0;
+
+  while (offset < line.length) {
+    if (line.charCodeAt(offset) === 0x1b && line[offset + 1] === '[') {
+      const ansi = ANSI_AT_START_RE.exec(line.slice(offset))?.[0];
+      if (ansi !== undefined) {
+        offset += ansi.length;
+        continue;
+      }
+    }
+
+    const code = line.codePointAt(offset);
+    if (code === undefined) break;
+    const character = String.fromCodePoint(code);
+    const sourceColumn = offset + 1;
+    offset += character.length;
+
+    if (ZERO_WIDTH_RE.test(character)) {
+      characters.push({ character, column, sourceColumn });
+      continue;
+    }
+    column += isWide(code) ? 2 : 1;
+    characters.push({ character, column, sourceColumn });
+  }
+
+  return characters;
+}
+
 export function visualWidth(line: string | undefined | null): number {
-  if (!line) return 0;
-  const stripped = String(line).replace(ANSI_RE, '').replace(ZERO_WIDTH_RE, '');
-  let w = 0;
-  for (const ch of stripped) {
-    w += isWide(ch.codePointAt(0)!) ? 2 : 1;
-  }
-  return w;
+  if (line === undefined || line === null || line.length === 0) return 0;
+  return visualCharacters(line).at(-1)?.column ?? 0;
 }
 
-// Find the visual column (1-based) where the LAST occurrence of `ch` in
-// `line` lands. Returns -1 if not found. Wide chars before the target
-// count for 2 columns; combining marks and ANSI escapes count for 0.
-// Used by L09 to compare actual closing-│ position against the anchor.
-export function lastVisualColumnOf(line: string, ch: string): number {
-  if (!line) return -1;
-  // Walk left→right while accumulating visual width; remember the column
-  // of the last matching codepoint.
-  let col = 0;
-  let last = -1;
-  // We need to skip ANSI escapes and zero-width chars without advancing
-  // the column counter — so walk the original string and detect runs.
-  let i = 0;
-  const s = String(line);
-  while (i < s.length) {
-    // Skip ANSI CSI sequence (\x1b[...m)
-    if (s.charCodeAt(i) === 0x1b && s[i + 1] === '[') {
-      const m = s.slice(i).match(/^\x1b\[[0-9;]*m/);
-      if (m) {
-        i += m[0].length;
-        continue;
-      }
-    }
-    const code = s.codePointAt(i)!;
-    const charLen = code > 0xffff ? 2 : 1; // surrogate pair occupies 2 UTF-16 units
-    // Zero-width: do not advance col
-    if (ZERO_WIDTH_TEST_RE.test(String.fromCodePoint(code))) {
-      if (String.fromCodePoint(code) === ch) last = col;
-      i += charLen;
-      continue;
-    }
-    const w = isWide(code) ? 2 : 1;
-    col += w;
-    if (String.fromCodePoint(code) === ch) last = col;
-    i += charLen;
-  }
-  return last;
+export function lastVisualColumnOf(line: string, character: string): number {
+  return (
+    visualCharacters(line)
+      .filter((entry) => entry.character === character)
+      .at(-1)?.column ?? -1
+  );
 }
 
-export function firstVisualColumnOf(line: string, ch: string): number {
-  if (!line) return -1;
-  let col = 0;
-  let i = 0;
-  const s = String(line);
-  while (i < s.length) {
-    if (s.charCodeAt(i) === 0x1b && s[i + 1] === '[') {
-      const m = s.slice(i).match(/^\x1b\[[0-9;]*m/);
-      if (m) {
-        i += m[0].length;
-        continue;
-      }
-    }
-    const code = s.codePointAt(i)!;
-    const charLen = code > 0xffff ? 2 : 1;
-    if (ZERO_WIDTH_RE.test(String.fromCodePoint(code))) {
-      ZERO_WIDTH_RE.lastIndex = 0;
-      if (String.fromCodePoint(code) === ch) return col;
-      i += charLen;
-      continue;
-    }
-    ZERO_WIDTH_RE.lastIndex = 0;
-    const w = isWide(code) ? 2 : 1;
-    col += w;
-    if (String.fromCodePoint(code) === ch) return col;
-    i += charLen;
-  }
-  return -1;
+export function firstVisualColumnOf(line: string, character: string): number {
+  return visualCharacters(line).find((entry) => entry.character === character)?.column ?? -1;
 }
