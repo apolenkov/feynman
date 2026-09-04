@@ -48,7 +48,10 @@ describe('changelog rendering', () => {
     assert.deepEqual(classify('refactor: simplify layers'), ['Maintenance', 'simplify layers']);
     assert.deepEqual(classify('perf: cache rules'), ['Performance', 'cache rules']);
     assert.deepEqual(classify('build: update tooling'), ['Build', 'update tooling']);
-    assert.deepEqual(classify('feat!: remove legacy adapter'), ['Breaking Changes', 'remove legacy adapter']);
+    assert.deepEqual(classify('feat!: remove legacy adapter'), [
+      'Breaking Changes',
+      'remove legacy adapter',
+    ]);
     assert.deepEqual(classify('miscellaneous note'), ['Other', 'miscellaneous note']);
   });
 

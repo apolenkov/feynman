@@ -89,7 +89,9 @@ function main(): void {
   checkBudget(text, 'after');
 
   if (dryRun) {
-    console.log(`  dry-run — not writing. ${added > 0 ? '+' : ''}${added} marker line(s) ${revert ? 'would be removed' : 'would be added'}.`);
+    console.log(
+      `  dry-run — not writing. ${added > 0 ? '+' : ''}${added} marker line(s) ${revert ? 'would be removed' : 'would be added'}.`,
+    );
     return;
   }
 
@@ -100,5 +102,9 @@ function main(): void {
   console.log('  npm test: pass');
 }
 
-try { main(); }
-catch (e) { console.error('error:', (e as Error).message); process.exit(1); }
+try {
+  main();
+} catch (e) {
+  console.error('error:', (e as Error).message);
+  process.exit(1);
+}

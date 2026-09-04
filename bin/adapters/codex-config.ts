@@ -3,8 +3,28 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { type FeynmanState, DEFAULT_STATE, normalizeState } from '../../lib/state/index.ts';
-import { flagContent, readState, statePaths, writeState } from './state-store.ts';
+import { reconcileState, statePaths } from './state-store.ts';
+import { atomicWrite } from './fs.ts';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function validSettings(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value)) return false;
+  if (!('hooks' in value)) return true;
+  if (!isRecord(value['hooks'])) return false;
+  return Object.values(value['hooks']).every(
+    (groups: unknown) =>
+      Array.isArray(groups) &&
+      groups.every(
+        (group: unknown) =>
+          isRecord(group) &&
+          Array.isArray(group['hooks']) &&
+          group['hooks'].every((hook: unknown) => isRecord(hook)),
+      ),
+  );
+}
 
 export interface CodexConfig {
   rootDir: string;
@@ -43,14 +63,19 @@ export function readJsonConfig(filePath: string): Record<string, unknown> {
     return fatal(`cannot read ${filePath}: ${(err as Error).message}`);
   }
   if (text.trim() === '') return {};
+  let parsed: unknown;
   try {
-    return JSON.parse(text) as Record<string, unknown>;
+    parsed = JSON.parse(text);
   } catch (_) {
     return fatal(
       `refusing to touch ${filePath}: file exists but is not valid JSON ` +
-      `(trailing comma, comment, or truncated write?). Fix it by hand and re-run.`,
+        `(trailing comma, comment, or truncated write?). Fix it by hand and re-run.`,
     );
   }
+  if (!validSettings(parsed)) {
+    return fatal(`refusing to touch ${filePath}: expected a JSON object with valid hook groups`);
+  }
+  return parsed;
 }
 
 export function readSettings(): Record<string, unknown> {
@@ -60,51 +85,114 @@ export function readSettings(): Record<string, unknown> {
 export function writeSettings(settings: Record<string, unknown>): void {
   const cfg = codexConfig();
   fs.mkdirSync(cfg.rootDir, { recursive: true });
-  fs.writeFileSync(cfg.settingsPath, JSON.stringify(settings, null, 2) + '\n');
+  atomicWrite(cfg.settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }
 
 export function isFeynmanHookCommand(command: string): boolean {
-  return isSessionStartHookCommand(command) || command.includes('feynman-lint.ts') || command.includes('feynman-lint.js');
+  return (
+    isSessionStartHookCommand(command) ||
+    ownsScript(command, 'feynman-lint.ts') ||
+    ownsScript(command, 'feynman-lint.js')
+  );
+}
+
+function ownsScript(command: string, scriptName: string): boolean {
+  return extractHookScriptPath(command, scriptName) !== null;
 }
 
 // The SessionStart hook is the one doctor and install introspection look for.
 // Centralised so renaming the script touches one place, not five inline literals.
 export function isSessionStartHookCommand(command: unknown): boolean {
-  return typeof command === 'string' && (
-    command.includes('feynman-session-start.ts') ||
-    command.includes('feynman-session-start.js')
+  return (
+    typeof command === 'string' &&
+    (ownsScript(command, 'feynman-session-start.ts') ||
+      ownsScript(command, 'feynman-session-start.js'))
   );
 }
 
 export function hasFeynmanHook(settings: Record<string, unknown>): boolean {
   const hooks = settings['hooks'] as Record<string, unknown[]> | undefined;
-  return ((hooks?.['SessionStart'] ?? []) as Array<Record<string, unknown>>).some(g => {
+  return ((hooks?.['SessionStart'] ?? []) as Array<Record<string, unknown>>).some((g) => {
     const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
-    return hs?.some(h => isSessionStartHookCommand(h['command']));
+    return hs?.some((h) => isSessionStartHookCommand(h['command']));
   });
 }
 
 export function hasAnyFeynmanHook(settings: Record<string, unknown>): boolean {
   const hooks = settings['hooks'] as Record<string, unknown[]> | undefined;
   if (!hooks) return false;
-  return ['SessionStart', 'UserPromptSubmit', 'Stop'].some(eventName =>
-    ((hooks[eventName] ?? []) as Array<Record<string, unknown>>).some(g => {
+  return ['SessionStart', 'UserPromptSubmit', 'Stop'].some((eventName) =>
+    ((hooks[eventName] ?? []) as Array<Record<string, unknown>>).some((g) => {
       const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
-      return hs?.some(h => typeof h['command'] === 'string' && isFeynmanHookCommand(h['command'] as string));
-    })
+      return hs?.some(
+        (h) => typeof h['command'] === 'string' && isFeynmanHookCommand(h['command']),
+      );
+    }),
   );
 }
 
-export function extractHookScriptPath(command: string, scriptName: string): string | null {
-  if (typeof command !== 'string') return null;
-  const escaped = scriptName.replace(/\./g, '\\.');
-  const quotedPattern = new RegExp("[\"']([^\"']*" + escaped + ")[\"']");
-  const quoted = command.match(quotedPattern);
-  if (quoted) return quoted[1] ?? null;
+/** Read literal shell words without executing expansions or accepting compound commands. */
+function literalShellWords(command: string): string[] | null {
+  const words: string[] = [];
+  let word = '';
+  let quote: string | null = null;
+  let escaped = false;
+  let started = false;
+  for (const character of command.trim()) {
+    if (escaped) {
+      if (quote === '"' && !'$`"\\\n'.includes(character)) word += '\\';
+      if (character !== '\n') word += character;
+      escaped = false;
+      continue;
+    }
+    if (quote === "'") {
+      if (character === "'") quote = null;
+      else word += character;
+      continue;
+    }
+    if (character === '\\') {
+      escaped = true;
+      started = true;
+      continue;
+    }
+    if (quote === '"') {
+      if (character === '"') quote = null;
+      else if ('$`'.includes(character)) return null;
+      else word += character;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      started = true;
+      continue;
+    }
+    if ('$`;&|<>(){}*?[]~\n\r'.includes(character)) return null;
+    if (/\s/.test(character)) {
+      if (started) words.push(word);
+      word = '';
+      started = false;
+    } else {
+      word += character;
+      started = true;
+    }
+  }
+  if (quote !== null || escaped) return null;
+  if (started) words.push(word);
+  return words;
+}
 
-  const unquotedPattern = new RegExp("(?:^|\\s)(/[^\\s\"';&|<>]*" + escaped + ")(?=$|\\s)");
-  const unquoted = command.match(unquotedPattern);
-  return unquoted ? (unquoted[1] ?? null) : null;
+export function extractHookScriptPath(command: string, scriptName: string): string | null {
+  const words = literalShellWords(command);
+  if (!words) return null;
+  const offset = words[0]?.startsWith('FEYNMAN_HOME=') ? 1 : 0;
+  const executable = words[offset];
+  const script = words[offset + 1];
+  return executable !== undefined &&
+    path.basename(executable) === 'node' &&
+    script !== undefined &&
+    path.basename(script) === scriptName
+    ? script
+    : null;
 }
 
 export function removeFeynmanHooks(settings: Record<string, unknown>): Record<string, unknown> {
@@ -114,19 +202,21 @@ export function removeFeynmanHooks(settings: Record<string, unknown>): Record<st
     if (!Array.isArray(hooks[eventName])) continue;
     const groups = hooks[eventName] as Array<Record<string, unknown>>;
     hooks[eventName] = groups
-      .map(g => {
+      .map((g) => {
         const hs = g['hooks'] as Array<Record<string, unknown>> | undefined;
         if (!Array.isArray(hs)) return g;
         return {
           ...g,
-          hooks: hs.filter(h => !(typeof h['command'] === 'string' && isFeynmanHookCommand(h['command'] as string))),
+          hooks: hs.filter(
+            (h) => !(typeof h['command'] === 'string' && isFeynmanHookCommand(h['command'])),
+          ),
         };
       })
-      .filter(g => {
+      .filter((g) => {
         const hs = g['hooks'] as Array<unknown> | undefined;
         return !Array.isArray(hs) || hs.length > 0;
       });
-    if ((hooks[eventName] as unknown[]).length === 0) {
+    if (hooks[eventName].length === 0) {
       delete hooks[eventName];
     }
   }
@@ -137,18 +227,5 @@ export function removeFeynmanHooks(settings: Record<string, unknown>): Record<st
 }
 
 export function bootstrapState(): void {
-  const cfg = codexConfig();
-  // Absent or corrupt state.json → (re)write default; otherwise merge with defaults.
-  const raw = readState(cfg.rootDir);
-  let state: FeynmanState = { ...DEFAULT_STATE };
-  if (raw === null) {
-    writeState(cfg.rootDir, state);
-  } else {
-    state = normalizeState(raw);
-  }
-  if (state.enabled) {
-    fs.writeFileSync(cfg.flagPath, flagContent(state));
-  } else if (fs.existsSync(cfg.flagPath)) {
-    fs.unlinkSync(cfg.flagPath);
-  }
+  reconcileState(codexConfig().rootDir);
 }

@@ -3,7 +3,14 @@
 // Subcommands: install, uninstall, doctor, lint, examples, bootstrap, version, help
 // Zero runtime deps. ESM TypeScript. Node >= 22.18.
 
-import { HELP, INSTALL_HELP, UNINSTALL_HELP, DOCTOR_HELP, STATE_HELP, cmdHelp } from './cli/help.ts';
+import {
+  HELP,
+  INSTALL_HELP,
+  UNINSTALL_HELP,
+  DOCTOR_HELP,
+  STATE_HELP,
+  cmdHelp,
+} from './cli/help.ts';
 import { cmdExamples } from './commands/examples.ts';
 import { cmdVersion } from './commands/version.ts';
 import { cmdLint } from './commands/lint.ts';
@@ -11,17 +18,6 @@ import { cmdBootstrap } from './commands/bootstrap.ts';
 import { cmdInstall, cmdUninstall } from './commands/install.ts';
 import { cmdDoctor } from './commands/doctor.ts';
 import { cmdState } from './commands/state.ts';
-
-// ─── Help text ────────────────────────────────────────────────────────────────
-// Moved to bin/cli/help.ts; imported above.
-
-// ─── Install/Uninstall ────────────────────────────────────────────────────────
-// Moved to bin/commands/install.ts; imported above.
-
-// ─── Doctor ───────────────────────────────────────────────────────────────────
-// Moved to bin/commands/doctor.ts; imported above.
-
-// ─── Dispatch ─────────────────────────────────────────────────────────────────
 
 /** Dispatch one CLI invocation; exported so all public routes are testable. */
 export function main(argv = process.argv.slice(2)): void {
@@ -40,28 +36,49 @@ export function main(argv = process.argv.slice(2)): void {
 
   switch (sub) {
     case 'install': {
-      if (rest.includes('--help')) { console.log(INSTALL_HELP); process.exit(0); }
+      if (rest.includes('--help')) {
+        console.log(INSTALL_HELP);
+        process.exit(0);
+      }
       const force = rest.includes('--force');
-      const unknown = rest.filter(arg => arg !== '--force');
-      if (unknown.length > 0) { console.error(`feynman install: unexpected arguments "${unknown.join(' ')}"`); process.exit(2); }
+      const unknown = rest.filter((arg) => arg !== '--force');
+      if (unknown.length > 0) {
+        console.error(`feynman install: unexpected arguments "${unknown.join(' ')}"`);
+        process.exit(2);
+      }
       cmdInstall({ force });
       break;
     }
     case 'uninstall': {
-      if (rest.includes('--help')) { console.log(UNINSTALL_HELP); process.exit(0); }
-      if (rest.length > 0) { console.error(`feynman uninstall: unexpected arguments "${rest.join(' ')}"`); process.exit(2); }
+      if (rest.includes('--help')) {
+        console.log(UNINSTALL_HELP);
+        process.exit(0);
+      }
+      if (rest.length > 0) {
+        console.error(`feynman uninstall: unexpected arguments "${rest.join(' ')}"`);
+        process.exit(2);
+      }
       cmdUninstall();
       break;
     }
     case 'doctor': {
-      if (rest.includes('--help')) { console.log(DOCTOR_HELP); process.exit(0); }
-      if (rest.length > 0) { console.error(`feynman doctor: unexpected arguments "${rest.join(' ')}"`); process.exit(2); }
+      if (rest.includes('--help')) {
+        console.log(DOCTOR_HELP);
+        process.exit(0);
+      }
+      if (rest.length > 0) {
+        console.error(`feynman doctor: unexpected arguments "${rest.join(' ')}"`);
+        process.exit(2);
+      }
       cmdDoctor();
       break;
     }
     case 'state':
     case 'status': {
-      if (rest.includes('--help') || rest.includes('-h')) { console.log(STATE_HELP); process.exit(0); }
+      if (rest.includes('--help') || rest.includes('-h')) {
+        console.log(STATE_HELP);
+        process.exit(0);
+      }
       cmdState(sub === 'status' ? ['status', ...rest] : rest);
       break;
     }

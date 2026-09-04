@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.build/
+eval/
+feynman-rules-workspace/
+# Historical decisions are not part of the maintained source style contract.
+openspec/changes/archive/
+# Markdown contains product diagrams and intentional invalid lint fixtures.
+*.md

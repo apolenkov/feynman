@@ -9,20 +9,143 @@ import path from 'node:path';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const CLI = path.join(ROOT, 'bin', 'feynman.ts');
 
-function tempHome(): string { return fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-cli-')); }
-function run(home: string, args: string[]) {
-  const result = spawnSync(process.execPath, [CLI, ...args], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, HOME: home, NO_COLOR: '1' },
+function tempHome(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-cli-'));
+}
+function run(home: string, args: string[], entrypoint = CLI) {
+  const result = spawnSync(process.execPath, [entrypoint, ...args], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, NO_COLOR: '1' },
   });
   return { status: result.status ?? 1, stdout: result.stdout || '', stderr: result.stderr || '' };
 }
-function configPath(home: string): string { return path.join(home, '.codex', 'hooks.json'); }
-function readConfig(home: string): Record<string, unknown> {
-  return JSON.parse(fs.readFileSync(configPath(home), 'utf8'));
+function configPath(home: string): string {
+  return path.join(home, '.codex', 'hooks.json');
 }
-function cleanup(home: string): void { fs.rmSync(home, { recursive: true, force: true }); }
+function readConfig(home: string): Record<string, unknown> {
+  return JSON.parse(fs.readFileSync(configPath(home), 'utf8')) as Record<string, unknown>;
+}
+function cleanup(home: string): void {
+  fs.rmSync(home, { recursive: true, force: true });
+}
 
 describe('feynman CLI', () => {
+  it('installs and executes hooks literally from paths containing quotes and dollar signs', () => {
+    const temporary = tempHome();
+    const home = path.join(temporary, "O'Brien $FEYNMAN_TEST_LABEL");
+    const exported = path.join(temporary, "plugin's $FEYNMAN_TEST_LABEL");
+    fs.mkdirSync(home);
+    try {
+      assert.equal(run(home, ['bootstrap', '--out', exported]).status, 0);
+      const entrypoint = path.join(exported, 'bin', 'feynman.ts');
+      assert.equal(run(home, ['install'], entrypoint).status, 0);
+      assert.equal(run(home, ['install'], entrypoint).status, 0);
+      const settings = readConfig(home) as {
+        hooks: { SessionStart: Array<{ hooks: Array<{ command: string }> }> };
+      };
+      const handlers = settings.hooks.SessionStart.flatMap((group) => group.hooks);
+      assert.equal(
+        handlers.length,
+        1,
+        'literal command must remain recognizable on repeat install',
+      );
+      const handler = handlers[0];
+      assert.ok(handler);
+      const result = spawnSync('sh', ['-c', handler.command], {
+        cwd: temporary,
+        input: '{"session_id":"quoted-path"}',
+        encoding: 'utf8',
+        env: { PATH: process.env['PATH'], HOME: home },
+      });
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /<triggers>/);
+      assert.deepEqual(
+        fs.readdirSync(temporary).sort(),
+        [path.basename(home), path.basename(exported)].sort(),
+      );
+      assert.equal(run(home, ['uninstall'], entrypoint).status, 0);
+      assert.equal(readConfig(home)['hooks'], undefined);
+    } finally {
+      cleanup(temporary);
+    }
+  });
+
+  it('rejects wrong configuration shapes without rewriting user bytes', () => {
+    const home = tempHome();
+    try {
+      fs.mkdirSync(path.dirname(configPath(home)), { recursive: true });
+      for (const value of [
+        [],
+        null,
+        12,
+        { hooks: [] },
+        { hooks: { SessionStart: {} } },
+        { hooks: { SessionStart: [null] } },
+      ]) {
+        const bytes = JSON.stringify(value);
+        fs.writeFileSync(configPath(home), bytes);
+        assert.equal(run(home, ['install', '--force']).status, 2);
+        assert.equal(fs.readFileSync(configPath(home), 'utf8'), bytes);
+      }
+    } finally {
+      cleanup(home);
+    }
+  });
+
+  it('install preserves corrupt state in the recovery backup', () => {
+    const home = tempHome();
+    const state = path.join(home, '.codex', '.feynman', 'state.json');
+    try {
+      fs.mkdirSync(path.dirname(state), { recursive: true });
+      fs.writeFileSync(state, '{ broken user bytes');
+      assert.equal(run(home, ['install']).status, 0);
+      assert.equal(fs.readFileSync(state + '.bak', 'utf8'), '{ broken user bytes');
+    } finally {
+      cleanup(home);
+    }
+  });
+
+  it('preserves similarly named unrelated hooks through install and uninstall', () => {
+    const home = tempHome();
+    const unrelated = {
+      hooks: [
+        { command: 'node /tmp/not-feynman-session-start.js' },
+        { command: 'echo "feynman-session-start.ts"' },
+      ],
+    };
+    try {
+      fs.mkdirSync(path.dirname(configPath(home)), { recursive: true });
+      fs.writeFileSync(configPath(home), JSON.stringify({ hooks: { SessionStart: [unrelated] } }));
+      const installed = run(home, ['install']);
+      assert.equal(installed.status, 0);
+      assert.doesNotMatch(installed.stdout, /already installed/);
+      assert.equal(run(home, ['uninstall']).status, 0);
+      assert.deepEqual(readConfig(home), { hooks: { SessionStart: [unrelated] } });
+    } finally {
+      cleanup(home);
+    }
+  });
+
+  it('rejects invalid state commands without creating or repairing state', () => {
+    for (const args of [['unknown'], ['on', 'extra'], ['style', 'wide']]) {
+      const home = tempHome();
+      try {
+        assert.equal(run(home, ['state', ...args]).status, 2);
+        assert.deepEqual(fs.readdirSync(home), []);
+        const statePath = path.join(home, '.codex', '.feynman', 'state.json');
+        fs.mkdirSync(path.dirname(statePath), { recursive: true });
+        fs.writeFileSync(statePath, '{ broken');
+        assert.equal(run(home, ['state', ...args]).status, 2);
+        assert.equal(fs.readFileSync(statePath, 'utf8'), '{ broken');
+        assert.deepEqual(fs.readdirSync(path.dirname(statePath)), ['state.json']);
+        assert.equal(fs.existsSync(path.join(home, '.codex', '.feynman-active')), false);
+      } finally {
+        cleanup(home);
+      }
+    }
+  });
+
   it('prints help and version', () => {
     const home = tempHome();
     try {
@@ -32,7 +155,9 @@ describe('feynman CLI', () => {
       const version = run(home, ['version']);
       assert.equal(version.status, 0);
       assert.match(version.stdout, /^\d+\.\d+\.\d+\n?$/);
-    } finally { cleanup(home); }
+    } finally {
+      cleanup(home);
+    }
   });
 
   it('installs one Codex SessionStart hook and is idempotent', () => {
@@ -43,20 +168,33 @@ describe('feynman CLI', () => {
       const hooks = first['hooks'] as Record<string, unknown[]>;
       assert.equal((hooks['SessionStart'] ?? []).length, 1);
       assert.equal(run(home, ['install']).status, 0);
-      assert.equal((readConfig(home)['hooks'] as Record<string, unknown[]>)['SessionStart']!.length, 1);
-    } finally { cleanup(home); }
+      assert.equal(
+        (readConfig(home)['hooks'] as Record<string, unknown[]>)['SessionStart']!.length,
+        1,
+      );
+    } finally {
+      cleanup(home);
+    }
   });
 
   it('preserves unrelated Codex settings while installing', () => {
     const home = tempHome();
     try {
       fs.mkdirSync(path.dirname(configPath(home)), { recursive: true });
-      fs.writeFileSync(configPath(home), JSON.stringify({ profile: 'work', hooks: { SessionStart: [{ hooks: [{ command: 'node other.js' }] }] } }));
+      fs.writeFileSync(
+        configPath(home),
+        JSON.stringify({
+          profile: 'work',
+          hooks: { SessionStart: [{ hooks: [{ command: 'node other.js' }] }] },
+        }),
+      );
       assert.equal(run(home, ['install', '--force']).status, 0);
       const config = readConfig(home);
       assert.equal(config['profile'], 'work');
       assert.equal((config['hooks'] as Record<string, unknown[]>)['SessionStart']!.length, 2);
-    } finally { cleanup(home); }
+    } finally {
+      cleanup(home);
+    }
   });
 
   it('doctor reports a healthy installed Codex setup', () => {
@@ -67,7 +205,9 @@ describe('feynman CLI', () => {
       assert.equal(doctor.status, 0);
       assert.match(doctor.stdout, /Status: OK/);
       assert.match(doctor.stdout, /Codex/);
-    } finally { cleanup(home); }
+    } finally {
+      cleanup(home);
+    }
   });
 
   it('uninstall removes Feynman hooks and preserves state', () => {
@@ -79,7 +219,9 @@ describe('feynman CLI', () => {
       const hooks = readConfig(home)['hooks'] as Record<string, unknown> | undefined;
       assert.equal(hooks?.['SessionStart'], undefined);
       assert.ok(fs.existsSync(statePath));
-    } finally { cleanup(home); }
+    } finally {
+      cleanup(home);
+    }
   });
 
   it('rejects removed target flags instead of silently selecting an adapter', () => {
@@ -91,7 +233,9 @@ describe('feynman CLI', () => {
       const doctor = run(home, ['doctor', '--target', 'codex']);
       assert.equal(doctor.status, 2);
       assert.match(doctor.stderr, /unexpected arguments/);
-    } finally { cleanup(home); }
+    } finally {
+      cleanup(home);
+    }
   });
 
   it('refuses to overwrite malformed Codex configuration', () => {
@@ -103,7 +247,9 @@ describe('feynman CLI', () => {
       assert.equal(result.status, 2);
       assert.match(result.stderr, /not valid JSON|refusing/i);
       assert.equal(fs.readFileSync(configPath(home), 'utf8'), '{ invalid');
-    } finally { cleanup(home); }
+    } finally {
+      cleanup(home);
+    }
   });
 
   it('bootstraps native Codex files without hook manifests', () => {
@@ -112,14 +258,21 @@ describe('feynman CLI', () => {
     try {
       const out = path.join(home, 'bootstrap');
       const result = spawnSync(process.execPath, [CLI, 'bootstrap', '--out', out], {
-        cwd: ROOT, encoding: 'utf8', env: { ...process.env, HOME: home, NO_COLOR: '1' },
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: { ...process.env, HOME: home, NO_COLOR: '1' },
       });
       assert.equal(result.status, 0, result.stderr);
       assert.ok(fs.existsSync(path.join(out, '.agents', 'plugins', 'marketplace.json')));
-      assert.ok(fs.existsSync(path.join(out, 'plugins', 'feynman', '.codex-plugin', 'plugin.json')));
+      assert.ok(
+        fs.existsSync(path.join(out, 'plugins', 'feynman', '.codex-plugin', 'plugin.json')),
+      );
       assert.equal(fs.existsSync(path.join(out, 'hooks', 'hooks.json')), false);
       assert.equal(fs.existsSync(path.join(out, 'skills')), false);
-    } finally { process.chdir(cwd); cleanup(home); }
+    } finally {
+      process.chdir(cwd);
+      cleanup(home);
+    }
   });
 
   it('manages Codex state and keeps the active flag invariant', () => {
@@ -134,18 +287,29 @@ describe('feynman CLI', () => {
       assert.equal(fs.existsSync(flagPath), false, 'status must not create the active flag');
 
       assert.equal(run(home, ['state', 'lite']).status, 0);
-      assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).intensity, 'lite');
+      assert.equal(
+        (JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>)['intensity'],
+        'lite',
+      );
       assert.equal(fs.readFileSync(flagPath, 'utf8'), 'lite');
       assert.equal(run(home, ['state', 'style', 'short']).status, 0);
-      assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).output_style, 'short');
+      assert.equal(
+        (JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>)['output_style'],
+        'short',
+      );
 
       assert.equal(run(home, ['state', 'off']).status, 0);
-      assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).enabled, false);
+      assert.equal(
+        (JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>)['enabled'],
+        false,
+      );
       assert.equal(fs.existsSync(flagPath), false);
       assert.equal(run(home, ['status']).status, 0);
       assert.equal(run(home, ['state', 'start']).status, 0);
       assert.ok(fs.existsSync(flagPath));
-    } finally { cleanup(home); }
+    } finally {
+      cleanup(home);
+    }
   });
 
   it('rejects target flags and invalid state values', () => {
@@ -157,6 +321,8 @@ describe('feynman CLI', () => {
       const style = run(home, ['state', 'style', 'wide']);
       assert.equal(style.status, 2);
       assert.match(style.stderr, /usage: feynman state style/);
-    } finally { cleanup(home); }
+    } finally {
+      cleanup(home);
+    }
   });
 });

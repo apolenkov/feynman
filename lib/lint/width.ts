@@ -22,22 +22,22 @@ const ZERO_WIDTH_TEST_RE = /[̀-ͯ​-‏﻿]/;
 // width 1.
 export function isWide(code: number): boolean {
   return (
-    (code >= 0x1100 && code <= 0x115F) ||
-    (code >= 0x2E80 && code <= 0x303E) ||
-    (code >= 0x3040 && code <= 0x33FF) ||
-    (code >= 0x3400 && code <= 0x4DBF) ||
-    (code >= 0x4E00 && code <= 0xA4CF) ||
-    (code >= 0xA960 && code <= 0xA97F) ||
-    (code >= 0xAC00 && code <= 0xD7FF) ||
-    (code >= 0xF900 && code <= 0xFAFF) ||
-    (code >= 0xFE10 && code <= 0xFE1F) ||
-    (code >= 0xFE30 && code <= 0xFE4F) ||
-    (code >= 0xFF00 && code <= 0xFF60) ||
-    (code >= 0xFFE0 && code <= 0xFFE6) ||
-    (code >= 0x1F300 && code <= 0x1F64F) ||
-    (code >= 0x1F900 && code <= 0x1F9FF) ||
-    (code >= 0x20000 && code <= 0x2FFFD) ||
-    (code >= 0x30000 && code <= 0x3FFFD)
+    (code >= 0x1100 && code <= 0x115f) ||
+    (code >= 0x2e80 && code <= 0x303e) ||
+    (code >= 0x3040 && code <= 0x33ff) ||
+    (code >= 0x3400 && code <= 0x4dbf) ||
+    (code >= 0x4e00 && code <= 0xa4cf) ||
+    (code >= 0xa960 && code <= 0xa97f) ||
+    (code >= 0xac00 && code <= 0xd7ff) ||
+    (code >= 0xf900 && code <= 0xfaff) ||
+    (code >= 0xfe10 && code <= 0xfe1f) ||
+    (code >= 0xfe30 && code <= 0xfe4f) ||
+    (code >= 0xff00 && code <= 0xff60) ||
+    (code >= 0xffe0 && code <= 0xffe6) ||
+    (code >= 0x1f300 && code <= 0x1f64f) ||
+    (code >= 0x1f900 && code <= 0x1f9ff) ||
+    (code >= 0x20000 && code <= 0x2fffd) ||
+    (code >= 0x30000 && code <= 0x3fffd)
   );
 }
 
@@ -69,10 +69,13 @@ export function lastVisualColumnOf(line: string, ch: string): number {
     // Skip ANSI CSI sequence (\x1b[...m)
     if (s.charCodeAt(i) === 0x1b && s[i + 1] === '[') {
       const m = s.slice(i).match(/^\x1b\[[0-9;]*m/);
-      if (m) { i += m[0].length; continue; }
+      if (m) {
+        i += m[0].length;
+        continue;
+      }
     }
     const code = s.codePointAt(i)!;
-    const charLen = code > 0xFFFF ? 2 : 1; // surrogate pair occupies 2 UTF-16 units
+    const charLen = code > 0xffff ? 2 : 1; // surrogate pair occupies 2 UTF-16 units
     // Zero-width: do not advance col
     if (ZERO_WIDTH_TEST_RE.test(String.fromCodePoint(code))) {
       if (String.fromCodePoint(code) === ch) last = col;
@@ -95,10 +98,13 @@ export function firstVisualColumnOf(line: string, ch: string): number {
   while (i < s.length) {
     if (s.charCodeAt(i) === 0x1b && s[i + 1] === '[') {
       const m = s.slice(i).match(/^\x1b\[[0-9;]*m/);
-      if (m) { i += m[0].length; continue; }
+      if (m) {
+        i += m[0].length;
+        continue;
+      }
     }
     const code = s.codePointAt(i)!;
-    const charLen = code > 0xFFFF ? 2 : 1;
+    const charLen = code > 0xffff ? 2 : 1;
     if (ZERO_WIDTH_RE.test(String.fromCodePoint(code))) {
       ZERO_WIDTH_RE.lastIndex = 0;
       if (String.fromCodePoint(code) === ch) return col;

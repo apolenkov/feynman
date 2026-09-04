@@ -371,10 +371,11 @@ file:3:11: L09 Frame inner row '│' at col 17 does not align with top '┐' at 
 ## L10: Mixed-Script Words (severity: warn)
 
 **What:** A single word must not mix Cyrillic and Latin letters (e.g.
-`zaфикшено` or `Cyrвнутри`). Project identifiers — anything in
-`package.json`'s `name`, `keywords`, or `bin` fields, hyphenated kebab
-tokens (`gsd-sdk`, `feynman-lint`, `worktree-agent-abc123`), and
-numeric-suffixed alphas (`foo123`) — are whitelisted.
+`zaфикшено` or `Cyrвнутри`). Hyphenated kebab tokens (`gsd-sdk`,
+`feynman-lint`, `worktree-agent-abc123`) and numeric-suffixed alphas (`foo123`)
+are whitelisted. Published package identifiers also pass this rule: they use
+Latin script. A regression test checks all package names, keywords and binary
+names; the core does not read package metadata to exempt mixed-script words.
 
 **Why:** Mixed Cyrillic+Latin tokens are a classic Runglish defect under
 fast typing or autocorrect ("Anti-Runglish" rule from

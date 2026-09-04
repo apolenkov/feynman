@@ -15,6 +15,27 @@ npm run ci
 Use Node.js 22.18 or newer. Tests use Node's built-in `node:test` runner.
 Lint changed documentation with `npm run lint -- <files>`.
 
+`npm run eslint` analyzes TypeScript types in application code, automation and
+tests and accepts no warnings. Parse external JSON as `unknown` and validate
+the fields used by production code. Test assertions may inspect parsed fixtures
+as records of unknown values. Test registration from `node:test` is owned by the
+runner; its exact declarations are allowed by the floating-Promise rule. Other
+asynchronous helpers must be awaited or handle rejection.
+
+Template interpolation permits numbers for diagnostic counts, but rejects
+implicit conversion of nullable values, booleans and arbitrary objects.
+Non-null assertions are forbidden in the CLI, hooks, automation and state core;
+parser index assertions must follow a checked bound. Local algorithm buffers
+may mutate; exported defaults and registries are frozen and core inputs are
+readonly. The import graph is checked for cycles as well as ownership violations.
+
+Run `npm run format` to apply the pinned Prettier version to TypeScript, module
+configuration, JSON and YAML. `npm run format:check` verifies the same scope in
+local CI and GitHub Actions. Markdown diagrams and intentional lint fixtures
+retain their exact spacing and are checked by the product linter instead.
+Embedded-language formatting is disabled so template-string content is not
+rewritten. Archived change records are historical and excluded from formatting.
+
 ## Where changes belong
 
 - `rules/` — the Codex-facing Contract and Intensity blocks.
@@ -53,6 +74,10 @@ precise, and within the per-Intensity size budget. Use the terms in
 Run `npm test` for the fast suite and `npm run ci` for the complete gate,
 including build, docs, packaging, and coverage. Release ownership and the
 GitHub-to-npm flow are documented in [docs/release.md](docs/release.md).
+The gate compares two clean tarballs; do not edit source or install dependencies
+while it runs. Coverage scope and missing files are reported explicitly;
+see [docs/coverage.md](docs/coverage.md). Live explanation evaluation is separate
+from CI and is described in [evals/README.md](evals/README.md).
 
 Security issues must be reported privately as described in
 [SECURITY.md](SECURITY.md).

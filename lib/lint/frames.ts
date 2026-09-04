@@ -1,24 +1,24 @@
 // lib/lint/frames.ts — canonical frame-iteration helper
-// Provides ONE shared iterateFrames() that all lint rules and CLI tools use.
+// Provides shared nextFrame() detection for lint rules and autofix.
 // Zero deps. ESM only.
 //
 // Design:
 //   - Opener: /^(\s*)┌─[^┌\n]*┐\s*$/ — title-aware (superset of /^(\s*)┌─+┐\s*$/).
 //     Matches both  ┌────┐  (untitled)  and  ┌─ Title ─┐  (titled).
-//   - Closer: /^(\s*)└─*┘\s*$/ — matches ┌┘ (zero dashes) used in L15.
+//   - Closer: /^(\s*)└─*┘\s*$/ — includes └┘ (zero dashes) used in L15.
 //   - Indent equality: botMatch indent must equal top indent.
-//   - inner: lines strictly between top and close that contain │ (leading bar).
-//   - Caller advances past closeLi or stays at topLi+1 depending on the 'found' flag.
+//   - inner: fully bordered │ … │ rows strictly between opener and closer.
+//   - Caller advances past closeLi, or to topLi+1 when no closer was found.
 
 export interface FrameInfo {
   /** 0-based index of the opening ┌ line in the supplied lines array. */
-  topLi: number;
+  readonly topLi: number;
   /** 0-based index of the closing └ line. -1 if no matching closer found. */
-  closeLi: number;
+  readonly closeLi: number;
   /** Whitespace-only prefix of the opener (the indent string). */
-  indent: string;
-  /** Lines strictly between top and close that contain a │ character. */
-  inner: string[];
+  readonly indent: string;
+  /** Fully bordered rows strictly between opener and closer. */
+  readonly inner: readonly string[];
 }
 
 // Title-aware opener: ┌─ followed by anything that isn't ┌ or newline, ending ┐.
@@ -29,7 +29,7 @@ const TOP_RE = /^(\s*)┌─[^┌\n]*┐\s*$/;
 const BOT_RE = /^(\s*)└─*┘\s*$/;
 
 /**
- * Yield every frame found in `lines` starting from `startIndex`.
+ * Find the first frame in `lines` starting from `startLi`.
  * A frame is a pair of matching opener / closer lines plus the inner content.
  *
  * Usage:

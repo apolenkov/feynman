@@ -44,7 +44,8 @@ function commitRange(tag: string): string {
 function commitsSince(tag: string): Commit[] {
   const format = '%H%x1f%s%x1f%b%x1e';
   const out = git(['log', commitRange(tag), `--pretty=format:${format}`], '');
-  return out.split('\x1e')
+  return out
+    .split('\x1e')
     .map((entry: string) => entry.trim())
     .filter(Boolean)
     .map((entry: string) => {
@@ -80,8 +81,9 @@ export function render(version: string, tag: string, commits: Commit[]): string 
 
   for (const commit of commits) {
     const [section, text] = classify(commit.subject);
-    if (!groups.has(section)) groups.set(section, []);
-    groups.get(section)!.push(`- ${text}`);
+    const entries = groups.get(section) ?? [];
+    entries.push(`- ${text}`);
+    groups.set(section, entries);
   }
 
   const order: string[] = [
@@ -128,7 +130,11 @@ export function render(version: string, tag: string, commits: Commit[]): string 
  * inferring a range from git tags. This preserves curated release notes when
  * an older repository has gaps in its tag history.
  */
-export function promoteUnreleased(existing: string, version: string, date: string): string | undefined {
+export function promoteUnreleased(
+  existing: string,
+  version: string,
+  date: string,
+): string | undefined {
   const heading = /^## \[Unreleased\][ \t]*$/m.exec(existing);
   if (!heading || heading.index === undefined) return undefined;
 
@@ -155,12 +161,15 @@ function main(): void {
   const commits = commitsSince(tag);
   const generated = render(pkg.version, tag, commits);
   const previous = existing.replace(/^# Changelog[\s\S]*?(?=^##\s)/m, '').trim();
-  const content = previous && !previous.startsWith(`## ${pkg.version} `)
-    ? `${generated}\n${previous}\n`
-    : `${generated}\n`;
+  const content =
+    previous && !previous.startsWith(`## ${pkg.version} `)
+      ? `${generated}\n${previous}\n`
+      : `${generated}\n`;
 
   fs.writeFileSync(CHANGELOG, content);
-  console.log(`CHANGELOG.md updated for ${pkg.version} (${commits.length} commits since ${tag || 'repo start'})`);
+  console.log(
+    `CHANGELOG.md updated for ${pkg.version} (${commits.length} commits since ${tag || 'repo start'})`,
+  );
 }
 
 const invokedPath = process.argv[1] ? fs.realpathSync(process.argv[1]) : '';

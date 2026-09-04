@@ -14,8 +14,12 @@ output style. In Codex, search **Feynman** in `/plugins`, install it, start a
 new session, then invoke it explicitly with `@feynman` or ask for a matching
 outcome.
 
+The plugin's skill can explain directly from its packaged instructions. An
+ordinary explanation request needs no CLI, hook, download, or local state read.
+The npm CLI and SessionStart hook provide optional persistent assistance.
+
 The plugin intentionally has no MCP server. MCP is for external tools or data;
-feynman has neither. Its state bridge is an explicit `npx -y
+feynman has neither. For an explicit settings request, its state bridge is `npx -y
 @albinocrabs/feynman@latest` command, which manages the user's Codex-local
 state and hook without a global binary prerequisite. If the package is not in
 the npm cache, that user-requested command may download the public package; the

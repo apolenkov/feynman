@@ -8,7 +8,6 @@ import assert from 'node:assert/strict';
 import { assertTagPairs } from '../lib/state/index.ts';
 
 describe('assertTagPairs', () => {
-
   it('returns true for well-formed rules file with matching tag pairs', () => {
     const content = [
       '<intensity name="lite">rules lite</intensity>',
@@ -25,5 +24,4 @@ describe('assertTagPairs', () => {
     ].join('\n');
     assert.equal(assertTagPairs(content), false);
   });
-
 });

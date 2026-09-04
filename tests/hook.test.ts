@@ -7,9 +7,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { readState } from '../bin/adapters/state-store.ts';
+
 import { assertTagPairs, readRulesForIntensity } from '../lib/state/index.ts';
 
-const SESSION_HOOK_PATH = path.resolve(import.meta.dirname, '..', 'hooks', 'feynman-session-start.ts');
+const SESSION_HOOK_PATH = path.resolve(
+  import.meta.dirname,
+  '..',
+  'hooks',
+  'feynman-session-start.ts',
+);
 
 interface HookResult {
   status: number;
@@ -51,16 +58,42 @@ function runSessionHook(
 }
 
 describe('SessionStart rule injection', () => {
+  it('rejects malformed event shapes before creating state', () => {
+    for (const input of [
+      null,
+      [],
+      42,
+      'session',
+      { session_id: null },
+      { session_id: 42 },
+      { session_id: {} },
+    ]) {
+      const home = makeTempHome();
+      try {
+        const result = runSessionHook(home, input);
+        assert.equal(result.status, 0);
+        assert.equal(result.stdout, '');
+        assert.equal(fs.existsSync(path.join(home, '.codex', '.feynman')), false);
+      } finally {
+        removeTempHome(home);
+      }
+    }
+  });
+
   it('bootstraps active default state and writes raw rules', () => {
     const home = makeTempHome();
     try {
       const result = runSessionHook(home);
       assert.equal(result.status, 0, result.stderr);
       assert.match(result.stdout, /<triggers>|<contract>|→|├──/);
-      assert.equal(result.stdout.endsWith('\n'), false, 'hook output must not add a trailing newline');
+      assert.equal(
+        result.stdout.endsWith('\n'),
+        false,
+        'hook output must not add a trailing newline',
+      );
 
       const root = path.join(home, '.codex');
-      const state = JSON.parse(fs.readFileSync(path.join(root, '.feynman', 'state.json'), 'utf8'));
+      const state = readState(root);
       assert.deepEqual(state, {
         enabled: true,
         intensity: 'full',
@@ -77,12 +110,31 @@ describe('SessionStart rule injection', () => {
     const home = makeTempHome();
     const codexHome = path.join(home, '.codex');
     try {
-      writeState(codexHome, { enabled: true, intensity: 'lite', output_style: 'full', injections: 3 });
-      const result = runSessionHook(home, { session_id: 'codex-session' }, { FEYNMAN_HOME: codexHome });
+      writeState(codexHome, {
+        enabled: true,
+        intensity: 'lite',
+        output_style: 'full',
+        injections: 3,
+      });
+      const preferences = fs.readFileSync(path.join(codexHome, '.feynman', 'state.json'), 'utf8');
+      const result = runSessionHook(
+        home,
+        { session_id: 'codex-session' },
+        { FEYNMAN_HOME: codexHome },
+      );
       assert.equal(result.status, 0, result.stderr);
       assert.match(result.stdout, /<triggers>|<contract>|→|├──/);
-      const state = JSON.parse(fs.readFileSync(path.join(codexHome, '.feynman', 'state.json'), 'utf8'));
-      assert.equal(state.injections, 4, 'each successful SessionStart injection increments the local counter');
+      assert.equal(
+        fs.readFileSync(path.join(codexHome, '.feynman', 'state.json'), 'utf8'),
+        preferences,
+      );
+      const state = readState(codexHome);
+      assert.ok(state);
+      assert.equal(
+        state['injections'],
+        4,
+        'each successful SessionStart injection increments the local counter',
+      );
     } finally {
       removeTempHome(home);
     }
@@ -152,11 +204,17 @@ describe('SessionStart rule injection', () => {
     const home = makeTempHome();
     const root = path.join(home, '.codex');
     try {
-      writeState(root, { enabled: true, intensity: 'full', output_style: 'full', injections: 'broken' });
+      writeState(root, {
+        enabled: true,
+        intensity: 'full',
+        output_style: 'full',
+        injections: 'broken',
+      });
       const result = runSessionHook(home);
       assert.equal(result.status, 0, result.stderr);
-      const state = JSON.parse(fs.readFileSync(path.join(root, '.feynman', 'state.json'), 'utf8'));
-      assert.equal(state.injections, 1);
+      const state = readState(root);
+      assert.ok(state);
+      assert.equal(state['injections'], 1);
     } finally {
       removeTempHome(home);
     }
@@ -167,7 +225,10 @@ describe('rules-file format contract', () => {
   it('uses only balanced XML intensity blocks', () => {
     assert.equal(assertTagPairs('<intensity name="full">rules</intensity>'), true);
     assert.equal(assertTagPairs('<intensity name="full">rules'), false);
-    assert.equal(readRulesForIntensity('<intensity name="full">rules</intensity>', 'full'), 'rules');
+    assert.equal(
+      readRulesForIntensity('<intensity name="full">rules</intensity>', 'full'),
+      'rules',
+    );
     assert.equal(readRulesForIntensity('<!-- full -->legacy<!-- /full -->', 'full'), '');
   });
 });

@@ -1,8 +1,8 @@
 // Pure rules parsing and intensity-tag validation.
 
-const VALID_INTENSITIES = ['lite', 'full', 'ultra'];
+import { isIntensity, type Intensity } from './model.ts';
 
-const XML_MATCHERS: Record<string, RegExp> = {
+const XML_MATCHERS: Readonly<Record<Intensity, RegExp>> = {
   lite: /<intensity\s+name\s*=\s*["']lite["'][^>]*>([\s\S]*?)<\/intensity>/i,
   full: /<intensity\s+name\s*=\s*["']full["'][^>]*>([\s\S]*?)<\/intensity>/i,
   ultra: /<intensity\s+name\s*=\s*["']ultra["'][^>]*>([\s\S]*?)<\/intensity>/i,
@@ -17,7 +17,7 @@ export function assertTagPairs(content: string): boolean {
 
 /** Extract one intensity block, or an empty string when it is unavailable. */
 export function readRulesForIntensity(rulesContent: string, intensity: string): string {
-  const selected = VALID_INTENSITIES.includes(intensity) ? intensity : 'full';
-  const xmlMatch = XML_MATCHERS[selected]!.exec(rulesContent);
-  return xmlMatch ? xmlMatch[1]!.trim() : '';
+  const selected = isIntensity(intensity) ? intensity : 'full';
+  const xmlMatch = XML_MATCHERS[selected].exec(rulesContent);
+  return xmlMatch?.[1]?.trim() ?? '';
 }

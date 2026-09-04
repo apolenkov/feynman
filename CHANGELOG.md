@@ -2,6 +2,45 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- SessionStart bookkeeping cannot overwrite a concurrent preference change.
+  The advisory injection counter is stored separately from user preferences.
+- Settings and state writes preserve the previous file when a staged write or
+  rename fails. Install backs up corrupt state and rejects malformed hook shapes.
+- Install and uninstall preserve unrelated hooks with similar script names.
+- Generated hook commands treat paths with quotes, spaces and dollar signs
+  literally, including after bootstrap export and repeated installation.
+- Bootstrap exports the complete CLI and core runtime. `--force` only replaces
+  owned exports and refuses symlinks and protected directories.
+- Autofix preserves text in damaged frames instead of deleting unbordered
+  content. Frames with ambiguous non-empty rows are left for manual repair,
+  including when L11/L15 conversion or fenced processing is requested.
+- Invalid state commands no longer bootstrap or repair state before failing.
+- Unknown output styles cannot resolve inherited object properties.
+- SessionStart ignores malformed event shapes before creating local state.
+
+### Changed
+
+- The native skill explains structures directly from its packaged instructions;
+  CLI state operations apply only to explicit settings requests.
+- Core input contracts are readonly. Core lint checks use TypeScript type
+  information and reject outer dependencies, dynamic loading and ambient I/O.
+- Type-aware lint now covers CLI, hooks, automation and tests as well as core
+  modules; warnings fail the gate.
+- A pinned Prettier version enforces source/configuration formatting in local
+  CI and GitHub Actions. Diagram strings and Markdown spacing are preserved.
+- Workflow actions use verified commit pins, release rehearsals have read-only
+  permissions, and publication reuses the artifact validated by CI.
+- The complete local gate also runs in CI on Node 22, 24 and 26; it now compares
+  two clean package builds and reports production files missing from LCOV.
+- Explanation evaluations use frozen facts and comprehension questions across
+  20 scenarios. Live usefulness remains subject to the paired evaluation gate.
+- The mixed-script rule no longer loads package metadata during module import;
+  regression tests preserve acceptance of all published package identifiers.
+
 ## 2.0.0 - 2026-09-01
 
 ### Breaking changes

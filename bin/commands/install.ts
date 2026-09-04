@@ -11,28 +11,39 @@ import {
   codexConfig,
 } from '../adapters/codex-config.ts';
 import { sessionStartHookCommand } from '../adapters/codex-hook.ts';
+import { removeActiveFlag } from '../adapters/state-store.ts';
 
 const HOME = os.homedir();
-const _hookExt = fs.existsSync(path.resolve(import.meta.dirname, '..', '..', 'hooks', 'feynman-session-start.ts')) ? '.ts' : '.js';
-const SESSION_HOOK_PATH = path.resolve(import.meta.dirname, '..', '..', 'hooks', `feynman-session-start${_hookExt}`);
+const _hookExt = fs.existsSync(
+  path.resolve(import.meta.dirname, '..', '..', 'hooks', 'feynman-session-start.ts'),
+)
+  ? '.ts'
+  : '.js';
+const SESSION_HOOK_PATH = path.resolve(
+  import.meta.dirname,
+  '..',
+  '..',
+  'hooks',
+  `feynman-session-start${_hookExt}`,
+);
 
 function installCodex(opts: { force: boolean }): { already: boolean } {
   const cfg = readSettings() as Record<string, Record<string, unknown[]>>;
   cfg['hooks'] = cfg['hooks'] ?? {};
   cfg['hooks']['SessionStart'] = cfg['hooks']['SessionStart'] ?? [];
-  const already = hasFeynmanHook(cfg as Record<string, unknown>);
+  const already = hasFeynmanHook(cfg);
   if (already && !opts.force) {
     bootstrapState();
     return { already: true };
   }
-  removeFeynmanHooks(cfg as Record<string, unknown>);
+  removeFeynmanHooks(cfg);
   cfg['hooks'] = cfg['hooks'] ?? {};
   cfg['hooks']['SessionStart'] = cfg['hooks']['SessionStart'] ?? [];
   cfg['hooks']['SessionStart'].push({
     matcher: 'startup|resume|compact|clear',
     hooks: [{ type: 'command', command: sessionStartHookCommand(), timeout: 5 }],
   });
-  writeSettings(cfg as Record<string, unknown>);
+  writeSettings(cfg);
   bootstrapState();
   return { already: false };
 }
@@ -60,7 +71,7 @@ export function cmdInstall(opts: { force: boolean }): void {
 export function cmdUninstall(): void {
   const tc = codexConfig();
   if (!fs.existsSync(tc.settingsPath)) {
-    if (fs.existsSync(tc.flagPath)) fs.unlinkSync(tc.flagPath);
+    removeActiveFlag(tc.rootDir);
     console.log('feynman: no Codex hook found — nothing to uninstall.');
     process.exit(0);
   }
@@ -68,7 +79,7 @@ export function cmdUninstall(): void {
   const hadHook = hasAnyFeynmanHook(cfg);
   removeFeynmanHooks(cfg);
   writeSettings(cfg);
-  if (fs.existsSync(tc.flagPath)) fs.unlinkSync(tc.flagPath);
+  removeActiveFlag(tc.rootDir);
   console.log(
     hadHook
       ? 'feynman disabled for Codex. State preserved. Re-enable: feynman install'

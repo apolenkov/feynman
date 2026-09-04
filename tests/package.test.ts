@@ -7,23 +7,41 @@ import path from 'node:path';
 const ROOT = path.resolve(import.meta.dirname, '..');
 
 function readJson(rel: string): Record<string, unknown> {
-  return JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+  return JSON.parse(fs.readFileSync(path.join(ROOT, rel), 'utf8')) as Record<string, unknown>;
 }
 
 describe('package metadata', () => {
   it('uses the public npm scope and TypeScript CLI entrypoints', () => {
     const pkg = readJson('package.json');
     assert.equal(pkg['name'], '@albinocrabs/feynman');
-    assert.deepEqual(pkg['bin'], { feynman: 'bin/feynman.ts', 'feynman-lint': 'bin/feynman-lint.ts' });
+    assert.deepEqual(pkg['bin'], {
+      feynman: 'bin/feynman.ts',
+      'feynman-lint': 'bin/feynman-lint.ts',
+    });
   });
 
   it('publishes only Codex marketplace assets and public documentation', () => {
     const files = readJson('package.json')['files'] as string[];
-    for (const entry of ['.agents/', 'plugins/', 'hooks/', 'rules/', 'docs/', 'examples/', 'README.md']) {
+    for (const entry of [
+      '.agents/',
+      'plugins/',
+      'hooks/',
+      'rules/',
+      'docs/',
+      'examples/',
+      'README.md',
+    ]) {
       assert.ok(files.includes(entry), `${entry} should be included in package files`);
     }
-    assert.equal(files.some((entry) => /claude|opencode/i.test(entry)), false);
-    assert.equal(files.includes('skills/'), false, 'retired root skills directory must not be packaged');
+    assert.equal(
+      files.some((entry) => /claude|opencode/i.test(entry)),
+      false,
+    );
+    assert.equal(
+      files.includes('skills/'),
+      false,
+      'retired root skills directory must not be packaged',
+    );
   });
 
   it('keeps coverage focused on application files', () => {
@@ -35,12 +53,14 @@ describe('package metadata', () => {
     const pkg = readJson('package.json');
     const marketplace = readJson('.agents/plugins/marketplace.json');
     assert.equal(marketplace['name'], 'feynman');
-    assert.deepEqual(marketplace['plugins'], [{
-      name: 'feynman',
-      source: { source: 'local', path: './plugins/feynman' },
-      policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
-      category: 'Productivity',
-    }]);
+    assert.deepEqual(marketplace['plugins'], [
+      {
+        name: 'feynman',
+        source: { source: 'local', path: './plugins/feynman' },
+        policy: { installation: 'AVAILABLE', authentication: 'ON_INSTALL' },
+        category: 'Productivity',
+      },
+    ]);
 
     const manifest = readJson('plugins/feynman/.codex-plugin/plugin.json');
     assert.equal(manifest['name'], 'feynman');
@@ -51,7 +71,13 @@ describe('package metadata', () => {
     assert.equal(manifest['skills'], './skills/');
     assert.match(String(manifest['description']), /visual architecture/i);
     assert.deepEqual(manifest['keywords'], [
-      'codex', 'ascii-diagrams', 'visual-architecture', 'flows', 'comparisons', 'status', 'productivity',
+      'codex',
+      'ascii-diagrams',
+      'visual-architecture',
+      'flows',
+      'comparisons',
+      'status',
+      'productivity',
     ]);
 
     const interfaceMeta = manifest['interface'] as Record<string, unknown>;
@@ -61,10 +87,18 @@ describe('package metadata', () => {
     assert.ok(prompts.length > 0 && prompts.length <= 3);
     assert.ok(prompts.every((prompt) => prompt.length <= 128));
 
-    const skill = fs.readFileSync(path.join(ROOT, 'plugins/feynman/skills/feynman/SKILL.md'), 'utf8');
+    const skill = fs.readFileSync(
+      path.join(ROOT, 'plugins/feynman/skills/feynman/SKILL.md'),
+      'utf8',
+    );
     assert.match(skill, /visual architecture/i);
-    assert.match(skill, /npx -y @albinocrabs\/feynman@latest state/);
+    assert.match(skill, /\]\(references\/settings\.md\)/);
+    const settings = fs.readFileSync(
+      path.join(ROOT, 'plugins/feynman/skills/feynman/references/settings.md'),
+      'utf8',
+    );
+    assert.match(settings, /npx -y @albinocrabs\/feynman@latest state/);
     assert.doesNotMatch(skill, /disable-model-invocation/);
-    assert.match(skill, /never write `~\/\.codex\/\.feynman\/state\.json`/);
+    assert.match(settings, /never write `~\/\.codex\/\.feynman\/state\.json`/);
   });
 });

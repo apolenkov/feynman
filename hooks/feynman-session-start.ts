@@ -7,12 +7,14 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { applyOutputStyle, assertTagPairs, readRulesForIntensity } from '../lib/state/index.ts';
-import { reconcileState, writeState } from '../bin/adapters/state-store.ts';
+import { reconcileState, recordInjection } from '../bin/adapters/state-store.ts';
 
 // state.json / .feynman-active I/O now lives behind the store (ADR-0004), keyed by CLIENT_HOME.
-const HOME        = os.homedir();
+const HOME = os.homedir();
 const CLIENT_HOME = process.env['FEYNMAN_HOME'] || path.join(HOME, '.codex');
-const RULES_PATH  = process.env['FEYNMAN_RULES_PATH'] || path.join(import.meta.dirname, '..', 'rules', 'feynman-contract.md');
+const RULES_PATH =
+  process.env['FEYNMAN_RULES_PATH'] ||
+  path.join(import.meta.dirname, '..', 'rules', 'feynman-contract.md');
 
 function readRules(intensity: string): string {
   const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
@@ -24,13 +26,17 @@ function readRules(intensity: string): string {
 }
 
 let input = '';
-process.stdin.on('data', (chunk: Buffer | string) => { input += chunk; });
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (chunk: string) => {
+  input += chunk;
+});
 process.stdin.on('end', () => {
   try {
     if (input.trim()) {
-      const data = JSON.parse(input);
-      const sessionId: string = data.session_id || '';
-      if (sessionId && /[/\\]|\.\./.test(sessionId)) process.exit(0);
+      const data: unknown = JSON.parse(input);
+      if (typeof data !== 'object' || data === null || Array.isArray(data)) process.exit(0);
+      const sessionId = 'session_id' in data ? data.session_id : '';
+      if (typeof sessionId !== 'string' || /[/\\]|\.\./.test(sessionId)) process.exit(0);
     }
 
     // Reconcile state + flag via the store (ADR-0004): first-run bootstrap,
@@ -49,8 +55,7 @@ process.stdin.on('end', () => {
     // state directory must not prevent an otherwise valid SessionStart hook from
     // supplying its rules.
     try {
-      state.injections += 1;
-      writeState(CLIENT_HOME, state);
+      recordInjection(CLIENT_HOME);
     } catch (_) {
       // Keep injection available when local state bookkeeping cannot be updated.
     }

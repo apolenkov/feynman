@@ -11,19 +11,25 @@ const FEYNMAN = path.join(ROOT, 'bin', 'feynman.ts');
 
 function run(home: string, args: string[]) {
   const result = spawnSync(process.execPath, [FEYNMAN, ...args], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, HOME: home, NO_COLOR: '1' },
+    cwd: ROOT,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, NO_COLOR: '1' },
   });
   return { status: result.status ?? 1, stdout: result.stdout || '', stderr: result.stderr || '' };
 }
 
 function readJson(file: string): Record<string, unknown> {
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
+  return JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
 }
 
 function runHook(home: string, command: string, input: unknown) {
   const result = spawnSync(command, [], {
-    cwd: ROOT, shell: true, input: JSON.stringify(input), encoding: 'utf8',
-    env: { ...process.env, HOME: home, NO_COLOR: '1' }, timeout: 10_000,
+    cwd: ROOT,
+    shell: true,
+    input: JSON.stringify(input),
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, NO_COLOR: '1' },
+    timeout: 10_000,
   });
   return { status: result.status ?? 1, stdout: result.stdout || '', stderr: result.stderr || '' };
 }
@@ -31,7 +37,9 @@ function runHook(home: string, command: string, input: unknown) {
 function findSessionHook(config: Record<string, unknown>): string {
   const hooks = config['hooks'] as Record<string, Array<{ hooks: Array<{ command: string }> }>>;
   for (const group of hooks['SessionStart'] ?? []) {
-    const command = group.hooks.find((hook) => hook.command.includes('feynman-session-start.ts'))?.command;
+    const command = group.hooks.find((hook) =>
+      hook.command.includes('feynman-session-start.ts'),
+    )?.command;
     if (command) return command;
   }
   assert.fail('Codex SessionStart hook command not found');
@@ -46,8 +54,11 @@ describe('installed Codex hook integration', () => {
       const codexHome = path.join(home, '.codex');
       const config = readJson(path.join(codexHome, 'hooks.json'));
       const command = findSessionHook(config);
-      assert.match(command, /FEYNMAN_HOME="\$HOME\/\.codex"|FEYNMAN_HOME="[^"]+\/\.codex"/);
-      const session = runHook(home, command, { hook_event_name: 'SessionStart', session_id: 'codex-session' });
+      assert.match(command, /FEYNMAN_HOME=['"][^'"]+\/\.codex['"]/);
+      const session = runHook(home, command, {
+        hook_event_name: 'SessionStart',
+        session_id: 'codex-session',
+      });
       assert.equal(session.status, 0, session.stderr);
       assert.equal(session.stderr, '');
       assert.match(session.stdout, /<triggers>|<contract>|→|├──/);
@@ -64,10 +75,16 @@ describe('installed Codex hook integration', () => {
     try {
       assert.equal(run(home, ['install', '--force']).status, 0);
       const codexHome = path.join(home, '.codex');
-      fs.writeFileSync(path.join(codexHome, '.feynman', 'state.json'), JSON.stringify({ enabled: false, intensity: 'full', injections: 7 }));
+      fs.writeFileSync(
+        path.join(codexHome, '.feynman', 'state.json'),
+        JSON.stringify({ enabled: false, intensity: 'full', injections: 7 }),
+      );
       fs.rmSync(path.join(codexHome, '.feynman-active'), { force: true });
       const command = findSessionHook(readJson(path.join(codexHome, 'hooks.json')));
-      const session = runHook(home, command, { hook_event_name: 'SessionStart', session_id: 'disabled-session' });
+      const session = runHook(home, command, {
+        hook_event_name: 'SessionStart',
+        session_id: 'disabled-session',
+      });
       assert.equal(session.status, 0);
       assert.equal(session.stdout, '');
       assert.equal(session.stderr, '');

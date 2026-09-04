@@ -10,14 +10,14 @@
     "rule": "L01",
     "expected": "fail",
     "input": "```\n┌─ Status ─┐\n│  done    │\n```",
-    "expected_issues": [{"rule": "L01", "line": 2}]
+    "expected_issues": [{ "rule": "L01", "line": 2 }]
   },
   {
     "name": "L01 fail — ┐ with no matching ┘",
     "rule": "L01",
     "expected": "fail",
     "input": "```\n┌─ Title ──┐\n│  item    │\n└──────────┘\n```\n\nAnother box:\n\n```\n  ──┐\n  ──│\n```",
-    "expected_issues": [{"rule": "L01"}]
+    "expected_issues": [{ "rule": "L01" }]
   },
   {
     "name": "L01 pass — multiple complete frames",
@@ -36,14 +36,14 @@
     "rule": "L02",
     "expected": "fail",
     "input": "```\nroot\n├── child-a\n├── child-b\n├── child-c\n```",
-    "expected_issues": [{"rule": "L02"}]
+    "expected_issues": [{ "rule": "L02" }]
   },
   {
     "name": "L02 pass — single child (only ├──, no siblings after)",
     "rule": "L02",
     "expected": "fail",
     "input": "```\nroot\n├── only-child\n```",
-    "expected_issues": [{"rule": "L02"}]
+    "expected_issues": [{ "rule": "L02" }]
   },
   {
     "name": "L02 pass — correctly structured multi-level tree",
@@ -68,14 +68,14 @@
     "rule": "L03",
     "expected": "fail",
     "input": "```\n[A] --> [B] → [C]\n```",
-    "expected_issues": [{"rule": "L03"}]
+    "expected_issues": [{ "rule": "L03" }]
   },
   {
     "name": "L03 fail — mixed --> and ──>",
     "rule": "L03",
     "expected": "fail",
     "input": "```\n[A] --> [B]\n[C] ──> [D]\n```",
-    "expected_issues": [{"rule": "L03"}]
+    "expected_issues": [{ "rule": "L03" }]
   },
   {
     "name": "L04 pass — consistent table column count",
@@ -88,7 +88,7 @@
     "rule": "L04",
     "expected": "fail",
     "input": "```\n| Name  | Value | Status |\n|-------|-------|\n| alpha | 1     | ok     |\n```",
-    "expected_issues": [{"rule": "L04"}]
+    "expected_issues": [{ "rule": "L04" }]
   },
   {
     "name": "L05 pass — boxes connected with arrows",
@@ -101,14 +101,14 @@
     "rule": "L05",
     "expected": "fail",
     "input": "```\n[Auth] [Handler]\n```",
-    "expected_issues": [{"rule": "L05"}]
+    "expected_issues": [{ "rule": "L05" }]
   },
   {
     "name": "L05 fail — three boxes no arrows",
     "rule": "L05",
     "expected": "fail",
     "input": "```\n[Auth] [Handler] [Response]\n```",
-    "expected_issues": [{"rule": "L05"}]
+    "expected_issues": [{ "rule": "L05" }]
   },
   {
     "name": "L06 pass — both ▲ and ▼ present",
@@ -121,14 +121,14 @@
     "rule": "L06",
     "expected": "fail",
     "input": "```\n▲ high priority\n  critical-fix\n  security-patch\n```",
-    "expected_issues": [{"rule": "L06"}]
+    "expected_issues": [{ "rule": "L06" }]
   },
   {
     "name": "L06 fail — ▼ without ▲",
     "rule": "L06",
     "expected": "fail",
     "input": "```\n▼ low priority\n  cosmetic-fix\n```",
-    "expected_issues": [{"rule": "L06"}]
+    "expected_issues": [{ "rule": "L06" }]
   },
   {
     "name": "L07 pass — ASCII only, no mermaid",
@@ -141,7 +141,7 @@
     "rule": "L07",
     "expected": "fail",
     "input": "ASCII diagram:\n\n```\n[A] --> [B]\n```\n\nMermaid version:\n\n```mermaid\ngraph LR\n  A --> B\n```",
-    "expected_issues": [{"rule": "L07"}]
+    "expected_issues": [{ "rule": "L07" }]
   },
   {
     "name": "L08 pass — frame with consistent row widths",
@@ -154,14 +154,14 @@
     "rule": "L08",
     "expected": "fail",
     "input": "```\n┌─ Status ─┐\n│  a  done │\n└────────────────────┘\n```",
-    "expected_issues": [{"rule": "L08"}]
+    "expected_issues": [{ "rule": "L08" }]
   },
   {
     "name": "L08 fail — internal frame row too wide",
     "rule": "L08",
     "expected": "fail",
     "input": "```\n┌─ Status ─┐\n│  a  done — this line is much too wide for the frame │\n└──────────┘\n```",
-    "expected_issues": [{"rule": "L08"}]
+    "expected_issues": [{ "rule": "L08" }]
   },
   {
     "name": "L09 pass — single perfectly aligned frame",
@@ -186,28 +186,28 @@
     "rule": "L09",
     "expected": "fail",
     "input": "```\n┌─ Status ─┐\n│  done    │\n│  long row PASS │\n└──────────┘\n```",
-    "expected_issues": [{"rule": "L09"}]
+    "expected_issues": [{ "rule": "L09" }]
   },
   {
     "name": "L09 fail — inner │ falls short of anchor",
     "rule": "L09",
     "expected": "fail",
     "input": "```\n┌─ Status ─┐\n│  ok│\n└──────────┘\n```",
-    "expected_issues": [{"rule": "L09"}]
+    "expected_issues": [{ "rule": "L09" }]
   },
   {
     "name": "L09 fail — bottom ┘ shifted past anchor",
     "rule": "L09",
     "expected": "fail",
     "input": "```\n┌─ Status ─┐\n│  done    │\n└────────────┘\n```",
-    "expected_issues": [{"rule": "L09"}]
+    "expected_issues": [{ "rule": "L09" }]
   },
   {
     "name": "L10 fail — within-word Cyrillic+Latin mix (zaфикшено)",
     "rule": "L10",
     "expected": "fail",
     "input": "повторить zaфикшено",
-    "expected_issues": [{"rule": "L10", "line": 1}]
+    "expected_issues": [{ "rule": "L10", "line": 1 }]
   },
   {
     "name": "L10 pass — kebab-case identifier whitelisted",
@@ -238,7 +238,7 @@
     "rule": "L10",
     "expected": "fail",
     "input": "тест Cyrвнутри слова",
-    "expected_issues": [{"rule": "L10", "line": 1}]
+    "expected_issues": [{ "rule": "L10", "line": 1 }]
   },
   {
     "name": "L08 pass — combining accent (é = e+U+0301) counts as 1 visual char",
@@ -287,21 +287,21 @@
     "rule": "L09",
     "expected": "fail",
     "input": "```\n┌──────────┐\n│ short  │\n└──────────┘\n```",
-    "expected_issues": [{"rule": "L09"}]
+    "expected_issues": [{ "rule": "L09" }]
   },
   {
     "name": "L09 fail — top border ┌─ shorter than inner content",
     "rule": "L09",
     "expected": "fail",
     "input": "```\n┌──┐\n│ much longer line │\n└──────────────────┘\n```",
-    "expected_issues": [{"rule": "L09"}]
+    "expected_issues": [{ "rule": "L09" }]
   },
   {
     "name": "L08+L09 mixed fail — top wider than inner with shifted │",
     "rule": "L08",
     "expected": "fail",
     "input": "```\n┌──────────┐\n│ x  │\n└──────────┘\n```",
-    "expected_issues": [{"rule": "L08"}, {"rule": "L09"}]
+    "expected_issues": [{ "rule": "L08" }, { "rule": "L09" }]
   },
   {
     "name": "No diagram — prose only, no issues",
@@ -338,7 +338,7 @@
     "rule": "L11",
     "expected": "fail",
     "input": "```\n┌──────────────────┐\n│ a ........ ok    │\n│ b ........ wait  │\n│ c ........ wip   │\n│ d ........ done  │\n│ e ........ done  │\n└──────────────────┘\n```",
-    "expected_issues": [{"rule": "L11"}],
+    "expected_issues": [{ "rule": "L11" }],
     "expected_after_autofix_shape": {
       "mode": "dot_leader",
       "row_count": 5,
@@ -352,7 +352,7 @@
     "rule": "L11",
     "expected": "fail",
     "input": "```\n┌────────────┐\n│ a ... ok   │\n│ b ... wait │\n└────────────┘\n```",
-    "expected_issues": [{"rule": "L11"}],
+    "expected_issues": [{ "rule": "L11" }],
     "expected_after_autofix_shape": {
       "mode": "dot_leader",
       "row_count": 2,
@@ -366,7 +366,7 @@
     "rule": "L11",
     "expected": "fail",
     "input": "```\n┌────────────────────┐\n│ a ........ ✓ done  │\n│ b ........ ✗ fail  │\n│ c ........ ← готов │\n│ d ........ wip     │\n│ e ........ done    │\n└────────────────────┘\n```",
-    "expected_issues": [{"rule": "L11"}],
+    "expected_issues": [{ "rule": "L11" }],
     "expected_after_autofix_shape": {
       "mode": "dot_leader",
       "row_count": 5,
@@ -390,7 +390,7 @@
     "rule": "L11",
     "expected": "fail",
     "input": "```\n┌──────────────────────────┐\n│ free-form note about X   │\n│ unstructured commentary  │\n│ another sentence here    │\n└──────────────────────────┘\n```",
-    "expected_issues": [{"rule": "L11"}],
+    "expected_issues": [{ "rule": "L11" }],
     "expected_after_autofix_shape": {
       "mode": "bullet",
       "row_count": 3,
@@ -421,21 +421,21 @@
     "rule": "L12",
     "expected": "fail",
     "input": "```\n┌────────────────────────────────────────┐\n│ a                                      │\n│ b                                      │\n│ c                                      │\n└────────────────────────────────────────┘\n```",
-    "expected_issues": [{"rule": "L12"}]
+    "expected_issues": [{ "rule": "L12" }]
   },
   {
     "name": "L12 fail — frame with 2-char states padded to 30",
     "rule": "L12",
     "expected": "fail",
     "input": "```\n┌──────────────────────────────────┐\n│ ok                               │\n│ no                               │\n│ ok                               │\n└──────────────────────────────────┘\n```",
-    "expected_issues": [{"rule": "L12"}]
+    "expected_issues": [{ "rule": "L12" }]
   },
   {
     "name": "L12 fail — frame with single-glyph status, padding dominates",
     "rule": "L12",
     "expected": "fail",
     "input": "```\n┌─────────────────────────────┐\n│ ✓                           │\n│ ✗                           │\n│ ◐                           │\n└─────────────────────────────┘\n```",
-    "expected_issues": [{"rule": "L12"}]
+    "expected_issues": [{ "rule": "L12" }]
   },
   {
     "name": "L13 pass — bare tree, no frame",
@@ -460,21 +460,21 @@
     "rule": "L13",
     "expected": "fail",
     "input": "```\n┌──────────────────┐\n│ root             │\n│ ├── child-a      │\n│ ├── child-b      │\n│ └── child-c      │\n└──────────────────┘\n```",
-    "expected_issues": [{"rule": "L13"}]
+    "expected_issues": [{ "rule": "L13" }]
   },
   {
     "name": "L13 fail — single-child tree inside frame",
     "rule": "L13",
     "expected": "fail",
     "input": "```\n┌──────────────────┐\n│ parent           │\n│ └── only-leaf    │\n└──────────────────┘\n```",
-    "expected_issues": [{"rule": "L13"}]
+    "expected_issues": [{ "rule": "L13" }]
   },
   {
     "name": "L13 fail — deeply nested tree inside frame",
     "rule": "L13",
     "expected": "fail",
     "input": "```\n┌────────────────────┐\n│ root               │\n│ ├── a              │\n│ │   ├── a-1       │\n│ │   └── a-2       │\n│ └── b              │\n└────────────────────┘\n```",
-    "expected_issues": [{"rule": "L13"}]
+    "expected_issues": [{ "rule": "L13" }]
   },
   {
     "name": "L14 pass — diagram with blank lines on both sides",
@@ -499,14 +499,14 @@
     "rule": "L14",
     "expected": "fail",
     "input": "prose before\n```\n[A] → [B] → [C]\n```\n\nprose after",
-    "expected_issues": [{"rule": "L14"}]
+    "expected_issues": [{ "rule": "L14" }]
   },
   {
     "name": "L14 fail — prose line directly after closing fence",
     "rule": "L14",
     "expected": "fail",
     "input": "prose before\n\n```\n[A] → [B] → [C]\n```\nprose after",
-    "expected_issues": [{"rule": "L14"}]
+    "expected_issues": [{ "rule": "L14" }]
   },
   {
     "name": "L03 pass — sequence diagram uses both ->> and -->> (same seq-msg family)",
@@ -519,7 +519,7 @@
     "rule": "L03",
     "expected": "fail",
     "input": "```\n[A] --> [B]\nClient ->> API : call\n```",
-    "expected_issues": [{"rule": "L03"}]
+    "expected_issues": [{ "rule": "L03" }]
   },
   {
     "name": "L05 pass — two boxes connected with ->> (seq arrow recognized)",
@@ -550,13 +550,13 @@
     "rule": "L15",
     "expected": "fail",
     "input": "```\n┌──────────────────┐\n│ name: Alice      │\n│ role: engineer   │\n│ team: backend    │\n└──────────────────┘\n```",
-    "expected_issues": [{"rule": "L15"}]
+    "expected_issues": [{ "rule": "L15" }]
   },
   {
     "name": "L15 fail — frame wrapping homogeneous bullet list",
     "rule": "L15",
     "expected": "fail",
     "input": "```\n┌────────────────┐\n│ - alpha        │\n│ - beta         │\n│ - gamma        │\n└────────────────┘\n```",
-    "expected_issues": [{"rule": "L15"}]
+    "expected_issues": [{ "rule": "L15" }]
   }
 ]

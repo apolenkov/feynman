@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const INSTALL_SH = path.resolve(import.meta.dirname, '..', 'install.sh');
-const REPO_DIR   = path.resolve(import.meta.dirname, '..');
+const REPO_DIR = path.resolve(import.meta.dirname, '..');
 
 /**
  * Create isolated temp HOME dir.
@@ -20,14 +20,20 @@ function makeTempHome(): string {
 }
 
 function rmrf(dir: string): void {
-  try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch (_) {}
 }
 
 /**
  * Run install.sh with HOME stubbed to tmpDir.
  * Returns { stdout, stderr, status }.
  */
-function runInstall(tmpHome: string, env: Record<string, string> = {}, args: string[] = []): { stdout: string; stderr: string; status: number } {
+function runInstall(
+  tmpHome: string,
+  env: Record<string, string> = {},
+  args: string[] = [],
+): { stdout: string; stderr: string; status: number } {
   try {
     const stdout = execFileSync('bash', [INSTALL_SH, ...args], {
       encoding: 'utf8',
@@ -54,11 +60,10 @@ function runInstall(tmpHome: string, env: Record<string, string> = {}, args: str
  */
 function readSettings(tmpHome: string): Record<string, unknown> {
   const settingsPath = path.join(tmpHome, '.codex', 'hooks.json');
-  return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  return JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as Record<string, unknown>;
 }
 
 describe('install.sh', () => {
-
   // -------------------------------------------------------------------------
   // Test 1: Fresh install — empty HOME
   // -------------------------------------------------------------------------
@@ -71,7 +76,9 @@ describe('install.sh', () => {
       result = runInstall(tmpHome);
     });
 
-    after(() => rmrf(tmpHome));
+    after(() => {
+      rmrf(tmpHome);
+    });
 
     it('exits 0', () => {
       assert.equal(result.status, 0, `install.sh failed: ${result.stderr}`);
@@ -87,27 +94,35 @@ describe('install.sh', () => {
       assert.ok(cfg['hooks'], 'hooks key must exist');
       const hooks = cfg['hooks'] as Record<string, unknown[]>;
       assert.ok(Array.isArray(hooks['SessionStart']), 'SessionStart must be array');
-      assert.ok(hooks['SessionStart']!.length >= 1, 'at least one session hook entry');
+      assert.ok(hooks['SessionStart'].length >= 1, 'at least one session hook entry');
     });
 
     it('SessionStart hook entry points to feynman-session-start with absolute path', () => {
       const cfg = readSettings(tmpHome);
-      const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[]; matcher?: string }[]>;
-      const sessionEntry = hooks['SessionStart']!.find(e =>
-        e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-session-start.ts'))
+      const hooks = cfg['hooks'] as Record<
+        string,
+        { hooks: { command: string }[]; matcher?: string }[]
+      >;
+      const sessionEntry = hooks['SessionStart']!.find(
+        (e) =>
+          e.hooks &&
+          e.hooks.some((h) => h.command && h.command.includes('feynman-session-start.ts')),
       );
       assert.ok(sessionEntry, 'feynman-session-start.ts hook entry not found');
-      const sessionHook = sessionEntry!.hooks[0]!;
-      assert.ok(sessionHook.command.includes('/'), 'session hook command must contain absolute path');
+      const sessionHook = sessionEntry.hooks[0]!;
+      assert.ok(
+        sessionHook.command.includes('/'),
+        'session hook command must contain absolute path',
+      );
       assert.ok(!sessionHook.command.includes('~/'), 'session hook command must not use tilde');
-      assert.ok(sessionEntry!.matcher?.includes('compact'), 'matcher must include compact');
-      assert.ok(sessionEntry!.matcher?.includes('clear'), 'matcher must include clear');
+      assert.ok(sessionEntry.matcher?.includes('compact'), 'matcher must include compact');
+      assert.ok(sessionEntry.matcher?.includes('clear'), 'matcher must include clear');
     });
 
     it('stdout mentions "hook: installed"', () => {
       assert.ok(
         result.stdout.includes('hook: installed') || result.stdout.includes('installed'),
-        `expected "installed" in stdout: ${result.stdout}`
+        `expected "installed" in stdout: ${result.stdout}`,
       );
     });
   });
@@ -124,15 +139,23 @@ describe('install.sh', () => {
       runInstall(tmpHome); // second install
     });
 
-    after(() => rmrf(tmpHome));
+    after(() => {
+      rmrf(tmpHome);
+    });
 
     it('SessionStart hook appears exactly once in settings.json', () => {
       const cfg = readSettings(tmpHome);
       const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
-      const sessionHooks = hooks['SessionStart']!.filter(e =>
-        e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-session-start.ts'))
+      const sessionHooks = hooks['SessionStart']!.filter(
+        (e) =>
+          e.hooks &&
+          e.hooks.some((h) => h.command && h.command.includes('feynman-session-start.ts')),
       );
-      assert.equal(sessionHooks.length, 1, `session hook should appear exactly once, found ${sessionHooks.length}`);
+      assert.equal(
+        sessionHooks.length,
+        1,
+        `session hook should appear exactly once, found ${sessionHooks.length}`,
+      );
     });
 
     it('second install stdout says "already installed"', () => {
@@ -140,7 +163,7 @@ describe('install.sh', () => {
       const result = runInstall(tmpHome);
       assert.ok(
         result.stdout.includes('already installed'),
-        `expected "already installed", got: ${result.stdout}`
+        `expected "already installed", got: ${result.stdout}`,
       );
     });
   });
@@ -160,52 +183,67 @@ describe('install.sh', () => {
         hooks: {
           SessionStart: [
             {
-              hooks: [{ type: 'command', command: 'node /other/codex-hook.js', timeout: 3 }]
-            }
-          ]
+              hooks: [{ type: 'command', command: 'node /other/codex-hook.js', timeout: 3 }],
+            },
+          ],
         },
-        someOtherConfig: { value: 42 }
+        someOtherConfig: { value: 42 },
       };
-        fs.writeFileSync(
-        path.join(codexDir, 'hooks.json'),
-        JSON.stringify(existingCfg, null, 2)
-      );
+      fs.writeFileSync(path.join(codexDir, 'hooks.json'), JSON.stringify(existingCfg, null, 2));
 
       runInstall(tmpHome);
     });
 
-    after(() => rmrf(tmpHome));
+    after(() => {
+      rmrf(tmpHome);
+    });
 
     it('existing Codex SessionStart hook preserved after merge', () => {
       const cfg = readSettings(tmpHome);
       const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
-      const existing = (hooks['SessionStart'] ?? []).find(e =>
-        e.hooks && e.hooks.some(h => h.command && h.command.includes('codex-hook.js'))
+      const existing = (hooks['SessionStart'] ?? []).find(
+        (e) => e.hooks && e.hooks.some((h) => h.command && h.command.includes('codex-hook.js')),
       );
-      assert.ok(existing, 'pre-existing Codex SessionStart hook should be preserved in merged settings');
+      assert.ok(
+        existing,
+        'pre-existing Codex SessionStart hook should be preserved in merged settings',
+      );
     });
 
     it('adds exactly one Feynman SessionStart hook', () => {
       const cfg = readSettings(tmpHome);
       const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
-      const feynman = (hooks['SessionStart'] ?? []).filter(e =>
-        e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-session-start.ts'))
+      const feynman = (hooks['SessionStart'] ?? []).filter(
+        (e) =>
+          e.hooks &&
+          e.hooks.some((h) => h.command && h.command.includes('feynman-session-start.ts')),
       );
       assert.equal(feynman.length, 1, 'feynman must add one SessionStart hook');
     });
 
     it('other config keys preserved', () => {
       const cfg = readSettings(tmpHome);
-      assert.deepEqual(cfg['someOtherConfig'], { value: 42 }, 'non-hooks config should not be touched');
+      assert.deepEqual(
+        cfg['someOtherConfig'],
+        { value: 42 },
+        'non-hooks config should not be touched',
+      );
     });
 
     it('preserves unrelated Codex hook groups', () => {
       const cfg = readSettings(tmpHome);
       const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]>;
-      assert.equal((hooks['SessionStart'] ?? []).filter((entry) =>
-        entry.hooks?.some((hook) => hook.command.includes('codex-hook.js')),
-      ).length, 1);
-      assert.equal(hooks['SessionStart']!.length, 2, 'unrelated and Feynman SessionStart groups must both remain');
+      assert.equal(
+        (hooks['SessionStart'] ?? []).filter((entry) =>
+          entry.hooks?.some((hook) => hook.command.includes('codex-hook.js')),
+        ).length,
+        1,
+      );
+      assert.equal(
+        hooks['SessionStart']!.length,
+        2,
+        'unrelated and Feynman SessionStart groups must both remain',
+      );
     });
   });
 
@@ -231,11 +269,18 @@ describe('install.sh', () => {
           });
           // After uninstall, feynman hook should be removed from settings
           const cfg = readSettings(tmpHome);
-          const hooks = cfg['hooks'] as Record<string, { hooks: { command: string }[] }[]> | undefined;
-          const feynmanSession = (hooks?.['SessionStart'] || []).find(e =>
-            e.hooks && e.hooks.some(h => h.command && h.command.includes('feynman-session-start.ts'))
+          const hooks = cfg['hooks'] as
+            Record<string, { hooks: { command: string }[] }[]> | undefined;
+          const feynmanSession = (hooks?.['SessionStart'] || []).find(
+            (e) =>
+              e.hooks &&
+              e.hooks.some((h) => h.command && h.command.includes('feynman-session-start.ts')),
           );
-          assert.equal(feynmanSession, undefined, 'feynman SessionStart hook should be removed by uninstall.sh');
+          assert.equal(
+            feynmanSession,
+            undefined,
+            'feynman SessionStart hook should be removed by uninstall.sh',
+          );
         } finally {
           rmrf(tmpHome);
         }
@@ -259,7 +304,7 @@ describe('install.sh', () => {
         if (result.status !== 0) {
           assert.ok(
             result.stderr.includes('node') || result.stderr.includes('Node'),
-            `expected node-related error in stderr: ${result.stderr}`
+            `expected node-related error in stderr: ${result.stderr}`,
           );
         }
         // If node was found anyway — install succeeded, which is fine
@@ -287,15 +332,18 @@ describe('install.sh', () => {
         // Put fake-bin first on PATH so it shadows the real node binary.
         // Keep /usr/bin:/bin so install.sh's POSIX utilities still resolve.
         const result = runInstall(tmpHome, { PATH: `${fakeBinDir}:/usr/bin:/bin` });
-        assert.equal(result.status, 1, `expected exit 1, got ${result.status}; stderr: ${result.stderr}`);
+        assert.equal(
+          result.status,
+          1,
+          `expected exit 1, got ${result.status}; stderr: ${result.stderr}`,
+        );
         assert.ok(
           result.stderr.includes('>=22.18') || result.stderr.includes('22.18'),
-          `expected ">=22.18 required" in stderr, got: ${result.stderr}`
+          `expected ">=22.18 required" in stderr, got: ${result.stderr}`,
         );
       } finally {
         rmrf(tmpHome);
       }
     });
   });
-
 });
