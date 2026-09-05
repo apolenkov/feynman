@@ -10,11 +10,11 @@
 | state-machine | labeled states+arrows |
 </triggers>
 <contract>
-No preamble. Whole-text: all facts; focused: state scope. Extract edges, necessary/sufficient conditions, negation/uncertainty, AND/OR; invent nothing; order ≠ cause.
+No preamble. Whole-text: all facts; focus: state scope. Extract edges, necessary/sufficient conditions, negation/uncertainty, AND/OR; invent nothing; order ≠ cause.
 All positive facts need visuals, also initial/parallel. Not prose in fences. Edges: left-verb-right: `[A] --requires success of--> [B]`; `[A] --may run in parallel-- [B]`.
-Aim <=60 columns; cap 80/user narrower. Hierarchy: tree. Other edges: one/row, label+both endpoints. Scoped IDs: East/API; no frames/slants. Alias+full legend; no truncation.
+Aim <=60 cols; cap 80/user narrower. Hierarchy: tree. Other edges: one/row, label+both endpoints. Scope IDs: East/API; no frames/slants. Alias+full legend; no truncation.
 One fenced ASCII visual; panels OK. Explicit ASCII beats style/suppression; prose-only beats defaults; latest format wins. Else greeting/definition/recommendation/simple fact/list/question-back = prose. Honor output/length in ALL messages.
-Check edges/attrs+width vs facts; fix omissions/invention/direction/AND-OR/identity. Retain only/all/none/cannot. Correct false premise; one requested question = one independent question.
+Pad columns; check facts/edges/attrs/width; fix omissions/invention/direction/AND-OR/identity. Retain only/all/none/cannot. Fix false premise; one requested question = one independent question.
 **bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
@@ -33,11 +33,11 @@ Check edges/attrs+width vs facts; fix omissions/invention/direction/AND-OR/ident
 | mapping / C4 context | explicit edge rows |
 </triggers>
 <contract>
-No preamble. Whole-text: all facts; focused: state scope. Extract edges, necessary/sufficient conditions, negation/uncertainty, AND/OR; invent nothing; order ≠ cause.
+No preamble. Whole-text: all facts; focus: state scope. Extract edges, necessary/sufficient conditions, negation/uncertainty, AND/OR; invent nothing; order ≠ cause.
 All positive facts need visuals, also initial/parallel. Not prose in fences. Edges: left-verb-right: `[A] --requires success of--> [B]`; `[A] --may run in parallel-- [B]`.
-Aim <=60 columns; cap 80/user narrower. Hierarchy: tree. Other edges: one/row, label+both endpoints. Scoped IDs: East/API; no frames/slants. Alias+full legend; no truncation.
+Aim <=60 cols; cap 80/user narrower. Hierarchy: tree. Other edges: one/row, label+both endpoints. Scope IDs: East/API; no frames/slants. Alias+full legend; no truncation.
 One fenced ASCII visual; panels OK. Explicit ASCII beats style/suppression; prose-only beats defaults; latest format wins. Else greeting/definition/recommendation/simple fact/list/question-back = prose. Honor output/length in ALL messages.
-Check edges/attrs+width vs facts; fix omissions/invention/direction/AND-OR/identity. Retain only/all/none/cannot. Correct false premise; one requested question = one independent question.
+Pad columns; check facts/edges/attrs/width; fix omissions/invention/direction/AND-OR/identity. Retain only/all/none/cannot. Fix false premise; one requested question = one independent question.
 **bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
@@ -57,11 +57,11 @@ Check edges/attrs+width vs facts; fix omissions/invention/direction/AND-OR/ident
 | relational list >=2 | topology-matched ASCII |
 </triggers>
 <contract>
-No preamble. Whole-text: all facts; focused: state scope. Extract edges, necessary/sufficient conditions, negation/uncertainty, AND/OR; invent nothing; order ≠ cause.
+No preamble. Whole-text: all facts; focus: state scope. Extract edges, necessary/sufficient conditions, negation/uncertainty, AND/OR; invent nothing; order ≠ cause.
 All positive facts need visuals, also initial/parallel. Not prose in fences. Edges: left-verb-right: `[A] --requires success of--> [B]`; `[A] --may run in parallel-- [B]`.
-Aim <=60 columns; cap 80/user narrower. Hierarchy: tree. Other edges: one/row, label+both endpoints. Scoped IDs: East/API; no frames/slants. Alias+full legend; no truncation.
+Aim <=60 cols; cap 80/user narrower. Hierarchy: tree. Other edges: one/row, label+both endpoints. Scope IDs: East/API; no frames/slants. Alias+full legend; no truncation.
 One fenced ASCII visual; panels OK. Explicit ASCII beats style/suppression; prose-only beats defaults; latest format wins. Else greeting/definition/recommendation/simple fact/list/question-back = prose. Honor output/length in ALL messages.
-Check edges/attrs+width vs facts; fix omissions/invention/direction/AND-OR/identity. Retain only/all/none/cannot. Correct false premise; one requested question = one independent question.
+Pad columns; check facts/edges/attrs/width; fix omissions/invention/direction/AND-OR/identity. Retain only/all/none/cannot. Fix false premise; one requested question = one independent question.
 **bold** keys; ▲▼ priority; ✓✗ status.
 </contract>
 </intensity>
