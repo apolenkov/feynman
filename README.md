@@ -5,9 +5,15 @@
 ![License](https://img.shields.io/github/license/apolenkov/feynman?color=2563EB)
 [![skills.sh](https://skills.sh/b/apolenkov/feynman)](https://skills.sh/apolenkov/feynman)
 
-feynman adds focused visual-explanation instructions to Codex. The native skill
-selects a concise flow, tree, table or list from the task's facts. An optional
+feynman adds visual-explanation instructions to Codex. The native skill guides
+Codex in choosing a flow, tree, table or list from the task's facts. An optional
 local CLI installs session-wide diagram guidance and provides an ASCII linter.
+
+Use it when you want a visual explanation. The latest controlled comparison
+did not establish clearer answers than ordinary Codex responses, and factual
+and instruction-compliance failures remain. See the
+[evaluation report](docs/evaluation-3ab9de4.md). Technical test results do not
+establish explanation quality.
 
 ## Install
 
@@ -57,8 +63,9 @@ The native plugin supplies the Codex skill. The CLI installer registers the
 
 ## What it does
 
-feynman classifies a response's structure and chooses the smallest useful
-visual: flow, tree, table, status marker, or frame. Prose stays prose. The
+The instructions ask Codex to identify a response's structure and choose a
+small visual: flow, tree, table, status marker, or frame. They ask it to preserve
+prose-only requests; model compliance is not guaranteed. The
 default hook Intensity is `full`; `lite` and `ultra` are available through
 `feynman state`. These persistent preferences apply to the CLI-installed hook;
 standalone skill explanations follow their packaged instructions and your request.
@@ -126,7 +133,9 @@ add a test for changed behavior.
 
 The quality gate checks formatting, types, typed lint, behavior, coverage scope,
 documentation and byte-for-byte package reproducibility. The live comparison
-of explanations is separate and remains incomplete; see [evals/README.md](evals/README.md).
+of explanations is separate: the latest 96-answer experiment completed and
+failed its acceptance criteria. See the [results](docs/evaluation-3ab9de4.md)
+and [protocol](evals/protocol-v2.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution workflow,
 [SECURITY.md](SECURITY.md) for private vulnerability reports, and

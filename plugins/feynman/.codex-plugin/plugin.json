@@ -22,7 +22,7 @@
   "interface": {
     "displayName": "Feynman",
     "shortDescription": "Visual architecture and concise ASCII diagrams.",
-    "longDescription": "Feynman helps Codex make flows, hierarchies, comparisons, priorities, and status summaries immediately readable with concise ASCII diagrams.",
+    "longDescription": "Feynman provides instructions for representing flows, hierarchies, comparisons, priorities, and status summaries with ASCII diagrams and tables.",
     "developerName": "apolenkov",
     "category": "Productivity",
     "capabilities": ["Interactive"],

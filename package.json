@@ -1,7 +1,7 @@
 {
   "name": "@albinocrabs/feynman",
   "version": "2.0.0",
-  "description": "Codex plugin that auto-injects readable ASCII diagram rules via the SessionStart hook",
+  "description": "Visual-explanation skill for Codex with an optional session hook and ASCII diagram linter",
   "license": "MIT",
   "author": "apolenkov",
   "keywords": [
