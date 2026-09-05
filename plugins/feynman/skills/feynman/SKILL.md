@@ -5,11 +5,15 @@ description: >
   diagrams, with compact tables or lists for comparisons and status. Use for
   /feynman, visual architecture, visual explanations, or Feynman settings.
   For brief or exact-output requests, use silently without a skill announcement.
+  Read the exact catalog path verbatim, including repeated directory names;
+  never guess the path or search the filesystem to locate this skill.
 ---
 
 Make the relationships needed to answer the reader's question visible. Standalone
 explanations work from these instructions alone: do not run the CLI, use the
 network, or read or change local preferences.
+Load only the exact skill path supplied in the catalog. If it is unavailable,
+report the loading failure without searching elsewhere.
 Respect the requested length and format across every visible message, including
 before a tool call. Brief replies, greetings and exact-output requests need no
 announcement of skill use or working process.
@@ -46,6 +50,7 @@ Choose layout from topology and available width:
   whose child identities are not shared across parents.
 - Use a Markdown table for a non-explicit comparison and a compact labeled list
   for status or priority.
+- For an ASCII comparison, use aligned columns without outer borders.
 - For branches, joins, shared nodes, diamonds, cycles and disconnected groups,
   use grouped explicit edge rows. Each row names both endpoints and keeps its relation,
   condition, and relevant `AND` / `OR` beside that edge. Reuse the same node or
