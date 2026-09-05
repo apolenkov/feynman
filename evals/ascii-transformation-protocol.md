@@ -91,6 +91,17 @@ or change user preferences. Hook bookkeeping counters may change as documented;
 preferences must not. Redact credentials from artifacts. Never touch the real
 user's configuration. Missing activation evidence is unproven, not a pass.
 
+Read-only, in-memory calculations on the supplied content, such as checking
+display width, are permitted in every condition. They must not fetch task facts,
+install software, invoke settings/bootstrap commands, or read or change user
+preferences. Record all command and other tool activity. A successful skill
+read proves activation independently of a subsequent calculation; neither a
+successful process exit nor unchanged settings proves that every tool action was
+permitted. Every model tool trace requires an explicit external review against
+these restrictions, including commands credited as a packaged skill read and
+unclassified activity. Keep that gate missing until reviewed, and reject
+prohibited activity even when generation completed successfully.
+
 The hook evaluation may use a transparent observation adapter around the exact
 installed command. The adapter must execute that command with the original
 stdin and relay its actual stdout/stderr without changing bytes. Freeze and

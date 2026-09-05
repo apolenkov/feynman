@@ -131,6 +131,7 @@ interface ManifestState {
   readonly eligibleForReview: boolean;
   readonly acceptanceEvidence: Readonly<{
     externalBlindReview: 'missing';
+    externalToolReview: 'missing';
   }>;
   readonly attemptsRecorded: number;
   readonly stoppedAfterFailure: boolean;
@@ -541,6 +542,7 @@ function parseJsonLines(
 function eventSummary(events: readonly unknown[]): Readonly<{
   eventTypes: readonly string[];
   itemTypes: readonly string[];
+  activityItemTypes: readonly string[];
   commands: readonly string[];
   commandExecutions: readonly Readonly<{
     command: string;
@@ -555,6 +557,10 @@ function eventSummary(events: readonly unknown[]): Readonly<{
   hookCompleted: boolean;
 }> {
   const records = events.filter(isRecord);
+  const activityItems = records
+    .filter((event) => event['type'] === 'item.started' || event['type'] === 'item.completed')
+    .map((event) => event['item'])
+    .filter(isRecord);
   const items = records
     .filter((event) => event['type'] === 'item.completed')
     .map((event) => event['item'])
@@ -563,6 +569,9 @@ function eventSummary(events: readonly unknown[]): Readonly<{
     typeof event['type'] === 'string' ? event['type'] : 'unknown',
   );
   const itemTypes = items.map((item) =>
+    typeof item['type'] === 'string' ? item['type'] : 'unknown',
+  );
+  const activityItemTypes = activityItems.map((item) =>
     typeof item['type'] === 'string' ? item['type'] : 'unknown',
   );
   const commandExecutions = items
@@ -586,6 +595,7 @@ function eventSummary(events: readonly unknown[]): Readonly<{
   return {
     eventTypes,
     itemTypes,
+    activityItemTypes,
     commands,
     commandExecutions,
     answer,
@@ -686,9 +696,16 @@ function buildAndVerifyArtifact(
     timeout: 120_000,
     maxBuffer: MAX_BUFFER_BYTES,
   });
+  const tarballBytes = fs.readFileSync(tarball);
+  const tarballHash = sha256(tarballBytes);
+  const frozenTarball = path.join(output, 'candidate-package.tgz');
+  fs.writeFileSync(frozenTarball, tarballBytes, { flag: 'wx', mode: 0o400 });
+  if (fileHash(frozenTarball) !== tarballHash) {
+    throw new Error('Frozen candidate package differs from the verified build artifact');
+  }
   return {
-    tarball,
-    tarballHash: sha256(fs.readFileSync(tarball)),
+    tarball: frozenTarball,
+    tarballHash,
     pointerHash: sha256(pointerText),
   };
 }
@@ -1060,19 +1077,37 @@ function modelArguments(model: string, home: IsolatedHome, prompt: string): read
 function nativeSkillReadIsProven(
   executions: ReturnType<typeof eventSummary>['commandExecutions'],
   installed: InstalledSkill,
+  cwd: string,
 ): boolean {
   const expectedOutput = fs.readFileSync(installed.path, 'utf8');
-  return (
-    executions.length > 0 &&
-    executions.every(
-      (execution) =>
-        execution.command.includes(installed.path) &&
-        execution.command.includes('SKILL.md') &&
-        !/\bnpx\b|\binstall\b|\bplugin\b|\.feynman|hooks\.json/.test(execution.command) &&
-        execution.status === 'completed' &&
-        execution.exitCode === 0 &&
-        execution.aggregatedOutput === expectedOutput,
-    )
+  const installedRealPath = fs.realpathSync(installed.path);
+  const cwdRealPath = fs.realpathSync(cwd);
+  const relativePath = path.relative(cwdRealPath, installedRealPath);
+  const allowedPaths = [
+    installed.path,
+    installedRealPath,
+    path.resolve(cwd, relativePath),
+    relativePath,
+    `.${path.sep}${relativePath}`,
+  ];
+  const referencesInstalledSkill = (command: string): boolean =>
+    !path.isAbsolute(relativePath) &&
+    !relativePath.startsWith(`..${path.sep}`) &&
+    allowedPaths.some((candidate) => {
+      const index = command.indexOf(candidate);
+      if (index < 0) return false;
+      const before = command[index - 1];
+      const after = command[index + candidate.length];
+      const boundary = (value: string | undefined): boolean =>
+        value === undefined || /[\s'"=]/u.test(value);
+      return boundary(before) && boundary(after);
+    });
+  return executions.some(
+    (execution) =>
+      referencesInstalledSkill(execution.command) &&
+      execution.status === 'completed' &&
+      execution.exitCode === 0 &&
+      execution.aggregatedOutput === expectedOutput,
   );
 }
 
@@ -1166,7 +1201,10 @@ function newManifest(
     fullGenerationComplete: false,
     acceptanceComplete: false,
     eligibleForReview: false,
-    acceptanceEvidence: { externalBlindReview: 'missing' },
+    acceptanceEvidence: {
+      externalBlindReview: 'missing',
+      externalToolReview: 'missing',
+    },
     attemptsRecorded: 0,
     stoppedAfterFailure: false,
   };
@@ -1780,8 +1818,16 @@ function executeModelCall(
   const nativeSkillRead =
     call.arm !== 'native' ||
     (options.delivery.installedSkill !== null &&
-      nativeSkillReadIsProven(summary.commandExecutions, options.delivery.installedSkill));
-  const noUnexpectedTools = call.arm === 'native' ? nativeSkillRead : summary.commands.length === 0;
+      nativeSkillReadIsProven(
+        summary.commandExecutions,
+        options.delivery.installedSkill,
+        home.home,
+      ));
+  const toolActivityItemTypes = summary.activityItemTypes.filter(
+    (itemType) => itemType !== 'agent_message' && itemType !== 'reasoning',
+  );
+  const noUnexpectedTools = toolActivityItemTypes.length === 0;
+  const externalToolReview = noUnexpectedTools ? 'not-required' : 'missing';
   const nativeAfter =
     call.arm === 'native' && options.delivery.installedSkill !== null
       ? nativeSnapshot(home, options.delivery.installedSkill)
@@ -1796,7 +1842,7 @@ function executeModelCall(
     parsed.parseError === null &&
     summary.completed &&
     summary.answer.length > 0 &&
-    noUnexpectedTools &&
+    nativeSkillRead &&
     hookDeliveryProven &&
     hookPreferencesUnchanged &&
     nativeStateUnchanged;
@@ -1822,6 +1868,9 @@ function executeModelCall(
     itemTypes: summary.itemTypes,
     commands: summary.commands,
     commandExecutions: summary.commandExecutions,
+    toolActivityItemTypes,
+    toolActivityEventsFile: `${call.id}.events.jsonl`,
+    externalToolReview,
     noUnexpectedTools,
     nativeSkillRead,
     nativeStateUnchanged,
