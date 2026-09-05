@@ -18,7 +18,10 @@ interface EvaluationFixture {
   readonly dispose: () => void;
 }
 
-function fixture(tasks: unknown = validTasks()): EvaluationFixture {
+function fixture(
+  tasks: unknown = validTasks(),
+  usefulnessTasks: unknown = validUsefulnessTasks(),
+): EvaluationFixture {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-evaluate-test-'));
   const root = path.join(base, 'repo');
   const output = path.join(base, 'output');
@@ -29,6 +32,10 @@ function fixture(tasks: unknown = validTasks()): EvaluationFixture {
   fs.mkdirSync(path.join(root, 'rules'), { recursive: true });
   fs.mkdirSync(temporaryRoot);
   fs.writeFileSync(path.join(root, 'evals/evals.json'), `${JSON.stringify(tasks)}\n`);
+  fs.writeFileSync(
+    path.join(root, 'evals/usefulness.json'),
+    `${JSON.stringify(usefulnessTasks)}\n`,
+  );
   fs.writeFileSync(path.join(root, 'plugins/feynman/skills/feynman/SKILL.md'), 'skill');
   fs.writeFileSync(
     path.join(root, 'rules/feynman-contract.md'),
@@ -43,6 +50,20 @@ function fixture(tasks: unknown = validTasks()): EvaluationFixture {
     dispose: () => {
       fs.rmSync(base, { recursive: true, force: true });
     },
+  };
+}
+
+function validUsefulnessTasks(): Readonly<{ tasks: readonly Record<string, unknown>[] }> {
+  return {
+    tasks: Array.from({ length: 12 }, (_, index) => ({
+      id: `N${String(index + 1).padStart(2, '0')}`,
+      shapeCategory: 'test-shape',
+      prompt: `new prompt ${index + 1}`,
+      facts: [{ id: 'F1', text: `new fact ${index + 1}` }],
+      requiredFactIds: ['F1'],
+      comprehensionQuestion: `new question ${index + 1}`,
+      answerKey: `SECRET answer ${index + 1}`,
+    })),
   };
 }
 
@@ -157,6 +178,7 @@ describe('evaluation runner', () => {
     for (const tasks of [
       { evals: [{ id: 1, prompt: 'only one' }] },
       { evals: Array.from({ length: 20 }, () => ({ id: 1, prompt: 'duplicate' })) },
+      { evals: Array.from({ length: 20 }, (_, index) => ({ id: index + 2, prompt: 'shifted' })) },
       { evals: Array.from({ length: 20 }, (_, id) => ({ id, prompt: 4 })) },
     ]) {
       const fx = fixture(tasks);
@@ -180,6 +202,48 @@ describe('evaluation runner', () => {
       assert.equal(calls, 0);
     } finally {
       malformed.dispose();
+    }
+  });
+
+  it('rejects malformed usefulness tasks before any model call', () => {
+    for (const tasks of [
+      { tasks: [] },
+      { tasks: Array.from({ length: 12 }, () => ({ id: 'N01' })) },
+      {
+        tasks: validUsefulnessTasks().tasks.map((task, index) =>
+          index === 4 ? { ...task, answerKey: 4 } : task,
+        ),
+      },
+    ]) {
+      const fx = fixture(validTasks(), tasks);
+      let calls = 0;
+      try {
+        assert.throws(() => {
+          run(fx, () => (calls++, ok()));
+        }, /12-task|usefulness/);
+        assert.equal(calls, 0);
+      } finally {
+        fx.dispose();
+      }
+    }
+  });
+
+  it('refuses a dirty source revision before any model attempt', () => {
+    const fx = fixture();
+    let execCalls = 0;
+    try {
+      assert.throws(() => {
+        run(fx, (command, args) => {
+          if (command === 'git')
+            return ok(args[0] === 'status' ? '?? evals/usefulness.json\n' : 'abc123\n');
+          if (args[0] === '--version') return ok('codex-test 1\n');
+          execCalls++;
+          return ok(events());
+        });
+      }, /clean source revision/);
+      assert.equal(execCalls, 0);
+    } finally {
+      fx.dispose();
     }
   });
 
@@ -303,7 +367,7 @@ describe('evaluation runner', () => {
     }
   });
 
-  it('records all 180 successful attempts in rotated order and cleans every home', () => {
+  it('records one fixed 96-attempt run with original and usefulness prompts', () => {
     const fx = fixture();
     const calls: string[][] = [];
     const progress: string[] = [];
@@ -318,10 +382,10 @@ describe('evaluation runner', () => {
       const execCalls = calls.filter(
         ([command, subcommand]) => command === 'codex' && subcommand === 'exec',
       );
-      assert.equal(execCalls.length, 180);
+      assert.equal(execCalls.length, 96);
       assert.equal(
         fs.readdirSync(fx.output).filter((name) => /^\d+-\d+-.+\.json$/.test(name)).length,
-        180,
+        96,
       );
       assert.deepEqual(progress.slice(0, 3), [
         '1-1-hook: recorded',
@@ -341,12 +405,51 @@ describe('evaluation runner', () => {
       const complete: unknown = JSON.parse(
         fs.readFileSync(path.join(fx.output, 'complete.json'), 'utf8'),
       );
-      assert.deepEqual(complete, { completedAt: '2026-09-05T00:00:00.000Z', attempts: 180 });
+      assert.deepEqual(complete, { completedAt: '2026-09-05T00:00:00.000Z', attempts: 96 });
       assert.deepEqual(fs.readdirSync(fx.temporaryRoot), []);
       const first = execCalls[0] ?? [];
       assert.ok(first.includes('exact-model'));
       assert.ok(first.includes('model_reasoning_effort="medium"'));
       assert.ok(first.includes('read-only'));
+      const firstUsefulnessPrompt = execCalls[60]?.at(-1);
+      assert.equal(
+        firstUsefulnessPrompt,
+        'These facts completely define the fictional system for this task.\n\nnew prompt 1\n\nF1: new fact 1\n\nComprehension question: new question 1',
+      );
+      assert.equal(firstUsefulnessPrompt.includes('SECRET answer 1'), false);
+      const newSummary: unknown = JSON.parse(
+        fs.readFileSync(path.join(fx.output, '21-1-skill.json'), 'utf8'),
+      );
+      assert.ok(typeof newSummary === 'object' && newSummary !== null);
+      assert.deepEqual(
+        {
+          taskId: 'taskId' in newSummary ? newSummary.taskId : undefined,
+          sourceTaskId: 'sourceTaskId' in newSummary ? newSummary.sourceTaskId : undefined,
+          suite: 'suite' in newSummary ? newSummary.suite : undefined,
+          repetition: 'repetition' in newSummary ? newSummary.repetition : undefined,
+        },
+        { taskId: 21, sourceTaskId: 'N01', suite: 'usefulness', repetition: 1 },
+      );
+      assert.equal(
+        fs.readFileSync(path.join(fx.output, 'original-tasks.json'), 'utf8'),
+        `${JSON.stringify(validTasks())}\n`,
+      );
+      assert.equal(
+        fs.readFileSync(path.join(fx.output, 'usefulness-tasks.json'), 'utf8'),
+        `${JSON.stringify(validUsefulnessTasks())}\n`,
+      );
+      const manifest: unknown = JSON.parse(
+        fs.readFileSync(path.join(fx.output, 'manifest.json'), 'utf8'),
+      );
+      assert.ok(typeof manifest === 'object' && manifest !== null);
+      assert.deepEqual(
+        {
+          protocol: 'protocol' in manifest ? manifest.protocol : undefined,
+          repetitions: 'repetitions' in manifest ? manifest.repetitions : undefined,
+          expectedAttempts: 'expectedAttempts' in manifest ? manifest.expectedAttempts : undefined,
+        },
+        { protocol: 2, repetitions: 1, expectedAttempts: 96 },
+      );
     } finally {
       fx.dispose();
     }

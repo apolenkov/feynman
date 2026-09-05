@@ -9,7 +9,11 @@ evidence. On 2026-09-04, one hook-condition answer completed, then the baseline
 attempt failed because the Codex usage limit was reached. No paired score or
 usefulness claim can be derived from this run.
 
-Run each task three times in each condition: baseline, standalone skill, and
+The current [single-run protocol](protocol-v2.md) retains these original tasks
+and adds the 12 tasks in `usefulness.json`. Earlier three-repetition results
+remain historical failures; they are not reclassified by the new protocol.
+
+Run each of the 32 tasks once in each condition: baseline, standalone skill, and
 full-intensity hook Contract. Use the same exact model identifier, reasoning
 settings, task prompt, tool permissions, and empty project environment. Record
 the Codex version and source revision, including the dirty diff hash when
@@ -18,7 +22,7 @@ project instructions, or global preferences. Establish isolated installation
 and activation separately; directly injecting instructions tests their effect
 but does not prove discovery or plugin installation.
 
-Retain all 180 attempts, including errors and retries, with raw events, final
+Retain all 96 planned attempts, including any errors, with raw events, final
 answer, instruction and prompt hashes, duration, and available token usage.
 Missing usage stays `unavailable`. A failed generation is not an omitted sample
 or a successful answer. Do not mix completed samples from different versions
@@ -48,15 +52,18 @@ unnecessary diagrams, frames, and tables fail suppression even if factual.
 
 Use the acceptance thresholds in
 [`repository-quality/spec.md`](../openspec/specs/repository-quality/spec.md).
-Compare task-level means over the three repetitions: comprehension plus
-readability must improve on at least 7 of the 12 structured tasks, with no
-overall reduction, no factual or explicit-instruction regression, and all
-suppression cases passing. Report wins, ties, losses, individual scores,
+Compare paired scores from the single repetition: comprehension plus
+readability must improve on at least 7 of the 12 new tasks, with no new-set
+overall reduction. Original tasks retain overall nonreduction and regression
+checks. Both deliveries require zero material factual errors, zero explicit
+instruction violations, no factual regression, and all suppression cases
+passing. Standalone skill is primary; hook usefulness is assessed separately.
+Report wins, ties, losses, individual scores,
 reviewer identity/method, tokens, answer lengths, and latency. Automated or
 agent review must be identified as such; it is not a human user study.
 
-Retain a failing run before changing instructions. Rerun all conditions for a
-new candidate without editing tasks or answer keys to fit the outputs. A green
+Retain a failing run and stop for a product decision. No automatic further
+experiment is authorized. Do not edit tasks or keys to fit outputs. A green
 unit-test suite does not establish usefulness.
 
 ## Running the evaluation

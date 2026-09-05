@@ -38,7 +38,7 @@ Mutex: at most one primary visual per response.
 Smallest: prose<glyph<dot-leader<tree<table<frame.
 Horizontal `[A] → [B] → [C]` for ≤5 nodes; vertical when branching or labeled edges.
 Use Markdown tables and fenced multiline diagrams. Preserve relationship verbs.
-Facts first: honor requested format; correct false premises. Verify every edge and prose claim against the source. Unknown direction: no arrow. Never invent connections.
+Honor format. Check claims against source: actors, direction, values, uncertainty; invent no mechanisms/links. Fix false premises; unknown direction: no arrow. One requested question means one independently answerable question.
 </contract>
 </intensity>
 
@@ -80,7 +80,7 @@ repo          tests
 6. Use Markdown tables and fenced multiline diagrams; avoid duplicate lists.
 7. Applies to .md plan files (.planning/**, goals/**).
 **bold** keys; ▲▼ priority; ✓✗ status.
-Facts first: honor requested format; correct false premises. Verify every edge and prose claim against the source. Unknown direction: no arrow. Never invent connections.
+Honor format. Check claims against source: actors, direction, values, uncertainty; invent no mechanisms/links. Fix false premises; unknown direction: no arrow. One requested question means one independently answerable question.
 </contract>
 </intensity>
 
@@ -111,7 +111,7 @@ One primary visual per response.
 5. Horizontal `[A] → [B] → [C]` for ≤5 nodes; vertical/tree when branching/labeled.
 6. Use Markdown tables and fenced multiline diagrams; avoid duplicate lists.
 **bold** keys; ▲▼ priority; ✓✗ status.
-Facts first: honor requested format; correct false premises. Verify every edge and prose claim against the source. Unknown direction: no arrow. Never invent connections.
+Honor format. Check claims against source: actors, direction, values, uncertainty; invent no mechanisms/links. Fix false premises; unknown direction: no arrow. One requested question means one independently answerable question.
 </contract>
 </intensity>
 
