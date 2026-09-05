@@ -22,6 +22,7 @@ import {
   runDocsCheck,
 } from '../scripts/check-docs.ts';
 import { assertDefined } from './helpers/assertions.ts';
+import { gitFixtureEnvironment, withGitFixtureEnvironment } from './helpers/git-environment.ts';
 
 const phrase = FORBIDDEN_PHRASES[0];
 if (phrase === undefined) throw new Error('FORBIDDEN_PHRASES must not be empty');
@@ -45,8 +46,9 @@ function docsFixture(): string {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, content);
   }
-  assert.equal(spawnSync('git', ['init', '--quiet'], { cwd: root }).status, 0);
-  assert.equal(spawnSync('git', ['add', '.'], { cwd: root }).status, 0);
+  const env = gitFixtureEnvironment();
+  assert.equal(spawnSync('git', ['init', '--quiet'], { cwd: root, env }).status, 0);
+  assert.equal(spawnSync('git', ['add', '.'], { cwd: root, env }).status, 0);
   return root;
 }
 
@@ -132,79 +134,85 @@ describe('guard constants', () => {
   });
 });
 
-describe('docs CLI boundary', () => {
+describe('docs CLI boundary', { concurrency: false }, () => {
   it('passes a complete temporary documentation tree without touching the workspace', () => {
-    const root = docsFixture();
-    try {
-      assert.deepEqual(checkDocs(root), {
-        files: [
-          'README.md',
-          'CONTRIBUTING.md',
-          'CHANGELOG.md',
-          'docs/guide.md',
-          'examples/sample.md',
-        ],
-        lintFailures: [],
-        hasInvalidPublicInstallExample: false,
-        driftFindings: [],
-      });
-      const stdout: string[] = [];
-      const stderr: string[] = [];
-      assert.equal(
-        runDocsCheck(root, {
-          stdout: (text) => stdout.push(text),
-          stderr: (text) => stderr.push(text),
-        }),
-        0,
-      );
-      assert.deepEqual(stdout, ['docs lint OK (5 files)\n']);
-      assert.deepEqual(stderr, []);
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
-    }
+    withGitFixtureEnvironment(() => {
+      const root = docsFixture();
+      try {
+        assert.deepEqual(checkDocs(root), {
+          files: [
+            'README.md',
+            'CONTRIBUTING.md',
+            'CHANGELOG.md',
+            'docs/guide.md',
+            'examples/sample.md',
+          ],
+          lintFailures: [],
+          hasInvalidPublicInstallExample: false,
+          driftFindings: [],
+        });
+        const stdout: string[] = [];
+        const stderr: string[] = [];
+        assert.equal(
+          runDocsCheck(root, {
+            stdout: (text) => stdout.push(text),
+            stderr: (text) => stderr.push(text),
+          }),
+          0,
+        );
+        assert.deepEqual(stdout, ['docs lint OK (5 files)\n']);
+        assert.deepEqual(stderr, []);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
   });
 
   it('reports lint, public-command, and tracked-drift failures together', () => {
-    const root = docsFixture();
-    try {
-      fs.writeFileSync(path.join(root, 'README.md'), `npx feynman install\n${withPhrase}\n`);
-      fs.writeFileSync(path.join(root, 'docs', 'guide.md'), 'LINT_FAIL\n');
-      const result = checkDocs(root);
-      assert.deepEqual(
-        result.lintFailures.map(({ file }) => file),
-        ['docs/guide.md'],
-      );
-      assert.equal(result.hasInvalidPublicInstallExample, true);
-      assert.equal(result.driftFindings.length, 1);
+    withGitFixtureEnvironment(() => {
+      const root = docsFixture();
+      try {
+        fs.writeFileSync(path.join(root, 'README.md'), `npx feynman install\n${withPhrase}\n`);
+        fs.writeFileSync(path.join(root, 'docs', 'guide.md'), 'LINT_FAIL\n');
+        const result = checkDocs(root);
+        assert.deepEqual(
+          result.lintFailures.map(({ file }) => file),
+          ['docs/guide.md'],
+        );
+        assert.equal(result.hasInvalidPublicInstallExample, true);
+        assert.equal(result.driftFindings.length, 1);
 
-      const errors: string[] = [];
-      assert.equal(
-        runDocsCheck(root, {
-          stdout: () => undefined,
-          stderr: (text) => errors.push(text),
-        }),
-        1,
-      );
-      const message = errors.join('');
-      assert.match(message, /docs lint failed: docs\/guide\.md/);
-      assert.match(message, /public install examples/);
-      assert.match(message, /superseded toolchain contract/);
-      assert.match(message, /README\.md/);
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
-    }
+        const errors: string[] = [];
+        assert.equal(
+          runDocsCheck(root, {
+            stdout: () => undefined,
+            stderr: (text) => errors.push(text),
+          }),
+          1,
+        );
+        const message = errors.join('');
+        assert.match(message, /docs lint failed: docs\/guide\.md/);
+        assert.match(message, /public install examples/);
+        assert.match(message, /superseded toolchain contract/);
+        assert.match(message, /README\.md/);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
   });
 
   it('preserves the original git diagnostic when tracked files cannot be listed', () => {
-    const root = docsFixture();
-    try {
-      fs.rmSync(path.join(root, '.git'), { recursive: true, force: true });
-      assert.throws(
-        () => checkDocs(root),
-        /unable to list tracked files via git: .*fatal: not a git repository/is,
-      );
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
-    }
+    withGitFixtureEnvironment(() => {
+      const root = docsFixture();
+      try {
+        fs.rmSync(path.join(root, '.git'), { recursive: true, force: true });
+        assert.throws(
+          () => checkDocs(root),
+          /unable to list tracked files via git: .*fatal: not a git repository/is,
+        );
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
   });
 });
