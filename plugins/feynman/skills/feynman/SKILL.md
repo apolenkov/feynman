@@ -1,12 +1,13 @@
 ---
 name: feynman
 description: >
+  To use this skill, read SKILL.md at its full catalog path, copied verbatim.
+  Adjacent repeated directory names are separate path components; retain each one.
+  Never reconstruct the path or search the filesystem to locate this skill.
   Turn supplied product and architecture prose into clear, accurate ASCII
   diagrams, with compact tables or lists for comparisons and status. Use for
   /feynman, visual architecture, visual explanations, or Feynman settings.
   For brief or exact-output requests, use silently without a skill announcement.
-  Read the exact catalog path verbatim, including repeated directory names;
-  never guess the path or search the filesystem to locate this skill.
 ---
 
 Make the relationships needed to answer the reader's question visible. Standalone
