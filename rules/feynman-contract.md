@@ -3,7 +3,7 @@
 | structure | visual |
 |---|---|
 | sequence / sequence-msg | ASCII flow / labeled message |
-| hierarchy >=3 | indented tree |
+| hierarchy >=3 | ASCII tree (+--) |
 | branching | labeled ASCII branches |
 | comparison / 2-col compare | md table |
 | status / priority | labeled list / ▲▼ scale |
@@ -25,7 +25,7 @@ Check edges/attrs+width vs facts; fix omissions/invention/direction/AND-OR/ident
 |---|---|
 | sequence / sequence-msg | ASCII flow / labeled message |
 | activity-flow | labeled ASCII flow |
-| hierarchy >=3 | indented tree |
+| hierarchy >=3 | ASCII tree (+--) |
 | branching | labeled ASCII branches |
 | comparison / 2-col compare | md table |
 | status / priority | labeled list / ▲▼ scale |
@@ -48,7 +48,7 @@ Check edges/attrs+width vs facts; fix omissions/invention/direction/AND-OR/ident
 |---|---|
 | sequence / sequence-msg | ASCII flow / labeled message |
 | activity-flow | labeled ASCII flow |
-| hierarchy >=2 | indented tree |
+| hierarchy >=2 | ASCII tree (+--) |
 | branching | labeled ASCII branches |
 | comparison / 2-col compare | md table |
 | status / priority | md table / ▲▼ scale |
