@@ -14,6 +14,14 @@ npm run ci
 Use Node.js 22.18 or newer. The working tree must be clean before the version
 bump.
 
+Native integration checks also need Codex CLI 0.153.3 on `PATH`. The CI,
+release-rehearsal and publishing jobs install that exact version before the
+complete gate; update all three pins together after compatibility validation.
+With `CI=true`, a missing or unresponsive app-server fails the native tests.
+A local run without Codex may skip them, which is incomplete acceptance;
+inspect the test summary and require zero skips before release. These tests
+use temporary homes and do not require a successful model request.
+
 ## Package reproducibility
 
 Run the package check after `npm ci` and before publishing:

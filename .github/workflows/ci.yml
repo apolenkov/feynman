@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install pinned Codex CLI for native tests
+        run: npm install --global --ignore-scripts @openai/codex@0.153.3
+
       - name: Run the complete local gate
         run: npm run ci
 

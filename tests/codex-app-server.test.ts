@@ -44,23 +44,16 @@ function codexAppServerAvailable(): boolean {
 
 /**
  * Probe whether a codex app-server process can actually start and respond to
- * an `initialize` RPC within `timeoutMs`.  Returns true only when a live
- * server is reachable — binary presence alone is not sufficient.
+ * an `initialize` RPC within the client's bounded request timeout. Binary
+ * presence alone is not sufficient; slow startup must not silently skip CI.
  */
-async function codexAppServerReachable(timeoutMs = 800): Promise<boolean> {
+async function codexAppServerReachable(): Promise<boolean> {
   if (!codexAppServerAvailable()) return false;
   const tmpHome = makeTempHome();
   const client = new CodexAppServerClient(tmpHome);
   try {
     client.start();
-    await Promise.race([
-      client.initialize(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => {
-          reject(new Error('probe timeout'));
-        }, timeoutMs),
-      ),
-    ]);
+    await client.initialize();
     return true;
   } catch {
     return false;
@@ -352,6 +345,7 @@ function hookList(value: unknown): ListedHook[] {
 describe('Codex app-server hook visibility contract', () => {
   it('installs the native marketplace plugin and discovers its skill without CLI bootstrap', async (t) => {
     if (!(await codexAppServerReachable())) {
+      assert.notEqual(process.env['CI'], 'true', 'A responsive Codex app-server is required in CI');
       t.skip('codex app-server unavailable; native discovery is unverified');
       return;
     }
@@ -416,6 +410,7 @@ describe('Codex app-server hook visibility contract', () => {
 
   it('exposes Feynman SessionStart output as hook context entries', async (t) => {
     if (!(await codexAppServerReachable())) {
+      assert.notEqual(process.env['CI'], 'true', 'A responsive Codex app-server is required in CI');
       t.skip('codex app-server did not respond within probe timeout — server unavailable');
       return;
     }
