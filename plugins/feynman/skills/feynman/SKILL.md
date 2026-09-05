@@ -29,19 +29,19 @@ Use an undirected line or an explicit relationship row when direction is absent.
 
 Choose layout from topology and available width:
 
-- Use a chain only for one path. Use a tree only for a real hierarchy whose
-  child identities are not shared across parents.
+- Keep a chain for one unambiguous path. Use a tree only for a real hierarchy
+  whose child identities are not shared across parents.
 - Use a Markdown table for a non-explicit comparison and a compact labeled list
   for status or priority.
-- For branches, put each condition beside its edge and mark `AND` or `OR` where
-  that distinction matters.
-- For shared nodes, diamonds, and cycles, use a graph or grouped explicit edge
-  rows. Reuse the same node or alias, and connect every member directly to a
-  shared hub.
-- Assume 80 display columns unless the user gives a width. Draw horizontally
-  only when all labels and edges remain readable. Otherwise use a vertical
-  layout or short aliases plus a legend containing every full name. Never
-  truncate a name or label.
+- For branches, joins, shared nodes, diamonds, and cycles, use grouped
+  explicit edge rows. Each row names both endpoints and keeps its relation,
+  condition, and relevant `AND` / `OR` beside that edge. Reuse the same node or
+  alias, and connect every member directly to a shared hub.
+- Do not hand-route diagonal or slanted wires or make the reader guess which
+  endpoints a junction connects.
+- Aim for at most 60 display columns and never exceed 80 or the user's narrower
+  width. Go vertical when needed. For long names, use short aliases plus a
+  legend containing every full name. Never truncate a name or label.
 
 Render ASCII in a fenced code block. Keep every relationship label or condition
 adjacent to its actual edge, with the source's relation name and direction.
@@ -51,23 +51,23 @@ clear; do not merge connectors in a way that makes their endpoints ambiguous.
 Useful compact patterns:
 
 ```text
-[Route] selects one branch (OR):
-  |-- if cached --> [Cache]
-  `-- otherwise --> [Origin]
+[Source] -- if condition (OR) --> [Branch A]
+[Source] -- otherwise (OR) -----> [Branch B]
 
-[Deploy] -- requires (AND) --> [Tests pass]
-[Deploy] -- requires (AND) --> [Approval]
+[Action] -- requires (AND) --> [Condition A]
+[Action] -- requires (AND) --> [Condition B]
 
-[Writer] -- writes --> [Store]
-[Reader] -- reads ---> [Store]
+[Member A] -- writes --> [Hub]
+[Member B] -- reads ---> [Hub]
 ```
 
 Work silently and show only the verified final visual, never a discarded draft.
-Before answering, read the actual diagram back edge by edge and compare it with
-the extracted facts. Fix every omitted or invented edge, reversed direction,
-detached condition, lost `AND`/`OR`, and ambiguous or duplicated identity before
-answering. Check nearby prose against the same facts, especially `only`, `all`,
-`none`, and `cannot`.
+Before answering, measure the widest rendered row and reflow if it exceeds the
+target or cap. Then read the actual final diagram back edge by edge and compare
+it with the extracted facts. Fix every omitted or invented edge, reversed
+direction, detached condition, lost `AND`/`OR`, and ambiguous or duplicated
+identity before answering. Check nearby prose against the same facts, especially
+`only`, `all`, `none`, and `cannot`.
 
 Use one primary visual by default and only enough prose to interpret it. An
 explicit ASCII-diagram request overrides automatic suppression and output-style

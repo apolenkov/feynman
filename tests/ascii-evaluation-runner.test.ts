@@ -33,6 +33,7 @@ interface FakeTransport {
   readonly execCalls: () => number;
   readonly trustCalls: () => number;
   readonly callOrder: readonly string[];
+  readonly extractedTarballs: readonly string[];
 }
 
 const ok = (stdout = ''): EvaluationCommandResult => ({
@@ -278,25 +279,44 @@ function modelEvents(
     commandOutput?: string;
     commandExitCode?: number;
     commandStatus?: string;
+    additionalCommandExecutions?: readonly Readonly<{
+      command: string;
+      aggregatedOutput: string;
+      exitCode: number;
+      status: string;
+    }>[];
+    additionalItems?: readonly Readonly<Record<string, unknown>>[];
+    additionalStartedItems?: readonly Readonly<Record<string, unknown>>[];
     hook?: boolean;
   }> = {},
 ): string {
-  const records: unknown[] = [
-    ...(options.hook === true ? [{ type: 'hook_started' }, { type: 'hook_completed' }] : []),
+  const commandExecutions = [
     ...(options.command === undefined
       ? []
       : [
           {
-            type: 'item.completed',
-            item: {
-              type: 'command_execution',
-              command: options.command,
-              aggregated_output: options.commandOutput ?? '',
-              exit_code: options.commandExitCode ?? 0,
-              status: options.commandStatus ?? 'completed',
-            },
+            command: options.command,
+            aggregatedOutput: options.commandOutput ?? '',
+            exitCode: options.commandExitCode ?? 0,
+            status: options.commandStatus ?? 'completed',
           },
         ]),
+    ...(options.additionalCommandExecutions ?? []),
+  ];
+  const records: unknown[] = [
+    ...(options.hook === true ? [{ type: 'hook_started' }, { type: 'hook_completed' }] : []),
+    ...(options.additionalStartedItems ?? []).map((item) => ({ type: 'item.started', item })),
+    ...commandExecutions.map((execution) => ({
+      type: 'item.completed',
+      item: {
+        type: 'command_execution',
+        command: execution.command,
+        aggregated_output: execution.aggregatedOutput,
+        exit_code: execution.exitCode,
+        status: execution.status,
+      },
+    })),
+    ...(options.additionalItems ?? []).map((item) => ({ type: 'item.completed', item })),
     { type: 'item.completed', item: { type: 'agent_message', text: 'answer' } },
     { type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 2 } },
   ];
@@ -314,10 +334,18 @@ function fakeTransport(
     settingFailureAfterCalls?: number;
     completionWriteFailure?: boolean;
     hookCaptureFailure?: boolean;
+    relativeSkillRead?: boolean;
+    originalAbsoluteSkillRead?: boolean;
+    wrongRelativeSkillRead?: boolean;
+    partialSkillRead?: boolean;
+    computationCommand?: boolean;
+    mutationCommand?: boolean;
+    unknownToolItem?: boolean;
   }> = {},
 ): FakeTransport {
   const prompts: string[] = [];
   const callOrder: string[] = [];
+  const extractedTarballs: string[] = [];
   let modelCalls = 0;
   let trustCalls = 0;
   const runner: EvaluationCommandRunner = (command, args, commandOptions) => {
@@ -330,6 +358,9 @@ function fakeTransport(
     }
     if (command === 'npm') return ok('package command complete\n');
     if (command === 'tar') {
+      const tarball = args[1];
+      assert.ok(typeof tarball === 'string');
+      extractedTarballs.push(tarball);
       const destinationIndex = args.indexOf('-C') + 1;
       const destination = args[destinationIndex];
       assert.ok(typeof destination === 'string');
@@ -424,17 +455,64 @@ function fakeTransport(
       if (options.completionWriteFailure === true) {
         fs.mkdirSync(path.join(fx.output, 'completion.json'), { recursive: true });
       }
+      const nativeModelEvent = (() => {
+        if (!isNative) return {};
+        let commandSkillPath = fs.realpathSync(installedSkill);
+        if (options.wrongRelativeSkillRead === true) {
+          commandSkillPath = '.codex/plugins/cache/feynman/feynman/2.0.0/skills/other/SKILL.md';
+        } else if (options.originalAbsoluteSkillRead === true) {
+          const commandCwd = commandOptions.cwd ?? '';
+          commandSkillPath = path.resolve(
+            commandCwd,
+            path.relative(fs.realpathSync(commandCwd), fs.realpathSync(installedSkill)),
+          );
+        } else if (options.relativeSkillRead === true) {
+          commandSkillPath = path.relative(
+            fs.realpathSync(commandOptions.cwd ?? ''),
+            fs.realpathSync(installedSkill),
+          );
+        }
+        return {
+          command: `sed -n 1,220p ${commandSkillPath}`,
+          commandOutput:
+            options.failedSkillRead === true
+              ? ''
+              : options.partialSkillRead === true
+                ? fs.readFileSync(installedSkill, 'utf8').slice(0, -1)
+                : fs.readFileSync(installedSkill, 'utf8'),
+          commandExitCode: options.failedSkillRead === true ? 1 : 0,
+          commandStatus: options.failedSkillRead === true ? 'failed' : 'completed',
+        };
+      })();
       return ok(
         modelEvents({
-          ...(isNative
-            ? {
-                command: `sed -n 1,220p ${fs.realpathSync(installedSkill)}`,
-                commandOutput:
-                  options.failedSkillRead === true ? '' : fs.readFileSync(installedSkill, 'utf8'),
-                commandExitCode: options.failedSkillRead === true ? 1 : 0,
-                commandStatus: options.failedSkillRead === true ? 'failed' : 'completed',
-              }
-            : {}),
+          ...nativeModelEvent,
+          additionalCommandExecutions: [
+            ...(options.computationCommand === true
+              ? [
+                  {
+                    command: "python3 -c 'print(46)'",
+                    aggregatedOutput: '46\n',
+                    exitCode: 0,
+                    status: 'completed',
+                  },
+                ]
+              : []),
+            ...(options.mutationCommand === true
+              ? [
+                  {
+                    command: 'npx @albinocrabs/feynman install',
+                    aggregatedOutput: 'installed\n',
+                    exitCode: 0,
+                    status: 'completed',
+                  },
+                ]
+              : []),
+          ],
+          additionalStartedItems:
+            options.unknownToolItem === true
+              ? [{ type: 'web_search', id: 'synthetic-search' }]
+              : [],
           hook: isHook,
         }),
       );
@@ -559,6 +637,7 @@ function fakeTransport(
     execCalls: () => modelCalls,
     trustCalls: () => trustCalls,
     callOrder,
+    extractedTarballs,
   };
 }
 
@@ -654,6 +733,32 @@ describe('ASCII evaluation runner', () => {
     );
   });
 
+  it('freezes the verified tarball bytes before extraction', async () => {
+    const fx = fixture();
+    const transport = fakeTransport(fx);
+    const builtTarball = path.join(fx.root, 'dist', 'feynman-fixture.tgz');
+    const builtBytes = fs.readFileSync(builtTarball);
+    try {
+      await run(fx, transport, { taskIds: ['A01'], arms: ['native'] });
+      const frozenTarball = path.join(fx.output, 'candidate-package.tgz');
+      assert.equal(fs.readFileSync(frozenTarball).equals(builtBytes), true);
+      assert.equal(fs.statSync(frozenTarball).mode & 0o777, 0o400);
+      assert.deepEqual(transport.extractedTarballs, [frozenTarball]);
+      const manifest: unknown = JSON.parse(
+        fs.readFileSync(path.join(fx.output, 'manifest.json'), 'utf8'),
+      );
+      assert.ok(isRecord(manifest));
+      assert.equal(
+        manifest['packageTarballHash'],
+        createHash('sha256').update(builtBytes).digest('hex'),
+      );
+      fs.writeFileSync(builtTarball, 'later build bytes\n');
+      assert.equal(fs.readFileSync(frozenTarball).equals(builtBytes), true);
+    } finally {
+      fx.dispose();
+    }
+  });
+
   it('never sends evaluator gold and freezes explicit versus automatic native activation', async () => {
     const fx = fixture();
     const transport = fakeTransport(fx);
@@ -726,7 +831,10 @@ describe('ASCII evaluation runner', () => {
       assert.equal(manifest['fullGenerationComplete'], true);
       assert.equal(manifest['acceptanceComplete'], false);
       assert.equal(manifest['eligibleForReview'], true);
-      assert.deepEqual(manifest['acceptanceEvidence'], { externalBlindReview: 'missing' });
+      assert.deepEqual(manifest['acceptanceEvidence'], {
+        externalBlindReview: 'missing',
+        externalToolReview: 'missing',
+      });
     } finally {
       fx.dispose();
     }
@@ -793,6 +901,177 @@ describe('ASCII evaluation runner', () => {
       assert.equal(execution['exitCode'], 1);
       assert.equal(execution['status'], 'failed');
       assert.equal(fs.readdirSync(fx.temporaryRoot).length, 0);
+    } finally {
+      fx.dispose();
+    }
+  });
+
+  it('rejects a partial native skill read as activation proof', async () => {
+    const fx = fixture();
+    const transport = fakeTransport(fx, { partialSkillRead: true });
+    try {
+      await assert.rejects(
+        run(fx, transport, { taskIds: ['A01'], arms: ['native'] }),
+        /Model attempt A01-native failed/,
+      );
+      const result: unknown = JSON.parse(
+        fs.readFileSync(path.join(fx.output, 'A01-native.json'), 'utf8'),
+      );
+      assert.ok(isRecord(result));
+      assert.equal(result['nativeSkillRead'], false);
+      assert.equal(result['success'], false);
+      assert.equal(result['externalToolReview'], 'missing');
+      assert.equal(result['noUnexpectedTools'], false);
+    } finally {
+      fx.dispose();
+    }
+  });
+
+  it('completes generation after an exact native skill read plus a computation', async () => {
+    const fx = fixture();
+    const transport = fakeTransport(fx, { computationCommand: true });
+    try {
+      await run(fx, transport, { taskIds: ['A13'], arms: ['native'] });
+      const result: unknown = JSON.parse(
+        fs.readFileSync(path.join(fx.output, 'A13-native.json'), 'utf8'),
+      );
+      assert.ok(isRecord(result));
+      assert.equal(result['nativeSkillRead'], true);
+      assert.equal(result['success'], true);
+      assert.equal(result['noUnexpectedTools'], false);
+      assert.equal(result['externalToolReview'], 'missing');
+      assert.equal(result['toolActivityEventsFile'], 'A13-native.events.jsonl');
+      assert.deepEqual(result['toolActivityItemTypes'], ['command_execution', 'command_execution']);
+      const executions = result['commandExecutions'];
+      assert.ok(Array.isArray(executions));
+      assert.equal(executions.length, 2);
+      assert.ok(isRecord(executions[1]));
+      assert.equal(executions[1]['command'], "python3 -c 'print(46)'");
+      assert.equal(executions[1]['aggregatedOutput'], '46\n');
+      assert.equal(executions[1]['status'], 'completed');
+      const manifest: unknown = JSON.parse(
+        fs.readFileSync(path.join(fx.output, 'manifest.json'), 'utf8'),
+      );
+      assert.ok(isRecord(manifest));
+      assert.equal(manifest['generationComplete'], true);
+      assert.equal(manifest['acceptanceComplete'], false);
+      assert.deepEqual(manifest['acceptanceEvidence'], {
+        externalBlindReview: 'missing',
+        externalToolReview: 'missing',
+      });
+    } finally {
+      fx.dispose();
+    }
+  });
+
+  it('keeps baseline and hook generations complete when extra commands await review', async () => {
+    for (const arm of ['baseline', 'hook'] as const) {
+      const fx = fixture();
+      const transport = fakeTransport(fx, { computationCommand: true });
+      try {
+        await run(fx, transport, { taskIds: ['A03'], arms: [arm] });
+        const result: unknown = JSON.parse(
+          fs.readFileSync(path.join(fx.output, `A03-${arm}.json`), 'utf8'),
+        );
+        assert.ok(isRecord(result));
+        assert.equal(result['success'], true);
+        assert.equal(result['noUnexpectedTools'], false);
+        assert.equal(result['externalToolReview'], 'missing');
+        if (arm === 'hook') assert.equal(result['hookEmissionProven'], true);
+        const manifest: unknown = JSON.parse(
+          fs.readFileSync(path.join(fx.output, 'manifest.json'), 'utf8'),
+        );
+        assert.ok(isRecord(manifest));
+        assert.equal(manifest['generationComplete'], true);
+        assert.equal(manifest['acceptanceComplete'], false);
+      } finally {
+        fx.dispose();
+      }
+    }
+  });
+
+  it('retains mutation attempts and unknown tool activity as unapproved review evidence', async () => {
+    const fx = fixture();
+    const transport = fakeTransport(fx, { mutationCommand: true, unknownToolItem: true });
+    try {
+      await run(fx, transport, { taskIds: ['A03'], arms: ['native'] });
+      const result: unknown = JSON.parse(
+        fs.readFileSync(path.join(fx.output, 'A03-native.json'), 'utf8'),
+      );
+      assert.ok(isRecord(result));
+      assert.equal(result['nativeSkillRead'], true);
+      assert.equal(result['success'], true);
+      assert.equal(result['noUnexpectedTools'], false);
+      assert.equal(result['externalToolReview'], 'missing');
+      assert.deepEqual(result['toolActivityItemTypes'], [
+        'web_search',
+        'command_execution',
+        'command_execution',
+      ]);
+      const executions = result['commandExecutions'];
+      assert.ok(Array.isArray(executions));
+      assert.equal(executions.length, 2);
+      assert.ok(isRecord(executions[1]));
+      assert.equal(executions[1]['command'], 'npx @albinocrabs/feynman install');
+      const manifest: unknown = JSON.parse(
+        fs.readFileSync(path.join(fx.output, 'manifest.json'), 'utf8'),
+      );
+      assert.ok(isRecord(manifest));
+      assert.equal(manifest['generationComplete'], true);
+      assert.equal(manifest['acceptanceComplete'], false);
+      assert.equal(fs.existsSync(path.join(fx.output, 'completion.json')), true);
+    } finally {
+      fx.dispose();
+    }
+  });
+
+  it('accepts a complete installed skill read through its cwd-relative path', async () => {
+    const fx = fixture();
+    const transport = fakeTransport(fx, { relativeSkillRead: true });
+    try {
+      await run(fx, transport, { taskIds: ['A03'], arms: ['native'] });
+      const result: unknown = JSON.parse(
+        fs.readFileSync(path.join(fx.output, 'A03-native.json'), 'utf8'),
+      );
+      assert.ok(isRecord(result));
+      assert.equal(result['nativeSkillRead'], true);
+      assert.equal(result['success'], true);
+      assert.match(String(result['commands']), /^sed .* \.codex\/plugins\/cache\//u);
+    } finally {
+      fx.dispose();
+    }
+  });
+
+  it('accepts the original absolute cwd spelling of the installed skill path', async () => {
+    const fx = fixture();
+    const transport = fakeTransport(fx, { originalAbsoluteSkillRead: true });
+    try {
+      await run(fx, transport, { taskIds: ['A03'], arms: ['native'] });
+      const result: unknown = JSON.parse(
+        fs.readFileSync(path.join(fx.output, 'A03-native.json'), 'utf8'),
+      );
+      assert.ok(isRecord(result));
+      assert.equal(result['nativeSkillRead'], true);
+      assert.equal(result['success'], true);
+    } finally {
+      fx.dispose();
+    }
+  });
+
+  it('rejects an exact skill payload read from a different relative path', async () => {
+    const fx = fixture();
+    const transport = fakeTransport(fx, { wrongRelativeSkillRead: true });
+    try {
+      await assert.rejects(
+        run(fx, transport, { taskIds: ['A03'], arms: ['native'] }),
+        /Model attempt A03-native failed/,
+      );
+      const result: unknown = JSON.parse(
+        fs.readFileSync(path.join(fx.output, 'A03-native.json'), 'utf8'),
+      );
+      assert.ok(isRecord(result));
+      assert.equal(result['nativeSkillRead'], false);
+      assert.equal(result['success'], false);
     } finally {
       fx.dispose();
     }
