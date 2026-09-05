@@ -33,6 +33,9 @@ Before drawing, extract:
 
 Preserve the source's actor, action, target, direction, and qualifiers. Ordering
 does not imply causation. Never guess a direction, mechanism, value, or link.
+When the source rules out all other relationships, explicitly preserve that
+absence and its scope. Do not weaken it to only shown, supplied, or known links;
+keep unspecified relationships distinct from explicitly absent relationships.
 Use an undirected line or an explicit relationship row when direction is absent.
 Read an edge literally as its left endpoint, verb, then right endpoint. A
 dependency uses `[Dependent] -- requires success of --> [Prerequisite]`;
