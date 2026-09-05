@@ -431,6 +431,7 @@ function createIsolatedHome(
   temporaryRoot: string,
   authSource: string,
   environment: Readonly<NodeJS.ProcessEnv>,
+  removeTemporaryHome: (home: string) => void,
 ): IsolatedHome {
   const home = fs.mkdtempSync(path.join(temporaryRoot, `feynman-ascii-${arm}-`));
   try {
@@ -446,8 +447,13 @@ function createIsolatedHome(
       environment: isolatedEnvironment(environment, home, codexHome),
     };
   } catch (error) {
-    fs.rmSync(home, { recursive: true, force: true });
-    throw error instanceof Error ? error : new Error(errorMessage(error));
+    const primaryError = error instanceof Error ? error : new Error(errorMessage(error));
+    try {
+      removeTemporaryHome(home);
+    } catch (cleanupError) {
+      throw combinedError(primaryError, cleanupError, 'Additional cleanup failure');
+    }
+    throw primaryError;
   }
 }
 
@@ -1612,15 +1618,30 @@ function createSelectedHomes(
   temporaryRoot: string,
   authSource: string,
   environment: Readonly<NodeJS.ProcessEnv>,
+  removeTemporaryHome: (home: string) => void,
 ): readonly IsolatedHome[] {
   const [arm, ...remaining] = arms;
   if (arm === undefined) return [];
-  const home = createIsolatedHome(arm, temporaryRoot, authSource, environment);
+  const home = createIsolatedHome(arm, temporaryRoot, authSource, environment, removeTemporaryHome);
   try {
-    return [home, ...createSelectedHomes(remaining, temporaryRoot, authSource, environment)];
+    return [
+      home,
+      ...createSelectedHomes(
+        remaining,
+        temporaryRoot,
+        authSource,
+        environment,
+        removeTemporaryHome,
+      ),
+    ];
   } catch (error) {
-    fs.rmSync(home.home, { recursive: true, force: true });
-    throw error instanceof Error ? error : new Error(errorMessage(error));
+    const primaryError = error instanceof Error ? error : new Error(errorMessage(error));
+    try {
+      removeTemporaryHome(home.home);
+    } catch (cleanupError) {
+      throw combinedError(primaryError, cleanupError, 'Additional cleanup failure');
+    }
+    throw primaryError;
   }
 }
 
@@ -2102,7 +2123,13 @@ export async function runAsciiEvaluation(options: Readonly<AsciiEvaluationOption
   const selectedArms = (['baseline', 'native', 'hook'] as const).filter((arm) =>
     selectedCalls.some((call) => call.arm === arm),
   );
-  const homes = createSelectedHomes(selectedArms, temporaryRoot, authSource, environment);
+  const homes = createSelectedHomes(
+    selectedArms,
+    temporaryRoot,
+    authSource,
+    environment,
+    removeTemporaryHome,
+  );
   let terminalError: Error | null = null;
   try {
     let outcome: ExecutionResult;

@@ -877,6 +877,85 @@ describe('ASCII evaluation runner', () => {
     }
   });
 
+  it('preserves an auth setup failure when early home cleanup also fails', async (t) => {
+    const fx = fixture();
+    const transport = fakeTransport(fx);
+    const copyFailure = new Error('PRIMARY_AUTH_COPY_FAILURE');
+    const copyMock = t.mock.method(fs, 'copyFileSync', () => {
+      throw copyFailure;
+    });
+    try {
+      await assert.rejects(
+        run(fx, transport, {
+          taskIds: ['A01'],
+          arms: ['baseline'],
+          removeTemporaryHome: () => {
+            throw new Error('SECONDARY_EARLY_CLEANUP_FAILURE');
+          },
+        }),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /PRIMARY_AUTH_COPY_FAILURE/);
+          assert.match(error.message, /SECONDARY_EARLY_CLEANUP_FAILURE/);
+          assert.equal(error.cause, copyFailure);
+          return true;
+        },
+      );
+      assert.equal(transport.execCalls(), 0);
+    } finally {
+      copyMock.mock.restore();
+      fx.dispose();
+    }
+  });
+
+  it('attempts every earlier home cleanup and preserves all recursive creation errors', async (t) => {
+    const fx = fixture();
+    const transport = fakeTransport(fx);
+    const originalCopyFileSync = fs.copyFileSync.bind(fs);
+    const primaryFailure = new Error('PRIMARY_LATER_HOME_CREATION_FAILURE');
+    const cleanupAttempts: string[] = [];
+    const copyMock = t.mock.method(
+      fs,
+      'copyFileSync',
+      (source: fs.PathLike, destination: fs.PathLike, mode?: number) => {
+        if (String(destination).includes(`${path.sep}feynman-ascii-native-`)) {
+          throw primaryFailure;
+        }
+        originalCopyFileSync(source, destination, mode);
+      },
+    );
+    try {
+      await assert.rejects(
+        run(fx, transport, {
+          taskIds: ['A01'],
+          arms: ['baseline', 'native'],
+          removeTemporaryHome: (home) => {
+            cleanupAttempts.push(home);
+            const arm = home.includes('native') ? 'NATIVE' : 'BASELINE';
+            throw new Error(`SECONDARY_${arm}_CLEANUP_FAILURE`);
+          },
+        }),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /PRIMARY_LATER_HOME_CREATION_FAILURE/);
+          assert.match(error.message, /SECONDARY_NATIVE_CLEANUP_FAILURE/);
+          assert.match(error.message, /SECONDARY_BASELINE_CLEANUP_FAILURE/);
+          assert.ok(error.cause instanceof Error);
+          assert.ok(error.cause.cause instanceof Error);
+          assert.equal(error.cause.cause, primaryFailure);
+          return true;
+        },
+      );
+      assert.equal(transport.execCalls(), 0);
+      assert.equal(cleanupAttempts.length, 2);
+      assert.match(cleanupAttempts[0] ?? '', /feynman-ascii-native-/);
+      assert.match(cleanupAttempts[1] ?? '', /feynman-ascii-baseline-/);
+    } finally {
+      copyMock.mock.restore();
+      fx.dispose();
+    }
+  });
+
   it('rejects a failed native skill read as activation proof', async () => {
     const fx = fixture();
     const transport = fakeTransport(fx, { failedSkillRead: true });

@@ -4,11 +4,15 @@ description: >
   Turn supplied product and architecture prose into clear, accurate ASCII
   diagrams, with compact tables or lists for comparisons and status. Use for
   /feynman, visual architecture, visual explanations, or Feynman settings.
+  For brief or exact-output requests, use silently without a skill announcement.
 ---
 
 Make the relationships needed to answer the reader's question visible. Standalone
 explanations work from these instructions alone: do not run the CLI, use the
 network, or read or change local preferences.
+Respect the requested length and format across every visible message, including
+before a tool call. Brief replies, greetings and exact-output requests need no
+announcement of skill use or working process.
 
 ## Build the explanation
 
@@ -26,6 +30,15 @@ Before drawing, extract:
 Preserve the source's actor, action, target, direction, and qualifiers. Ordering
 does not imply causation. Never guess a direction, mechanism, value, or link.
 Use an undirected line or an explicit relationship row when direction is absent.
+Read an edge literally as its left endpoint, verb, then right endpoint. A
+dependency uses `[Dependent] -- requires success of --> [Prerequisite]`;
+do not reverse those endpoints while keeping the verb `requires`.
+
+Every positive fact must appear as a labeled edge, node attribute, table cell,
+or actual containment in the visual. This includes initial location and parallel
+execution, not just the main route. A prose sentence inside a fence is still
+prose; it cannot replace a missing visual relationship. Negative facts and
+uncertainty may use concise local notes.
 
 Choose layout from topology and available width:
 
@@ -33,10 +46,12 @@ Choose layout from topology and available width:
   whose child identities are not shared across parents.
 - Use a Markdown table for a non-explicit comparison and a compact labeled list
   for status or priority.
-- For branches, joins, shared nodes, diamonds, and cycles, use grouped
-  explicit edge rows. Each row names both endpoints and keeps its relation,
+- For branches, joins, shared nodes, diamonds, cycles and disconnected groups,
+  use grouped explicit edge rows. Each row names both endpoints and keeps its relation,
   condition, and relevant `AND` / `OR` beside that edge. Reuse the same node or
   alias, and connect every member directly to a shared hub.
+- Distinguish scoped identities in node names, such as `[East/API]` and
+  `[West/API]`. Use headings and space to group them, without decorative frames.
 - Do not hand-route diagonal or slanted wires or make the reader guess which
   endpoints a junction connects.
 - Aim for at most 60 display columns and never exceed 80 or the user's narrower
@@ -56,6 +71,10 @@ Useful compact patterns:
 
 [Action] -- requires (AND) --> [Condition A]
 [Action] -- requires (AND) --> [Condition B]
+
+[Item] -- begins at --> [Entry]
+[Job A] -- may run in parallel with -- [Job B]
+[Job B] -- requires success of --> [Input]
 
 [Member A] -- writes --> [Hub]
 [Member B] -- reads ---> [Hub]
