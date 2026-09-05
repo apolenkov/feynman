@@ -363,21 +363,79 @@ describe('L04 column widths — unit tests', () => {
 // ---------------------------------------------------------------------------
 describe('L05 flow integrity — unit tests', () => {
   it('connected boxes pass', () => {
-    const md = '```\n[A] --> [B]\n```';
-    const result = lint(md);
-    assert.equal(result.issues.filter((i) => i.rule === 'L05').length, 0);
+    for (const connector of ['->', '<-', '-->', '<--', '<->', '<-->', '→', '←', '↔', '─→', '──>']) {
+      const result = lint(`\`\`\`\n[A] ${connector} [B]\n\`\`\``);
+      assert.equal(
+        result.issues.filter((i) => i.rule === 'L05').length,
+        0,
+        `${connector} must count as a directed connection`,
+      );
+    }
   });
 
-  it('two boxes no arrow flagged', () => {
+  it('undirected connection between bracketed nodes passes', () => {
+    for (const connector of ['--', '----', '-- connects --', '-- shares bus --']) {
+      const result = lint(`\`\`\`\n[Auth] ${connector} [Bus]\n\`\`\``);
+      assert.equal(
+        result.issues.filter((i) => i.rule === 'L05').length,
+        0,
+        `${connector} must count as an undirected connection`,
+      );
+    }
+  });
+
+  it('bounded labels preserve direction and conditions', () => {
+    for (const connector of [
+      '-- sends -->',
+      '--request-->',
+      '<-- sends --',
+      '<--response--',
+      '<-- synchronizes -->',
+      '<--sync-->',
+      '--shares--',
+      '-- load > 8 -->',
+      '-- threshold <8 -->',
+      '---- sends ---->',
+    ]) {
+      const result = lint(`\`\`\`\n[A] ${connector} [B]\n\`\`\``);
+      assert.equal(
+        result.issues.filter((issue) => issue.rule === 'L05').length,
+        0,
+        `${connector} must count as one complete labeled connection`,
+      );
+    }
+  });
+
+  it('two boxes without a connection are flagged', () => {
     const md = '```\n[A] [B]\n```';
     const result = lint(md);
     assert.ok(result.issues.filter((i) => i.rule === 'L05').length >= 1);
   });
 
-  it('three boxes no arrows flagged', () => {
+  it('three boxes without connections are flagged', () => {
     const md = '```\n[A] [B] [C]\n```';
     const result = lint(md);
     assert.ok(result.issues.filter((i) => i.rule === 'L05').length >= 1);
+  });
+
+  it('malformed arrow-like connections remain flagged without directional advice', () => {
+    for (const connector of [
+      '-',
+      '-- >',
+      'connects to',
+      '-> <-',
+      '-- -> <- --',
+      'label mentions -> symbol',
+      '-- label mentions -> symbol --',
+      'prefix -->',
+      '--> suffix',
+      '-- sends --> trailing',
+    ]) {
+      const result = lint(`\`\`\`\n[A] ${connector} [B]\n\`\`\``);
+      const l05 = result.issues.filter((issue) => issue.rule === 'L05');
+      assert.equal(l05.length, 1, `${connector} must not count as a connection`);
+      assert.match(l05[0]?.suggestion ?? '', /Add a connection/);
+    }
   });
 
   it('parallel layout (wide spacing) not flagged', () => {
@@ -386,6 +444,16 @@ describe('L05 flow integrity — unit tests', () => {
     const result = lint(md);
     // Parallel layout uses 3+ spaces gap — should not be flagged
     assert.equal(result.issues.filter((i) => i.rule === 'L05').length, 0);
+  });
+
+  it('a separate branch connector after a wide gap starts a parallel column', () => {
+    const md = '```\n+--> [Adopt]                              +--> [Re-open path]\n```';
+    const result = lint(md);
+    assert.equal(
+      result.issues.filter((issue) => issue.rule === 'L05').length,
+      0,
+      'the second +--> belongs to its own column, not to an Adopt→Re-open edge',
+    );
   });
 
   it('[A] ->> [B] is not flagged (seq arrow recognized by L05)', () => {

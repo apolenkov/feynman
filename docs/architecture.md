@@ -50,6 +50,9 @@ Codex event
 Missing state is bootstrapped; corrupt state is backed up and recovered to a
 default. Disabled state emits nothing, and a stale flag is reconciled. The hook
 never reads prompt or response content.
+Codex also requires trust in the installed hook definition before invocation.
+Registration alone does not establish activation; new or changed definitions
+must be reviewed through `/hooks`.
 
 ## CLI boundary
 
@@ -70,6 +73,21 @@ The native marketplace package under `plugins/feynman/` exposes the Codex
 skill's self-contained visual-explanation instructions. The npm package supplies
 the linter, preferences CLI and compiled hook. The optional hook injects the
 separately maintained Contract; both delivery paths support Codex only.
+
+## Explanation workflow
+
+Both instruction surfaces separate source interpretation from drawing:
+identify the requested scope, extract entities and qualified relationships,
+choose a topology and width that fit, render, then reconstruct each edge from
+the result and compare it with the source. Trees represent hierarchies;
+shared nodes and cycles use explicit graph connections or grouped edge rows.
+This workflow runs in Codex; the hook does not read or transform user content.
+
+There is no prose parser or general graph renderer in the runtime. The linter
+checks finished geometry and notation, including directed and undirected
+connections, but cannot prove source-fact preservation. The
+[ASCII acceptance protocol](../evals/ascii-transformation-protocol.md) therefore
+checks actual model outputs separately from unit tests and package smoke tests.
 
 ## Lint pipeline
 

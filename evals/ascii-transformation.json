@@ -1,0 +1,351 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "id": "A01",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied fact and condition. Use only the supplied facts.",
+      "source": "A parcel begins at Intake. Intake sends fragile parcels to Foam. Intake sends non-fragile parcels to Belt. Foam sends its parcels to North. Belt sends its parcels to South. North and South each unload at Dock.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "A parcel begins at Intake." },
+        { "id": "F2", "text": "Intake sends fragile parcels to Foam." },
+        { "id": "F3", "text": "Intake sends non-fragile parcels to Belt." },
+        { "id": "F4", "text": "Foam sends its parcels to North." },
+        { "id": "F5", "text": "Belt sends its parcels to South." },
+        { "id": "F6", "text": "North unloads its parcels at Dock." },
+        { "id": "F7", "text": "South unloads its parcels at Dock." }
+      ],
+      "questions": [
+        { "question": "Where does Intake send a non-fragile parcel?", "answer": "Belt." },
+        { "question": "Which two stations unload at Dock?", "answer": "North and South." },
+        { "question": "Which station receives parcels directly from Foam?", "answer": "North." }
+      ]
+    },
+    {
+      "id": "A02",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied fact, including prerequisite logic. Use only the supplied facts.",
+      "source": "Build requires Source to succeed. Scan also requires Source to succeed. Release requires both Build and Scan to succeed. Build and Scan may run in parallel. Source has no prerequisite in this workflow. Failed jobs do not enable their successors.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "Build requires Source to succeed." },
+        { "id": "F2", "text": "Scan requires Source to succeed." },
+        { "id": "F3", "text": "Release requires both Build and Scan to succeed." },
+        { "id": "F4", "text": "Build and Scan may run in parallel." },
+        { "id": "F5", "text": "Source has no prerequisite in this workflow." },
+        { "id": "F6", "text": "Failed jobs do not enable their successors." }
+      ],
+      "questions": [
+        {
+          "question": "Can Release begin when Build succeeds but Scan fails?",
+          "answer": "No; both must succeed."
+        },
+        {
+          "question": "Must Scan wait for Build?",
+          "answer": "No; both depend on Source and may run in parallel."
+        },
+        { "question": "What must succeed before Build can begin?", "answer": "Source." }
+      ]
+    },
+    {
+      "id": "A03",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied fact, including alternative and joint prerequisites. Use only the supplied facts.",
+      "source": "Sensor P feeds Mixer R. Sensor Q also feeds Mixer R. Mixer R can produce a signal when either P or Q is online; it does not require both sensors. Archive U receives the signal from R. Delivery to U requires both R and U to be online.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "Sensor P feeds Mixer R." },
+        { "id": "F2", "text": "Sensor Q feeds Mixer R." },
+        {
+          "id": "F3",
+          "text": "Mixer R can produce a signal when either P or Q is online; both sensors are not required."
+        },
+        { "id": "F4", "text": "Archive U receives the signal from R." },
+        { "id": "F5", "text": "Delivery to U requires both R and U to be online." }
+      ],
+      "questions": [
+        { "question": "Can R produce a signal with P offline and Q online?", "answer": "Yes." },
+        { "question": "Can delivery to U occur while U is offline?", "answer": "No." },
+        {
+          "question": "Which component is specified as U's direct signal source?",
+          "answer": "Mixer R."
+        }
+      ]
+    },
+    {
+      "id": "A04",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied fact and every limit on what is known. Use only the supplied facts.",
+      "source": "Auth is connected to one shared Bus. Billing is connected to that same Bus. Notifications is connected to that same Bus. These connections have no specified message direction. No connections between Auth, Billing, and Notifications have been specified.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "Auth is connected to the shared Bus." },
+        { "id": "F2", "text": "Billing is connected to the same shared Bus." },
+        { "id": "F3", "text": "Notifications is connected to the same shared Bus." },
+        { "id": "F4", "text": "The message direction of these connections is unspecified." },
+        {
+          "id": "F5",
+          "text": "Connections between Auth, Billing, and Notifications are unspecified."
+        }
+      ],
+      "questions": [
+        { "question": "How many distinct buses are specified?", "answer": "One." },
+        {
+          "question": "Is Billing known to send messages to Auth?",
+          "answer": "No; neither that connection nor its direction is specified."
+        },
+        {
+          "question": "Which component is Notifications connected to?",
+          "answer": "The shared Bus."
+        }
+      ]
+    },
+    {
+      "id": "A05",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied state, event and transition. Use only the supplied facts.",
+      "source": "The controller starts in Idle. Start moves Idle to Running. Pause moves Running to Paused. Resume moves Paused to Running. Stop moves Running to Idle. A tick in Paused leaves the controller in Paused. These are the only transitions.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "The controller starts in Idle." },
+        { "id": "F2", "text": "Start moves Idle to Running." },
+        { "id": "F3", "text": "Pause moves Running to Paused." },
+        { "id": "F4", "text": "Resume moves Paused to Running." },
+        { "id": "F5", "text": "Stop moves Running to Idle." },
+        { "id": "F6", "text": "A tick in Paused leaves the controller in Paused." },
+        { "id": "F7", "text": "These are the only transitions." }
+      ],
+      "questions": [
+        {
+          "question": "What happens on a tick in Paused?",
+          "answer": "The controller remains Paused."
+        },
+        { "question": "Which event returns Paused to Running?", "answer": "Resume." },
+        { "question": "Is there a specified Stop transition from Paused to Idle?", "answer": "No." }
+      ]
+    },
+    {
+      "id": "A06",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied containment relationship and name. Use only the supplied facts.",
+      "source": "The project root contains src, tests, and docs. The src directory contains main.ts and worker.ts. The tests directory contains worker.test.ts. The docs directory contains usage.md.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "The project root contains src." },
+        { "id": "F2", "text": "The project root contains tests." },
+        { "id": "F3", "text": "The project root contains docs." },
+        { "id": "F4", "text": "src contains main.ts." },
+        { "id": "F5", "text": "src contains worker.ts." },
+        { "id": "F6", "text": "tests contains worker.test.ts." },
+        { "id": "F7", "text": "docs contains usage.md." }
+      ],
+      "questions": [
+        { "question": "What is the full relative path to worker.ts?", "answer": "src/worker.ts." },
+        { "question": "Which directory contains worker.test.ts?", "answer": "tests." },
+        {
+          "question": "Is docs inside src?",
+          "answer": "No; both are directly under the project root."
+        }
+      ]
+    },
+    {
+      "id": "A07",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text comparison. Preserve every supplied property, value and qualification. Use only the supplied facts.",
+      "source": "In this fictional measurement, Alder stores data locally, handles 30 jobs per minute, and has backups enabled. Birch stores data remotely, handles 50 jobs per minute, and has backups disabled. These measurements describe this setup only, not general product limits.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "Alder stores data locally." },
+        { "id": "F2", "text": "Alder handles 30 jobs per minute in this measurement." },
+        { "id": "F3", "text": "Alder has backups enabled." },
+        { "id": "F4", "text": "Birch stores data remotely." },
+        { "id": "F5", "text": "Birch handles 50 jobs per minute in this measurement." },
+        { "id": "F6", "text": "Birch has backups disabled." },
+        {
+          "id": "F7",
+          "text": "These fictional measurements describe this setup only, not general product limits."
+        }
+      ],
+      "questions": [
+        {
+          "question": "Which option stores data locally and has backups enabled?",
+          "answer": "Alder."
+        },
+        { "question": "What rate was measured for Birch?", "answer": "50 jobs per minute." },
+        { "question": "Do these measurements establish general product limits?", "answer": "No." }
+      ]
+    },
+    {
+      "id": "A08",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied dependency and distinguish separate jobs. Use only the supplied facts.",
+      "source": "Cutting enables Polishing. Cutting independently enables Labeling. Polishing enables Packing. Labeling enables Dispatch. There is no dependency between Polishing and Labeling. There is no dependency between Packing and Dispatch. These are the only dependencies among the five jobs.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "Cutting enables Polishing." },
+        { "id": "F2", "text": "Cutting enables Labeling." },
+        { "id": "F3", "text": "Polishing enables Packing." },
+        { "id": "F4", "text": "Labeling enables Dispatch." },
+        { "id": "F5", "text": "There is no dependency between Polishing and Labeling." },
+        { "id": "F6", "text": "There is no dependency between Packing and Dispatch." },
+        { "id": "F7", "text": "These are the only dependencies among the five jobs." }
+      ],
+      "questions": [
+        { "question": "What directly enables Labeling?", "answer": "Cutting." },
+        { "question": "Does Dispatch depend on Polishing?", "answer": "No." },
+        { "question": "What directly enables Packing?", "answer": "Polishing." }
+      ]
+    },
+    {
+      "id": "A09",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied identity and connection. Use only the supplied facts.",
+      "source": "The East site has a service named API and a database named Store. The West site has a different service also named API and a different database also named Store. East's API writes to East's Store. West's API reads from West's Store. There are no connections between the two sites.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "East has its own service named API." },
+        { "id": "F2", "text": "East has its own database named Store." },
+        { "id": "F3", "text": "West has a different service named API." },
+        { "id": "F4", "text": "West has a different database named Store." },
+        { "id": "F5", "text": "East's API writes to East's Store." },
+        { "id": "F6", "text": "West's API reads from West's Store." },
+        { "id": "F7", "text": "There are no connections between the two sites." }
+      ],
+      "questions": [
+        { "question": "Are East's API and West's API the same service?", "answer": "No." },
+        {
+          "question": "Which API writes, and to which Store?",
+          "answer": "East's API writes to East's Store."
+        },
+        { "question": "Does West's API have a connection to East's Store?", "answer": "No." }
+      ]
+    },
+    {
+      "id": "A10",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied fact, uncertainty and explicitly absent relationship. Use only the supplied facts.",
+      "source": "Probe definitely sends readings to Collector. Collector may send readings to Archive, but whether that connection exists is unconfirmed. Collector does not send readings to Dashboard. The connection between Dashboard and Archive is unspecified.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "Probe definitely sends readings to Collector." },
+        {
+          "id": "F2",
+          "text": "A connection sending readings from Collector to Archive is possible but unconfirmed."
+        },
+        { "id": "F3", "text": "Collector does not send readings to Dashboard." },
+        { "id": "F4", "text": "The connection between Dashboard and Archive is unspecified." }
+      ],
+      "questions": [
+        {
+          "question": "Which destination definitely receives Probe's readings?",
+          "answer": "Collector."
+        },
+        {
+          "question": "Is Collector-to-Archive confirmed?",
+          "answer": "No; it is possible but unconfirmed."
+        },
+        {
+          "question": "Is Dashboard-to-Archive known to be absent?",
+          "answer": "No; that connection is unspecified."
+        }
+      ]
+    },
+    {
+      "id": "A11",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied condition and boundary. Use only the supplied facts.",
+      "source": "Gate routes loads heavier than 8 zins to Heavy. It routes loads of 8 zins or less to Light. Heavy sends red-tag loads to Hold. Heavy sends loads without a red tag to Release. Light sends every load to Release. These are the only routes.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "Gate routes loads heavier than 8 zins to Heavy." },
+        { "id": "F2", "text": "Gate routes loads of 8 zins or less to Light." },
+        { "id": "F3", "text": "Heavy sends red-tag loads to Hold." },
+        { "id": "F4", "text": "Heavy sends loads without a red tag to Release." },
+        { "id": "F5", "text": "Light sends every load to Release." },
+        { "id": "F6", "text": "These are the only routes." }
+      ],
+      "questions": [
+        { "question": "Where does Gate send a load weighing exactly 8 zins?", "answer": "Light." },
+        { "question": "Where does a red-tag load weighing 9 zins finish?", "answer": "Hold." },
+        {
+          "question": "Where does a load without a red tag weighing 9 zins finish?",
+          "answer": "Release."
+        }
+      ]
+    },
+    {
+      "id": "A12",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied message, order and limitation. Use only the supplied facts.",
+      "source": "At time 1, Client sends request to Server. At time 2, Server sends acknowledgment to Client. At time 3, Monitor sends ping to Server. The timestamps establish observation order only, not that one message causes the next. No other messages are specified.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "At time 1, Client sends request to Server." },
+        { "id": "F2", "text": "At time 2, Server sends acknowledgment to Client." },
+        { "id": "F3", "text": "At time 3, Monitor sends ping to Server." },
+        {
+          "id": "F4",
+          "text": "The timestamps establish observation order only, not causation between consecutive messages."
+        },
+        { "id": "F5", "text": "No other messages are specified." }
+      ],
+      "questions": [
+        { "question": "Who receives acknowledgment at time 2?", "answer": "Client." },
+        { "question": "Who sends ping, and to whom?", "answer": "Monitor sends ping to Server." },
+        {
+          "question": "Is acknowledgment known to cause ping?",
+          "answer": "No; the timestamps establish observation order only."
+        }
+      ]
+    },
+    {
+      "id": "A13",
+      "prompt": "Преобразуй весь исходный текст в понятную ASCII-схему на русском языке. Сохрани все факты и полные названия. Используй только исходные сведения.",
+      "source": "Центр предварительной проверки документов передаёт принятые документы в Отдел согласования международных договоров. Отклонённые документы этот центр передаёт в Архив неподтверждённых заявок. Отдел согласования международных договоров передаёт согласованные документы в Реестр договоров 東京. Архив неподтверждённых заявок не передаёт документы в этот реестр.",
+      "maxColumns": 60,
+      "facts": [
+        {
+          "id": "F1",
+          "text": "Центр предварительной проверки документов передаёт принятые документы в Отдел согласования международных договоров."
+        },
+        {
+          "id": "F2",
+          "text": "Центр предварительной проверки документов передаёт отклонённые документы в Архив неподтверждённых заявок."
+        },
+        {
+          "id": "F3",
+          "text": "Отдел согласования международных договоров передаёт согласованные документы в Реестр договоров 東京."
+        },
+        {
+          "id": "F4",
+          "text": "Архив неподтверждённых заявок не передаёт документы в Реестр договоров 東京."
+        }
+      ],
+      "questions": [
+        {
+          "question": "Куда центр передаёт отклонённые документы?",
+          "answer": "В Архив неподтверждённых заявок."
+        },
+        {
+          "question": "Какое подразделение передаёт согласованные документы в реестр?",
+          "answer": "Отдел согласования международных договоров."
+        },
+        { "question": "Передаёт ли архив документы в реестр?", "answer": "Нет." }
+      ]
+    },
+    {
+      "id": "A14",
+      "prompt": "Convert the entire supplied prose into a clear ASCII text diagram. Preserve every supplied ownership, inheritance and override fact. Use only the supplied facts.",
+      "source": "The root configuration sets timeout to 30 seconds. Service A inherits the root configuration. Service B inherits the root configuration but overrides timeout to 10 seconds. Worker C inherits Service A's configuration without overrides. The timeout setting has no other source in this example.",
+      "maxColumns": 80,
+      "facts": [
+        { "id": "F1", "text": "The root configuration sets timeout to 30 seconds." },
+        { "id": "F2", "text": "Service A inherits the root configuration." },
+        { "id": "F3", "text": "Service B inherits the root configuration." },
+        { "id": "F4", "text": "Service B overrides timeout to 10 seconds." },
+        { "id": "F5", "text": "Worker C inherits Service A's configuration without overrides." },
+        { "id": "F6", "text": "The timeout setting has no other source in this example." }
+      ],
+      "questions": [
+        {
+          "question": "Which service overrides timeout, and to what value?",
+          "answer": "Service B, to 10 seconds."
+        },
+        {
+          "question": "From which configuration does Worker C directly inherit?",
+          "answer": "Service A's configuration."
+        },
+        { "question": "What timeout does Worker C inherit?", "answer": "30 seconds." }
+      ]
+    }
+  ]
+}

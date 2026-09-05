@@ -22,9 +22,9 @@ export const DEFAULT_STATE: FeynmanState = Object.freeze({
 
 export const OUTPUT_STYLE_SUFFIX: Readonly<Partial<Record<OutputStyle, string>>> = Object.freeze({
   short:
-    '\n\nOutput style: short — dot-leader and inline glyphs only; no frames, no ASCII art, no trees.',
+    '\n\nOutput style: short — default to the most compact accurate diagram and minimal commentary. An explicit diagram request overrides automatic suppression and visual-form limits.',
   middle:
-    '\n\nOutput style: middle — frame blocks only for ≥6 items; prefer trees and markdown tables.',
+    '\n\nOutput style: middle — prefer compact trees or Markdown tables and concise commentary; use a larger ASCII layout when the relationships require it. An explicit diagram request overrides automatic suppression and visual-form limits.',
 });
 
 export function isIntensity(value: unknown): value is Intensity {

@@ -1,61 +1,89 @@
 ---
 name: feynman
 description: >
-  Explain architecture, flows, hierarchies, comparisons, and status with concise
-  text diagrams when seeing relationships helps. Use when the user asks for /feynman,
-  visual architecture, visual explanations, or Feynman intensity and output-style settings.
+  Turn supplied product and architecture prose into clear, accurate ASCII
+  diagrams, with compact tables or lists for comparisons and status. Use for
+  /feynman, visual architecture, visual explanations, or Feynman settings.
 ---
 
-Help the reader answer the question by making the relevant relationships visible.
-Visual explanation works directly from these instructions; it does not require
-the CLI, a hook, network access, or reading/changing local preferences.
+Make the relationships needed to answer the reader's question visible. Standalone
+explanations work from these instructions alone: do not run the CLI, use the
+network, or read or change local preferences.
 
-## Explain
+## Build the explanation
 
-Identify the question the reader needs to answer and the facts supplied by the
-user or verified source. Preserve names, direction, conditions, and uncertainty.
-Do not turn an ordering into causation, invent missing connections, or present
-an illustrative example as the user's actual system. Ask one focused question
-if a missing relationship would change the explanation; otherwise label the
+Silently identify the question and requested scope. For a whole-text
+transformation, include every fact and relationship in that scope. For a focused
+answer, narrow the scope only when useful and state what the diagram covers.
+
+Before drawing, extract:
+
+- every supplied entity, keeping its identity stable;
+- each relationship's verb or type and whether it is directed or undirected;
+- edge conditions, negation, and uncertainty;
+- branch semantics, including whether alternatives are `AND` or `OR`.
+
+Preserve the source's actor, action, target, direction, and qualifiers. Ordering
+does not imply causation. Never guess a direction, mechanism, value, or link.
+Use an undirected line or an explicit relationship row when direction is absent.
+
+Choose layout from topology and available width:
+
+- Use a chain only for one path. Use a tree only for a real hierarchy whose
+  child identities are not shared across parents.
+- Use a Markdown table for a non-explicit comparison and a compact labeled list
+  for status or priority.
+- For branches, put each condition beside its edge and mark `AND` or `OR` where
+  that distinction matters.
+- For shared nodes, diamonds, and cycles, use a graph or grouped explicit edge
+  rows. Reuse the same node or alias, and connect every member directly to a
+  shared hub.
+- Assume 80 display columns unless the user gives a width. Draw horizontally
+  only when all labels and edges remain readable. Otherwise use a vertical
+  layout or short aliases plus a legend containing every full name. Never
+  truncate a name or label.
+
+Render ASCII in a fenced code block. Keep every relationship label or condition
+adjacent to its actual edge, with the source's relation name and direction.
+Coordinated panels may form one primary visual when one layout cannot stay
+clear; do not merge connectors in a way that makes their endpoints ambiguous.
+
+Useful compact patterns:
+
+```text
+[Route] selects one branch (OR):
+  |-- if cached --> [Cache]
+  `-- otherwise --> [Origin]
+
+[Deploy] -- requires (AND) --> [Tests pass]
+[Deploy] -- requires (AND) --> [Approval]
+
+[Writer] -- writes --> [Store]
+[Reader] -- reads ---> [Store]
+```
+
+Work silently and show only the verified final visual, never a discarded draft.
+Before answering, read the actual diagram back edge by edge and compare it with
+the extracted facts. Fix every omitted or invented edge, reversed direction,
+detached condition, lost `AND`/`OR`, and ambiguous or duplicated identity before
+answering. Check nearby prose against the same facts, especially `only`, `all`,
+`none`, and `cannot`.
+
+Use one primary visual by default and only enough prose to interpret it. An
+explicit ASCII-diagram request overrides automatic suppression and output-style
+limits. An explicit prose-only request overrides defaults; when explicit format
+requests conflict, follow the user's latest instruction. Otherwise answer a
+greeting, simple definition, recommendation, single fact, simple list, or
+question-back directly in prose.
+
+Correct a false premise instead of diagramming it as fact. If one missing
+relationship would materially change the answer, ask one focused question. If
+the user requests one question, ask exactly one independently answerable
+question; do not join separate requests with “and” or “or”. Otherwise label the
 uncertainty in the answer.
-
-When paraphrasing, keep each actor attached to the same action and target as in
-the source. Do not turn a stated relationship into an unstated mechanism,
-calculation, or value. If the user requests one question, ask exactly one
-independently answerable question about one missing fact; do not bundle separate
-requests with “and” or “or”.
-
-Distinguish a supplied fact from a premise the user asks you to assess. Correct
-a false premise instead of repeating it. When direction is unspecified, use
-an undirected connection or name the relationship in a table; an arrow would
-add a fact. For a shared hub, connect each member directly to that hub.
-
-Choose the smallest form that exposes the useful structure:
-
-- Sequence: a short arrow chain; use branches when the conditions matter.
-- Hierarchy: an indented tree with clear parent/child relationships.
-- Comparison: a Markdown table with shared criteria and comparable values.
-- State machine: states and labeled transitions, including relevant failures.
-- Status or priority: a compact list; use words so symbols do not carry meaning alone.
-
-Use at most one primary visual by default. Follow the user's requested format
-and language. For a single fact, greeting, definition, short list, or an explicit
-prose-only request, answer directly without forcing a diagram. A diagram is
-useful only if it helps answer the question more clearly than that direct answer.
-
-Keep diagram labels readable and preserve meaningful verbs on relationships.
-Put multiline text diagrams in a fenced code block; prefer a vertical layout
-when a horizontal one would wrap. Avoid decorative frames and repeated prose.
-Add only the explanation needed to interpret conditions, uncertainty, or the
-decision the visual supports. Before answering, check every edge and table cell
-against the source and verify that the visual preserves the important facts.
-Check the accompanying prose against the same relationships, especially words
-such as "only", "all", "none", and "cannot". If layout obscures an edge, simplify
-the representation before adding explanatory prose.
 
 ## Settings requests
 
 For an explicit Feynman settings request or bare `/feynman`, follow
-[the settings reference](references/settings.md). These preferences control the
-optional CLI-installed hook, not standalone explanations. Explanation requests
-must not run `npx`, install a package, or read/change user state.
+[the settings reference](references/settings.md). Those preferences affect the
+optional CLI-installed hook, not standalone explanations.

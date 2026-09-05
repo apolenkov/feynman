@@ -7,6 +7,12 @@ sources and applicability decisions belong in `docs/quality-research.md`.
 The 2026-09-05 user-requested implementation re-audit adds the binding
 [S01–S09 strict-code contract](strict-code.md), including exact lint presets,
 immutable command decisions and individually justified local mutation.
+The subsequent 2026-09-05 user clarification makes accurate whole-text-to-ASCII
+transformation the product objective and authorizes corrective iterations.
+The [ASCII transformation protocol](../../../evals/ascii-transformation-protocol.md)
+now governs Q03 and the corresponding live Q02/Q04 checks. The earlier paired
+comparison below is retained as a historical failed acceptance contract; it is
+not retroactively passed or rerun merely to beat its score ceiling.
 
 ## Requirement: Bounded, evidence-based acceptance
 
@@ -29,7 +35,7 @@ SHALL NOT be weakened to obtain a pass.
 |---|---|---|
 | Q01 | Delivery form follows the use case | Document skill-only, plugin, and hook/CLI tradeoffs; independently install and exercise the chosen delivery paths |
 | Q02 | Skill performs visual explanation without setup side effects | A clean plugin-only installation can answer an explanation request without downloading a CLI or changing user state |
-| Q03 | Contract improves answers | Paired, blind-reviewed live Codex evaluation under the protocol below |
+| Q03 | Contract accurately transforms text into readable diagrams | Complete source-fact preservation and unambiguous rendered relationships under the ASCII transformation protocol; baseline comparison is reported separately |
 | Q04 | Contract respects user intent | Explicit prose-only requests and suppression cases pass; all intensity blocks have checked size budgets |
 | Q05 | Types and style are enforced | Strict TypeScript, type-aware ESLint and formatter checks pass with zero warnings across first-party code and tests |
 | Q06 | Core is pure and inputs immutable | Readonly public core data contracts; tests with frozen inputs; automated dependency rules exclude I/O and outer layers |
@@ -43,7 +49,38 @@ SHALL NOT be weakened to obtain a pass.
 | Q14 | Documentation reflects behavior | Requirements, architecture, CLI help, skill, README and release instructions agree; links and examples are checked |
 | Q15 | Release and maintenance are operable | Version consistency, artifact verification, release rehearsal, recovery instructions, security reporting and contribution workflow are verified |
 
-## Requirement: Useful explanations
+## Requirement: Accurate ASCII explanations
+
+For whole-text transformations, every supplied fact within the requested scope
+SHALL survive in the rendered result, with zero invented or changed facts.
+Relationships SHALL retain identities, type, direction or its uncertainty,
+conditions, negation, and conjunctive or alternative prerequisites. A graph
+SHALL NOT become an apparent tree by losing shared nodes or return edges.
+Width SHALL be checked in display columns against the supplied budget.
+
+### Scenario: Independent output reconstruction
+
+- GIVEN source texts, atomic facts and reader questions frozen before generation
+- WHEN the native skill and actual installed hook produce the diagrams
+- THEN an independent reviewer reconstructs each diagram without the source
+- AND the reconstructed facts are compared with the complete frozen fact set
+- AND ambiguous connectors and unsupported prose are treated as defects
+- AND corrupted control diagrams demonstrate the review can detect semantic errors.
+
+### Scenario: User intent and settings
+
+- WHEN the user explicitly requests an ASCII diagram
+- THEN intensity and output style do not suppress that requested diagram
+- AND the requested width is respected without removing facts
+- AND ordinary prose-only and applicable suppression requests remain diagram-free.
+
+The complete task counts, delivery evidence, negative controls and reporting
+rules live in the linked protocol. This measures correctness and structural
+answerability on the frozen tasks, not human reading speed or universal model
+reliability. New failures SHALL be retained and addressed with source changes;
+criteria SHALL NOT be relaxed after seeing outputs to obtain a pass.
+
+## Historical requirement: Useful explanations
 
 The system SHALL be evaluated against an unassisted baseline, not against the
 presence of diagram characters. The initial comparison SHALL retain all 20

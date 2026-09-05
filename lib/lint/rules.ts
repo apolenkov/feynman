@@ -362,13 +362,22 @@ export function L04_column_widths(ast: ASTNode): Issue[] {
 
 // ---------------------------------------------------------------------------
 // L05 — Flow integrity
-// Two [Box] tokens on same line require an arrow between them
+// Two [Box] tokens on same line require an explicit connection between them.
+// Connections may be directed or intentionally undirected.
 // ---------------------------------------------------------------------------
 const BOX_RE = /\[[^\]]+\]/g;
-// L05: longest-match-first so -->> is consumed before --> is tried.
-// ->> / -->> added for sequence-diagram lines that use [box] notation.
-// Bare -> intentionally excluded (rules promote → for activity flow).
-const ARROW_RE = /-->>|->>|-->|→|─→|──>/;
+const BARE_CONNECTION_RE = /^\s*(?:(?:<-+>|<-+|-+>{1,2})|(?:←|↔|→|─+(?:→|>))|-{2,})\s*$/;
+// Labels may be compact (`--request-->`) or spaced (`-- load > 8 -->`). The
+// boundary arrowheads carry direction; arrow tokens inside the label are invalid.
+const LABELED_CONNECTION_RE = /^\s*<?-{2,}\s*(.+?)\s*-{2,}>?\s*$/;
+const ARROW_TOKEN_RE = /<-|->|←|↔|→|─+(?:→|>)/;
+const PARALLEL_BRANCH_COLUMN_RE = /^\s{3,}\+-->\s*$/;
+
+function isCompleteConnection(value: string): boolean {
+  if (BARE_CONNECTION_RE.test(value)) return true;
+  const label = LABELED_CONNECTION_RE.exec(value)?.[1]?.trim();
+  return label !== undefined && label.length > 0 && !ARROW_TOKEN_RE.test(label);
+}
 
 export function L05_flow_integrity(ast: ASTNode): Issue[] {
   if (ast.content.length === 0) return [];
@@ -393,10 +402,10 @@ export function L05_flow_integrity(ast: ASTNode): Issue[] {
 
       // If between region is pure whitespace (≥3 spaces), treat as parallel layout (not connected)
       // Parallel layout means boxes are in separate columns, not sequentially connected
-      if (/^\s{3,}$/.test(between)) return false;
+      if (/^\s{3,}$/.test(between) || PARALLEL_BRANCH_COLUMN_RE.test(between)) return false;
 
-      // Between region has content but no arrow — violation
-      return !ARROW_RE.test(between);
+      // Between region has content but is not one complete connection — violation.
+      return !isCompleteConnection(between);
     });
 
     return hasViolation
@@ -406,8 +415,8 @@ export function L05_flow_integrity(ast: ASTNode): Issue[] {
             'error',
             baseLineNum + li,
             (boxes[0]?.index ?? 0) + 1,
-            `${boxes.length} boxes on same line with no arrow between them: ${boxes.map((m) => m[0]).join(', ')}`,
-            `Add an arrow (-->, →) between consecutive boxes`,
+            `${boxes.length} boxes on same line with no connection between them: ${boxes.map((m) => m[0]).join(', ')}`,
+            `Add a connection (for example --, -->, or →) between consecutive boxes`,
           ),
         ]
       : [];

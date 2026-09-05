@@ -170,33 +170,48 @@ file:2:1: L04 Table separator has 3 columns but header has 2 columns
 
 ## L05: Flow Integrity (severity: error)
 
-**What:** When two or more `[Box]` tokens appear on the same line, an arrow
-must exist between each consecutive pair.
+**What:** When two or more `[Box]` tokens appear on the same line, one complete
+directed or undirected connection must occupy the region between each
+consecutive pair.
 
-**Why:** Adjacent boxes without arrows are ambiguous — are they sequential
-steps, parallel options, or unrelated elements? An arrow makes the
-relationship explicit.
+**Why:** Adjacent boxes without a connection are ambiguous. Finding an arrow
+symbol somewhere in prose between them does not identify a relationship; the
+whole region must use a recognized connector.
 
-**Source:** [`lib/lint/rules.ts#L349`](../lib/lint/rules.ts)
+**Source:** [`lib/lint/rules.ts#L364`](../lib/lint/rules.ts)
 
-Note: boxes separated by three or more spaces are treated as parallel layout
-(e.g. side-by-side comparison columns) and do not require an arrow.
+Recognized forms include bare arrows (`->`, `<-`, `-->`, `<--`, `<->`, `<-->`,
+`→`, `←`, `↔`, `─→`, `──>`, `->>`, `-->>`), bare undirected dash runs (`--` or
+longer), labeled directed edges (`-- sends -->`, `<-- sends --`,
+`<-- syncs -->`), and labeled undirected edges (`-- shares bus --`). Labels may
+contain conditions, such as `-- load > 8 -->`, and bounding dash runs may be
+longer. L05 validates the connector's syntax; it does not infer its direction
+from the label.
+
+Boxes separated only by three or more spaces are treated as parallel layout
+(e.g. side-by-side comparison columns) and do not require a connection. After
+such a gap, a separate `+-->` branch connector may start the next parallel
+column; it is not an edge from the preceding box.
 
 ### Valid
 
-```
-[Auth] --> [Handler] --> [Response]
+```text
+[Auth] -- authenticates --> [Handler] --> [Response]
+[Worker] <-- dispatches -- [Queue]
+[Autoscaler] -- load > 8 --> [Scale out]
+[Reader] -- shares bus -- [Writer]
 ```
 
 ### Invalid
 
 ```text
-[Auth] [Handler] [Response]
+[Auth] label mentions -> symbol [Handler]
+[Handler] -> <- [Response]
 ```
 
 Output:
 ```text
-file:1:1: L05 3 boxes on same line with no arrow between them: [Auth], [Handler], [Response]
+file:1:1: L05 2 boxes on same line with no connection between them: [Auth], [Handler]
 ```
 
 ---

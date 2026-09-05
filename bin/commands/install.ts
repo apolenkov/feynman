@@ -74,7 +74,7 @@ export function cmdInstall(opts: Readonly<{ force: boolean }>): void {
   console.log(`│ flag:     ${tc.flagPath.replace(HOME, '~')}`);
   console.log('└──────────────────────────────────────────────────────────────┘');
   console.log('');
-  console.log('Restart Codex to activate feynman full mode.');
+  console.log('Open /hooks in Codex, review and trust the Feynman hook, then start a new session.');
   process.exit(0);
 }
 

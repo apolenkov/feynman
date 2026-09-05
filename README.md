@@ -6,12 +6,13 @@
 [![skills.sh](https://skills.sh/b/apolenkov/feynman)](https://skills.sh/apolenkov/feynman)
 
 feynman adds visual-explanation instructions to Codex. The native skill guides
-Codex in choosing a flow, tree, table or list from the task's facts. An optional
+Codex through extracting relationships from text, choosing a readable layout,
+and checking the finished diagram against the supplied facts. An optional
 local CLI installs session-wide diagram guidance and provides an ASCII linter.
 
-Use it when you want a visual explanation. The latest controlled comparison
-did not establish clearer answers than ordinary Codex responses, and factual
-and instruction-compliance failures remain. See the
+Use it when you want a visual explanation. The earlier controlled comparison
+did not establish clearer answers than ordinary Codex responses and exhibited
+factual and instruction-compliance failures. See the historical
 [evaluation report](docs/evaluation-3ab9de4.md). Technical test results do not
 establish explanation quality.
 
@@ -60,12 +61,21 @@ npx -y @albinocrabs/feynman@latest uninstall
 
 The native plugin supplies the Codex skill. The CLI installer registers the
 `SessionStart` hook that injects the selected ruleset into a session.
+After installing or updating the hook, open `/hooks` in Codex, review and trust
+its current definition, then start a new session. Codex skips new or changed
+hooks until they are trusted. This step applies to the optional hook; standalone
+skill explanations need no hook setup.
 
 ## What it does
 
-The instructions ask Codex to identify a response's structure and choose a
-small visual: flow, tree, table, status marker, or frame. They ask it to preserve
-prose-only requests; model compliance is not guaranteed. The
+The instructions separate meaning from layout: preserve entities, relationship
+verbs, conditions and uncertainty, then choose a flow, graph, hierarchy, table
+or list. Whole-text transformations must retain every in-scope fact. Shared
+nodes and cycles need explicit connections; a tree is reserved for a hierarchy.
+Diagrams use the requested width, or 80 display columns by default.
+
+An explicit diagram request takes precedence over automatic style limits;
+prose-only requests remain prose. Model compliance is not guaranteed. The
 default hook Intensity is `full`; `lite` and `ultra` are available through
 `feynman state`. These persistent preferences apply to the CLI-installed hook;
 standalone skill explanations follow their packaged instructions and your request.
@@ -127,8 +137,8 @@ npm ci
 npm run ci
 ```
 
-Before opening a pull request, run `npm run ci` and lint changed markdown with
-`npm run lint -- <files>`. Use Conventional Commits. Keep changes focused and
+Before opening a pull request, run `npm run ci` and lint each changed Markdown file
+with `npm run lint -- <file.md>`. Use Conventional Commits. Keep changes focused and
 add a test for changed behavior.
 
 The quality gate checks formatting, types, typed lint, behavior, coverage scope,
@@ -136,6 +146,10 @@ documentation and byte-for-byte package reproducibility. The live comparison
 of explanations is separate: the latest 96-answer experiment completed and
 failed its acceptance criteria. See the [results](docs/evaluation-3ab9de4.md)
 and [protocol](evals/protocol-v2.md).
+The new [ASCII transformation protocol](evals/ascii-transformation-protocol.md)
+tests complete fact preservation and readable relationships through the actual
+delivery paths. Its [research rationale](docs/ascii-explanation-research.md)
+distinguishes these checks from unproven claims about human reading speed.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution workflow,
 [SECURITY.md](SECURITY.md) for private vulnerability reports, and
