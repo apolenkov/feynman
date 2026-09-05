@@ -77,7 +77,7 @@ const ruleEntries: readonly RuleEntry[] = [
     scope: 'pernode',
     fn: (node) => rules.L05_flow_integrity(node),
     description:
-      'Flow integrity: two [Box] tokens on the same line must have an arrow between them',
+      'Flow integrity: two [Box] tokens on the same line must have a complete connection between them',
   },
   {
     id: 'L06',

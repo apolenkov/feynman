@@ -153,6 +153,30 @@
       "test": "tests/packaging-behavior.test.ts"
     },
     {
+      "file": "scripts/capture-evaluation-hook.ts",
+      "owner": "captureHook",
+      "mutationHash": "c4cf086ff94e49fe7bf17e2d458644773e334657f067188b2ea0370096c62867",
+      "count": 1,
+      "reason": "A new digest builder hashes the observed hook output before exposing the finalized digest.",
+      "test": "tests/capture-evaluation-hook.test.ts"
+    },
+    {
+      "file": "scripts/capture-evaluation-hook.ts",
+      "owner": "hookCaptureMain",
+      "mutationHash": "31d43aa99da62807a1451825431f9e3f544f38566df8f04cfac15646b3010465",
+      "count": 2,
+      "reason": "Outer CLI boundary exposes the child and relay outcome through process status.",
+      "test": "tests/capture-evaluation-hook.test.ts"
+    },
+    {
+      "file": "scripts/capture-evaluation-hook.ts",
+      "owner": "readAndRelay",
+      "mutationHash": "b851e4bf857c0103391403a2569483c0bc684d3de167e1b02b4238aff0789153",
+      "count": 3,
+      "reason": "Invocation-owned stream buffer collects at most 4 MiB while tracking byte count and awaiting unchanged output relay.",
+      "test": "tests/capture-evaluation-hook.test.ts"
+    },
+    {
       "file": "scripts/check-coverage.ts",
       "owner": "iterateLcovRecords",
       "mutationHash": "ec7aad89f9e830294f1c07ddab848591271f27180d79fd6808cd718df030f431",
@@ -183,6 +207,54 @@
       "count": 4,
       "reason": "Invocation-owned cryptographic builder streams sorted source metadata and bytes without concatenating the entire repository in memory.",
       "test": "tests/reproducibility.test.ts"
+    },
+    {
+      "file": "scripts/evaluate-ascii.ts",
+      "owner": "asciiEvaluationMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "Outer CLI boundary reports failure after the runner completes isolated-home cleanup.",
+      "test": "tests/ascii-evaluation-runner.test.ts"
+    },
+    {
+      "file": "scripts/evaluate-ascii.ts",
+      "owner": "discoverInstalledSkills",
+      "mutationHash": "cf0fb001c79d0ac52c2b673b0cd2b252bfcb26a531e13dbe0e7c4cea2d9a4de4",
+      "count": 11,
+      "reason": "Invocation-owned bounded app-server stream buffers and request state parse discovery events; no shared domain state is mutated.",
+      "test": "tests/ascii-evaluation-runner.test.ts"
+    },
+    {
+      "file": "scripts/evaluate-ascii.ts",
+      "owner": "finish",
+      "mutationHash": "8d32a5c046da2d54c455210b63e271e1598bd1f0b9deeaefc15586235d5bd557",
+      "count": 2,
+      "reason": "Each invocation marks its app-server response settled once and terminates its owned child process.",
+      "test": "tests/ascii-evaluation-runner.test.ts"
+    },
+    {
+      "file": "scripts/evaluate-ascii.ts",
+      "owner": "runAsciiEvaluation",
+      "mutationHash": "14076dec8f0845ab163175efe76cdd3201bae782cd72dab80b4c25951c01a0a1",
+      "count": 9,
+      "reason": "Outer I/O boundary retains the terminal error and immutable execution result across evidence writes and unconditional isolated-home cleanup; manifests are replaced with new values.",
+      "test": "tests/ascii-evaluation-runner.test.ts"
+    },
+    {
+      "file": "scripts/evaluate-ascii.ts",
+      "owner": "sendSkillsRequest",
+      "mutationHash": "499bc1a77c8382d9236e49e73392f6ef15bcbf3e4681cde627ba6be47e301c7d",
+      "count": 1,
+      "reason": "Invocation-local guard sends the skills discovery RPC exactly once after initialization.",
+      "test": "tests/ascii-evaluation-runner.test.ts"
+    },
+    {
+      "file": "scripts/evaluate-ascii.ts",
+      "owner": "trustInstalledHooks",
+      "mutationHash": "2fbadf90190fac3c2c1de1a0562d589ecdb393f812b53437c4b0ffad65611c78",
+      "count": 14,
+      "reason": "Invocation-owned bounded app-server streams and trust handshake state record and verify the isolated installed hook hash.",
+      "test": "tests/ascii-evaluation-runner.test.ts"
     },
     {
       "file": "scripts/evaluate.ts",

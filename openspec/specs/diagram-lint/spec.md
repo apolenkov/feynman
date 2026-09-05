@@ -96,12 +96,23 @@ Severity: **error**.
 
 ---
 
-### Requirement: L05 — flow boxes on the same line require an arrow between them
+### Requirement: L05 — flow boxes on the same line require a connection between them
 
-The linter SHALL report an error (L05) when two or more `[box]` tokens appear on the same
-line and the region between consecutive boxes contains no arrow (`-->`, `→`, `─→`, `──>`,
-`->>`, or `-->>`). A gap of three or more spaces between boxes is treated as a parallel
-layout column and is not flagged.
+The linter SHALL report an error (L05) when two or more `[box]` tokens appear on
+the same line and the complete region between consecutive boxes is not one
+recognized connection. Connections MAY be bare directed arrows (`->`, `<-`,
+`-->`, `<--`, `<->`, `<-->`, `→`, `←`, `↔`, `─→`, `──>`, `->>`, or `-->>`),
+bare undirected dash runs of at least two dashes, or labels bounded by dash runs
+of at least two dashes. Bounded labels MAY be compact or spaced, forward
+(`--request-->`), reverse (`<--response--`), bidirectional (`<--sync-->`), or
+undirected (`--shares--`), and MAY contain numeric comparisons such as
+`-- load > 8 -->`. Longer bounding dash runs SHALL be valid. An arrow token
+inside a label, an arrow-like substring within prose, multiple conflicting
+arrows, or text outside a connector SHALL NOT count as a connection. A gap of
+three or more spaces between boxes is treated as a parallel layout column and
+is not flagged. A separate `+-->` branch connector after such a gap SHALL start
+the next parallel column and SHALL NOT imply an edge from the preceding box.
+L05 SHALL validate syntax without inferring a direction from label text.
 Severity: **error**.
 
 #### Scenario: two boxes connected by an arrow
@@ -109,15 +120,40 @@ Severity: **error**.
 - **WHEN** a line reads `[A] --> [B]`
 - **THEN** L05 does not report any issue
 
-#### Scenario: two boxes with no arrow
+#### Scenario: two boxes connected by a labeled undirected edge
 
-- **WHEN** a line reads `[A] [B]` (fewer than three spaces between them)
+- **WHEN** a line reads `[Auth] -- shares bus -- [Bus]`
+- **THEN** L05 does not report any issue
+
+#### Scenario: a labeled numeric condition
+
+- **WHEN** a line reads `[Gate] -- load > 8 --> [Scale]`
+- **THEN** L05 treats the full bounded label as one directed connection
+
+#### Scenario: an arrow-like substring in prose
+
+- **WHEN** consecutive boxes have the intervening text `label mentions -> symbol`
+- **THEN** L05 reports an error because the entire region is not a connection
+
+#### Scenario: conflicting arrows
+
+- **WHEN** consecutive boxes have the intervening text `-> <-`
+- **THEN** L05 reports an error because the region contains more than one connection
+
+#### Scenario: two boxes with no connection
+
+- **WHEN** boxes named A and B have fewer than three spaces and no connector between them
 - **THEN** L05 reports an error listing both box tokens
 
 #### Scenario: parallel layout columns
 
 - **WHEN** a line reads `[A]   [B]` (three or more spaces between them)
 - **THEN** L05 treats them as a parallel layout and does not report any issue
+
+#### Scenario: parallel columns have separate branch connectors
+
+- **WHEN** a box named Adopt is followed by a wide gap and a `+-->` branch into a box named Re-open path
+- **THEN** L05 treats `+-->` as the next column's branch and does not infer an edge from Adopt
 
 ---
 

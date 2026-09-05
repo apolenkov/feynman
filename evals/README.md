@@ -1,5 +1,12 @@
 # Explanation usefulness evaluation
 
+The active whole-text-to-ASCII objective uses the
+[ASCII transformation protocol](ascii-transformation-protocol.md) and
+[`ascii-transformation.json`](ascii-transformation.json). It checks complete
+source-fact preservation and actual installed delivery paths. The comparisons
+below remain historical evidence, including their failures; they are not
+retroactively passed by the new protocol.
+
 `evals.json` preserves the original 20 scenario IDs and categories. Version 1
 replaces open-ended and time-dependent assumptions with supplied facts and
 task-specific answer keys. Freeze its SHA-256 before generating any answers.
