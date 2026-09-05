@@ -1,0 +1,614 @@
+{
+  "schemaVersion": 1,
+  "status": "accepted-v2-single-run-no-answers-generated",
+  "tasks": [
+    {
+      "id": "N01",
+      "shapeCategory": "sequence/conditional-flow",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the parcel-routing system that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "Every parcel enters at Intake."
+        },
+        {
+          "id": "F2",
+          "text": "Intake sends fragile parcels to the Foam station."
+        },
+        {
+          "id": "F3",
+          "text": "Intake sends non-fragile parcels to the Belt station."
+        },
+        {
+          "id": "F4",
+          "text": "Foam sends blue-tag parcels to the North cart."
+        },
+        {
+          "id": "F5",
+          "text": "Foam sends parcels without a blue tag to the South cart."
+        },
+        {
+          "id": "F6",
+          "text": "Belt sends parcels heavier than 8 zins to the South cart."
+        },
+        {
+          "id": "F7",
+          "text": "Belt sends parcels of 8 zins or less to the East cart."
+        },
+        {
+          "id": "F8",
+          "text": "The North cart unloads at Dock A."
+        },
+        {
+          "id": "F9",
+          "text": "The South cart unloads at Dock B."
+        },
+        {
+          "id": "F10",
+          "text": "The East cart unloads at Dock C."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F4", "F8"],
+      "comprehensionQuestion": "At which dock does a fragile blue-tag parcel weighing 11 zins unload?",
+      "answerKey": "Dock A"
+    },
+    {
+      "id": "N02",
+      "shapeCategory": "shared-dependency-graph",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the observatory signal network that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "Sensor P feeds Mixer R."
+        },
+        {
+          "id": "F2",
+          "text": "Sensor Q feeds Mixer R."
+        },
+        {
+          "id": "F3",
+          "text": "Sensor Q also feeds Mixer S."
+        },
+        {
+          "id": "F4",
+          "text": "Sensor T feeds Mixer S."
+        },
+        {
+          "id": "F5",
+          "text": "Mixer R feeds Archive U."
+        },
+        {
+          "id": "F6",
+          "text": "Mixer R also feeds Alert V."
+        },
+        {
+          "id": "F7",
+          "text": "Mixer S feeds Alert V."
+        },
+        {
+          "id": "F8",
+          "text": "Mixer S also feeds Display W."
+        },
+        {
+          "id": "F9",
+          "text": "An output is available exactly when at least one path from an online sensor to it contains only online components."
+        },
+        {
+          "id": "F10",
+          "text": "All components except Sensor Q are online."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10"],
+      "comprehensionQuestion": "If Sensor Q goes offline while all other components stay online, which named outputs remain available?",
+      "answerKey": "Archive U, Alert V, and Display W all remain available."
+    },
+    {
+      "id": "N03",
+      "shapeCategory": "state-transition",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the lantern controller that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "The controller starts in Sleeping."
+        },
+        {
+          "id": "F2",
+          "text": "A tap in Sleeping changes the state to Ready."
+        },
+        {
+          "id": "F3",
+          "text": "A tap in Ready changes the state to Bright."
+        },
+        {
+          "id": "F4",
+          "text": "A tap in Bright changes the state to Ready."
+        },
+        {
+          "id": "F5",
+          "text": "A hold in Ready changes the state to Sleeping."
+        },
+        {
+          "id": "F6",
+          "text": "A hold in Bright changes the state to Locked."
+        },
+        {
+          "id": "F7",
+          "text": "A tap in Locked leaves the state Locked."
+        },
+        {
+          "id": "F8",
+          "text": "Two taps in a row are processed as two separate taps."
+        },
+        {
+          "id": "F9",
+          "text": "A reset in Locked changes the state to Sleeping."
+        },
+        {
+          "id": "F10",
+          "text": "No reset occurs in the described input sequence."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F3", "F6", "F7", "F8"],
+      "comprehensionQuestion": "What is the final state after tap, tap, hold, tap?",
+      "answerKey": "Locked"
+    },
+    {
+      "id": "N04",
+      "shapeCategory": "hierarchy",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the library access hierarchy that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "The Root collection contains the East and West collections."
+        },
+        {
+          "id": "F2",
+          "text": "East contains Maps and Songs."
+        },
+        {
+          "id": "F3",
+          "text": "West contains Seeds and Stars."
+        },
+        {
+          "id": "F4",
+          "text": "A permission on a collection is inherited by every descendant unless overridden."
+        },
+        {
+          "id": "F5",
+          "text": "Root grants Mira read permission."
+        },
+        {
+          "id": "F6",
+          "text": "East denies Mira read permission."
+        },
+        {
+          "id": "F7",
+          "text": "Songs grants Mira read permission."
+        },
+        {
+          "id": "F8",
+          "text": "West has no override for Mira."
+        },
+        {
+          "id": "F9",
+          "text": "Maps has no override for Mira."
+        },
+        {
+          "id": "F10",
+          "text": "A nearer override takes precedence over an inherited permission."
+        },
+        {
+          "id": "F11",
+          "text": "There are no permission overrides beyond those listed."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11"],
+      "comprehensionQuestion": "Which leaf collections can Mira read?",
+      "answerKey": "Songs, Seeds, and Stars"
+    },
+    {
+      "id": "N05",
+      "shapeCategory": "comparison",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the three ferry options that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "Ferry L costs 6 shells."
+        },
+        {
+          "id": "F2",
+          "text": "Ferry L takes 40 minutes."
+        },
+        {
+          "id": "F3",
+          "text": "Ferry L carries bicycles but not animals."
+        },
+        {
+          "id": "F4",
+          "text": "Ferry M costs 8 shells."
+        },
+        {
+          "id": "F5",
+          "text": "Ferry M takes 25 minutes."
+        },
+        {
+          "id": "F6",
+          "text": "Ferry M carries animals but not bicycles."
+        },
+        {
+          "id": "F7",
+          "text": "Ferry N costs 9 shells."
+        },
+        {
+          "id": "F8",
+          "text": "Ferry N takes 35 minutes."
+        },
+        {
+          "id": "F9",
+          "text": "Ferry N carries both bicycles and animals."
+        },
+        {
+          "id": "F10",
+          "text": "A travel party must keep all of its passengers and cargo on one ferry."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10"],
+      "comprehensionQuestion": "Which ferry is the least expensive valid choice for a traveler with both a bicycle and an animal who must arrive within 38 minutes?",
+      "answerKey": "Ferry N"
+    },
+    {
+      "id": "N06",
+      "shapeCategory": "schedule/status",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the workshop schedule that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "Cutting starts at minute 0 and lasts 3 minutes."
+        },
+        {
+          "id": "F2",
+          "text": "Polishing starts only after Cutting finishes and lasts 4 minutes."
+        },
+        {
+          "id": "F3",
+          "text": "Painting starts only after Polishing finishes and lasts 2 minutes."
+        },
+        {
+          "id": "F4",
+          "text": "Labeling starts only after Cutting finishes and lasts 5 minutes."
+        },
+        {
+          "id": "F5",
+          "text": "Packing starts only after both Painting and Labeling finish."
+        },
+        {
+          "id": "F6",
+          "text": "Packing lasts 3 minutes."
+        },
+        {
+          "id": "F7",
+          "text": "Inspection starts only after Packing finishes."
+        },
+        {
+          "id": "F8",
+          "text": "Inspection lasts 2 minutes."
+        },
+        {
+          "id": "F9",
+          "text": "Tasks start immediately when all prerequisites are complete."
+        },
+        {
+          "id": "F10",
+          "text": "There are enough workers for independent tasks to overlap."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10"],
+      "comprehensionQuestion": "At what minute does Inspection finish?",
+      "answerKey": "Minute 14"
+    },
+    {
+      "id": "N07",
+      "shapeCategory": "sequence/conditional-flow",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the garden gate procedure that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "Every visitor first presents a token at Gate One."
+        },
+        {
+          "id": "F2",
+          "text": "A silver token sends the visitor to the Moon path."
+        },
+        {
+          "id": "F3",
+          "text": "A copper token sends the visitor to the Sun path."
+        },
+        {
+          "id": "F4",
+          "text": "On the Moon path, carrying a seed sends the visitor to the Round door."
+        },
+        {
+          "id": "F5",
+          "text": "On the Moon path, not carrying a seed sends the visitor to the Square door."
+        },
+        {
+          "id": "F6",
+          "text": "On the Sun path, arriving before noon sends the visitor to the Square door."
+        },
+        {
+          "id": "F7",
+          "text": "On the Sun path, arriving at or after noon sends the visitor to the Tall door."
+        },
+        {
+          "id": "F8",
+          "text": "The Round door leads to Orchard Two."
+        },
+        {
+          "id": "F9",
+          "text": "The Square door leads to Orchard One."
+        },
+        {
+          "id": "F10",
+          "text": "The Tall door leads to Orchard Three."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F5", "F9"],
+      "comprehensionQuestion": "Which orchard does a visitor with a silver token and no seed enter at 3 p.m.?",
+      "answerKey": "Orchard One"
+    },
+    {
+      "id": "N08",
+      "shapeCategory": "shared-dependency-graph",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the fountain pipe network that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "Reservoir A supplies Junction C."
+        },
+        {
+          "id": "F2",
+          "text": "Reservoir B supplies Junction C."
+        },
+        {
+          "id": "F3",
+          "text": "Reservoir B also supplies Junction D."
+        },
+        {
+          "id": "F4",
+          "text": "Junction C supplies Fountain E."
+        },
+        {
+          "id": "F5",
+          "text": "Junction C also supplies Fountain F."
+        },
+        {
+          "id": "F6",
+          "text": "Junction D supplies Fountain F."
+        },
+        {
+          "id": "F7",
+          "text": "Junction D also supplies Fountain G."
+        },
+        {
+          "id": "F8",
+          "text": "A fountain runs if at least one complete supply path from an open reservoir remains."
+        },
+        {
+          "id": "F9",
+          "text": "Closing a reservoir blocks every path beginning at it."
+        },
+        {
+          "id": "F10",
+          "text": "All junctions remain open."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10"],
+      "comprehensionQuestion": "If Reservoir B closes and Reservoir A stays open, which fountains still run?",
+      "answerKey": "Fountains E and F"
+    },
+    {
+      "id": "N09",
+      "shapeCategory": "state-transition",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the manuscript workflow that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "A manuscript starts in Draft."
+        },
+        {
+          "id": "F2",
+          "text": "Submit changes Draft to Review."
+        },
+        {
+          "id": "F3",
+          "text": "Approve changes Review to Ready."
+        },
+        {
+          "id": "F4",
+          "text": "Request-changes changes Review to Draft."
+        },
+        {
+          "id": "F5",
+          "text": "Publish changes Ready to Published."
+        },
+        {
+          "id": "F6",
+          "text": "Withdraw changes Ready to Draft."
+        },
+        {
+          "id": "F7",
+          "text": "Archive changes Published to Archived."
+        },
+        {
+          "id": "F8",
+          "text": "Submit has no effect outside Draft."
+        },
+        {
+          "id": "F9",
+          "text": "Approve has no effect outside Review."
+        },
+        {
+          "id": "F10",
+          "text": "Commands are processed from left to right."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F3", "F6", "F10"],
+      "comprehensionQuestion": "What is the final state after Submit, Approve, Withdraw, Submit?",
+      "answerKey": "Review"
+    },
+    {
+      "id": "N10",
+      "shapeCategory": "hierarchy",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the storeroom hierarchy that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "The Depot contains Rooms Red and Blue."
+        },
+        {
+          "id": "F2",
+          "text": "Room Red contains Bins R1 and R2."
+        },
+        {
+          "id": "F3",
+          "text": "Room Blue contains Bins B1 and B2."
+        },
+        {
+          "id": "F4",
+          "text": "A temperature setting applies to all descendants unless a descendant has its own setting."
+        },
+        {
+          "id": "F5",
+          "text": "The Depot setting is cool."
+        },
+        {
+          "id": "F6",
+          "text": "Room Red overrides the setting to warm."
+        },
+        {
+          "id": "F7",
+          "text": "Bin R2 overrides the setting to cold."
+        },
+        {
+          "id": "F8",
+          "text": "Room Blue has no override."
+        },
+        {
+          "id": "F9",
+          "text": "Bin B1 overrides the setting to warm."
+        },
+        {
+          "id": "F10",
+          "text": "Bins R1 and B2 have no override."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10"],
+      "comprehensionQuestion": "Which bins have a warm effective setting?",
+      "answerKey": "Bins R1 and B1"
+    },
+    {
+      "id": "N11",
+      "shapeCategory": "comparison",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the three kiln options that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "Kiln A holds 5 tiles."
+        },
+        {
+          "id": "F2",
+          "text": "Kiln A takes 12 minutes per batch."
+        },
+        {
+          "id": "F3",
+          "text": "Kiln A supports the violet glaze."
+        },
+        {
+          "id": "F4",
+          "text": "Kiln B holds 8 tiles."
+        },
+        {
+          "id": "F5",
+          "text": "Kiln B takes 18 minutes per batch."
+        },
+        {
+          "id": "F6",
+          "text": "Kiln B does not support the violet glaze."
+        },
+        {
+          "id": "F7",
+          "text": "Kiln C holds 4 tiles."
+        },
+        {
+          "id": "F8",
+          "text": "Kiln C takes 9 minutes per batch."
+        },
+        {
+          "id": "F9",
+          "text": "Kiln C supports the violet glaze."
+        },
+        {
+          "id": "F10",
+          "text": "A second batch in the same kiln starts only after its first batch finishes."
+        },
+        {
+          "id": "F11",
+          "text": "All tiles in the order require violet glaze."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11"],
+      "comprehensionQuestion": "Which single kiln finishes an order of 9 tiles soonest?",
+      "answerKey": "Kiln A, in 24 minutes"
+    },
+    {
+      "id": "N12",
+      "shapeCategory": "schedule/status",
+      "prompt": "Using only the supplied fictional facts, give a concise, useful explanation of the airship repair schedule that makes the comprehension question easy to answer.",
+      "facts": [
+        {
+          "id": "F1",
+          "text": "Frame repair starts at hour 0 and lasts 4 hours."
+        },
+        {
+          "id": "F2",
+          "text": "Sail repair starts at hour 0 and lasts 6 hours."
+        },
+        {
+          "id": "F3",
+          "text": "Painting starts after Frame repair finishes and lasts 3 hours."
+        },
+        {
+          "id": "F4",
+          "text": "Rigging starts after Sail repair finishes and lasts 2 hours."
+        },
+        {
+          "id": "F5",
+          "text": "Balancing starts only after both Painting and Rigging finish."
+        },
+        {
+          "id": "F6",
+          "text": "Balancing lasts 2 hours."
+        },
+        {
+          "id": "F7",
+          "text": "Inspection starts after Balancing finishes and lasts 1 hour."
+        },
+        {
+          "id": "F8",
+          "text": "Launch starts immediately after Inspection finishes."
+        },
+        {
+          "id": "F9",
+          "text": "Independent jobs may run at the same time."
+        },
+        {
+          "id": "F10",
+          "text": "A job begins immediately when all of its prerequisites finish."
+        }
+      ],
+      "requiredFactIds": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10"],
+      "comprehensionQuestion": "At what hour does Launch start?",
+      "answerKey": "Hour 11"
+    }
+  ]
+}

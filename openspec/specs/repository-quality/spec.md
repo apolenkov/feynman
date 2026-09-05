@@ -50,11 +50,11 @@ presence of diagram characters. The initial comparison SHALL retain all 20
 cases in `evals/evals.json`, with frozen, factual task inputs replacing vague
 or time-dependent assumptions before any model outputs are collected.
 
-### Scenario: Paired evaluation
+### Scenario: Paired evaluation (revised 2026-09-05)
 
-- GIVEN at least 20 frozen tasks spanning structured explanations and suppression
+- GIVEN the unchanged 20 original tasks plus 12 new tasks in `evals/usefulness.json`
 - AND the same model/version, settings, task inputs and isolated environment
-- WHEN each task runs three times with no Feynman, skill-only, and hook Contract
+- WHEN each task runs once with no Feynman, skill-only, and hook Contract (96 answers)
 - THEN retain every response, failure, elapsed time and available token count
 - AND record the exact source revision, prompt hashes and runner version
 - AND randomize anonymous answer pairs for review.
@@ -64,18 +64,30 @@ comprehension question, readable structure, and unnecessary content separately.
 Each score uses 0 (fails), 1 (partial), or 2 (satisfies). Criteria and answer keys
 must be fixed before generation. Diagram presence alone earns no credit.
 
-Acceptance requires no factual or explicit-instruction regression; all
-suppression cases must avoid unnecessary visuals. On structured tasks, the
-selected delivery form must improve the combined comprehension/readability
-score on a majority of task-level averages and not reduce its overall average.
+Acceptance requires zero material factual errors, zero explicit-instruction
+violations and no factual regression; all suppression cases must avoid
+unnecessary visuals. Original tasks retain their factual, intent, suppression
+and overall comprehension/readability nonreduction gates. On the 12 new tasks,
+the standalone skill, designated as primary before generation, must improve
+the combined comprehension/readability score on at least 7 tasks and not reduce
+its overall average. Hook results are separate; both deliveries must satisfy
+all hard factual and intent gates. A usefulness claim for hook additionally
+requires its own 7-of-12 and nonreduction pass. The two task sets are not pooled.
 Report ties and failures, total/per-case tokens, output length and latency;
 unavailable usage must be marked unavailable. This is a project acceptance
 experiment, not a claim of statistically established benefit for all users.
 
+The user authorized a revised comparison and fewer experiments on 2026-09-05.
+This explicitly transfers the majority gate from the original tasks to the new
+12 and reduces three repetitions to one. It does not retroactively pass earlier
+runs, whose failures remain in `docs/evaluation-fa0d2d5.md` and
+`docs/evaluation-72c6eb9.md`. The complete frozen protocol is
+[`evals/protocol-v2.md`](../../../evals/protocol-v2.md).
+
 ### Scenario: The current design fails the comparison
 
 - WHEN a candidate does not meet the frozen rubric
-- THEN change the Contract or delivery design and rerun the same task set
+- THEN retain the failure and request a product decision before any further experiment
 - AND retain the failed run as evidence
 - AND do not substitute unit tests or synthetic answers for live outcomes.
 
