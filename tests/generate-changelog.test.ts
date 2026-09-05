@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
+import { gitFixtureEnvironment, withGitFixtureEnvironment } from './helpers/git-environment.ts';
 
 import {
   classify,
@@ -89,7 +90,7 @@ describe('changelog rendering', () => {
   });
 });
 
-describe('changelog loss and failure regressions', () => {
+describe('changelog loss and failure regressions', { concurrency: false }, () => {
   it('recognizes a breaking footer in the body without promoting ordinary features', () => {
     const breaking = render('2.0.0', '', [
       {
@@ -113,54 +114,56 @@ describe('changelog loss and failure regressions', () => {
   });
 
   it('regenerates the current section twice without deleting older releases', (t) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-changelog-test-'));
-    t.after(() => {
-      fs.rmSync(root, { recursive: true, force: true });
+    withGitFixtureEnvironment(() => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-changelog-test-'));
+      t.after(() => {
+        fs.rmSync(root, { recursive: true, force: true });
+      });
+      fs.writeFileSync(
+        path.join(root, 'package.json'),
+        JSON.stringify({ name: 'fixture', version: '2.0.0' }),
+      );
+      const older = '## 1.4.0 - 2026-05-25\n\n- Historical release must remain.\n';
+      fs.writeFileSync(
+        path.join(root, 'CHANGELOG.md'),
+        render('2.0.0', '', [
+          { hash: 'oldhash', subject: 'fix: previous generation', body: '' },
+        ]).replace(
+          'All notable changes to this project are documented here.',
+          'Maintained introduction.',
+        ) +
+          '\n' +
+          older,
+      );
+      const env = gitFixtureEnvironment();
+      execFileSync('git', ['init', '-q'], { cwd: root, env });
+      execFileSync(
+        'git',
+        [
+          '-c',
+          'user.name=Fixture',
+          '-c',
+          'user.email=fixture@example.invalid',
+          'commit',
+          '--allow-empty',
+          '-qm',
+          'feat: change API',
+          '-m',
+          'BREAKING CHANGE: removed old API',
+        ],
+        { cwd: root, env },
+      );
+      generateChangelog(root);
+      const first = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
+      generateChangelog(root);
+      const second = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
+      assert.equal(first, second);
+      assert.ok(second.endsWith(older));
+      assert.equal(Array.from(second.matchAll(/^## 2\.0\.0 /gm)).length, 1);
+      assert.match(second, /Maintained introduction/);
+      assert.match(second, /### Breaking Changes/);
+      assert.doesNotMatch(second, /previous generation/);
     });
-    fs.writeFileSync(
-      path.join(root, 'package.json'),
-      JSON.stringify({ name: 'fixture', version: '2.0.0' }),
-    );
-    const older = '## 1.4.0 - 2026-05-25\n\n- Historical release must remain.\n';
-    fs.writeFileSync(
-      path.join(root, 'CHANGELOG.md'),
-      render('2.0.0', '', [
-        { hash: 'oldhash', subject: 'fix: previous generation', body: '' },
-      ]).replace(
-        'All notable changes to this project are documented here.',
-        'Maintained introduction.',
-      ) +
-        '\n' +
-        older,
-    );
-    const env = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
-    execFileSync('git', ['init', '-q'], { cwd: root, env });
-    execFileSync(
-      'git',
-      [
-        '-c',
-        'user.name=Fixture',
-        '-c',
-        'user.email=fixture@example.invalid',
-        'commit',
-        '--allow-empty',
-        '-qm',
-        'feat: change API',
-        '-m',
-        'BREAKING CHANGE: removed old API',
-      ],
-      { cwd: root, env },
-    );
-    generateChangelog(root);
-    const first = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
-    generateChangelog(root);
-    const second = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
-    assert.equal(first, second);
-    assert.ok(second.endsWith(older));
-    assert.equal(Array.from(second.matchAll(/^## 2\.0\.0 /gm)).length, 1);
-    assert.match(second, /Maintained introduction/);
-    assert.match(second, /### Breaking Changes/);
-    assert.doesNotMatch(second, /previous generation/);
   });
 
   it('keeps an empty Unreleased section above the generated release', () => {
@@ -210,27 +213,29 @@ describe('changelog loss and failure regressions', () => {
   });
 
   it('retains original bytes when history cannot be read', (t) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-git-failure-'));
-    t.after(() => {
-      fs.rmSync(root, { recursive: true, force: true });
-    });
-    fs.writeFileSync(
-      path.join(root, 'package.json'),
-      JSON.stringify({ name: 'fixture', version: '2.0.0' }),
-    );
-    const original = '# Changelog\n\n## 1.0.0 - old\n\n- Must not be overwritten.\n';
-    const file = path.join(root, 'CHANGELOG.md');
-    fs.writeFileSync(file, original);
-    assert.throws(() => {
-      generateChangelog(root, (_directory, args) => {
-        if (args[0] === 'log') throw new Error('git history read failed');
-        return '';
+    withGitFixtureEnvironment(() => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-git-failure-'));
+      t.after(() => {
+        fs.rmSync(root, { recursive: true, force: true });
       });
-    }, /git history read failed/);
-    assert.equal(fs.readFileSync(file, 'utf8'), original);
-    assert.throws(() => {
-      generateChangelog(root);
-    }, /git tag failed/);
-    assert.equal(fs.readFileSync(file, 'utf8'), original);
+      fs.writeFileSync(
+        path.join(root, 'package.json'),
+        JSON.stringify({ name: 'fixture', version: '2.0.0' }),
+      );
+      const original = '# Changelog\n\n## 1.0.0 - old\n\n- Must not be overwritten.\n';
+      const file = path.join(root, 'CHANGELOG.md');
+      fs.writeFileSync(file, original);
+      assert.throws(() => {
+        generateChangelog(root, (_directory, args) => {
+          if (args[0] === 'log') throw new Error('git history read failed');
+          return '';
+        });
+      }, /git history read failed/);
+      assert.equal(fs.readFileSync(file, 'utf8'), original);
+      assert.throws(() => {
+        generateChangelog(root);
+      }, /git tag failed/);
+      assert.equal(fs.readFileSync(file, 'utf8'), original);
+    });
   });
 });
