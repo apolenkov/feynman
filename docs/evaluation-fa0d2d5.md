@@ -4,6 +4,9 @@ The evaluated revision did **not** meet the frozen usefulness acceptance.
 This is historical evidence for `fa0d2d5521ae7f21576d8f67152a8cc9d69dc504`,
 not evidence for subsequent implementation changes.
 
+The corrected candidate's full rerun is recorded separately in
+[evaluation-72c6eb9.md](evaluation-72c6eb9.md).
+
 ## Protocol and provenance
 
 The unchanged public 20-task set was run three times under each condition:
@@ -54,8 +57,9 @@ tasks tied on comprehension/readability, which does not erase factual errors.
 Skill answer `9-2-skill` contradicted supplied outgoing state transitions.
 Answers `11-2-skill` and `11-3-skill` introduced message directions despite an
 explicitly unspecified direction and drew inconsistent bus topology. Hook
-answers for task 15 repeated a false initial-sequence-number premise rather
-than correcting it; task 12 also had a lower factual mean than its baseline.
+answers for task 15 invented a literal echo of initial sequence numbers in
+acknowledgment fields; the supplied prompt described acknowledgment, not that
+mechanism. Task 12 also had a lower factual mean than its baseline.
 These are defects requiring correction independently of the numerical threshold.
 
 ## Observed cost and latency
