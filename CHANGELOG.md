@@ -21,6 +21,11 @@ All notable changes to this project are documented here.
 - Invalid state commands no longer bootstrap or repair state before failing.
 - Unknown output styles cannot resolve inherited object properties.
 - SessionStart ignores malformed event shapes before creating local state.
+- ASCII explanations retain relation types, direction, conditions, explicit
+  absences, uncertainty and exhaustive scope. Compact layouts preserve complete
+  labels, aligned table columns and readable hierarchy branches.
+- Native skill loading uses the exact catalog path, including repeated directory
+  components, without filesystem discovery or setup actions.
 
 ### Changed
 
@@ -36,8 +41,10 @@ All notable changes to this project are documented here.
   permissions, and publication reuses the artifact validated by CI.
 - The complete local gate also runs in CI on Node 22, 24 and 26; it now compares
   two clean package builds and reports production files missing from LCOV.
-- Explanation evaluations use frozen facts and comprehension questions across
-  20 scenarios. Live usefulness remains subject to the paired evaluation gate.
+- ASCII evaluation records a frozen 67-call suite, including native skill,
+  installed-hook and baseline arms, settings and suppression cases. Independent
+  readers reconstruct diagrams before receiving hidden questions and source
+  facts; tool activity and rendered alignment have separate acceptance gates.
 - The mixed-script rule no longer loads package metadata during module import;
   regression tests preserve acceptance of all published package identifiers.
 
