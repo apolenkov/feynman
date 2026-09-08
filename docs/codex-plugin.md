@@ -19,11 +19,12 @@ ordinary explanation request needs no CLI, hook, download, or local state read.
 The npm CLI and SessionStart hook provide optional persistent assistance.
 
 The plugin intentionally has no MCP server. MCP is for external tools or data;
-feynman has neither. For an explicit settings request, its state bridge is `npx -y
-@albinocrabs/feynman@latest` command, which manages the user's Codex-local
-state and hook without a global binary prerequisite. If the package is not in
-the npm cache, that user-requested command may download the public package; the
-installed hook itself stays local and network-free.
+feynman has neither. For an explicit settings request, its state bridge is an
+already installed local `feynman` executable from `PATH`, or an absolute
+executable path supplied by the user. The skill never uses a remote package
+runner, downloads code, installs, or updates the CLI. If the executable is
+missing, it explains the separate optional setup and leaves state unchanged.
+The CLI owns Codex-local state writes; the skill never edits state files itself.
 
 The repository marketplace is the distribution source for the native plugin;
 the npm package distributes the CLI and hook. Keep their versions synchronized

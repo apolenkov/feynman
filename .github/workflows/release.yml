@@ -67,6 +67,39 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
 
+      - name: Validate release source
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          PACKAGE_TAG="v${PACKAGE_VERSION}"
+
+          if [ "$EVENT_NAME" = "release" ]; then
+            if [ -z "$RELEASE_TAG" ]; then
+              echo "Release event is missing its tag name."
+              exit 1
+            fi
+            if [ "$RELEASE_TAG" != "$PACKAGE_TAG" ]; then
+              echo "Release tag mismatch: github=${RELEASE_TAG}, package=${PACKAGE_TAG}"
+              exit 1
+            fi
+          fi
+
+          if git show-ref --verify --quiet "refs/tags/${PACKAGE_TAG}"; then
+            TAG_COMMIT=$(git rev-parse "refs/tags/${PACKAGE_TAG}^{commit}")
+            HEAD_COMMIT=$(git rev-parse HEAD)
+            if [ "$TAG_COMMIT" != "$HEAD_COMMIT" ]; then
+              echo "Release source mismatch: ${PACKAGE_TAG}=${TAG_COMMIT}, HEAD=${HEAD_COMMIT}"
+              exit 1
+            fi
+          elif [ "$EVENT_NAME" = "release" ]; then
+            echo "Release tag is missing from fetched refs: ${PACKAGE_TAG}"
+            exit 1
+          fi
+
+          echo "Release source validated: ${PACKAGE_TAG} at $(git rev-parse HEAD)"
+
       - name: Upgrade npm for Trusted Publishing
         run: |
           npm install --global npm@12.0.2
@@ -153,19 +186,6 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
             echo "$PACKAGE_NAME@$PACKAGE_VERSION is not published yet"
           fi
-
-      - name: Validate release tag matches package version
-        if: github.event_name == 'release'
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          PACKAGE_TAG="v${PACKAGE_VERSION}"
-          if [ "$RELEASE_TAG" != "$PACKAGE_TAG" ]; then
-            echo "❌ Release tag mismatch: github=${RELEASE_TAG}, package=${PACKAGE_TAG}"
-            exit 1
-          fi
-          echo "✅ Release tag matches package version: ${PACKAGE_TAG}"
 
       - name: Update GitHub release notes
         if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)

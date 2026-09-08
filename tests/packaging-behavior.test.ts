@@ -183,6 +183,7 @@ type ReleaseFailure =
   | 'manifest-fields'
   | 'entry'
   | 'forbidden'
+  | 'remote-runner'
   | 'install'
   | 'version'
   | 'doctor'
@@ -220,7 +221,11 @@ function releaseRunner(failure: ReleaseFailure = 'none'): ReleaseCommandRunner {
             ? 'missing link'
             : `See [settings](references/settings.md)${failure === 'forbidden' ? ' disable-model-invocation' : ''}`,
         );
-      return result('npx -y @albinocrabs/feynman@latest state');
+      return result(
+        failure === 'remote-runner'
+          ? 'feynman state [status|on|off]\nnpx -y @albinocrabs/feynman state'
+          : 'feynman state [status|on|off]',
+      );
     }
     if (command === 'npm')
       return failure === 'install' ? { ...OK, status: 2, stderr: 'install failed' } : OK;
@@ -282,6 +287,7 @@ describe('release smoke behavior', () => {
     ['manifest-fields', /manifest is incomplete/],
     ['entry', /entry failed/],
     ['forbidden', /non-discoverable metadata/],
+    ['remote-runner', /automatic remote runner/],
     ['install', /install failed/],
     ['version', /version mismatch/],
     ['doctor', /doctor smoke failed/],

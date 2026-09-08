@@ -79,6 +79,13 @@ does not receive an npm publish token. Both publication and rehearsal use
 pinned npm 12.0.2; review and verify a new npm version before changing this pin.
 npm 11.5.1 or newer is required for Trusted Publishing.
 
+Before any publishing write, the workflow derives `v<version>` from the checked
+out `package.json`. A release event must name that exact tag, and any fetched tag
+with that name must resolve to the checked-out `HEAD`, including annotated tags.
+A publishing dispatch may omit a tag so the workflow can create it, but it must
+stop if that version tag already points to another commit. This keeps npm,
+GitHub Release, and source provenance bound to one commit.
+
 Workflow permissions default to `contents: read`. Only the publishing job gets
 repository write and OIDC permissions; `dry_run=true` runs a separate read-only
 job. Release runs are serialized, and checkout does not persist Git credentials.

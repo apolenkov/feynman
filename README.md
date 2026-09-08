@@ -40,24 +40,37 @@ install the same Codex-only skill directly from this repository:
 npx skills add apolenkov/feynman --skill feynman --agent codex --global --yes
 ```
 
-The skill delegates state changes to the published CLI through `npx`; it does
-not install or configure any non-Codex integration. The skills.sh catalog is
-indexed asynchronously after installations, so a newly released source can
-take a short time to appear in search.
+For settings, the skill invokes an already installed local `feynman` executable
+from `PATH`, or an absolute executable path supplied by the user. It never uses
+a remote package runner or installs or updates the CLI as a side effect. The
+skills.sh catalog is indexed asynchronously after installations, so a newly
+released source can take a short time to appear in search.
 
 ### Local hook and CLI
 
 ```bash
-npx -y @albinocrabs/feynman@latest install
-npx -y @albinocrabs/feynman@latest doctor
+npm install --global --ignore-scripts @albinocrabs/feynman@2.1.1
+feynman install
+feynman doctor
 ```
 
 The installer targets Codex by default and writes only to `~/.codex`. It is
 idempotent. Uninstall with:
 
 ```bash
-npx -y @albinocrabs/feynman@latest uninstall
+feynman uninstall
 ```
+
+This persistent CLI setup is optional. Upgrade it only as a separate explicit
+action by installing the intended version; skill settings never trigger an
+install or upgrade. The GitHub project `apolenkov/feynman` and npm package
+`@albinocrabs/feynman` are the two distribution paths for the same project.
+Get the attestation URL with
+`npm view @albinocrabs/feynman@2.1.1 dist.attestations.url`. Open that URL and
+decode the SLSA attestation's base64 `bundle.dsseEnvelope.payload`; its
+`predicate.buildDefinition` identifies the repository, release workflow and
+source commit. Check these against the intended GitHub release. Provenance
+identifies the source and build; it does not establish that the code is safe.
 
 The native plugin supplies the Codex skill. The CLI installer registers the
 `SessionStart` hook that injects the selected ruleset into a session.
@@ -104,8 +117,8 @@ feynman version
 ```
 
 The CLI has zero third-party runtime dependencies and requires Node.js 22.18 or
-newer. Installation through `npx` still requires npm. The native explanation
-skill does not need Node.js until you explicitly request a CLI operation.
+newer. The native explanation skill does not need Node.js until you explicitly
+request a CLI operation.
 
 `bootstrap --force` replaces only a previous Feynman export with ownership
 metadata. It refuses unrelated, symlinked and protected destinations.
@@ -159,6 +172,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution workflow,
 ## Privacy and license
 
 feynman is local-only: its hook reads packaged rules and Codex-local state and
-writes no telemetry. A skill-requested `npx` state command may fetch the public
-package if it is not already cached; the hook itself makes no network request.
+writes no telemetry. Skill settings invoke only an already installed local CLI;
+they do not fetch packages. The hook itself makes no network request.
 See [PRIVACY.md](PRIVACY.md). Licensed under the MIT License.

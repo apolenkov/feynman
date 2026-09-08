@@ -171,9 +171,11 @@ compiled JavaScript and SHALL declare an empty `dependencies` object.
 
 The repository SHALL publish a native Codex plugin with a marketplace entry,
 manifest, and `SKILL.md`. Its name, description, and keywords SHALL describe
-visual architecture and ASCII diagram use cases. The skill SHALL invoke the
-published CLI through `npx` for a state operation and SHALL not require an MCP
-server or a globally installed binary.
+visual architecture and ASCII diagram use cases. For a state operation, the
+skill SHALL invoke only an already installed local CLI resolved from `PATH` or
+from an absolute executable path supplied by the user. It SHALL not require an
+MCP server, use a remote package runner, install or update code as a side effect,
+or write state files directly.
 
 #### Scenario: visual explanation without CLI installation
 
@@ -187,9 +189,15 @@ server or a globally installed binary.
 - **THEN** the skill uses the documented CLI state operation
 - **AND** it does not apply this operation to an ordinary explanation request
 
+#### Scenario: local CLI is unavailable
+
+- **WHEN** the user requests a settings operation and no allowed local CLI is available
+- **THEN** the skill explains the separate optional setup and leaves state unchanged
+- **AND** it does not invoke `npx`, `npm exec`, another remote runner, or an installer
+
 #### Scenario: plugin search and invocation
 
 - **WHEN** a user searches the Codex plugin browser for visual architecture,
   ASCII diagrams, flows, comparisons, or status
 - **THEN** the Feynman marketplace entry and skill metadata describe that
-  capability, and the skill can manage state with `npx`
+  capability, and the skill can manage state through the allowed local CLI
