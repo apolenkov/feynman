@@ -29,9 +29,9 @@ ${c.bold('Options:')}
   --force      (install) Re-register even if already installed
 
 ${c.bold('Examples:')}
-  npx @albinocrabs/feynman install
-  npx @albinocrabs/feynman install
-  npx @albinocrabs/feynman doctor
+  feynman install
+  feynman doctor
+  feynman state lite
   feynman lint response.md
   feynman bootstrap --out ./feynman-package
   feynman examples

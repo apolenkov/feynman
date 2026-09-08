@@ -23,10 +23,17 @@ The published package has zero runtime npm dependencies. The hook validates
 session input, confines state to the selected Codex home, and fails safe on
 invalid state or rules.
 
+Native skill settings invoke only an already installed local CLI from `PATH` or
+a user-provided absolute executable path. They never use `npx`, `npm exec`, or
+another remote runner and never install or update code as a side effect. The CLI
+owns all state writes; skill instructions do not write state files directly.
+
 ## Release checks
 
 - CI passes on the supported Node.js baseline on Ubuntu and macOS.
 - `npm run audit` reports no moderate-or-higher vulnerabilities.
 - The GitHub tag matches `package.json` with a `v` prefix.
+- An existing release tag must resolve to the source commit being published,
+  including for manually dispatched publication.
 - npm provenance is enabled.
 - A clean-directory npm smoke test passes after publication.

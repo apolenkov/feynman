@@ -111,8 +111,10 @@ describe('package metadata', () => {
       path.join(ROOT, 'plugins/feynman/skills/feynman/references/settings.md'),
       'utf8',
     );
-    assert.match(settings, /npx -y @albinocrabs\/feynman@latest state/);
+    assert.match(settings, /feynman state \[status\|on\|off/);
+    assert.match(settings, /absolute executable path only.*user provided/s);
+    assert.doesNotMatch(settings, /^(?:npx\s+(?:-y\s+)?@albinocrabs\/feynman|npm exec\b)/im);
     assert.doesNotMatch(skill, /disable-model-invocation/);
-    assert.match(settings, /never write `~\/\.codex\/\.feynman\/state\.json`/);
+    assert.match(settings, /never write `~\/\.codex\/\.feynman\/state\.json`/i);
   });
 });

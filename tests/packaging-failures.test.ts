@@ -248,7 +248,7 @@ describe('packaging failure cleanup', () => {
             })
           : entry.endsWith('SKILL.md')
             ? 'See [settings](references/settings.md)'
-            : 'npx -y @albinocrabs/feynman@latest state';
+            : 'feynman state [status|on|off]';
         return { status: 0, signal: null, stdout, stderr: '', error: undefined };
       }
       return {

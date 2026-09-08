@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- Native skill settings invoke only an already installed local CLI. They do not
+  use a remote package runner, install or update code, or write state directly.
+- Manual publishing rejects a release tag that points to a different source
+  commit before changing a GitHub release or publishing to npm.
+
 ## 2.1.0 - 2026-09-06
 
 ### Fixed

@@ -326,9 +326,12 @@ function verifyNativePlugin(
   );
   if (
     !skill.includes('](references/settings.md)') ||
-    !settings.includes('npx -y @albinocrabs/feynman@latest state')
+    !settings.includes('feynman state [status|on|off')
   ) {
     throw new Error('packed native Codex skill lacks its linked CLI settings reference');
+  }
+  if (/^(?:npx\s+(?:-y\s+)?@albinocrabs\/feynman|npm exec\b)/im.test(settings)) {
+    throw new Error('packed native Codex skill settings contain an automatic remote runner');
   }
   if (/disable-model-invocation/i.test(skill)) {
     throw new Error('packed native Codex skill contains non-discoverable metadata');
