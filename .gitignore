@@ -12,11 +12,6 @@ dist/
 *.tgz
 .planning/session-retros/
 .planning/memory/
-.sisyphus/
-
-# CodeGraph local index (machine-specific, not part of repo)
-.codegraph/
-
 # Eval run artifacts — local research history, kept out of the repo (git history retains prior commits)
 eval/
 feynman-rules-workspace/
