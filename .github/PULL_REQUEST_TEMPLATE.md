@@ -20,6 +20,10 @@ Closes #
 -
 -
 
+## How it was verified
+
+<!-- Commands run and what you saw. For UI or docs media, attach a screenshot. -->
+
 ## Tests
 
 - [ ] Added tests covering the change

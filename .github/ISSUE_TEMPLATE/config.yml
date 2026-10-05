@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/apolenkov/feynman/security/advisories/new
+    about: Private reports only. Do not open a public issue for vulnerabilities.
+  - name: Ask a question
+    url: https://github.com/apolenkov/feynman/blob/main/SUPPORT.md
+    about: See SUPPORT.md for where to ask.

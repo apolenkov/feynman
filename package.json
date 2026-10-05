@@ -66,13 +66,18 @@
     "ci": "npm run audit && npm run format:check && npm run typecheck && npm run eslint && npm run coverage && npm run check:coverage && npm run test:docs && npm run check:reproducibility && npm run test:release",
     "prepublishOnly": "npm run audit && npm run typecheck && npm run coverage && npm run check:coverage && npm run test:docs",
     "release": "npm run ci && npm publish \"./$(cat dist/TARBALL.txt)\" --access public",
-    "check:reproducibility": "node scripts/check-reproducibility.ts"
+    "check:reproducibility": "node scripts/check-reproducibility.ts",
+    "prepare": "lefthook install >/dev/null 2>&1 || true"
   },
   "devDependencies": {
+    "@commitlint/cli": "21.2.3",
+    "@commitlint/config-conventional": "21.2.3",
+    "@commitlint/types": "21.2.3",
     "@types/node": "^26.4.0",
     "@typescript-eslint/eslint-plugin": "^8.69.0",
     "@typescript-eslint/parser": "^8.69.0",
     "eslint": "^10.9.1",
+    "lefthook": "2.1.17",
     "prettier": "3.9.6",
     "typescript": "^6.0.3"
   }
