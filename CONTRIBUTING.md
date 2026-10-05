@@ -12,6 +12,11 @@ npm ci
 npm run ci
 ```
 
+`npm install` registers git hooks through [lefthook](https://lefthook.dev/): staged
+TypeScript, JSON and YAML are format-checked and linted before commit,
+[Conventional Commits](https://www.conventionalcommits.org/) are enforced by
+commitlint, and typecheck, lint, tests and docs run before push.
+
 Use Node.js 22.18 or newer. Tests use Node's built-in `node:test` runner.
 Lint changed documentation with `npm run lint -- <files>`.
 

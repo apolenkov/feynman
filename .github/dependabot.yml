@@ -1,17 +1,31 @@
+# Weekly version updates; a new release waits 3 days before Dependabot
+# proposes it (cooldown), so a pulled or compromised version is skipped.
+# Passing PRs are merged by .github/workflows/dependabot-automerge.yml.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
-    schedule:
-      interval: weekly
-      day: monday
-      time: '09:00'
-    labels:
-      - dependencies
+    # TypeScript majors change the compiler contract this repo pins in
+    # tsconfig and typed ESLint; take a new major by hand.
     ignore:
       - dependency-name: typescript
         update-types:
           - version-update:semver-major
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+    cooldown:
+      default-days: 3
+    groups:
+      tooling:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
@@ -23,9 +37,15 @@ updates:
       interval: weekly
       day: monday
       time: '09:00'
+    cooldown:
+      default-days: 3
+    groups:
+      actions:
+        patterns:
+          - '*'
     labels:
       - github-actions
     open-pull-requests-limit: 5
     commit-message:
-      prefix: ci
+      prefix: chore
       include: scope
