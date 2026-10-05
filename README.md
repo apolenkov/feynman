@@ -151,7 +151,7 @@ metadata. It refuses unrelated, symlinked and protected destinations.
 
 ## Configuration
 
-The hook has two persistent settings, managed only through the CLI:
+The hook has three persistent settings (intensity, output style, on/off), managed only through the CLI:
 
 ```bash
 feynman state lite|full|ultra   # diagram intensity, default: full
