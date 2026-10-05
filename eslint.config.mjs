@@ -11,6 +11,7 @@ export default [
       'feynman-rules-workspace/**',
       'eval/**',
       'evals/**',
+      'commitlint.config.ts',
     ],
   },
 

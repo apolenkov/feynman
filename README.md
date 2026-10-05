@@ -1,20 +1,50 @@
-# feynman
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/banner-dark.svg">
+    <img alt="feynman: why explain in words when diagram do trick" src=".github/assets/banner-light.svg" width="100%">
+  </picture>
+</p>
 
-![CI](https://github.com/apolenkov/feynman/actions/workflows/ci.yml/badge.svg?label=CI&color=2563EB)
-![npm](https://img.shields.io/npm/v/@albinocrabs/feynman?color=2563EB)
-![License](https://img.shields.io/github/license/apolenkov/feynman?color=2563EB)
-[![skills.sh](https://skills.sh/b/apolenkov/feynman)](https://skills.sh/apolenkov/feynman)
+<p align="center">
+  <a href="https://github.com/apolenkov/feynman/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/apolenkov/feynman/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://www.npmjs.com/package/@albinocrabs/feynman"><img alt="npm" src="https://img.shields.io/npm/v/@albinocrabs/feynman?color=2563EB"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/apolenkov/feynman?color=2563EB"></a>
+  <img alt="Node.js 22.18+" src="https://img.shields.io/badge/node-%E2%89%A522.18-2563EB">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-2563EB">
+  <a href="https://skills.sh/apolenkov/feynman"><img alt="skills.sh" src="https://skills.sh/b/apolenkov/feynman"></a>
+</p>
 
-feynman adds visual-explanation instructions to Codex. The native skill guides
-Codex through extracting relationships from text, choosing a readable layout,
-and checking the finished diagram against the supplied facts. An optional
-local CLI installs session-wide diagram guidance and provides an ASCII linter.
+**feynman adds visual-explanation instructions to Codex: a skill that turns relationships into diagrams, an optional session hook, and an ASCII diagram linter.**
+
+![feynman lint catching a broken box and passing a clean flow](.github/assets/demo.gif)
+
+## Why
+
+Some answers are about relationships: what calls what, what happens first,
+which branch is taken. A diagram shows those at a glance. The native skill
+guides Codex through extracting relationships from text, choosing a readable
+layout, and checking the finished diagram against the supplied facts. An
+optional local CLI installs session-wide diagram guidance and provides an ASCII
+linter.
 
 Use it when you want a visual explanation. The earlier controlled comparison
 did not establish clearer answers than ordinary Codex responses and exhibited
 factual and instruction-compliance failures. See the historical
 [evaluation report](docs/evaluation-3ab9de4.md). Technical test results do not
 establish explanation quality.
+
+## Features
+
+- **Codex skill.** Extracts entities, relationship verbs, conditions and
+  uncertainty from text, then picks a flow, graph, hierarchy, table or list.
+- **SessionStart hook (optional).** Restores the diagram rules on `startup`,
+  `resume`, `compact` and `clear`, so they survive context compaction without
+  being repeated on every prompt.
+- **ASCII linter.** `feynman lint` checks diagrams in Markdown for unclosed
+  boxes, bad trees, mixed arrows, column widths and frame-width mismatches
+  (rules L01 to L15), with `--strict` and `--json` modes. See [lint rules](docs/lint-rules.md).
+- **Local only.** The CLI has zero third-party runtime dependencies, and the
+  hook writes no telemetry.
 
 ## Install
 
@@ -79,28 +109,24 @@ its current definition, then start a new session. Codex skips new or changed
 hooks until they are trusted. This step applies to the optional hook; standalone
 skill explanations need no hook setup.
 
-## What it does
+## Usage
 
-The instructions separate meaning from layout: preserve entities, relationship
-verbs, conditions and uncertainty, then choose a flow, graph, hierarchy, table
-or list. Whole-text transformations must retain every in-scope fact. Shared
-nodes and cycles need explicit connections; a tree is reserved for a hierarchy.
-Diagrams use the requested width, or 80 display columns by default.
+In Codex, ask for a visual explanation: architecture, a flow, a tree, a
+comparison, priorities or a status summary. The instructions separate meaning
+from layout: preserve entities, relationship verbs, conditions and uncertainty,
+then choose a flow, graph, hierarchy, table or list. Whole-text transformations
+must retain every in-scope fact. Shared nodes and cycles need explicit
+connections; a tree is reserved for a hierarchy. Diagrams use the requested
+width, or 80 display columns by default.
 
 An explicit diagram request takes precedence over automatic style limits;
-prose-only requests remain prose. Model compliance is not guaranteed. The
-default hook Intensity is `full`; `lite` and `ultra` are available through
-`feynman state`. These persistent preferences apply to the CLI-installed hook;
-standalone skill explanations follow their packaged instructions and your request.
+prose-only requests remain prose. Model compliance is not guaranteed.
 
 ```text
 [Build] --> [Test] --> [Deploy]
 ```
 
-The hook runs on `startup`, `resume`, `compact`, and `clear`, so the rules are
-restored after context compaction without being repeated on every prompt.
-
-## CLI
+### CLI
 
 ```bash
 feynman install             # register the Codex hook
@@ -122,6 +148,21 @@ request a CLI operation.
 
 `bootstrap --force` replaces only a previous Feynman export with ownership
 metadata. It refuses unrelated, symlinked and protected destinations.
+
+## Configuration
+
+The hook has three persistent settings (intensity, output style, on/off), managed only through the CLI:
+
+```bash
+feynman state lite|full|ultra   # diagram intensity, default: full
+feynman state style short       # output-style preset: short, middle or full
+feynman state on|off            # enable or disable diagram assistance
+feynman status                  # show current state
+```
+
+State lives under `~/.codex/.feynman/`. These preferences apply to the
+CLI-installed hook; standalone skill explanations follow their packaged
+instructions and your request.
 
 ## Repository map
 
