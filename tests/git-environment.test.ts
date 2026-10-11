@@ -72,22 +72,53 @@ it('keeps Git fixture writes out of a repository named by inherited environment'
   assert.equal(fs.existsSync(path.join(protectedRoot, 'fixture.txt')), false);
 });
 
-it('restores the caller environment after successful and failed synchronous fixture scopes', () => {
-  const original = process.env;
-  const failure = new Error('fixture callback failed');
-  withGitFixtureEnvironment(() => {
-    assert.notEqual(process.env, original);
-    assert.equal(process.env['GIT_DIR'], undefined);
-    assert.equal(process.env['GIT_CONFIG_GLOBAL'], '/dev/null');
+for (const throws of [false, true]) {
+  it(`isolates implicit child environment and restores it after callback ${throws ? 'throw' : 'success'}`, (t) => {
+    const original = { ...process.env };
+    const root = fs.mkdtempSync(path.join(process.cwd(), '.git-environment-test-'));
+    t.after(() => {
+      for (const name of Object.keys(process.env)) {
+        if (!Object.hasOwn(original, name)) Reflect.deleteProperty(process.env, name);
+      }
+      Object.assign(process.env, original);
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+    execFileSync('git', ['init', '--quiet'], { cwd: root, env: gitFixtureEnvironment() });
+    const gitDir = path.join(root, '.git');
+    process.env['GIT_DIR'] = gitDir;
+    process.env['GIT_CONFIG_GLOBAL'] = path.join(root, 'caller-config');
+    process.env['GIT_CONFIG_NOSYSTEM'] = '0';
+    process.env['FEYNMAN_GIT_ENVIRONMENT_TEST'] = 'caller';
+    delete process.env['GIT_TEST_SCOPE'];
+    const childEnvironment = (): string =>
+      execFileSync(
+        process.execPath,
+        [
+          '-e',
+          'process.stdout.write(JSON.stringify([process.env.GIT_DIR ?? null, process.env.GIT_CONFIG_GLOBAL, process.env.GIT_CONFIG_NOSYSTEM, process.env.FEYNMAN_GIT_ENVIRONMENT_TEST, process.env.GIT_TEST_SCOPE ?? null]))',
+        ],
+        { encoding: 'utf8' },
+      );
+    const failure = new Error('fixture callback failed');
+    const operation = (): undefined => {
+      assert.equal(childEnvironment(), '[null,"/dev/null","1","caller",null]');
+      process.env['FEYNMAN_GIT_ENVIRONMENT_TEST'] = 'callback';
+      process.env['GIT_TEST_SCOPE'] = 'callback';
+      if (throws) throw failure;
+    };
+    if (throws) {
+      assert.throws(
+        () => {
+          withGitFixtureEnvironment(operation);
+        },
+        (error: unknown) => error === failure,
+      );
+    } else {
+      withGitFixtureEnvironment(operation);
+    }
+    assert.equal(
+      childEnvironment(),
+      JSON.stringify([gitDir, path.join(root, 'caller-config'), '0', 'caller', null]),
+    );
   });
-  assert.equal(process.env, original);
-  assert.throws(
-    () => {
-      withGitFixtureEnvironment(() => {
-        throw failure;
-      });
-    },
-    (error: unknown) => error === failure,
-  );
-  assert.equal(process.env, original);
-});
+}

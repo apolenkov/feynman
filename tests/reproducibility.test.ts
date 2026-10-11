@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { withGitFixtureEnvironment } from './helpers/git-environment.ts';
 import {
   checkReproducibility,
   runReproducibilityCommand,
@@ -69,15 +70,17 @@ describe('reproducibility check', () => {
   });
 
   it('preserves the real git diagnostic outside a repository', () => {
-    const fx = fixture();
-    try {
-      assert.throws(
-        () => checkReproducibility({ root: fx.root }),
-        /Cannot enumerate repository source inputs:[\s\S]*not a git repository/i,
-      );
-    } finally {
-      fx.dispose();
-    }
+    withGitFixtureEnvironment(() => {
+      const fx = fixture();
+      try {
+        assert.throws(
+          () => checkReproducibility({ root: fx.root }),
+          /Cannot enumerate repository source inputs:[\s\S]*not a git repository/i,
+        );
+      } finally {
+        fx.dispose();
+      }
+    });
   });
 
   it('preserves a signal-only source enumeration failure', () => {
