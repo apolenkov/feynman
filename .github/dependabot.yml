@@ -1,6 +1,5 @@
 # Weekly version updates; a new release waits 3 days before Dependabot
 # proposes it (cooldown), so a pulled or compromised version is skipped.
-# Passing PRs are merged by .github/workflows/dependabot-automerge.yml.
 version: 2
 updates:
   - package-ecosystem: npm
