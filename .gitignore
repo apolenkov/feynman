@@ -18,3 +18,4 @@ feynman-rules-workspace/
 /.worktrees/
 /.superpowers/
 /.codegraph/
+/.agents/skills/openspec-*/
