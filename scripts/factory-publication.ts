@@ -75,16 +75,38 @@ function evidenceReference(envelope: JsonRecord): JsonRecord {
     source_sha: core['workflow_source_sha'],
   };
 }
-function canonicalIssue(issue: JsonRecord): JsonRecord | null {
-  if (issue['pull_request'] !== undefined || typeof issue['body'] !== 'string') return null;
+export function isCanonicalIssueAuthor(context: FactoryContext, issue: JsonRecord): boolean {
+  const user = issue['user'];
+  if (typeof user !== 'object' || user === null || Array.isArray(user)) return false;
+  const id = record(user)['id'];
+  return (
+    typeof id === 'number' &&
+    Number.isSafeInteger(id) &&
+    (String(id) === context.policy['owner_id'] || id === 41898282)
+  );
+}
+function canonicalIssue(context: FactoryContext, issue: JsonRecord): JsonRecord | null {
+  if (
+    !isCanonicalIssueAuthor(context, issue) ||
+    issue['pull_request'] !== undefined ||
+    typeof issue['body'] !== 'string'
+  )
+    return null;
   const prefix = '<!-- factory-finding-v1 ';
   const marker = issue['body'].split('\n').filter((line) => line.startsWith(prefix));
-  if (marker.length !== 1 || marker[0] === undefined) return null;
+  if (marker.length === 0) return null;
+  if (marker.length !== 1 || marker[0]?.endsWith(' -->') !== true)
+    throw new FactoryFailure('Invalid canonical finding marker; preserve work');
   try {
     const parsed: unknown = JSON.parse(marker[0].slice(prefix.length, -4));
-    return record(parsed);
+    const value = record(parsed);
+    stringField(value, 'repository_id');
+    stringField(value, 'fingerprint_policy_revision');
+    if (!/^[a-f0-9]{64}$/.test(stringField(value, 'fingerprint')))
+      throw new FactoryFailure('Invalid canonical fingerprint');
+    return value;
   } catch {
-    return null;
+    throw new FactoryFailure('Invalid canonical finding marker; preserve work');
   }
 }
 export async function reconcilePublication(
@@ -132,7 +154,35 @@ export async function reconcilePublication(
     let snapshot = (await githubPages(context, `${route}?state=all`)).map(record);
     const issues: JsonRecord[] = [];
     const dispatch: JsonRecord[] = [];
-    for (const finding of selected) {
+    const processed: JsonRecord[] = [];
+    const deferred: JsonRecord[] = [];
+    let created = 0;
+    const closing: JsonRecord[] = [];
+    if (complete) {
+      for (const issue of snapshot) {
+        const marker = canonicalIssue(context, issue);
+        if (
+          marker === null ||
+          marker['repository_id'] !== context.policy['repository_id'] ||
+          marker['fingerprint_policy_revision'] !== scan['fingerprint_policy_revision'] ||
+          issue['state'] !== 'open' ||
+          presence.includes(stringField(marker, 'fingerprint'))
+        )
+          continue;
+        const provenance = await verifyAuthority(
+          context,
+          record(record(scan['disappearance_authority'])[stringField(issue, 'node_id')]),
+        );
+        if (
+          provenance['issue_node_id'] !== issue['node_id'] ||
+          provenance['fingerprint'] !== marker['fingerprint'] ||
+          provenance['outcome'] !== 'complete-absence'
+        )
+          throw new FactoryFailure('Unproven disappearance');
+        closing.push(issue);
+      }
+    }
+    for (const finding of identified) {
       const proof = await verifyAuthority(context, record(finding['authority']));
       const verifierOperation = record(proof['operation']);
       if (
@@ -144,7 +194,10 @@ export async function reconcilePublication(
       )
         throw new FactoryFailure('Finding adjudication provenance mismatch');
       const confidence = stringField(proof, 'outcome');
-      if (confidence === 'refuted') continue;
+      if (confidence === 'refuted') {
+        processed.push(finding);
+        continue;
+      }
       if (confidence !== 'confirmed' && confidence !== 'disputed')
         throw new FactoryFailure('Verifier infrastructure/no-verdict failure');
       const fingerprint = stringField(finding, 'fingerprint');
@@ -154,7 +207,7 @@ export async function reconcilePublication(
         fingerprint,
       };
       const matches = snapshot.filter((issue) => {
-        const marker = canonicalIssue(issue);
+        const marker = canonicalIssue(context, issue);
         return (
           marker !== null &&
           marker['repository_id'] === identity.repository_id &&
@@ -164,6 +217,11 @@ export async function reconcilePublication(
       });
       if (matches.length > 1) throw new FactoryFailure('Canonical issue conflict');
       let issue = matches[0];
+      if (issue === undefined && created >= numberField(context.policy, 'issue_cap')) {
+        deferred.push({ fingerprint, path: finding['path'], adjudication: confidence });
+        continue;
+      }
+      processed.push(finding);
       const protectedPath = arrayField(context.policy, 'protected_paths').some(
         (pattern) =>
           typeof pattern === 'string' &&
@@ -173,19 +231,22 @@ export async function reconcilePublication(
       );
       const repairState = confidence === 'disputed' || protectedPath ? 'needs-human' : 'eligible';
       const body = `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->\nConfidence: ${confidence}\nRepair: ${repairState}\nAuthenticated receipt: ${sha256(proof)}`;
+      const title = `[factory:${confidence}] ${fingerprint.slice(0, 16)}`;
+      const findingLabels = [`severity:${stringField(finding, 'severity')}`, 'source:ocr-scan'];
       if (issue === undefined) {
         await verifyControlSource(context);
         try {
           issue = record(
             await githubRequest(context, route, 'POST', {
-              title: `[factory:${confidence}] ${fingerprint.slice(0, 16)}`,
+              title,
               body,
+              labels: findingLabels,
             }),
           );
         } catch {
           snapshot = (await githubPages(context, `${route}?state=all`)).map(record);
           const discovered = snapshot.filter((candidate) => {
-            const marker = canonicalIssue(candidate);
+            const marker = canonicalIssue(context, candidate);
             return (
               marker !== null &&
               marker['repository_id'] === identity.repository_id &&
@@ -198,7 +259,10 @@ export async function reconcilePublication(
           issue = discovered[0];
         }
         snapshot = (await githubPages(context, `${route}?state=all`)).map(record);
+        created++;
       }
+      if (!isCanonicalIssueAuthor(context, issue))
+        throw new FactoryFailure('Issue publication author untrusted');
       const issueNumber = numberField(issue, 'number');
       if (issue['state'] === 'closed') {
         issues.push({
@@ -210,6 +274,25 @@ export async function reconcilePublication(
           reason: 'Reopening not implemented; existing closure preserved',
         });
         continue;
+      }
+      const currentLabels = arrayField(issue, 'labels').map((label) =>
+        typeof label === 'string' ? label : stringField(record(label), 'name'),
+      );
+      const labels = [
+        ...currentLabels.filter(
+          (label) => !label.startsWith('severity:') && label !== 'source:ocr-scan',
+        ),
+        ...findingLabels,
+      ];
+      if (
+        issue['title'] !== title ||
+        issue['body'] !== body ||
+        JSON.stringify(currentLabels.toSorted()) !== JSON.stringify(labels.toSorted())
+      ) {
+        await verifyControlSource(context);
+        issue = record(
+          await githubRequest(context, `${route}/${issueNumber}`, 'PATCH', { title, body, labels }),
+        );
       }
       const stableIdentity = { ...identity, issue_node_id: stringField(issue, 'node_id') };
       const registration = produceReceipt({
@@ -259,34 +342,17 @@ export async function reconcilePublication(
       if (repairState === 'eligible')
         dispatch.push({ issue_number: issueNumber, receipt_sha256: sha256(proof) });
     }
-    if (complete) {
-      for (const issue of snapshot) {
-        const marker = canonicalIssue(issue);
-        if (
-          marker === null ||
-          marker['repository_id'] !== context.policy['repository_id'] ||
-          marker['fingerprint_policy_revision'] !== scan['fingerprint_policy_revision'] ||
-          issue['state'] !== 'open' ||
-          presence.includes(stringField(marker, 'fingerprint'))
-        )
-          continue;
-        // Marker locates a candidate; immutable producer proof must authorize its identity.
-        const provenance = await verifyAuthority(context, record(scan['disappearance_authority']));
-        if (
-          provenance['issue_node_id'] !== issue['node_id'] ||
-          provenance['fingerprint'] !== marker['fingerprint'] ||
-          provenance['outcome'] !== 'complete-absence'
-        )
-          throw new FactoryFailure('Unproven disappearance');
-        await verifyControlSource(context);
-        await githubRequest(context, `${route}/${numberField(issue, 'number')}`, 'PATCH', {
-          state: 'closed',
-          state_reason: 'completed',
-        });
-      }
+    for (const issue of closing) {
+      await verifyControlSource(context);
+      await githubRequest(context, `${route}/${numberField(issue, 'number')}`, 'PATCH', {
+        state: 'closed',
+        state_reason: 'completed',
+      });
     }
     return {
       ...base,
+      selected: processed,
+      pending: deferred,
       issues,
       dispatch,
       status: 'accepted',

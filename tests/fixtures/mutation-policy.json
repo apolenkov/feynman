@@ -451,9 +451,9 @@
     {
       "file": "scripts/factory-publication.ts",
       "owner": "reconcilePublication",
-      "mutationHash": "655780db26f33e69cb9b8e4e5b7943093c615d3b08fdfa411983c87a6ea14aee",
-      "count": 9,
-      "reason": "Invocation-owned complete snapshot and issue/pending collections reconcile detached finding proofs; four-identity, deduplication and incomplete-scan controls verify all finding identities remain represented.",
+      "mutationHash": "15ebe56358049d5dcddec4e298753541ed39238c7beb82de16c394176237ee47",
+      "count": 16,
+      "reason": "Invocation-owned presence, creation counter and issue/pending/closure collections reconcile authenticated findings; Opus regressions prove per-issue preauthentication before every PATCH, author filtering, refresh and the three-new-issue cap.",
       "test": "tests/night-factory-publication.test.ts"
     },
     {

@@ -12,6 +12,7 @@ import {
   loadFactoryPolicy,
   sha256,
   canonicalBytes,
+  numberField,
   arrayField,
   authorityMarker,
 } from '../scripts/factory-protocol.ts';
@@ -198,7 +199,9 @@ it('publishes confirmed and disputed findings from detached non-lineage proofs, 
   const pendingIssue = {
     number: 55,
     node_id: 'I_PENDING',
+    user: { id: 23296915, login: 'apolenkov' },
     state: 'open',
+    labels: [],
     body: `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: '1230959148', fingerprint_policy_revision: 'reviewed-v1', fingerprint: pendingFingerprint })} -->`,
   };
   platform.issues.push(pendingIssue);
@@ -231,9 +234,9 @@ it('publishes confirmed and disputed findings from detached non-lineage proofs, 
   assert.equal(result.status, 'accepted', result.reason);
   assert.equal(result.complete, true);
   assert.equal(result.presence.length, 4);
-  assert.equal(result.pending.length, 1);
-  assert.equal(result.issues.length, 2);
-  assert.equal(result.dispatch.length, 1);
+  assert.equal(result.pending.length, 0);
+  assert.equal(result.issues.length, 3);
+  assert.equal(result.dispatch.length, 2);
   assert.equal(
     record(result.issues[0])['confidence'],
     'confirmed',
@@ -738,6 +741,7 @@ async function publishedHeadFixture(test: TestContext) {
   const issue = {
     number: 42,
     node_id: identity.issue_node_id,
+    user: { id: 23296915, login: 'apolenkov' },
     state: 'open',
     labels: [{ name: 'factory-fix' }],
     body: `<!-- factory-finding-v1 ${JSON.stringify(marker)} -->`,
@@ -1272,6 +1276,7 @@ it('AC03–05 refuses ambiguous failed POST adoption from a foreign repository m
   platform.issues.push({
     number: 55,
     node_id: 'I_FOREIGN_MARKER',
+    user: { id: 23296915, login: 'apolenkov' },
     state: 'open',
     body: `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: '999', fingerprint_policy_revision: 'reviewed-v1', fingerprint: fixture.fingerprint })} -->`,
   });
@@ -1298,6 +1303,7 @@ it('AC03–05 retains a human-closed canonical finding and never reopens it mere
   const issue = {
     number: 42,
     node_id: 'I_HUMAN_CLOSED',
+    user: { id: 23296915, login: 'apolenkov' },
     state: 'closed',
     body: `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: '1230959148', fingerprint_policy_revision: 'reviewed-v1', fingerprint: fixture.fingerprint })} -->`,
   };
@@ -1329,6 +1335,7 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
       const issue = {
         number: 42,
         node_id: 'I_ABSENT',
+        user: { id: 23296915, login: 'apolenkov' },
         state: 'open',
         body: `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->`,
       };
@@ -1412,7 +1419,7 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
       const result = await reconcilePublication(fixture.context, {
         ...absent,
         authority: scanAuthority,
-        disappearance_authority: proof,
+        disappearance_authority: { [issue.node_id]: proof },
       });
       assert.equal(
         result.status,
@@ -1427,5 +1434,390 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
         platform.requests.slice(before).filter((request) => request.method === 'PATCH').length,
         control === 'complete-absence' ? 1 : 0,
       );
+    });
+});
+
+function refreshedScan(
+  fixture: Awaited<ReturnType<typeof publicationFindingFixture>>,
+  findings: readonly JsonRecord[],
+): JsonRecord {
+  const { authority: _authority, ...document } = fixture.scan;
+  const next = { ...document, findings };
+  return {
+    ...next,
+    authority: fixture.authority('scan', 'complete', fixture.baseline, sha256(next), 'reviewed-v1'),
+  };
+}
+
+it('Opus F1 skips foreign valid and malformed issue markers before canonical publication or disappearance', async (test) => {
+  for (const trustedId of [23296915, 41898282, null])
+    await test.test(`canonical author ${trustedId ?? 'foreign-only'}`, async (subtest) => {
+      const fixture = await publicationFindingFixture(subtest);
+      const { platform } = fixture;
+      const identity = {
+        repository_id: '1230959148',
+        fingerprint_policy_revision: 'reviewed-v1',
+        fingerprint: fixture.fingerprint,
+      };
+      const marker = `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->`;
+      const foreign = [
+        {
+          number: 51,
+          node_id: 'I_FOREIGN_DUPLICATE',
+          user: { id: 999, login: 'apolenkov' },
+          state: 'open',
+          body: marker,
+        },
+        {
+          number: 52,
+          node_id: 'I_FOREIGN_MALFORMED',
+          user: { id: 999 },
+          state: 'open',
+          body: '<!-- factory-finding-v1 {bad-json} -->',
+        },
+        {
+          number: 53,
+          node_id: 'I_FOREIGN_MISSING',
+          user: { id: 999 },
+          state: 'open',
+          body: `<!-- factory-finding-v1 ${JSON.stringify({ ...identity, fingerprint: sha256('foreign missing finding') })} -->`,
+        },
+        {
+          number: 54,
+          node_id: 'I_NON_NUMERIC_AUTHOR',
+          user: { id: '23296915' },
+          state: 'open',
+          body: marker,
+        },
+        { number: 55, node_id: 'I_UNKNOWN_AUTHOR', user: null, state: 'open', body: marker },
+      ];
+      platform.issues.push(...foreign);
+      if (trustedId !== null)
+        platform.issues.push({
+          number: 42,
+          node_id: 'I_TRUSTED',
+          user: { id: trustedId },
+          state: 'open',
+          labels: [],
+          body: marker,
+        });
+      const before = platform.requests.length;
+      const result = await reconcilePublication(fixture.context, fixture.scan);
+      assert.equal(result.status, 'accepted', result.reason);
+      assert.equal(result.issues.length, 1);
+      const canonical = record(result.issues[0]);
+      if (trustedId === null)
+        assert.equal(
+          foreign.some((issue) => issue.node_id === canonical['issue_node_id']),
+          false,
+        );
+      else assert.equal(canonical['issue_node_id'], 'I_TRUSTED');
+      const effects = platform.requests.slice(before).filter((request) => request.method !== 'GET');
+      assert.equal(
+        effects.filter((request) => request.method === 'POST').length,
+        trustedId === null ? 1 : 0,
+      );
+      assert.equal(
+        effects.some((request) =>
+          foreign.some((issue) => request.path.endsWith(`/issues/${issue.number}`)),
+        ),
+        false,
+      );
+      for (const issue of foreign)
+        assert.deepEqual(
+          platform.issues.find((entry) => entry['node_id'] === issue.node_id),
+          issue,
+        );
+    });
+});
+
+it('Opus F3 refreshes disputed to confirmed on the same issue with current severity/source labels and preserves unrelated labels', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const finding = { ...fixture.finding, severity: 'low' };
+  const disputed = {
+    ...finding,
+    authority: fixture.authority(
+      'verifier',
+      'disputed',
+      fixture.baseline,
+      sha256(finding),
+      fixture.fingerprint,
+    ),
+  };
+  const first = await reconcilePublication(fixture.context, refreshedScan(fixture, [disputed]));
+  assert.equal(first.status, 'accepted', first.reason);
+  const original = record(fixture.platform.issues[0]);
+  const labeled = {
+    ...original,
+    labels: [
+      { name: 'severity:low' },
+      { name: 'severity:critical' },
+      { name: 'factory-fix' },
+      { name: 'owner-note' },
+    ],
+  };
+  fixture.platform.issues[0] = labeled;
+  fixture.platform.facts.set(
+    `/repos/apolenkov/feynman/issues/${numberField(original, 'number')}`,
+    labeled,
+  );
+  const confirmed = {
+    ...fixture.finding,
+    authority: fixture.authority(
+      'verifier',
+      'confirmed',
+      fixture.baseline,
+      sha256(fixture.finding),
+      fixture.fingerprint,
+    ),
+  };
+  const second = await reconcilePublication(fixture.context, refreshedScan(fixture, [confirmed]));
+  assert.equal(second.status, 'accepted', second.reason);
+  assert.equal(record(second.issues[0])['issue_node_id'], original['node_id']);
+  const current = record(fixture.platform.issues[0]);
+  assert.equal(current['title'], `[factory:confirmed] ${fixture.fingerprint.slice(0, 16)}`);
+  assert.match(stringField(current, 'body'), /Confidence: confirmed\nRepair: eligible/);
+  assert.deepEqual(arrayField(current, 'labels').toSorted(), [
+    'factory-fix',
+    'owner-note',
+    'severity:high',
+    'source:ocr-scan',
+  ]);
+  const posts = fixture.platform.requests.filter(
+    (request) => request.method === 'POST' && request.path === '/repos/apolenkov/feynman/issues',
+  );
+  assert.equal(posts.length, 1);
+  assert.deepEqual(arrayField(record(posts[0]?.body), 'labels').toSorted(), [
+    'severity:low',
+    'source:ocr-scan',
+  ]);
+  assert.equal(
+    fixture.platform.requests.filter(
+      (request) =>
+        request.method === 'PATCH' &&
+        request.path.endsWith(`/issues/${numberField(original, 'number')}`),
+    ).length,
+    1,
+  );
+});
+
+it('Opus F6 caps only three new issues while existing first findings and refuted verdicts consume no creation allowance', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const findings: JsonRecord[] = [];
+  for (let index = 0; index < 8; index++) {
+    const finding = { ...fixture.finding, fingerprint: sha256(`creation-cap-${index}`) };
+    findings.push({
+      ...finding,
+      authority: fixture.authority(
+        'verifier',
+        index === 4 ? 'refuted' : 'confirmed',
+        fixture.baseline,
+        sha256(finding),
+        finding.fingerprint,
+      ),
+    });
+    if (index < 3)
+      fixture.platform.issues.push({
+        number: 40 + index,
+        node_id: `I_EXISTING_${index}`,
+        user: { id: 23296915 },
+        state: 'open',
+        labels: [],
+        body: `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: '1230959148', fingerprint_policy_revision: 'reviewed-v1', fingerprint: finding.fingerprint })} -->`,
+      });
+  }
+  const before = fixture.platform.requests.length;
+  const result = await reconcilePublication(fixture.context, refreshedScan(fixture, findings));
+  assert.equal(result.status, 'accepted', result.reason);
+  assert.equal(result.presence.length, 8);
+  assert.equal(result.issues.length, 6);
+  assert.equal(result.pending.length, 1);
+  assert.equal(record(result.pending[0])['fingerprint'], record(findings[7])['fingerprint']);
+  const posts = fixture.platform.requests
+    .slice(before)
+    .filter(
+      (request) => request.method === 'POST' && request.path === '/repos/apolenkov/feynman/issues',
+    );
+  assert.equal(posts.length, 3);
+  for (const index of [3, 5, 6])
+    assert.ok(
+      posts.some((request) =>
+        stringField(record(request.body), 'body').includes(
+          stringField(record(findings[index]), 'fingerprint'),
+        ),
+      ),
+    );
+  assert.equal(
+    fixture.platform.issues.some(
+      (issue) =>
+        typeof issue['body'] === 'string' &&
+        issue['body'].includes(stringField(record(findings[4]), 'fingerprint')),
+    ),
+    false,
+  );
+});
+
+it('Opus F2 authenticates both missing-issue proofs before any closure or existing refresh PATCH', async (test) => {
+  for (const control of ['all-valid', 'invalid-second'])
+    await test.test(control, async (subtest) => {
+      const fixture = await publicationFindingFixture(subtest);
+      const { platform } = fixture;
+      const red = fixture.authority(
+        'verifier',
+        'behavioral-red',
+        fixture.baseline,
+        sha256(fixture.testBytes),
+      );
+      const repaired = fixture.fix();
+      const patch = fixture.authority(
+        'patch',
+        'patch-candidate',
+        repaired,
+        sha256(fixture.patchBytes(repaired)),
+      );
+      const green = await runReproduction(fixture.context, {
+        ...fixture.input,
+        phase: 'green',
+        red_authority: red,
+        patch_authority: patch,
+      });
+      assert.equal(green.status, 'accepted', green.reason);
+      platform.git(['fetch', '--quiet', fixture.root, repaired]);
+      platform.git(['update-ref', 'refs/heads/main', repaired]);
+      const refreshed = {
+        number: 42,
+        node_id: 'I_PRESENT_REFRESH',
+        user: { id: 23296915 },
+        state: 'open',
+        labels: [],
+        title: 'stale title',
+        body: `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: '1230959148', fingerprint_policy_revision: 'reviewed-v1', fingerprint: fixture.fingerprint })} -->`,
+      };
+      platform.issues.push(refreshed);
+      const missing = [43, 44].map((number) => {
+        const identity = {
+          repository_id: '1230959148',
+          fingerprint_policy_revision: 'reviewed-v1',
+          fingerprint: sha256(`absent-${number}`),
+        };
+        const issue = {
+          number,
+          node_id: `I_ABSENT_${number}`,
+          user: { id: 41898282 },
+          state: 'open',
+          body: `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->`,
+        };
+        platform.issues.push(issue);
+        platform.facts.set(`/repos/apolenkov/feynman/issues/${number}`, issue);
+        return { issue, identity };
+      });
+      const disappearance: Record<string, JsonRecord> = {};
+      const artifactIds: string[] = [];
+      for (const [index, item] of missing.entries()) {
+        const run = String(9910 + index);
+        platform.context(fixture.activation, run);
+        const {
+          bootstrap_ticket: _ticket,
+          legacy_inventory_sha256: _inventory,
+          ...normal
+        } = fixture.genesisReceipt;
+        const fingerprint =
+          control === 'invalid-second' && index === 1
+            ? sha256('wrong independent fingerprint')
+            : item.identity.fingerprint;
+        const identity = { ...item.identity, fingerprint, issue_node_id: item.issue.node_id };
+        const proof = produceReceipt({
+          ...normal,
+          sequence: 1,
+          parent_head: fixture.genesis['genesis_head'],
+          parent_checkpoint_head: fixture.genesis['genesis_head'],
+          run_id: run,
+          producer_phase: 'verifier',
+          request_key: sha256({ identity, repaired }),
+          actor_decision: 'approved-publisher',
+          lineage_id: sha256(identity),
+          issue_node_id: identity.issue_node_id,
+          issue_number: item.issue.number,
+          fingerprint_policy_revision: identity.fingerprint_policy_revision,
+          fingerprint,
+          baseline_sha: repaired,
+          current_source_head: repaired,
+          expected_transition: 'closed',
+          outcome: 'complete-absence',
+          aliases: [
+            {
+              kind: 'issue',
+              id: String(item.issue.number),
+              head: null,
+              original_identity_sha256: sha256(identity),
+            },
+          ],
+        });
+        const envelope = platform.upload(
+          proof,
+          'receipt',
+          stringField(proof, 'transition_id'),
+          'verifier',
+        );
+        disappearance[item.issue.node_id] = envelope;
+        artifactIds.push(stringField(record(envelope['transport']), 'artifact_id'));
+      }
+      const finding = {
+        ...fixture.finding,
+        authority: fixture.authority(
+          'verifier',
+          'confirmed',
+          repaired,
+          sha256(fixture.finding),
+          fixture.fingerprint,
+        ),
+      };
+      const { authority: _scan, ...document } = fixture.scan;
+      const scan = { ...document, source_sha: repaired, findings: [finding] };
+      const authority = fixture.authority(
+        'scan',
+        'complete',
+        repaired,
+        sha256(scan),
+        'reviewed-v1',
+      );
+      const before = platform.requests.length;
+      const result = await reconcilePublication(fixture.context, {
+        ...scan,
+        authority,
+        disappearance_authority: disappearance,
+      });
+      const effects = platform.requests.slice(before);
+      if (control === 'invalid-second') {
+        assert.equal(result.status, 'needs-human');
+        assert.match(result.reason, /Unproven disappearance/);
+        assert.equal(
+          effects.some((request) => request.method === 'PATCH'),
+          false,
+          'no refresh or closure before all proof bindings pass',
+        );
+        assert.equal(record(platform.issues[0])['title'], 'stale title');
+        for (const { issue } of missing)
+          assert.equal(
+            record(platform.facts.get(`/repos/apolenkov/feynman/issues/${issue.number}`))['state'],
+            'open',
+          );
+      } else {
+        assert.equal(result.status, 'accepted', result.reason);
+        assert.equal(effects.filter((request) => request.method === 'PATCH').length, 3);
+        assert.match(stringField(record(platform.issues[0]), 'title'), /factory:confirmed/);
+        for (const { issue } of missing)
+          assert.equal(
+            record(platform.facts.get(`/repos/apolenkov/feynman/issues/${issue.number}`))['state'],
+            'closed',
+          );
+      }
+      for (const id of artifactIds)
+        assert.ok(
+          effects.some(
+            (request) => request.path === `/repos/apolenkov/feynman/actions/artifacts/${id}/zip`,
+          ),
+          'each trusted proof reaches authenticated archive validation',
+        );
     });
 });

@@ -28,18 +28,26 @@ The system SHALL establish complete compatible presence before applying severity
 - **THEN** no absence-based issue closure occurs
 
 ### Requirement: Bounded selection
-The system SHALL preserve all identified presence while selecting at most three findings per publication/adjudication run. The complete accepted protocol is normative; historical host observations are replaced only by this change’s explicit repository binding.
+The system SHALL preserve all identified presence and create at most three new canonical issues per publication run. Existing issue refreshes and refuted findings SHALL NOT consume that creation cap. This cap clarification is the coordinator's 2026-10-13 F6 decision; the accepted protocol import remains unchanged.
 
 #### Scenario: AC04 observable contract
-- **WHEN** four candidates are present and the cap is three
-- **THEN** all four remain present and only three are selected; the fourth is not treated as disappeared
+- **WHEN** three existing findings precede four new candidates and the creation cap is three
+- **THEN** existing issues are refreshed, at most three new issues are created, and every candidate remains present without a false disappearance
 
 ### Requirement: Paginated deduplication
-The system SHALL reconcile canonical issues across complete pagination without a permanent seen-set. The complete accepted protocol is normative; historical host observations are replaced only by this change’s explicit repository binding.
+The system SHALL reconcile canonical issues across complete pagination without a permanent seen-set. Only the repository owner or github-actions[bot] SHALL author canonical issues; foreign authors SHALL be skipped before marker parsing. Existing issues SHALL refresh title, body, severity labels and `source:ocr-scan` without duplicates.
 
 #### Scenario: AC05 observable contract
 - **WHEN** a matching issue appears beyond item500 or its prior repair state changed
 - **THEN** the existing issue is refreshed without duplicates or permanent retry suppression
+
+#### Scenario: Foreign issue markers
+- **WHEN** a foreign author supplies a duplicate or malformed finding marker
+- **THEN** that issue is skipped before parsing and does not block publication or bootstrap
+
+#### Scenario: Per-issue disappearance authority before mutation
+- **WHEN** a complete scan has multiple missing canonical issues and one node-keyed authority is invalid
+- **THEN** every missing issue's authority is checked before any PATCH, including refreshes, and no issue is modified
 
 ### Requirement: Trusted admission
 The system SHALL require authentic owner or approved producer ingress and durable admission evidence. The complete accepted protocol is normative; historical host observations are replaced only by this change’s explicit repository binding.

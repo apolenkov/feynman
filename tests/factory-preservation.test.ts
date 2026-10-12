@@ -253,6 +253,7 @@ async function remoteFixture(t: TestContext): Promise<{
   const issue = {
     number: 42,
     node_id: 'I_KEEP',
+    user: { id: 41898282, login: 'github-actions[bot]' },
     state: 'open',
     labels: [{ name: 'factory-fix' }],
     body: `<!-- factory-finding-v1 ${JSON.stringify(marker)} -->`,

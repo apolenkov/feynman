@@ -29,6 +29,17 @@
 
 ## Workflow follow-up
 
+### Opus PR54 prerequisites before activation
+
+These findings are deferred from the disabled source PR by the coordinator on 2026-10-13. Each must be resolved and verified before activation; this list grants no live authority.
+
+- [ ] F5: wire the hosted `admit`, `operation-intent`, `operation-outcome`, `retry-claim` and request-driven `preflight` chain, or remove unsupported dispatch choices; prove ingress and manual retry reach their actual controller jobs.
+- [ ] F7: let an owner-authorized emergency stop work when control files have drifted, with repository/registry identity checks; implement setting `stop.json` or remove its dead check, and verify stop/readback under drift.
+- [ ] F8: memoize the verified actionlint download promise per process and clean its private temporary directory after use; verify repeated workflow validation avoids duplicate downloads and leaves no tool directories.
+- [ ] F9: explicitly grant `actions: read` to hosted jobs that authenticate runs, jobs, logs and artifacts; verify actual token access rather than assuming local fixtures prove it.
+- [ ] F10: share the protected-path matcher between publication eligibility and the writer so `.env*` findings are consistently denied; verify the common boundary.
+- [ ] F11: document squash-only ancestry as a branch-preservation limitation, or remove the unreachable REST DELETE path; do not claim expected-old CAS or automatic squash cleanup.
+
 - Coordinator alone authorizes merge; no source merge without his word.
 - Hosted H1/H2/H3, bootstrap/activation/provider calls, genuine scan→issue→PR→merge→closure and 14-day/three-update observation require later assignments and are outside this disabled source delivery.
 - Additional targets stay Waiting: targets not assigned; only feynman is authorized. Keep the contract template Prepared with no fabricated rows.

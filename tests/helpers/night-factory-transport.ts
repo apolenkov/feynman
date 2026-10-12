@@ -448,6 +448,7 @@ export class FactoryPlatform {
           ...record(body),
           number: this.counter++,
           node_id: `I_${this.counter}`,
+          user: { id: 41898282, login: 'github-actions[bot]' },
           state: 'open',
           created_at: '2026-10-12T00:00:00Z',
         };

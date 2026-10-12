@@ -92,6 +92,49 @@ it('native factory workflow JSON boundaries reject malformed input without expos
   }
 });
 
+it('F4 native append-bootstrap programs succeed without an unproduced receipt file', (test) => {
+  const root = process.cwd();
+  fs.mkdirSync(path.join(root, '.worktrees'), { recursive: true });
+  const directory = fs.mkdtempSync(path.join(root, '.worktrees/factory-bootstrap-output-'));
+  test.after(() => {
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+  fs.symlinkSync(path.join(root, 'scripts'), path.join(directory, 'scripts'), 'dir');
+  const output = path.join(directory, 'github-output');
+  fs.writeFileSync(output, '');
+  const workflow = fs.readFileSync(
+    path.join(root, '.github/workflows/factory-control.yml'),
+    'utf8',
+  );
+  const job = workflow.split('\n  append-bootstrap:\n')[1]?.split('\n  authority-register:\n')[0];
+  assert.ok(job !== undefined && job.length > 0, 'the append-bootstrap job must exist');
+  const programs = [
+    ...job.matchAll(/^[ \t]*node --input-type=module <<'NODE'\r?\n([\s\S]*?)^[ \t]*NODE\s*$/gm),
+  ];
+  assert.ok(programs.length > 0);
+  for (const program of programs) {
+    const result = spawnSync(process.execPath, ['--input-type=module'], {
+      cwd: directory,
+      input: program[1],
+      encoding: 'utf8',
+      timeout: 10_000,
+      env: { PATH: process.env['PATH'], FACTORY_INPUT: '{}', GITHUB_OUTPUT: output },
+    });
+    assert.equal(result.error, undefined);
+    assert.equal(result.signal, null);
+    assert.equal(result.status, 0, result.stderr);
+  }
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(directory, 'factory-input.json'), 'utf8')),
+    {
+      producer_phase: 'bootstrap',
+      commit_bootstrap: true,
+    },
+  );
+  assert.equal(fs.existsSync(path.join(directory, 'factory/receipt.json')), false);
+  assert.equal(fs.readFileSync(output, 'utf8'), '');
+});
+
 it('rejects unverified actionlint download bytes before creating any archive or executable', (test) => {
   const root = process.cwd();
   fs.mkdirSync(path.join(root, '.worktrees'), { recursive: true });

@@ -203,13 +203,6 @@ jobs:
           fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, producer_phase: 'bootstrap', commit_bootstrap: true }));
           NODE
           node scripts/factory-control.ts bootstrap factory-input.json
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          import { parseFactoryJson } from './scripts/factory-protocol.ts';
-          const core = parseFactoryJson(fs.readFileSync('factory/receipt.json'));
-          const transition = core.kind === 'checkpoint' ? fs.readFileSync('factory/checkpoint.json.transition', 'utf8') : core.transition_id;
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `transition_id=${transition}\n`);
-          NODE
   authority-register:
     name: factory-authority-register
     needs: preflight

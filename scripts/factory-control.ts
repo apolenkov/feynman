@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { isCanonicalIssueAuthor } from './factory-publication.ts';
 import {
   resolveFactoryContext,
   FactoryFailure,
@@ -429,6 +430,7 @@ async function publicationIdentity(
     stringField(record(state.files.get('bootstrap-ticket.json')), 'legacy_cutoff_at'),
   );
   if (
+    !isCanonicalIssueAuthor(context, issue) ||
     issue['node_id'] !== publication['issue_node_id'] ||
     issue['pull_request'] !== undefined ||
     issue['state'] !== 'open' ||
@@ -456,6 +458,7 @@ async function publicationIdentity(
   const marker = `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: identity.repository_id, fingerprint_policy_revision: identity.fingerprint_policy_revision, fingerprint: identity.fingerprint })} -->`;
   const matches = issues.filter(
     (candidate) =>
+      isCanonicalIssueAuthor(context, candidate) &&
       candidate['pull_request'] === undefined &&
       typeof candidate['body'] === 'string' &&
       candidate['body'].split('\n').includes(marker),
@@ -521,6 +524,8 @@ async function canonicalLineage(
 ): Promise<Lineage> {
   const issueNumber = numberField(request, 'issue_number');
   const issue = record(await githubRequest(context, `${base(context)}/issues/${issueNumber}`));
+  if (!isCanonicalIssueAuthor(context, issue))
+    throw new FactoryFailure('Canonical issue author untrusted');
   if (issue['state'] !== 'open' || issue['pull_request'] !== undefined)
     throw new FactoryFailure('Canonical issue closed or not an issue');
   const currentLabels = arrayField(issue, 'labels').map((label) =>
@@ -1082,7 +1087,9 @@ async function bootstrapGenesis(
     throw new FactoryFailure('Unreviewed bootstrap ticket');
   const issues = (await githubPages(context, `${base(context)}/issues?state=all`))
     .map(record)
-    .filter((issue) => issue['pull_request'] === undefined);
+    .filter(
+      (issue) => isCanonicalIssueAuthor(context, issue) && issue['pull_request'] === undefined,
+    );
   const prs = (await githubPages(context, `${base(context)}/pulls?state=all`)).map(record);
   const imported: Lineage[] = [];
   for (const issue of issues) {

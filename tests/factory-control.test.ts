@@ -297,6 +297,7 @@ it('registers a provably new confirmed issue, consumes two immutable reservation
   const issue = {
     number: 42,
     node_id: 'I_CANONICAL',
+    user: { id: 23296915, login: 'apolenkov' },
     state: 'open',
     labels: [{ name: 'factory-fix' }],
     body: `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->`,
@@ -665,7 +666,7 @@ it('rejects pinned malformed activation registries and unknown budgets independe
   }
 });
 
-async function registeredFactory(test: TestContext) {
+async function registeredFactory(test: TestContext, additionalIssues: readonly JsonRecord[] = []) {
   const fixture = await bootstrapped(test);
   const { platform, activation, genesis } = fixture;
   const identity = {
@@ -676,12 +677,13 @@ async function registeredFactory(test: TestContext) {
   const issue = {
     number: 42,
     node_id: 'I_CANONICAL',
+    user: { id: 23296915, login: 'apolenkov' },
     state: 'open',
     labels: [{ name: 'factory-fix' }],
     body: `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->`,
     created_at: '2026-10-12T00:00:00Z',
   };
-  platform.issues.push(issue);
+  platform.issues.push(issue, ...additionalIssues);
   platform.facts.set('/repos/apolenkov/feynman/issues/42', issue);
   platform.facts.set('/repos/apolenkov/feynman/issues/42/events', [
     {
@@ -1119,6 +1121,7 @@ it('AC07–09 bootstraps actual legacy issue and PR inventories into quarantine 
   const issue = {
     number: 42,
     node_id: 'I_LEGACY',
+    user: { id: 23296915, login: 'apolenkov' },
     state: 'open',
     labels: [{ name: 'factory-fix' }],
     body: `<!-- factory-finding-v1 ${JSON.stringify(finding)} -->`,
@@ -1218,6 +1221,7 @@ it('AC07–09 refuses malformed or foreign legacy finding identity before creati
       platform.issues.push({
         number: 42,
         node_id: 'I_UNKNOWN_LEGACY',
+        user: { id: 23296915, login: 'apolenkov' },
         state: 'open',
         body: marker,
       });
@@ -1333,5 +1337,113 @@ it('AC08–09 denies native Git state substitutions with valid outer checkpoint 
       assert.equal(platform.git(['rev-parse', 'refs/heads/factory-state']), corrupted);
       assert.equal(platform.git(['cat-file', '-t', valid]), 'commit');
       assert.equal(platform.git(['cat-file', '-t', corrupted]), 'commit');
+    });
+});
+
+it('Opus F1 ignores foreign duplicate and malformed markers during real registration and denies a foreign current canonical author', async (test) => {
+  const marker = `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: '1230959148', fingerprint_policy_revision: 'reviewed-v1', fingerprint: 'd'.repeat(64) })} -->`;
+  const fixture = await registeredFactory(test, [
+    { number: 51, node_id: 'I_FOREIGN_DUPLICATE', state: 'open', user: { id: 999 }, body: marker },
+    {
+      number: 52,
+      node_id: 'I_FOREIGN_BAD_MARKER',
+      state: 'open',
+      user: { id: 999 },
+      body: '<!-- factory-finding-v1 {broken} -->',
+    },
+  ]);
+  const route = '/repos/apolenkov/feynman/issues/42';
+  const issue = record(fixture.platform.facts.get(route));
+  const state = fixture.platform.git(['rev-parse', 'refs/heads/factory-state']);
+  fixture.platform.facts.set(route, { ...issue, user: { id: 999, login: 'apolenkov' } });
+  const denied = await runController(fixture.context, {
+    command: 'admit',
+    issue_number: 42,
+    event_id: '12',
+  });
+  assert.equal(denied.status, 'denied');
+  assert.match(denied.reason, /author/i);
+  assert.equal(fixture.platform.git(['rev-parse', 'refs/heads/factory-state']), state);
+});
+
+it('Opus F1 bootstraps only numeric trusted authors and skips foreign duplicate or malformed markers before parsing', async (test) => {
+  for (const author of [23296915, 41898282])
+    await test.test(`trusted ${author}`, async (subtest) => {
+      const platform = new FactoryPlatform(subtest);
+      const identity = {
+        repository_id: '1230959148',
+        fingerprint_policy_revision: 'legacy-v1',
+        fingerprint: 'a'.repeat(64),
+      };
+      const marker = `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->`;
+      platform.issues.push(
+        {
+          number: 42,
+          node_id: 'I_TRUSTED_LEGACY',
+          state: 'open',
+          user: { id: author },
+          body: marker,
+        },
+        {
+          number: 51,
+          node_id: 'I_FOREIGN_DUPLICATE',
+          state: 'open',
+          user: { id: 999 },
+          body: marker,
+        },
+        {
+          number: 52,
+          node_id: 'I_FOREIGN_MALFORMED',
+          state: 'open',
+          user: { id: 999 },
+          body: '<!-- factory-finding-v1 not-json -->',
+        },
+        {
+          number: 53,
+          node_id: 'I_NON_NUMERIC',
+          state: 'open',
+          user: { id: String(author) },
+          body: marker,
+        },
+      );
+      const activation = platform.activation({
+        activation: false,
+        bootstrap_completed: false,
+        genesis_head: null,
+        genesis_receipt_sha256: null,
+        legacy_inventory_sha256: null,
+      });
+      const context = platform.context(activation, '9860', 'bootstrap');
+      const prepared = await runController(context, {
+        command: 'bootstrap',
+        bootstrap_ticket: activation['bootstrap_ticket'],
+      });
+      assert.equal(prepared.status, 'accepted', prepared.reason);
+      const receipt = record(record(prepared.record)['receipt']);
+      const created = await runController(context, {
+        command: 'bootstrap',
+        bootstrap_ticket: activation['bootstrap_ticket'],
+        envelope: platform.upload(
+          receipt,
+          'receipt',
+          stringField(receipt, 'transition_id'),
+          'bootstrap',
+        ),
+      });
+      assert.equal(created.status, 'accepted', created.reason);
+      const head = stringField(record(created.record), 'genesis_head');
+      const inventory = parseProtocol(
+        Buffer.from(platform.git(['show', `${head}:legacy-inventory.json`])),
+        'inventory',
+      );
+      assert.equal(arrayField(inventory, 'lineages').length, 1);
+      const entry = record(arrayField(inventory, 'lineages')[0]);
+      const lineage = parseProtocol(
+        Buffer.from(
+          platform.git(['show', `${head}:lineages/${stringField(entry, 'lineage_id')}.json`]),
+        ),
+        'lineage',
+      );
+      assert.equal(record(lineage['identity'])['issue_node_id'], 'I_TRUSTED_LEGACY');
     });
 });
