@@ -65,7 +65,7 @@ export async function actionlintBinary(): Promise<string> {
   if (crypto.createHash('sha256').update(bytes).digest('hex') !== expected)
     throw new Error('Pinned upstream actionlint checksum mismatch');
   const binary = path.join(directory, `actionlint-${RELEASE}-${platform}`);
-  const executable = execFileSync('tar', ['-xOf', '-', 'actionlint'], {
+  const executable = execFileSync('tar', ['-xzOf', '-', 'actionlint'], {
     input: bytes,
     maxBuffer: 20_000_000,
   });
