@@ -168,7 +168,12 @@ export function buildPackage(options: Readonly<BuildPackageOptions> = {}): strin
       const source = path.join(root, item);
       if (!fs.existsSync(source)) continue;
       const destination = path.join(staging, item);
-      if (fs.statSync(source).isDirectory()) copyDir(source, destination);
+      if (item === '.agents') {
+        fs.cpSync(source, destination, {
+          recursive: true,
+          filter: (entry) => !path.matchesGlob(path.relative(source, entry), 'skills/openspec-*'),
+        });
+      } else if (fs.statSync(source).isDirectory()) copyDir(source, destination);
       else fs.copyFileSync(source, destination);
     }
     fs.writeFileSync(

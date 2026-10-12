@@ -3,10 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { gitFixtureEnvironment } from './helpers/git-environment.ts';
 
 import {
   buildPackage,
   buildPackageMain,
+  runCommand,
   type CommandResult,
   type CommandRunner,
 } from '../scripts/build-package.ts';
@@ -94,6 +96,56 @@ describe('build package behavior', () => {
         'dist/test.tgz\n',
       );
       assert.deepEqual(fs.readdirSync(fixture.temporaryRoot), []);
+    } finally {
+      fs.rmSync(fixture.owned, { recursive: true, force: true });
+    }
+  });
+
+  it('excludes locally retained OpenSpec adapters from the real tarball while preserving product skills', () => {
+    const fixture = ownedRoot('feynman-build-local-adapters-');
+    writePackage(fixture.root, {
+      name: '@test/feynman',
+      version: '1.0.0',
+      bin: { feynman: 'bin/feynman.ts' },
+      files: ['.agents/', 'plugins/'],
+    });
+    const adapter = '.agents/skills/openspec-apply-change/SKILL.md';
+    const product = '.agents/skills/feynman/SKILL.md';
+    const native = 'plugins/feynman/skills/feynman/SKILL.md';
+    const marketplace = '.agents/plugins/marketplace.json';
+    for (const file of [adapter, product, native, marketplace]) {
+      fs.mkdirSync(path.dirname(path.join(fixture.root, file)), { recursive: true });
+      fs.writeFileSync(path.join(fixture.root, file), file);
+    }
+    fs.writeFileSync(path.join(fixture.root, '.gitignore'), '/.agents/skills/openspec-*/\n');
+    const runner: CommandRunner = (command, args, options) =>
+      command === 'npx' ? OK : runCommand(command, args, options);
+    try {
+      const gitOptions = { cwd: fixture.root, env: { ...gitFixtureEnvironment() } };
+      const initialized = runCommand('git', ['init', '--quiet'], gitOptions);
+      assert.equal(initialized.status, 0, initialized.stderr);
+      assert.equal(runCommand('git', ['check-ignore', '-q', '--', adapter], gitOptions).status, 0);
+      const tarball = buildPackage({
+        root: fixture.root,
+        temporaryRoot: fixture.temporaryRoot,
+        runCommand: runner,
+      });
+      const listing = runCommand('tar', ['-tzf', tarball], {
+        cwd: fixture.root,
+        env: { ...process.env },
+      });
+      assert.equal(listing.status, 0, listing.stderr);
+      const entries = listing.stdout.split('\n');
+      assert.equal(entries.includes(`package/${adapter}`), false);
+      for (const file of [product, native, marketplace]) {
+        const entry = runCommand('tar', ['-xOf', tarball, `package/${file}`], {
+          cwd: fixture.root,
+          env: { ...process.env },
+        });
+        assert.equal(entry.status, 0, entry.stderr);
+        assert.equal(entry.stdout, file);
+      }
+      assert.equal(fs.readFileSync(path.join(fixture.root, adapter), 'utf8'), adapter);
     } finally {
       fs.rmSync(fixture.owned, { recursive: true, force: true });
     }
