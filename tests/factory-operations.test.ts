@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { it } from 'node:test';
+import { createJiti } from 'jiti';
+import type { TemplateToken } from '@actions/workflow-parser/templates/tokens/template-token';
 import type { TestContext } from 'node:test';
 import { FactoryPlatform } from './helpers/night-factory-transport.ts';
 import { record } from '../scripts/factory-protocol.ts';
@@ -165,6 +167,110 @@ it('rejects unverified actionlint download bytes before creating any archive or 
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(fs.readdirSync(directory).sort(), ['node_modules', 'scripts']);
   assert.deepEqual(fs.readdirSync(path.join(directory, 'scripts')), ['check-factory-workflows.ts']);
+});
+
+const { isBoolean, isMapping, isString, NoOperationTraceWriter, parseWorkflow } = await createJiti(
+  import.meta.url,
+  { tryNative: false },
+).import<typeof import('@actions/workflow-parser')>('@actions/workflow-parser');
+
+function assertFactoryWriteJobsDisabled(content: string, name: string): number {
+  const parsed = parseWorkflow({ name, content }, new NoOperationTraceWriter());
+  parsed.context.errors.check('Official workflow parser');
+  assert.ok(parsed.value !== undefined && isMapping(parsed.value));
+  const jobs = parsed.value.find('jobs');
+  assert.ok(jobs !== undefined && isMapping(jobs));
+  const grantsWrite = (permissions: TemplateToken | undefined): boolean =>
+    permissions !== undefined &&
+    ((isString(permissions) && permissions.value === 'write-all') ||
+      (isMapping(permissions) &&
+        [...permissions].some(({ value }) => isString(value) && value.value === 'write')));
+  let privileged = 0;
+  for (const job of jobs) {
+    assert.ok(isMapping(job.value));
+    if (!grantsWrite(job.value.find('permissions') ?? parsed.value.find('permissions'))) continue;
+    privileged++;
+    const condition = job.value.find('if');
+    assert.ok(
+      condition !== undefined &&
+        ((isBoolean(condition) && !condition.value) ||
+          (isString(condition) && condition.value === 'false')),
+      `${name}/${job.key.toString()}: write permission requires literal job-level false before checkout/npm lifecycle`,
+    );
+  }
+  return privileged;
+}
+
+it('factory write-permission jobs require platform literal false independent of preflight or future privileged jobs', async (test) => {
+  let privileged = 0;
+  for (const name of [
+    'factory-control.yml',
+    'factory-operations.yml',
+    'factory-ingress.yml',
+    'night-review.yml',
+  ])
+    await test.test(name, () => {
+      privileged += assertFactoryWriteJobsDisabled(
+        fs.readFileSync(path.join('.github/workflows', name), 'utf8'),
+        name,
+      );
+    });
+  await test.test('non-vacuous privileged job inventory', () => {
+    assert.ok(privileged > 0);
+  });
+  const future = (
+    condition: string,
+    permission = 'actions: write',
+    inherited = false,
+  ): string => `name: Future privileged job
+on: workflow_dispatch
+permissions: ${inherited ? 'write-all' : '{}'}
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      authorized: \${{ steps.forge.outputs.authorized }}
+    steps:
+      - id: forge
+        run: echo 'authorized=true' >> "$GITHUB_OUTPUT"
+  future-untrusted:
+    needs: preflight
+    ${condition}
+    runs-on: ubuntu-latest
+    ${inherited ? '' : `permissions:\n      ${permission}`}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - run: npm ci
+`;
+  for (const permission of [
+    'contents: write',
+    'issues: write',
+    'pull-requests: write',
+    'actions: write',
+    'id-token: write',
+  ])
+    await test.test(`future hard-disabled ${permission}`, () => {
+      assert.equal(
+        assertFactoryWriteJobsDisabled(future('if: false', permission), 'future.yml'),
+        1,
+      );
+    });
+  await test.test('inherited write-all hard-disabled', () => {
+    assert.equal(assertFactoryWriteJobsDisabled(future('if: false', '', true), 'future.yml'), 1);
+  });
+  for (const condition of [
+    '# if: false',
+    'if: true',
+    "if: needs.preflight.outputs.authorized == 'true'",
+    "if: vars.FACTORY_DISABLED != 'true'",
+  ])
+    await test.test(`future privilege cannot use ${condition}`, () => {
+      assert.throws(
+        () => assertFactoryWriteJobsDisabled(future(condition), 'future.yml'),
+        /literal job-level false/,
+      );
+    });
 });
 
 // AC20–22/25–26 primary owner; no window start or additional target is synthesized.

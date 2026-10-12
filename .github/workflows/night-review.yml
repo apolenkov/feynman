@@ -16,6 +16,8 @@ permissions:
 
 jobs:
   execute:
+    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: read

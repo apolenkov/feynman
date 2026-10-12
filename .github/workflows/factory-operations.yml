@@ -16,7 +16,8 @@ permissions:
 
 jobs:
   execute:
-    if: github.actor == github.repository_owner && github.ref == 'refs/heads/main'
+    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: read

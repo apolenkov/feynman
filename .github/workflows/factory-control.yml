@@ -168,7 +168,8 @@ jobs:
         run: node scripts/factory-protocol.ts emit factory/receipt.json
   append-bootstrap:
     needs: authority-bootstrap
-    if: needs.authority-bootstrap.result == 'success'
+    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -265,7 +266,8 @@ jobs:
         run: node scripts/factory-protocol.ts emit factory/receipt.json
   append-register:
     needs: authority-register
-    if: needs.authority-register.result == 'success'
+    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -362,7 +364,8 @@ jobs:
         run: node scripts/factory-protocol.ts emit factory/receipt.json
   append-reserve:
     needs: authority-reserve
-    if: needs.authority-reserve.result == 'success'
+    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -459,7 +462,8 @@ jobs:
         run: node scripts/factory-protocol.ts emit factory/receipt.json
   append-outcome:
     needs: authority-outcome
-    if: needs.authority-outcome.result == 'success'
+    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -556,7 +560,8 @@ jobs:
         run: node scripts/factory-protocol.ts emit factory/checkpoint.json
   publication:
     needs: preflight
-    if: needs.preflight.outputs.authorized == 'true' && (inputs.command == 'publication')
+    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -629,7 +634,8 @@ jobs:
           node scripts/factory-writer.ts "$FACTORY_COMMAND" factory-input.json
   writer:
     needs: preflight
-    if: needs.preflight.outputs.authorized == 'true' && (inputs.command == 'push-pr' || inputs.command == 'closure' || inputs.command == 'provider-gate' || inputs.command == 'merge' || inputs.command == 'sweep')
+    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: write
