@@ -39,6 +39,7 @@ These findings are deferred from the disabled source PR by the coordinator on 20
 - [ ] F9: explicitly grant `actions: read` to hosted jobs that authenticate runs, jobs, logs and artifacts; verify actual token access rather than assuming local fixtures prove it.
 - [ ] F10: share the protected-path matcher between publication eligibility and the writer so `.env*` findings are consistently denied; verify the common boundary.
 - [ ] F11: document squash-only ancestry as a branch-preservation limitation, or remove the unreachable REST DELETE path; do not claim expected-old CAS or automatic squash cleanup.
+- [ ] F14: before activation, remove `labels` from refresh PATCH and use `POST /issues/{n}/labels` plus `DELETE /issues/{n}/labels/{name}` to eliminate stale label replacement and preserve owner opt-in; also record that partially created/refreshed issues are currently omitted from the `needs-human` failure result, which does not roll back earlier effects.
 
 - Coordinator alone authorizes merge; no source merge without his word.
 - Hosted H1/H2/H3, bootstrap/activation/provider calls, genuine scan→issue→PR→merge→closure and 14-day/three-update observation require later assignments and are outside this disabled source delivery.
