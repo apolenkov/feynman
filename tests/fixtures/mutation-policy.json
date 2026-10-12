@@ -451,9 +451,9 @@
     {
       "file": "scripts/factory-publication.ts",
       "owner": "reconcilePublication",
-      "mutationHash": "15ebe56358049d5dcddec4e298753541ed39238c7beb82de16c394176237ee47",
+      "mutationHash": "96b8492f47e184d712bd9e772cc02d4f5f19eb2846c08a801e5400551d548723",
       "count": 16,
-      "reason": "Invocation-owned presence, creation counter and issue/pending/closure collections reconcile authenticated findings; Opus regressions prove per-issue preauthentication before every PATCH, author filtering, refresh and the three-new-issue cap.",
+      "reason": "Invocation-owned presence, creation counter and issue/pending/closure collections reconcile authenticated findings; Opus regressions prove author filtering, proof prevalidation, fresh owner-label preservation, safe failure reporting and the three-new-issue cap.",
       "test": "tests/night-factory-publication.test.ts"
     },
     {

@@ -68,9 +68,9 @@ it('retains four finding identities before selecting three and never closes on i
   };
   const result = await reconcilePublication(context, scan);
   assert.equal(result.presence.length, 4);
-  assert.equal(result.selected.length, 3);
+  assert.equal(result.selected.length, 0);
   assert.equal(result.complete, false);
-  assert.equal(result.pending.length, 1);
+  assert.equal(result.pending.length, 4);
   assert.deepEqual(calls, []); // Disabled source cannot publish even in the manual path.
 });
 
@@ -1501,6 +1501,8 @@ it('Opus F1 skips foreign valid and malformed issue markers before canonical pub
           labels: [],
           body: marker,
         });
+      if (trustedId !== null)
+        platform.facts.set('/repos/apolenkov/feynman/issues/42', platform.issues.at(-1));
       const before = platform.requests.length;
       const result = await reconcilePublication(fixture.context, fixture.scan);
       assert.equal(result.status, 'accepted', result.reason);
@@ -1616,7 +1618,7 @@ it('Opus F6 caps only three new issues while existing first findings and refuted
         finding.fingerprint,
       ),
     });
-    if (index < 3)
+    if (index < 3) {
       fixture.platform.issues.push({
         number: 40 + index,
         node_id: `I_EXISTING_${index}`,
@@ -1625,6 +1627,11 @@ it('Opus F6 caps only three new issues while existing first findings and refuted
         labels: [],
         body: `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: '1230959148', fingerprint_policy_revision: 'reviewed-v1', fingerprint: finding.fingerprint })} -->`,
       });
+      fixture.platform.facts.set(
+        `/repos/apolenkov/feynman/issues/${40 + index}`,
+        fixture.platform.issues.at(-1),
+      );
+    }
   }
   const before = fixture.platform.requests.length;
   const result = await reconcilePublication(fixture.context, refreshedScan(fixture, findings));
@@ -1694,6 +1701,7 @@ it('Opus F2 authenticates both missing-issue proofs before any closure or existi
         body: `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: '1230959148', fingerprint_policy_revision: 'reviewed-v1', fingerprint: fixture.fingerprint })} -->`,
       };
       platform.issues.push(refreshed);
+      platform.facts.set('/repos/apolenkov/feynman/issues/42', refreshed);
       const missing = [43, 44].map((number) => {
         const identity = {
           repository_id: '1230959148',
@@ -1819,5 +1827,147 @@ it('Opus F2 authenticates both missing-issue proofs before any closure or existi
           ),
           'each trusted proof reaches authenticated archive validation',
         );
+    });
+});
+
+it('Opus F14 preserves owner labels added after the encoded snapshot and refuses changed fresh canonical identity', async (test) => {
+  for (const control of [
+    'labels-added',
+    'labels-removed',
+    'foreign-author',
+    'changed-marker',
+    'closed',
+  ])
+    await test.test(control, async (subtest) => {
+      const fixture = await publicationFindingFixture(subtest);
+      const { platform } = fixture;
+      const identity = {
+        repository_id: '1230959148',
+        fingerprint_policy_revision: 'reviewed-v1',
+        fingerprint: fixture.fingerprint,
+      };
+      const original = {
+        number: 42,
+        node_id: 'I_REFRESH_RACE',
+        user: { id: 23296915 },
+        state: 'open',
+        title: 'stale title',
+        labels: [
+          { name: 'severity:low' },
+          ...(control === 'labels-removed' ? [{ name: 'factory-fix' }] : []),
+        ],
+        body: `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->`,
+      };
+      platform.issues.push(original);
+      platform.facts.set('/repos/apolenkov/feynman/issues/42', original);
+      const fetch = platform.fetch.bind(platform);
+      let changed = false;
+      subtest.mock.method(
+        platform,
+        'fetch',
+        async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+          const response = await fetch(input, init);
+          const url = new URL(input instanceof Request ? input.url : input);
+          if (
+            !changed &&
+            (init?.method ?? 'GET') === 'GET' &&
+            url.pathname === '/repos/apolenkov/feynman/issues' &&
+            url.searchParams.get('state') === 'all'
+          ) {
+            changed = true;
+            const fresh = {
+              ...original,
+              labels: [
+                { name: 'severity:low' },
+                ...(control === 'labels-removed' ? [] : [{ name: 'factory-fix' }]),
+                { name: 'owner-note' },
+              ],
+              ...(control === 'foreign-author' ? { user: { id: 999 } } : {}),
+              ...(control === 'changed-marker'
+                ? {
+                    body: `<!-- factory-finding-v1 ${JSON.stringify({ ...identity, fingerprint: sha256('different current finding') })} -->`,
+                  }
+                : {}),
+              ...(control === 'closed' ? { state: 'closed' } : {}),
+            };
+            platform.issues[0] = fresh;
+            platform.facts.set('/repos/apolenkov/feynman/issues/42', fresh);
+          }
+          return response;
+        },
+      );
+      const before = platform.requests.length;
+      const result = await reconcilePublication(fixture.context, fixture.scan);
+      assert.equal(changed, true, 'server changed after the initial response was encoded');
+      const effects = platform.requests.slice(before);
+      const current = record(platform.issues[0]);
+      if (control === 'labels-added' || control === 'labels-removed') {
+        assert.equal(result.status, 'accepted', result.reason);
+        assert.deepEqual(arrayField(current, 'labels').toSorted(), [
+          ...(control === 'labels-removed' ? [] : ['factory-fix']),
+          'owner-note',
+          'severity:high',
+          'source:ocr-scan',
+        ]);
+        const patch = effects.findIndex(
+          (request) =>
+            request.method === 'PATCH' && request.path === '/repos/apolenkov/feynman/issues/42',
+        );
+        assert.ok(patch > 0);
+        assert.equal(effects[patch - 1]?.method, 'GET');
+        assert.equal(effects[patch - 1]?.path, '/repos/apolenkov/feynman/issues/42');
+      } else {
+        assert.equal(result.status, 'needs-human');
+        assert.match(result.reason, /Canonical issue changed before refresh/);
+        assert.equal(
+          effects.some((request) => request.method === 'PATCH'),
+          false,
+        );
+        assert.equal(current['title'], 'stale title');
+        assert.equal(
+          effects.some(
+            (request) =>
+              request.method === 'GET' && request.path === '/repos/apolenkov/feynman/issues/42',
+          ),
+          true,
+        );
+      }
+      assert.equal(
+        effects.some((request) => request.method === 'POST'),
+        false,
+      );
+    });
+});
+
+it('Opus catch reports every identified finding pending and no selected work after invalid scan or unknown caller cap', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const findings = Array.from({ length: 4 }, (_, index) => ({
+    ...fixture.finding,
+    fingerprint: sha256(`failed-scan-${index}`),
+  }));
+  const scan = { ...fixture.scan, source_sha: 'f'.repeat(40), findings };
+  for (const control of ['invalid-scan', 'unknown-cap'])
+    await test.test(control, async () => {
+      const context =
+        control === 'unknown-cap'
+          ? { ...fixture.context, policy: { ...fixture.context.policy, issue_cap: null } }
+          : fixture.context;
+      const before = fixture.platform.requests.length;
+      const result = await reconcilePublication(context, scan);
+      assert.equal(result.status, 'needs-human');
+      assert.equal(result.presence.length, 4);
+      assert.deepEqual(result.selected, []);
+      assert.deepEqual(
+        result.pending,
+        findings.map((finding) => ({
+          fingerprint: finding.fingerprint,
+          path: finding.path,
+          adjudication: 'unvalidated-pending',
+        })),
+      );
+      assert.equal(
+        fixture.platform.requests.slice(before).some((request) => request.method !== 'GET'),
+        false,
+      );
     });
 });

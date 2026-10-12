@@ -122,8 +122,8 @@ export async function reconcilePublication(
   const presence = [
     ...new Set(identified.map((finding) => stringField(finding, 'fingerprint'))),
   ].toSorted();
-  const selected = identified.slice(0, numberField(inputContext.policy, 'issue_cap'));
-  const pending = identified.slice(selected.length).map((finding) => ({
+  const selected: readonly JsonRecord[] = [];
+  const pending = identified.map((finding) => ({
     fingerprint: finding['fingerprint'],
     path: finding['path'],
     adjudication: 'unvalidated-pending',
@@ -289,9 +289,40 @@ export async function reconcilePublication(
         issue['body'] !== body ||
         JSON.stringify(currentLabels.toSorted()) !== JSON.stringify(labels.toSorted())
       ) {
+        const expectedNodeId = stringField(issue, 'node_id');
         await verifyControlSource(context);
+        const fresh = record(await githubRequest(context, `${route}/${issueNumber}`));
+        if (
+          !isCanonicalIssueAuthor(context, fresh) ||
+          fresh['node_id'] !== expectedNodeId ||
+          fresh['number'] !== issueNumber ||
+          fresh['state'] !== 'open'
+        )
+          throw new FactoryFailure('Canonical issue changed before refresh; preserve work');
+        const marker = canonicalIssue(context, fresh);
+        if (
+          marker === null ||
+          marker['repository_id'] !== identity.repository_id ||
+          marker['fingerprint_policy_revision'] !== identity.fingerprint_policy_revision ||
+          marker['fingerprint'] !== identity.fingerprint
+        )
+          throw new FactoryFailure('Canonical issue changed before refresh; preserve work');
+        const freshLabels = arrayField(fresh, 'labels').map((label) =>
+          typeof label === 'string' ? label : stringField(record(label), 'name'),
+        );
+        const refreshLabels = [
+          ...freshLabels.filter(
+            (label) => !label.startsWith('severity:') && label !== 'source:ocr-scan',
+          ),
+          ...findingLabels,
+        ];
+        // shortcut: GET-to-PATCH is not atomic; serialize concurrent label writers before activation.
         issue = record(
-          await githubRequest(context, `${route}/${issueNumber}`, 'PATCH', { title, body, labels }),
+          await githubRequest(context, `${route}/${issueNumber}`, 'PATCH', {
+            title,
+            body,
+            labels: refreshLabels,
+          }),
         );
       }
       const stableIdentity = { ...identity, issue_node_id: stringField(issue, 'node_id') };
