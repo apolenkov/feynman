@@ -38,6 +38,14 @@ jobs:
       - name: Install pinned Codex CLI for native tests
         run: npm install --global --ignore-scripts @openai/codex@0.153.3
 
+      - name: Ensure native archive tools
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+
       - name: Run the complete local gate
         run: npm run ci
 

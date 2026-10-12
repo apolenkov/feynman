@@ -1,0 +1,674 @@
+name: Factory control
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        type: choice
+        options:
+          [
+            preflight,
+            admit,
+            bootstrap,
+            register,
+            reserve,
+            outcome,
+            checkpoint,
+            recover,
+            publication,
+            repro,
+            push-pr,
+            merge,
+            closure,
+            sweep,
+            provider-gate,
+            operation-intent,
+            operation-outcome,
+            retry-claim,
+          ]
+        default: preflight
+      request:
+        type: string
+        default: '{}'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: factory-control-v1
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      authorized: ${{ steps.gate.outputs.authorized }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - name: Independently verify role, public source, release and finite budget
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          printf '%s' '{"output_file":"factory-preflight.json"}' > factory-input.json
+          node scripts/factory-control.ts source-preflight factory-input.json || true
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          let authorized = false;
+          if (fs.existsSync('factory-preflight.json')) authorized = parseFactoryJson(fs.readFileSync('factory-preflight.json')).authorized === true;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `authorized=${authorized}\n`);
+          NODE
+  recover:
+    needs: preflight
+    if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'recover'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - name: Recover exact independent checkpoint and intervening history
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: node scripts/factory-control.ts recover
+  authority-bootstrap:
+    name: factory-authority-bootstrap
+    needs: preflight
+    if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'bootstrap'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - id: prepare
+        name: Prepare canonical bootstrap core without mutation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          mkdir -p factory
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const value = parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, output_file: 'factory/receipt.json' }));
+          NODE
+          node scripts/factory-control.ts bootstrap factory-input.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const core = parseFactoryJson(fs.readFileSync('factory/receipt.json'));
+          const transition = core.kind === 'checkpoint' ? fs.readFileSync('factory/checkpoint.json.transition', 'utf8') : core.transition_id;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `transition_id=${transition}\n`);
+          NODE
+      - name: Upload authority
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: factory-v1-receipt-${{ github.run_id }}-1-${{ steps.prepare.outputs.transition_id }}
+          path: factory/receipt.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Emit authority
+        env:
+          FACTORY_ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          FACTORY_ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: node scripts/factory-protocol.ts emit factory/receipt.json
+  append-bootstrap:
+    needs: authority-bootstrap
+    if: needs.authority-bootstrap.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - name: Authenticate completed producer and publish one ordinary fast forward
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const value = parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, producer_phase: 'bootstrap', commit_bootstrap: true }));
+          NODE
+          node scripts/factory-control.ts bootstrap factory-input.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const core = parseFactoryJson(fs.readFileSync('factory/receipt.json'));
+          const transition = core.kind === 'checkpoint' ? fs.readFileSync('factory/checkpoint.json.transition', 'utf8') : core.transition_id;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `transition_id=${transition}\n`);
+          NODE
+  authority-register:
+    name: factory-authority-register
+    needs: preflight
+    if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'register'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - id: prepare
+        name: Prepare canonical register core without mutation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          mkdir -p factory
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const value = parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, output_file: 'factory/receipt.json' }));
+          NODE
+          node scripts/factory-control.ts register factory-input.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const core = parseFactoryJson(fs.readFileSync('factory/receipt.json'));
+          const transition = core.kind === 'checkpoint' ? fs.readFileSync('factory/checkpoint.json.transition', 'utf8') : core.transition_id;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `transition_id=${transition}\n`);
+          NODE
+      - name: Upload authority
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: factory-v1-receipt-${{ github.run_id }}-1-${{ steps.prepare.outputs.transition_id }}
+          path: factory/receipt.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Emit authority
+        env:
+          FACTORY_ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          FACTORY_ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: node scripts/factory-protocol.ts emit factory/receipt.json
+  append-register:
+    needs: authority-register
+    if: needs.authority-register.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - name: Authenticate completed producer and publish one ordinary fast forward
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const value = parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, producer_phase: 'register', commit_bootstrap: false }));
+          NODE
+          node scripts/factory-control.ts append factory-input.json
+  authority-reserve:
+    name: factory-authority-reserve
+    needs: preflight
+    if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'reserve'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - id: prepare
+        name: Prepare canonical reserve core without mutation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          mkdir -p factory
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const value = parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, output_file: 'factory/receipt.json' }));
+          NODE
+          node scripts/factory-control.ts reserve factory-input.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const core = parseFactoryJson(fs.readFileSync('factory/receipt.json'));
+          const transition = core.kind === 'checkpoint' ? fs.readFileSync('factory/checkpoint.json.transition', 'utf8') : core.transition_id;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `transition_id=${transition}\n`);
+          NODE
+      - name: Upload authority
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: factory-v1-receipt-${{ github.run_id }}-1-${{ steps.prepare.outputs.transition_id }}
+          path: factory/receipt.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Emit authority
+        env:
+          FACTORY_ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          FACTORY_ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: node scripts/factory-protocol.ts emit factory/receipt.json
+  append-reserve:
+    needs: authority-reserve
+    if: needs.authority-reserve.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - name: Authenticate completed producer and publish one ordinary fast forward
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const value = parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, producer_phase: 'reserve', commit_bootstrap: false }));
+          NODE
+          node scripts/factory-control.ts append factory-input.json
+  authority-outcome:
+    name: factory-authority-outcome
+    needs: preflight
+    if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'outcome'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - id: prepare
+        name: Prepare canonical outcome core without mutation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          mkdir -p factory
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const value = parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, output_file: 'factory/receipt.json' }));
+          NODE
+          node scripts/factory-control.ts outcome factory-input.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const core = parseFactoryJson(fs.readFileSync('factory/receipt.json'));
+          const transition = core.kind === 'checkpoint' ? fs.readFileSync('factory/checkpoint.json.transition', 'utf8') : core.transition_id;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `transition_id=${transition}\n`);
+          NODE
+      - name: Upload authority
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: factory-v1-receipt-${{ github.run_id }}-1-${{ steps.prepare.outputs.transition_id }}
+          path: factory/receipt.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Emit authority
+        env:
+          FACTORY_ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          FACTORY_ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: node scripts/factory-protocol.ts emit factory/receipt.json
+  append-outcome:
+    needs: authority-outcome
+    if: needs.authority-outcome.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - name: Authenticate completed producer and publish one ordinary fast forward
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const value = parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, producer_phase: 'outcome', commit_bootstrap: false }));
+          NODE
+          node scripts/factory-control.ts append factory-input.json
+  authority-checkpoint:
+    name: factory-authority-checkpoint
+    needs: [preflight, append-bootstrap, append-register, append-reserve, append-outcome]
+    if: always() && needs.preflight.outputs.authorized == 'true' && (inputs.command == 'checkpoint' || needs.append-bootstrap.result == 'success' || needs.append-register.result == 'success' || needs.append-reserve.result == 'success' || needs.append-outcome.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - id: prepare
+        name: Prepare canonical checkpoint core without mutation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          mkdir -p factory
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const value = parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, output_file: 'factory/checkpoint.json' }));
+          NODE
+          node scripts/factory-control.ts checkpoint factory-input.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const core = parseFactoryJson(fs.readFileSync('factory/checkpoint.json'));
+          const transition = core.kind === 'checkpoint' ? fs.readFileSync('factory/checkpoint.json.transition', 'utf8') : core.transition_id;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `transition_id=${transition}\n`);
+          NODE
+      - name: Upload authority
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: factory-v1-checkpoint-${{ github.run_id }}-1-${{ steps.prepare.outputs.transition_id }}
+          path: factory/checkpoint.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Emit authority
+        env:
+          FACTORY_ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          FACTORY_ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: node scripts/factory-protocol.ts emit factory/checkpoint.json
+  publication:
+    needs: preflight
+    if: needs.preflight.outputs.authorized == 'true' && (inputs.command == 'publication')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install development tools from approved release without credentials
+        run: npm ci
+      - name: Execute fixed release role with authenticated request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_COMMAND: ${{ inputs.command }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          fs.writeFileSync('factory-input.json', JSON.stringify(parseFactoryJson(process.env.FACTORY_INPUT || '{}')));
+          NODE
+          node scripts/factory-publication.ts "$FACTORY_COMMAND" factory-input.json
+  repro:
+    needs: preflight
+    if: needs.preflight.outputs.authorized == 'true' && (inputs.command == 'repro')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install development tools from approved release without credentials
+        run: npm ci
+      - name: Execute fixed release role with authenticated request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_COMMAND: ${{ inputs.command }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          fs.writeFileSync('factory-input.json', JSON.stringify(parseFactoryJson(process.env.FACTORY_INPUT || '{}')));
+          NODE
+          node scripts/factory-writer.ts "$FACTORY_COMMAND" factory-input.json
+  writer:
+    needs: preflight
+    if: needs.preflight.outputs.authorized == 'true' && (inputs.command == 'push-pr' || inputs.command == 'closure' || inputs.command == 'provider-gate' || inputs.command == 'merge' || inputs.command == 'sweep')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install development tools from approved release without credentials
+        run: npm ci
+      - name: Execute fixed release role with authenticated request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_COMMAND: ${{ inputs.command }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          fs.writeFileSync('factory-input.json', JSON.stringify(parseFactoryJson(process.env.FACTORY_INPUT || '{}')));
+          NODE
+          node scripts/factory-writer.ts "$FACTORY_COMMAND" factory-input.json

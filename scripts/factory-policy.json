@@ -1,0 +1,132 @@
+{
+  "schema": "factory/v1",
+  "activation": false,
+  "repository_id": "1230959148",
+  "owner_id": "23296915",
+  "owner_login": "apolenkov",
+  "repository_full_name": "apolenkov/feynman",
+  "api_origin": "https://api.github.com",
+  "default_ref": "refs/heads/main",
+  "source_snapshot_sha": "f82feb6248bc8f1536c149816e11f3aad3549a8d",
+  "controller_workflow_id": null,
+  "controller_workflow_path": ".github/workflows/factory-control.yml",
+  "ci_workflow_id": "272235418",
+  "ci_workflow_path": ".github/workflows/ci.yml",
+  "control_release_sha": null,
+  "control_manifest": [],
+  "workflow_registry": [
+    {
+      "id": null,
+      "path": ".github/workflows/night-review.yml",
+      "mutating": true
+    },
+    {
+      "id": null,
+      "path": ".github/workflows/factory-ingress.yml",
+      "mutating": true
+    },
+    {
+      "id": null,
+      "path": ".github/workflows/factory-control.yml",
+      "mutating": true
+    },
+    {
+      "id": null,
+      "path": ".github/workflows/factory-operations.yml",
+      "mutating": true
+    }
+  ],
+  "retired_workflow_ids": ["375253262"],
+  "state_ref": "refs/heads/factory-state",
+  "epoch_id": null,
+  "genesis_head": null,
+  "genesis_receipt_sha256": null,
+  "bootstrap_ticket": null,
+  "legacy_inventory_sha256": null,
+  "bootstrap_completed": false,
+  "provider_transport": null,
+  "token_budget": null,
+  "timeout_seconds": null,
+  "secret_names": ["OCR_LLM_AUTH_TOKEN"],
+  "required_checks": [
+    {
+      "context": "Test (Node 22 on ubuntu-latest)",
+      "app_id": null
+    },
+    {
+      "context": "Test (Node 22 on macos-latest)",
+      "app_id": null
+    }
+  ],
+  "strict": true,
+  "squash_only": true,
+  "issue_cap": 3,
+  "repair_reservations_per_lineage": 2,
+  "patch_files_cap": 25,
+  "patch_lines_cap": 600,
+  "recovery_appends_cap": 100,
+  "recovery_attempts_cap": 100,
+  "pagination_pages_cap": 100,
+  "artifact_retention_days": 90,
+  "protected_paths": [
+    ".agents/**",
+    ".codex/**",
+    ".git/**",
+    ".github/**",
+    "tests/**",
+    "test/**",
+    "scripts/**",
+    "hooks/**",
+    "rules/**",
+    "plugins/**",
+    "package.json",
+    "package-lock.json",
+    "install.sh",
+    "uninstall.sh",
+    "lefthook.yml",
+    "tsconfig.json",
+    "eslint.config.mjs",
+    "commitlint.config.ts",
+    ".npmrc",
+    ".env*",
+    ".gitattributes",
+    ".gitmodules",
+    ".gitignore"
+  ],
+  "required_gate": ["npm", "run", "ci"],
+  "new_targets": [],
+  "excluded_targets": ["multitracker"],
+  "additional_targets_status": "Waiting: targets не назначены владельцем; единственный разрешённый — feynman",
+  "signal_registry": [
+    {
+      "kind": "ocr-scan",
+      "automatic": false,
+      "status": "Waiting: authoritative signal adapter not configured"
+    },
+    {
+      "kind": "codeql",
+      "automatic": false,
+      "status": "Waiting: authoritative signal adapter not configured"
+    },
+    {
+      "kind": "scorecard",
+      "automatic": false,
+      "status": "Waiting: authoritative signal adapter not configured"
+    },
+    {
+      "kind": "ci-failure",
+      "automatic": false,
+      "status": "Waiting: authoritative signal adapter not configured"
+    },
+    {
+      "kind": "dependabot-update",
+      "automatic": false,
+      "status": "Waiting: authoritative signal adapter not configured"
+    },
+    {
+      "kind": "issue",
+      "automatic": false,
+      "status": "Waiting: authoritative signal adapter not configured"
+    }
+  ]
+}

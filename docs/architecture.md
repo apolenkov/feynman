@@ -164,3 +164,16 @@ See [CONTEXT.md](../CONTEXT.md) for domain vocabulary and
 for the source/package trade-off.
 See [ADR-0006](adr/0006-codex-only-ports-and-adapters.md) for the boundary
 decision.
+
+## Repository automation
+
+The issue-driven night factory is repository-only automation under `scripts/factory-*`
+and four `.github/workflows/` entrypoints. It is separate from the Codex hook, CLI,
+Contract, Visual linter and published package runtime. Its initial policy disables
+activation; unknown provider, budget or deployment authority denies effects.
+
+A single native controller coordinates durable lineage accounting and authenticated
+checkpoints. Separate jobs isolate model access, secretless repro/gates and trusted
+data/Git publication. Source fault fixtures do not establish hosted or genuine-finding
+acceptance. See [ADR0007](adr/0007-disabled-issue-driven-night-factory.md) and the
+[change design](../openspec/changes/issue-driven-night-factory/design.md).
