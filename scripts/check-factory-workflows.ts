@@ -50,30 +50,23 @@ export async function actionlintBinary(): Promise<string> {
   const expected = ARCHIVE_DIGESTS[platform];
   if (expected === undefined)
     throw new Error('Unsupported actionlint platform; no unverified fallback');
-  const directory = path.resolve(import.meta.dirname, '..', '.build', 'factory-tools');
-  fs.mkdirSync(directory, { recursive: true });
-  const archivePath = path.join(directory, `actionlint_${RELEASE}_${platform}.tar.gz`);
-  if (!fs.existsSync(archivePath)) {
-    const response = await fetch(
-      `https://github.com/rhysd/actionlint/releases/download/v${RELEASE}/actionlint_${RELEASE}_${platform}.tar.gz`,
-      { signal: AbortSignal.timeout(30000) },
-    );
-    if (!response.ok) throw new Error('Pinned upstream actionlint download failed');
-    fs.writeFileSync(archivePath, Buffer.from(await response.arrayBuffer()));
-  }
-  const bytes = fs.readFileSync(archivePath);
+  const response = await fetch(
+    `https://github.com/rhysd/actionlint/releases/download/v${RELEASE}/actionlint_${RELEASE}_${platform}.tar.gz`,
+    { signal: AbortSignal.timeout(30000) },
+  );
+  if (!response.ok) throw new Error('Pinned upstream actionlint download failed');
+  const bytes = Buffer.from(await response.arrayBuffer());
   if (crypto.createHash('sha256').update(bytes).digest('hex') !== expected)
     throw new Error('Pinned upstream actionlint checksum mismatch');
-  const binary = path.join(directory, `actionlint-${RELEASE}-${platform}`);
   const executable = execFileSync('tar', ['-xzOf', '-', 'actionlint'], {
     input: bytes,
     maxBuffer: 20_000_000,
   });
-  if (!fs.existsSync(binary) || !fs.readFileSync(binary).equals(executable)) {
-    const temporary = `${binary}.${process.pid}.new`;
-    fs.writeFileSync(temporary, executable, { mode: 0o755 });
-    fs.renameSync(temporary, binary);
-  }
+  const directory = path.resolve(import.meta.dirname, '..', '.build', 'factory-tools');
+  fs.mkdirSync(directory, { recursive: true });
+  const privateDirectory = fs.mkdtempSync(path.join(directory, 'actionlint-'));
+  const binary = path.join(privateDirectory, 'actionlint');
+  fs.writeFileSync(binary, executable, { flag: 'wx', mode: 0o700 });
   return binary;
 }
 export async function validateNativeWorkflow(content: string, name: string): Promise<void> {

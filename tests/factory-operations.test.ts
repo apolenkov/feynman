@@ -16,6 +16,7 @@ import {
 
 it('native factory workflow JSON boundaries reject malformed input without exposing bytes or writing outputs', async (test) => {
   const root = process.cwd();
+  fs.mkdirSync(path.join(root, '.worktrees'), { recursive: true });
   const sentinel = 'SYNTHETIC_FACTORY_JSON_PRIVATE_MARKER_282';
   const malformed = `{"private":"${sentinel}", broken}`;
   for (const workflow of [
@@ -89,6 +90,38 @@ it('native factory workflow JSON boundaries reject malformed input without expos
         ]);
       });
   }
+});
+
+it('rejects unverified actionlint download bytes before creating any archive or executable', (test) => {
+  const root = process.cwd();
+  fs.mkdirSync(path.join(root, '.worktrees'), { recursive: true });
+  const directory = fs.mkdtempSync(path.join(root, '.worktrees/factory-checksum-'));
+  test.after(() => {
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+  fs.mkdirSync(path.join(directory, 'scripts'));
+  fs.copyFileSync(
+    path.join(root, 'scripts/check-factory-workflows.ts'),
+    path.join(directory, 'scripts/check-factory-workflows.ts'),
+  );
+  fs.symlinkSync(path.join(root, 'node_modules'), path.join(directory, 'node_modules'), 'dir');
+  const result = spawnSync(process.execPath, ['--input-type=module'], {
+    cwd: directory,
+    encoding: 'utf8',
+    timeout: 30_000,
+    input: `
+      import assert from 'node:assert/strict';
+      import { actionlintBinary } from './scripts/check-factory-workflows.ts';
+      globalThis.fetch = async () => new Response('UNVERIFIED_ACTIONLINT_TEST_BYTES');
+      await assert.rejects(actionlintBinary(), /Pinned upstream actionlint checksum mismatch/);
+    `,
+    env: { PATH: process.env['PATH'] },
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.signal, null);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(fs.readdirSync(directory).sort(), ['node_modules', 'scripts']);
+  assert.deepEqual(fs.readdirSync(path.join(directory, 'scripts')), ['check-factory-workflows.ts']);
 });
 
 // AC20–22/25–26 primary owner; no window start or additional target is synthesized.
@@ -556,6 +589,7 @@ it('AC21–22 native observe CLI refuses to certify supplied synthetic qualifyin
     observeFactory(loadFactoryPolicy(), candidates, new Date().toISOString()).eligible,
     true,
   );
+  fs.mkdirSync(path.resolve('.worktrees'), { recursive: true });
   const directory = fs.mkdtempSync(path.resolve('.worktrees', 'factory-observation-cli-'));
   test.after(() => {
     fs.rmSync(directory, { recursive: true, force: true });

@@ -38,6 +38,7 @@ export class FactoryPlatform {
   private counter = 1000;
   private gitProcessLaunches = 0;
   constructor(test: TestContext, fileOverrides: ReadonlyMap<string, Buffer> = new Map()) {
+    fs.mkdirSync(path.join(process.cwd(), '.worktrees'), { recursive: true });
     this.root = fs.mkdtempSync(path.join(process.cwd(), '.worktrees', 'factory-platform-'));
     this.repository = path.join(this.root, 'remote.git');
     execFileSync('git', ['init', '--bare', '-q', this.repository], {

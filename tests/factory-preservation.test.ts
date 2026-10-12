@@ -17,6 +17,7 @@ function localFixture(t: TestContext): {
   readonly git: (args: readonly string[], cwd?: string) => string;
   readonly commit: (cwd: string) => string;
 } {
+  fs.mkdirSync(path.join(process.cwd(), '.worktrees'), { recursive: true });
   const root = fs.mkdtempSync(path.join(process.cwd(), '.worktrees/factory-keep-'));
   t.after(() => {
     fs.rmSync(root, { recursive: true, force: true });
