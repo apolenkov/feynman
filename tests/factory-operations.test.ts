@@ -169,10 +169,46 @@ it('rejects unverified actionlint download bytes before creating any archive or 
   assert.deepEqual(fs.readdirSync(path.join(directory, 'scripts')), ['check-factory-workflows.ts']);
 });
 
-const { isBoolean, isMapping, isString, NoOperationTraceWriter, parseWorkflow } = await createJiti(
+const { isMapping, isString, NoOperationTraceWriter, parseWorkflow } = await createJiti(
   import.meta.url,
   { tryNative: false },
 ).import<typeof import('@actions/workflow-parser')>('@actions/workflow-parser');
+
+const expressionLoader = createJiti(import.meta.url, { tryNative: false });
+const { Lexer, Parser, Evaluator, data } =
+  await expressionLoader.import<typeof import('@actions/expressions')>('@actions/expressions');
+const { Binary, ContextAccess, IndexAccess, Literal, Logical, Grouping } =
+  await expressionLoader.import<typeof import('@actions/expressions/ast')>(
+    '@actions/expressions/ast',
+  );
+const PRIVILEGED_FLAG = 'FACTORY_PRIVILEGED_JOBS_ENABLED';
+const OWNER_GATE = `vars.${PRIVILEGED_FLAG} == 'true'`;
+
+function ownerJobExpression(condition: string) {
+  return new Parser(
+    new Lexer(condition).lex().tokens,
+    ['vars', 'needs', 'inputs', 'github'],
+    [],
+  ).parse();
+}
+function evaluateOwnerJob(condition: string, flag: string | undefined): string {
+  const variables = new data.Dictionary();
+  if (flag !== undefined) variables.add(PRIVILEGED_FLAG, new data.StringData(flag));
+  const context = new data.Dictionary(
+    { key: 'vars', value: variables },
+    {
+      key: 'needs',
+      value: new data.Dictionary({
+        key: 'preflight',
+        value: new data.Dictionary({
+          key: 'outputs',
+          value: new data.Dictionary({ key: 'authorized', value: new data.StringData('true') }),
+        }),
+      }),
+    },
+  );
+  return new Evaluator(ownerJobExpression(condition), context).evaluate().coerceString();
+}
 
 function assertFactoryWriteJobsDisabled(content: string, name: string): number {
   const parsed = parseWorkflow({ name, content }, new NoOperationTraceWriter());
@@ -192,16 +228,38 @@ function assertFactoryWriteJobsDisabled(content: string, name: string): number {
     privileged++;
     const condition = job.value.find('if');
     assert.ok(
-      condition !== undefined &&
-        ((isBoolean(condition) && !condition.value) ||
-          (isString(condition) && condition.value === 'false')),
-      `${name}/${job.key.toString()}: write permission requires literal job-level false before checkout/npm lifecycle`,
+      condition !== undefined && isString(condition),
+      `${name}: owner-controlled platform gate required`,
     );
+    const expression = ownerJobExpression(condition.value);
+    const root = expression instanceof Grouping ? expression.group : expression;
+    const candidate =
+      root instanceof Logical && root.operator.lexeme === '&&' ? root.args[0] : root;
+    assert.ok(
+      candidate instanceof Binary &&
+        candidate.operator.lexeme === '==' &&
+        candidate.left instanceof IndexAccess &&
+        candidate.left.expr instanceof ContextAccess &&
+        candidate.left.expr.name.lexeme === 'vars' &&
+        candidate.left.index instanceof Literal &&
+        candidate.left.index.literal instanceof data.StringData &&
+        candidate.left.index.literal.value === PRIVILEGED_FLAG &&
+        candidate.right instanceof Literal &&
+        candidate.right.literal instanceof data.StringData &&
+        candidate.right.literal.value === 'true',
+      `${name}/${job.key.toString()}: owner-controlled platform gate must dominate job admission`,
+    );
+    for (const flag of [undefined, '', 'false'])
+      assert.equal(
+        evaluateOwnerJob(condition.value, flag),
+        'false',
+        `${name}: absent/empty/false owner flag must deny even forged preflight`,
+      );
   }
   return privileged;
 }
 
-it('factory write-permission jobs require platform literal false independent of preflight or future privileged jobs', async (test) => {
+it('factory write-permission jobs require a default-deny owner platform flag independent of preflight or future privileged jobs', async (test) => {
   let privileged = 0;
   for (const name of [
     'factory-control.yml',
@@ -250,25 +308,40 @@ jobs:
     'actions: write',
     'id-token: write',
   ])
-    await test.test(`future hard-disabled ${permission}`, () => {
+    await test.test(`future owner-gated ${permission}`, () => {
       assert.equal(
-        assertFactoryWriteJobsDisabled(future('if: false', permission), 'future.yml'),
+        assertFactoryWriteJobsDisabled(future(`if: ${OWNER_GATE}`, permission), 'future.yml'),
         1,
       );
     });
-  await test.test('inherited write-all hard-disabled', () => {
-    assert.equal(assertFactoryWriteJobsDisabled(future('if: false', '', true), 'future.yml'), 1);
+  await test.test('inherited write-all owner-gated', () => {
+    assert.equal(
+      assertFactoryWriteJobsDisabled(future(`if: ${OWNER_GATE}`, '', true), 'future.yml'),
+      1,
+    );
   });
+  await test.test(
+    'explicit owner true permits gated future job while forged preflight alone cannot',
+    () => {
+      const condition = `${OWNER_GATE} && (needs.preflight.outputs.authorized == 'true')`;
+      assert.equal(assertFactoryWriteJobsDisabled(future(`if: ${condition}`), 'future.yml'), 1);
+      assert.equal(evaluateOwnerJob(condition, 'true'), 'true');
+      for (const flag of [undefined, '', 'false'])
+        assert.equal(evaluateOwnerJob(condition, flag), 'false');
+    },
+  );
   for (const condition of [
-    '# if: false',
+    `# if: ${OWNER_GATE}`,
     'if: true',
     "if: needs.preflight.outputs.authorized == 'true'",
-    "if: vars.FACTORY_DISABLED != 'true'",
+    "if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED != 'false'",
+    `if: ${OWNER_GATE} || true`,
+    `if: ${OWNER_GATE} || needs.preflight.outputs.authorized == 'true'`,
   ])
     await test.test(`future privilege cannot use ${condition}`, () => {
       assert.throws(
         () => assertFactoryWriteJobsDisabled(future(condition), 'future.yml'),
-        /literal job-level false/,
+        /owner-controlled platform gate/,
       );
     });
 });

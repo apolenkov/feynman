@@ -43,7 +43,7 @@ These findings are deferred from the disabled source PR by the coordinator on 20
 
 - [ ] Devin readiness: preserve the observed nullable required-check tuples while authenticating their origin separately through approved workflow/run identity; verify a complete target with `app_id: null` without inventing app IDs before activation.
 - [ ] Devin disappearance: persist originating scan scope/inventory/tool/configuration, require compatible prior/current coverage and bind every absence proof to the current scan source and operation; narrowed or incompatible scans must not close unseen findings before activation.
-- [ ] Devin security: before activation, establish trusted pinned admission before any repository/dependency execution, install with `npm ci --ignore-scripts`, and keep every privileged job platform-disabled until that trusted bootstrap and its denial tests are accepted; a guard loaded after lifecycle execution is insufficient.
+- [ ] Devin security: before activation, establish trusted pinned admission before any repository/dependency execution, install with `npm ci --ignore-scripts`, and keep every privileged job platform-disabled until that trusted bootstrap and its denial tests are accepted; a guard loaded after lifecycle execution is insufficient. Keep `FACTORY_PRIVILEGED_JOBS_ENABLED` unset; only the repository owner may set it to the string `true` during activation after those prerequisites are accepted.
 
 - Coordinator alone authorizes merge; no source merge without his word.
 - Hosted H1/H2/H3, bootstrap/activation/provider calls, genuine scan→issue→PR→merge→closure and 14-day/three-update observation require later assignments and are outside this disabled source delivery.

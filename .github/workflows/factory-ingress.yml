@@ -16,8 +16,8 @@ permissions:
 
 jobs:
   execute:
-    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
-    if: false
+    # shortcut: unset flag denies; owner enables only after trusted bootstrap.
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

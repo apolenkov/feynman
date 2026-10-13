@@ -168,8 +168,8 @@ jobs:
         run: node scripts/factory-protocol.ts emit factory/receipt.json
   append-bootstrap:
     needs: authority-bootstrap
-    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
-    if: false
+    # shortcut: unset flag denies; owner enables only after trusted bootstrap.
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.authority-bootstrap.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -266,8 +266,8 @@ jobs:
         run: node scripts/factory-protocol.ts emit factory/receipt.json
   append-register:
     needs: authority-register
-    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
-    if: false
+    # shortcut: unset flag denies; owner enables only after trusted bootstrap.
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.authority-register.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -364,8 +364,8 @@ jobs:
         run: node scripts/factory-protocol.ts emit factory/receipt.json
   append-reserve:
     needs: authority-reserve
-    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
-    if: false
+    # shortcut: unset flag denies; owner enables only after trusted bootstrap.
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.authority-reserve.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -462,8 +462,8 @@ jobs:
         run: node scripts/factory-protocol.ts emit factory/receipt.json
   append-outcome:
     needs: authority-outcome
-    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
-    if: false
+    # shortcut: unset flag denies; owner enables only after trusted bootstrap.
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.authority-outcome.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -560,8 +560,8 @@ jobs:
         run: node scripts/factory-protocol.ts emit factory/checkpoint.json
   publication:
     needs: preflight
-    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
-    if: false
+    # shortcut: unset flag denies; owner enables only after trusted bootstrap.
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.preflight.outputs.authorized == 'true' && (inputs.command == 'publication'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -634,8 +634,8 @@ jobs:
           node scripts/factory-writer.ts "$FACTORY_COMMAND" factory-input.json
   writer:
     needs: preflight
-    # shortcut: platform block until trusted admission exists before checkout/npm lifecycle.
-    if: false
+    # shortcut: unset flag denies; owner enables only after trusted bootstrap.
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.preflight.outputs.authorized == 'true' && (inputs.command == 'push-pr' || inputs.command == 'closure' || inputs.command == 'provider-gate' || inputs.command == 'merge' || inputs.command == 'sweep'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
