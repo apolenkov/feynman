@@ -1,0 +1,55 @@
+name: Factory operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        type: choice
+        options: [prepare, observe, stop]
+        default: prepare
+      request:
+        type: string
+        default: '{}'
+
+permissions:
+  contents: read
+
+jobs:
+  execute:
+    # shortcut: unset flag denies; owner enables only after trusted bootstrap.
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (github.actor == github.repository_owner && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure native libarchive tools
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci
+      - name: Closed policy admission before dispatch or stop effects
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_COMMAND: ${{ inputs.command }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          fs.writeFileSync('factory-input.json', JSON.stringify(parseFactoryJson(process.env.FACTORY_INPUT || '{}')));
+          NODE
+          node scripts/factory-operations.ts "$FACTORY_COMMAND" factory-input.json
