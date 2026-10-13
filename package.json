@@ -49,9 +49,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test tests/*.test.ts",
+    "test": "node --test --test-concurrency=1 tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "coverage": "mkdir -p coverage && node --experimental-test-coverage --test-coverage-exclude=tests/** --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test tests/*.test.ts",
+    "coverage": "mkdir -p coverage && node --experimental-test-coverage --test-coverage-exclude=tests/** --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info --test --test-concurrency=1 tests/*.test.ts",
     "check:coverage": "node scripts/check-coverage.ts",
     "lint": "node bin/feynman-lint.ts",
     "eslint": "eslint . --max-warnings=0",
@@ -63,20 +63,24 @@
     "test:published": "node scripts/verify-published-package.ts",
     "build": "node scripts/build-package.ts",
     "changelog": "node scripts/generate-changelog.ts",
-    "ci": "npm run audit && npm run format:check && npm run typecheck && npm run eslint && npm run coverage && npm run check:coverage && npm run test:docs && npm run check:reproducibility && npm run test:release",
+    "check:factory-workflows": "node scripts/check-factory-workflows.ts",
+    "ci": "npm run audit && npm run format:check && npm run typecheck && npm run eslint && npm run check:factory-workflows && npm run coverage && npm run check:coverage && npm run test:docs && npm run check:reproducibility && npm run test:release",
     "prepublishOnly": "npm run audit && npm run typecheck && npm run coverage && npm run check:coverage && npm run test:docs",
     "release": "npm run ci && npm publish \"./$(cat dist/TARBALL.txt)\" --access public",
     "check:reproducibility": "node scripts/check-reproducibility.ts",
     "prepare": "lefthook install >/dev/null 2>&1 || true"
   },
   "devDependencies": {
+    "@actions/workflow-parser": "0.3.61",
     "@commitlint/cli": "21.2.3",
     "@commitlint/config-conventional": "21.2.3",
     "@commitlint/types": "21.2.3",
     "@types/node": "^26.4.0",
     "@typescript-eslint/eslint-plugin": "^8.69.0",
     "@typescript-eslint/parser": "^8.69.0",
+    "canonicalize": "5.1.0",
     "eslint": "^10.9.1",
+    "jiti": "2.7.0",
     "lefthook": "2.1.17",
     "prettier": "3.9.9",
     "typescript": "^6.0.3"

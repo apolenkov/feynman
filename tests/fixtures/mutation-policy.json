@@ -343,6 +343,174 @@
       "count": 1,
       "reason": "Outer CLI boundary reports failure after the isolated published-consumer cleanup finishes.",
       "test": "tests/packaging-behavior.test.ts"
+    },
+    {
+      "file": "scripts/factory-control.ts",
+      "owner": "readState",
+      "mutationHash": "071eada422d28a3be3197fd0441056abce7bd3e47bf1c50cbe933b44e54fc133",
+      "count": 2,
+      "reason": "Invocation-owned state map collects authenticated Git blobs; checkpoint field corruption and real Git recovery cases verify its consumers.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-control.ts",
+      "owner": "discoverCheckpoint",
+      "mutationHash": "46fa4546f7615e27ecba97ab0feee886d3a505389ce674bbffc969fa4d78b1d5",
+      "count": 9,
+      "reason": "Bounded invocation-owned counters, archive collection and Git cursor authenticate the newest checkpoint, intervening attempts and consumed orphans; 100/101 and corruption controls exercise the bounds.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-control.ts",
+      "owner": "transportOperation",
+      "mutationHash": "94a55489a564ffcdcf54267891db94ba7386e119bd6d72d009fe269b57a3bb4c",
+      "count": 4,
+      "reason": "Invocation-owned stage/status slots assemble one canonical operation receipt; durable initial, identical retry and third-call denial controls exercise preservation of claims.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-control.ts",
+      "owner": "bootstrapGenesis",
+      "mutationHash": "089d7f2814ab90be499853f70ed552170d60f6d5019002a2816fb9de0a80e039",
+      "count": 7,
+      "reason": "Invocation-owned quarantine inventory, file map and tree entries build one native Git root; real genesis and public checkpoint recovery exercise publication without reusable counters.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-control.ts",
+      "owner": "appendTransition",
+      "mutationHash": "dd72b4fb78f481cddcdea632fdc8e13f107f4ab9977dd9caf2fed45753e3bc23",
+      "count": 1,
+      "reason": "Invocation-owned copied lineage/file map and tree entries append consumed reservations through an ordinary fast forward; native sibling conflict and killed Node controls verify preservation.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-protocol.ts",
+      "owner": "constructor",
+      "mutationHash": "9f9da267c246dfb013e07c0c1d690799b3f272f82d1cda860e96555321dc52dd",
+      "count": 1,
+      "reason": "GitHubFailure assigns its own immutable HTTP status for safe classified denials; incomplete HTTP evidence is exercised by checkpoint fault controls.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-protocol.ts",
+      "owner": "sha256",
+      "mutationHash": "a328feb20d28068cccf91d97afb2d4abde299290af2788f0ce0d77a3d5ba201f",
+      "count": 1,
+      "reason": "Invocation-owned standard SHA256 builder consumes canonical bytes once; independent rehashed checkpoint transport controls exercise the digest bindings.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-protocol.ts",
+      "owner": "validateProtocol",
+      "mutationHash": "8ec31ac8f2443952ec8d3cdef52193579c20c860cfe285d7f9fa7b88ab4f19e9",
+      "count": 10,
+      "reason": "Invocation-owned schema-dispatch result validates closed protocol variants; canonical core and individual checkpoint field controls cover acceptance and denial.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-protocol.ts",
+      "owner": "canonicalSet",
+      "mutationHash": "85a57fbe671fc6c58d4bf992867c99cf88ecddbf6ee6f06e41aca328508859b1",
+      "count": 2,
+      "reason": "Bounded invocation-owned index compares sorted canonical set members; protocol identity and duplicate schema controls exercise deterministic comparison.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-protocol.ts",
+      "owner": "resolveFactoryContext",
+      "mutationHash": "397de9746b3b08fad685727ecf2b24097a09c3760d77ce02b77517296106bf8a",
+      "count": 1,
+      "reason": "Invocation-owned trusted activation record is overlaid only after exact immutable Git pin proof; malformed registry and unknown budget controls exercise admission.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-protocol.ts",
+      "owner": "githubPages",
+      "mutationHash": "a49a8145621c8e1dfe8b6533c7c19923fef236f9dfeea00ab54f24a22af4a801",
+      "count": 8,
+      "reason": "Invocation-owned page cursor, counts and set collect complete fixed-origin GitHub pagination; Link terminal-count and 100/101 attempt controls exercise bounded traversal.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-protocol.ts",
+      "owner": "factoryMain",
+      "mutationHash": "6b4e4bd6528fc2985b016d3d60a18a3f35a42b90622fa7cf4ea1d2ab93970857",
+      "count": 2,
+      "reason": "Named CLI boundary owns only process exit classification; operations CLI observation denial proves the native non-success exit contract.",
+      "test": "tests/factory-operations.test.ts"
+    },
+    {
+      "file": "scripts/factory-protocol.ts",
+      "owner": "protocolMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "Named protocol CLI boundary owns only failure exit classification; primary controller tests independently authenticate the exact marker schema and core digest consumed by this producer.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-publication.ts",
+      "owner": "reconcilePublication",
+      "mutationHash": "96b8492f47e184d712bd9e772cc02d4f5f19eb2846c08a801e5400551d548723",
+      "count": 16,
+      "reason": "Invocation-owned presence, creation counter and issue/pending/closure collections reconcile authenticated findings; Opus regressions prove author filtering, proof prevalidation, fresh owner-label preservation, safe failure reporting and the three-new-issue cap.",
+      "test": "tests/night-factory-publication.test.ts"
+    },
+    {
+      "file": "scripts/factory-writer.ts",
+      "owner": "guardPatch",
+      "mutationHash": "2e66d518714e6b3696f64ddfbd820e2396d422bea85378b09bfba2d31eb91880",
+      "count": 3,
+      "reason": "Invocation-owned changed-line counter and path set enforce fixed patch caps; oversized, protected and non-text negative controls exercise the bounds.",
+      "test": "tests/night-factory-publication.test.ts"
+    },
+    {
+      "file": "scripts/factory-writer.ts",
+      "owner": "runReproduction",
+      "mutationHash": "760710b475e07c2c9437b0d5f6e53f061e40d059921bf7cc831f29e82ca3022a",
+      "count": 6,
+      "reason": "Invocation-owned authenticated proof/context/head slots bind immutable RED and GREEN; real native assertion and secretless complete-gate cases exercise exact source and test preservation.",
+      "test": "tests/night-factory-publication.test.ts"
+    },
+    {
+      "file": "scripts/factory-operations.ts",
+      "owner": "prepareTarget",
+      "mutationHash": "d5aad20f13875b91335f6b570a904d0ca1592cea20cfdcbfe1fdc10a0ee64b0e",
+      "count": 7,
+      "reason": "Invocation-owned candidate slots produce data-only target readiness; unknown target and malformed preparation inputs are covered by operations controls.",
+      "test": "tests/factory-operations.test.ts"
+    },
+    {
+      "file": "scripts/check-factory-workflows.ts",
+      "owner": "actionlintBinary",
+      "mutationHash": "7d0cdd85226b7b919d9c45be714e4df73805d761702c02f6f78520db65cf5583",
+      "count": 1,
+      "reason": "Invocation-owned verified archive digest builder checks one official upstream binary before native actionlint; single/max and unrelated diagnostic controls exercise the gate.",
+      "test": "tests/factory-operations.test.ts"
+    },
+    {
+      "file": "scripts/check-factory-workflows.ts",
+      "owner": "workflowMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "Named workflow CLI boundary owns only failure exit classification; native queue acceptance and unrelated-error controls exercise the same validation route.",
+      "test": "tests/factory-operations.test.ts"
+    },
+    {
+      "file": "scripts/factory-control.ts",
+      "owner": "transitionFiles",
+      "mutationHash": "2d9b212e8aea2c1607733e099d3c5b3ebab1faa024b803f18c65b9aeb95569a4",
+      "count": 5,
+      "reason": "Invocation-owned copied map and lineage slot derive the complete canonical append payload for both publication and recovery; native Git siblings and legitimately rehashed extra-lineage/confidence/history/observation corruption controls exercise exact state preservation.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-writer.ts",
+      "owner": "publishPatch",
+      "mutationHash": "059ba62312aadf300d8bbfe6360acfaa820450b0a2367df6d8c616967955299f",
+      "count": 4,
+      "reason": "Invocation-owned expected/live head slots classify immutable remote transport and canonical PR state; primary actual Git existing-head recovery and foreign head/body/repository/origin controls exercise reuse and denial without a network push.",
+      "test": "tests/night-factory-publication.test.ts"
     }
   ]
 }
