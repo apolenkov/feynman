@@ -71,6 +71,7 @@
     "prepare": "lefthook install >/dev/null 2>&1 || true"
   },
   "devDependencies": {
+    "@actions/expressions": "0.3.61",
     "@actions/workflow-parser": "0.3.61",
     "@commitlint/cli": "21.2.3",
     "@commitlint/config-conventional": "21.2.3",

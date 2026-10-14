@@ -12,6 +12,9 @@ import type { JsonRecord } from '../scripts/factory-protocol.ts';
 import { loadFactoryPolicy, createFactoryContext } from '../scripts/factory-protocol.ts';
 import { observeFactory, prepareTarget, stopFactory } from '../scripts/factory-operations.ts';
 import {
+  FACTORY_ENVIRONMENT,
+  FACTORY_WORKFLOWS,
+  validateFactoryHardening,
   validateNativeWorkflow,
   validateWorkflowSchema,
 } from '../scripts/check-factory-workflows.ts';
@@ -344,6 +347,146 @@ jobs:
         /owner-controlled platform gate/,
       );
     });
+});
+
+it('factory workflows pin protected environment, install without lifecycle scripts and grant actions explicitly', async (test) => {
+  const sources = new Map(
+    FACTORY_WORKFLOWS.map((name) => [
+      name,
+      fs.readFileSync(path.join('.github/workflows', name), 'utf8'),
+    ]),
+  );
+  for (const [name, source] of sources)
+    await test.test(name, () => {
+      validateFactoryHardening(source, name);
+    });
+  const control = sources.get('factory-control.yml') ?? '';
+  const mutations: [string, string, string, RegExp][] = [
+    ['environment', `    environment: ${FACTORY_ENVIRONMENT}\n`, '', /requires environment/],
+    ['ignore-scripts', 'npm ci --ignore-scripts', 'npm ci', /--ignore-scripts/],
+    ['actions', '      actions: read\n', '', /explicit actions permission/],
+    [
+      'expression run (parser yields a non-string token)',
+      'npm ci --ignore-scripts',
+      "npm ci ${{ '' }}",
+      /--ignore-scripts/,
+    ],
+  ];
+  for (const [label, from, to, error] of mutations)
+    await test.test(`mutation without ${label} is rejected`, () => {
+      assert.ok(control.includes(from));
+      assert.throws(() => {
+        validateFactoryHardening(control.replace(from, to), 'factory-control.yml');
+      }, error);
+    });
+});
+
+const hardeningWorkflow = (job: string, top = 'permissions: {}\n'): string =>
+  `name: t\non: workflow_dispatch\n${top}jobs:\n  j:\n    runs-on: ubuntu-latest\n${job}`;
+const hardeningRun = (run: string): string =>
+  `    steps:\n      - run: |\n${run
+    .split('\n')
+    .map((line) => `          ${line}`)
+    .join('\n')}\n`;
+const privileged = `    environment: ${FACTORY_ENVIRONMENT}\n`;
+
+it('factory hardening rejects install commands that can run lifecycle scripts and keeps safe forms', () => {
+  const rejected = [
+    'npm ci',
+    'npm ci # ${{ github.run_id }}',
+    "npm ci ${{ '' }}",
+    'npm ci --ignore-scripts=false',
+    'npm ci --ignore-scripts --ignore-scripts=false',
+    'npm ci --no-ignore-scripts',
+    'npm ci  # --ignore-scripts',
+    'npm ci \\\n  --ignore-scripts=false',
+    'npm ci --ignore-scripts && npm ci',
+    'npm ci --ignore-scripts\nnpm i',
+    'npm install',
+    'npm i',
+    'npm clean-install',
+    'npm cit',
+    'npm install-ci-test',
+  ];
+  for (const run of rejected)
+    assert.throws(
+      () => {
+        validateFactoryHardening(hardeningWorkflow(hardeningRun(run)), 'h.yml');
+      },
+      /--ignore-scripts/,
+      run,
+    );
+  for (const run of [
+    'npm ci --ignore-scripts',
+    'npm ci --ignore-scripts=true',
+    'npm ci --ignore-scripts # note',
+    'npm ci --ignore-scripts ${{ github.run_id }}',
+    'npm ci --ignore-scripts && npm test',
+    'npm run build',
+  ])
+    validateFactoryHardening(hardeningWorkflow(hardeningRun(run)), 'h.yml');
+});
+
+it('factory hardening treats missing permissions as write-all and honours inheritance', () => {
+  const steps = hardeningRun('npm ci --ignore-scripts');
+  const rejects = (workflow: string): void => {
+    assert.throws(() => {
+      validateFactoryHardening(workflow, 'h.yml');
+    }, /requires environment/);
+  };
+  rejects(hardeningWorkflow(steps, ''));
+  validateFactoryHardening(hardeningWorkflow(privileged + steps, ''), 'h.yml');
+  rejects(hardeningWorkflow(steps, 'permissions: write-all\n'));
+  rejects(hardeningWorkflow(steps, 'permissions:\n  contents: write\n'));
+  validateFactoryHardening(
+    hardeningWorkflow(privileged + steps, 'permissions: write-all\n'),
+    'h.yml',
+  );
+  validateFactoryHardening(hardeningWorkflow(steps, 'permissions:\n  contents: read\n'), 'h.yml');
+  validateFactoryHardening(hardeningWorkflow(`    permissions: {}\n${steps}`, ''), 'h.yml');
+  validateFactoryHardening(
+    hardeningWorkflow(`    permissions: read-all\n${steps}`, 'permissions: write-all\n'),
+    'h.yml',
+  );
+  rejects(hardeningWorkflow(`    permissions: write-all\n${steps}`));
+  rejects(hardeningWorkflow(`    permissions:\n      contents: write\n${steps}`));
+});
+
+it('factory hardening checks the environment form and the explicit actions grant', () => {
+  const steps = hardeningRun('npm ci --ignore-scripts');
+  const write = '    permissions:\n      contents: write\n';
+  validateFactoryHardening(
+    hardeningWorkflow(`    environment:\n      name: ${FACTORY_ENVIRONMENT}\n${write}${steps}`),
+    'h.yml',
+  );
+  for (const environment of ['environment:\n      name: other', 'environment: other'])
+    assert.throws(() => {
+      validateFactoryHardening(hardeningWorkflow(`    ${environment}\n${write}${steps}`), 'h.yml');
+    }, /requires environment/);
+  const factoryRun = hardeningRun('npm ci --ignore-scripts\nnode scripts/factory-control.ts run');
+  for (const permissions of [
+    '',
+    '    permissions:\n      contents: read\n',
+    '    permissions:\n      actions: none\n',
+  ])
+    assert.throws(() => {
+      validateFactoryHardening(
+        hardeningWorkflow(`${permissions}${factoryRun}`, 'permissions:\n  actions: read\n'),
+        'h.yml',
+      );
+    }, /explicit actions permission/);
+  validateFactoryHardening(
+    hardeningWorkflow(`    permissions:\n      actions: read\n${factoryRun}`),
+    'h.yml',
+  );
+  validateFactoryHardening(
+    hardeningWorkflow('    steps:\n      - uses: actions/checkout@v7\n'),
+    'h.yml',
+  );
+  validateFactoryHardening(
+    'name: t\non: workflow_dispatch\npermissions: {}\njobs:\n  j:\n    uses: ./.github/workflows/x.yml\n',
+    'h.yml',
+  );
 });
 
 // AC20–22/25–26 primary owner; no window start or additional target is synthesized.
