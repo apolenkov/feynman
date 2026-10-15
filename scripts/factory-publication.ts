@@ -1,4 +1,8 @@
+import fs from 'node:fs';
 import {
+  readAuthorityArchive,
+  resolveReceipt,
+  parseFactoryJson,
   resolveFactoryContext,
   FactoryFailure,
   safeReason,
@@ -15,6 +19,9 @@ import {
   stringField,
   verifyAuthority,
   verifyControlSource,
+  producerActor,
+  assertParentUnused,
+  nightParentKey,
 } from './factory-protocol.ts';
 import type { FactoryContext, FactoryDecision, JsonRecord } from './factory-protocol.ts';
 import { isProtectedPath, isSafeRepoPath } from './factory-paths.ts';
@@ -110,6 +117,48 @@ function canonicalIssue(context: FactoryContext, issue: JsonRecord): JsonRecord 
     throw new FactoryFailure('Invalid canonical finding marker; preserve work');
   }
 }
+const SEVERITIES = ['critical', 'high', 'medium', 'low'];
+const MAX_BODY_BYTES = 2048;
+const DETAILS_LABEL = 'Model output (untrusted):';
+// Model text is data, never markup: neutralize anything that pings, links or mimics our marker,
+// bound it, and fence it with more backticks than any run it contains.
+export function renderUntrusted(text: string, maxBytes: number): string {
+  const neutral = text
+    .replace(/[\u0000-\u0008\u000B-\u001F\u007F\u2028\u2029]/g, ' ')
+    .replaceAll('<!--', '<\u200b!--')
+    .replaceAll('@', '@\u200b')
+    .replace(/#(?=\d)/g, '#\u200b')
+    .replaceAll('://', ':\u200b//')
+    .replace(/www\./gi, (match) => `${match.slice(0, 3)}\u200b.`);
+  const longestRun = Math.max(0, ...(neutral.match(/`+/g) ?? []).map((run) => run.length));
+  const fence = '`'.repeat(Math.max(3, longestRun + 1));
+  const room = Math.max(0, maxBytes - 2 * fence.length - 2);
+  const bounded = Buffer.from(neutral, 'utf8')
+    .subarray(0, room)
+    .toString('utf8')
+    .replace(/\uFFFD$/, '');
+  return `${fence}\n${bounded}\n${fence}`;
+}
+function findingText(finding: JsonRecord): string | null {
+  const description = finding['description'];
+  if (typeof description !== 'string') return null;
+  const field = (label: string, value: unknown): string[] =>
+    typeof value === 'string' || typeof value === 'number' ? [`${label}: ${String(value)}`] : [];
+  const criteria = Array.isArray(finding['acceptance_criteria'])
+    ? ['Acceptance criteria:', ...finding['acceptance_criteria'].map((c) => `- ${String(c)}`)]
+    : [];
+  return [
+    ...field(
+      'Location',
+      `${String(finding['path'])}:${String(finding['start_line'])}-${String(finding['end_line'])}`,
+    ),
+    ...field('Severity', finding['severity']),
+    ...field('Category', finding['category']),
+    ...field('Description', description),
+    ...field('Verifier', finding['verdict_reason']),
+    ...criteria,
+  ].join('\n');
+}
 function labelNames(issue: JsonRecord): string[] {
   return arrayField(issue, 'labels').map((label) =>
     typeof label === 'string' ? label : stringField(record(label), 'name'),
@@ -185,6 +234,9 @@ export async function reconcilePublication(
       scanOperation['target_id'] !== scan['fingerprint_policy_revision']
     )
       throw new FactoryFailure('Scan source/policy provenance mismatch');
+    // Labels and issue text derive from severity: refuse anything outside the closed set before any write.
+    if (identified.some((finding) => !SEVERITIES.includes(String(finding['severity']))))
+      throw new FactoryFailure('Unknown finding severity');
     const route = `/repos/${stringField(context.policy, 'repository_full_name')}/issues`;
     let snapshot = (await githubPages(context, `${route}?state=all`)).map(record);
     const dispatch: JsonRecord[] = [];
@@ -192,7 +244,8 @@ export async function reconcilePublication(
     const deferred: JsonRecord[] = [];
     let created = 0;
     const closing: JsonRecord[] = [];
-    if (complete) {
+    // Absence closes an issue only with independent disappearance proof; without it nothing is closed.
+    if (complete && scan['disappearance_authority'] !== undefined) {
       for (const issue of snapshot) {
         const marker = canonicalIssue(context, issue);
         if (
@@ -204,10 +257,10 @@ export async function reconcilePublication(
           !compatibleOrigin(marker, scan)
         )
           continue;
-        const provenance = await verifyAuthority(
-          context,
-          record(record(scan['disappearance_authority'])[stringField(issue, 'node_id')]),
-        );
+        // No proof for this issue: leave it open rather than fail the publication.
+        const proof = record(scan['disappearance_authority'])[stringField(issue, 'node_id')];
+        if (proof === undefined) continue;
+        const provenance = await verifyAuthority(context, record(proof));
         const absenceOperation = record(provenance['operation'] ?? {});
         if (
           provenance['issue_node_id'] !== issue['node_id'] ||
@@ -267,7 +320,7 @@ export async function reconcilePublication(
       const blockedPath =
         !isSafeRepoPath(findingPath) || isProtectedPath(context.policy, findingPath);
       const repairState = confidence === 'disputed' || blockedPath ? 'needs-human' : 'eligible';
-      const bodyFor = (inventory: unknown): string => {
+      const headerFor = (inventory: unknown): string => {
         const origin = {
           scope: stringField(finding, 'path'),
           inventory_sha256: inventory,
@@ -276,17 +329,30 @@ export async function reconcilePublication(
         };
         return `<!-- factory-finding-v1 ${JSON.stringify({ ...identity, origin })} -->\nConfidence: ${confidence}\nRepair: ${repairState}\nAuthenticated receipt: ${sha256(proof)}`;
       };
-      const body = bodyFor(scan['inventory_sha256']);
-      // The stored inventory digest is bookkeeping: an inventory-only change must not rewrite every issue.
+      const comparable = (value: string): string | undefined =>
+        value
+          .split('\n\n')[0]
+          ?.split('\n')
+          .filter((line) => !line.startsWith('Authenticated receipt: '))
+          .join('\n');
+      const header = headerFor(scan['inventory_sha256']);
+      const text = findingText(finding);
+      const room = MAX_BODY_BYTES - Buffer.byteLength(header) - DETAILS_LABEL.length - 3;
+      const body =
+        text === null ? header : `${header}\n\n${DETAILS_LABEL}\n${renderUntrusted(text, room)}`;
+      // Only the structural header is compared: a reworded description of the same finding is no change,
+      // and the stored inventory digest is bookkeeping that must not rewrite every issue.
       const sameBody = (current: JsonRecord): boolean => {
         const stored = canonicalIssue(context, current)?.['origin'];
+        // The receipt digest changes with every nightly verifier run and says nothing about the finding.
+        const currentHeader = comparable(String(current['body']));
         return (
-          current['body'] === body ||
+          currentHeader === comparable(header) ||
           (typeof stored === 'object' &&
             stored !== null &&
             !Array.isArray(stored) &&
             /^[a-f0-9]{64}$/.test(String(record(stored)['inventory_sha256'])) &&
-            current['body'] === bodyFor(record(stored)['inventory_sha256']))
+            currentHeader === comparable(headerFor(record(stored)['inventory_sha256'])))
         );
       };
       const title = `[factory:${confidence}] ${fingerprint.slice(0, 16)}`;
@@ -473,11 +539,102 @@ export async function reconcilePublication(
   }
 }
 
+// Fingerprints the night scan must not spend verifier tokens on again: every canonical finding issue of the
+// current policy revision. Closed ones count too, because publication never reopens them.
+export async function knownFingerprints(context: FactoryContext): Promise<JsonRecord> {
+  const revision = record(context.staticPolicy['night_scan'] ?? {})['fingerprint_policy_revision'];
+  if (typeof revision !== 'string' || revision === '')
+    throw new FactoryFailure('Night scan fingerprint policy revision unknown');
+  const issues = (
+    await githubPages(
+      context,
+      `/repos/${stringField(context.staticPolicy, 'repository_full_name')}/issues?state=all`,
+    )
+  ).map(record);
+  const fingerprints = new Set<string>();
+  for (const issue of issues) {
+    const marker = canonicalIssue(context, issue);
+    if (
+      marker !== null &&
+      marker['repository_id'] === context.staticPolicy['repository_id'] &&
+      marker['fingerprint_policy_revision'] === revision
+    )
+      fingerprints.add(stringField(marker, 'fingerprint'));
+  }
+  return { fingerprint_policy_revision: revision, fingerprints: [...fingerprints].toSorted() };
+}
+// Before the model pass: only the owner, or the Actions bot with a fresh, never-used night-review parent, may
+// spend provider tokens on a night (protocol v1 section 8).
+export async function assertNightProducer(
+  inputContext: FactoryContext,
+  request: JsonRecord,
+): Promise<void> {
+  const context = await resolveFactoryContext(inputContext);
+  if ((await producerActor(context, request, true)).actor_decision === 'owner') return;
+  const parentId = stringField(request, 'parent_run_id');
+  await assertParentUnused(
+    context,
+    parentId,
+    ['verifier', 'scan'].map((phase) => nightParentKey(phase, parentId)),
+  );
+}
+// The scan record is read from the scan producer's own run: the artifact bytes plus the verified scan receipt.
+export async function loadScanRecord(
+  inputContext: FactoryContext,
+  runId: string,
+): Promise<JsonRecord> {
+  if (!/^[1-9]\d*$/.test(runId)) throw new FactoryFailure('Invalid scan run id');
+  const context = await resolveFactoryContext(inputContext);
+  const name = `factory-night-scan-${runId}`;
+  const artifacts = (
+    await githubPages(
+      context,
+      `/repos/${stringField(context.policy, 'repository_full_name')}/actions/runs/${runId}/artifacts`,
+      'artifacts',
+    )
+  )
+    .map(record)
+    .filter((artifact) => artifact['name'] === name);
+  const artifact = artifacts[0];
+  const digest = artifact?.['digest'];
+  if (
+    artifacts.length !== 1 ||
+    artifact?.['expired'] !== false ||
+    String(record(artifact['workflow_run'])['id']) !== runId ||
+    typeof digest !== 'string' ||
+    !/^sha256:[a-f0-9]{64}$/.test(digest)
+  )
+    throw new FactoryFailure('Night scan artifact missing or ambiguous');
+  const bytes = await readAuthorityArchive(
+    context,
+    String(artifact['id']),
+    digest.slice(7),
+    'scan',
+  );
+  return { ...parseFactoryJson(bytes), authority: await resolveReceipt(context, runId, 'scan') };
+}
+
 if (process.argv[1] === import.meta.filename) {
   await factoryMain(async (context, input): Promise<FactoryDecision> => {
+    if (input['command'] === 'known') {
+      await assertNightProducer(context, input);
+      fs.writeFileSync(
+        stringField(input, 'output_file'),
+        JSON.stringify(await knownFingerprints(context)),
+      );
+      return { status: 'accepted', reason: 'Known fingerprints listed' };
+    }
     if (input['command'] !== 'publication' && input['command'] !== 'publish')
       return { status: 'denied', reason: 'Unknown publication command' };
-    const { command: _command, ...scan } = input;
+    const { command: _command, ...request } = input;
+    let scan: JsonRecord = request;
+    if (request['scan_run_id'] !== undefined) {
+      try {
+        scan = await loadScanRecord(context, stringField(request, 'scan_run_id'));
+      } catch (error: unknown) {
+        return { status: 'needs-human', reason: safeReason(error) };
+      }
+    }
     const result = await reconcilePublication(context, scan);
     return {
       status: result.status,

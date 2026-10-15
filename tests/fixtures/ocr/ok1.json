@@ -1,0 +1,118 @@
+{
+  "exit_code": 0,
+  "preview": "preview",
+  "stdout": {
+    "status": "success",
+    "llm": {
+      "model": "fake-model"
+    },
+    "summary": {
+      "files_reviewed": 4,
+      "comments": 3,
+      "total_tokens": 25135,
+      "input_tokens": 24035,
+      "output_tokens": 1100,
+      "elapsed": "0s"
+    },
+    "tool_calls": {
+      "total": 2,
+      "by_tool": {
+        "code_comment": 2
+      },
+      "failure": 0,
+      "failure_by_tool": {},
+      "failure_details": []
+    },
+    "comments": [
+      {
+        "path": "src/auth.ts",
+        "content": "MD5 is unsuitable for password hashing; use a slow KDF such as argon2id or scrypt.",
+        "suggestion_code": "return scryptSync(password, salt, 64).toString(\"hex\");",
+        "existing_code": "return createHash('md5').update(password).digest('hex');",
+        "start_line": 4,
+        "end_line": 4,
+        "category": "security",
+        "severity": "high"
+      },
+      {
+        "path": "src/auth.ts",
+        "content": "Loose equality; use strict equality.",
+        "suggestion_code": "return user.role === 'admin';",
+        "existing_code": "return user.role == 'admin';",
+        "start_line": 8,
+        "end_line": 8,
+        "category": "bug",
+        "severity": "low"
+      },
+      {
+        "path": "src/db.ts",
+        "content": "SQL built by string concatenation allows injection; use parameterized queries.",
+        "suggestion_code": "return db.query(\"SELECT * FROM users WHERE name = $1\", [name]);",
+        "existing_code": "return db.query(\"SELECT * FROM users WHERE name = '\" + name + \"'\");",
+        "start_line": 2,
+        "end_line": 2,
+        "category": "security",
+        "severity": "critical"
+      }
+    ],
+    "project_summary": "### Top Issues\n- weak hashing\n- sql injection",
+    "session_id": "2c7d8f3b-94f7-4888-bff7-f65a4b7bd101"
+  },
+  "session": {
+    "summary": {
+      "session_id": "2c7d8f3b-94f7-4888-bff7-f65a4b7bd101",
+      "model": "fake-model",
+      "review_mode": "full_scan",
+      "start_time": "2026-10-15T06:37:35Z",
+      "end_time": "2026-10-15T06:37:35Z",
+      "duration_ns": 118699583,
+      "selected_files": 4,
+      "completed_files": 4,
+      "failed_files": 0,
+      "reused_files": 0,
+      "waived_files": 0,
+      "total_comments": 3,
+      "llm_failures": 0,
+      "aborted": false,
+      "legacy": true
+    },
+    "items": [
+      {
+        "type": "done",
+        "timestamp": "2026-10-15T06:37:35Z",
+        "file_path": "src/util.ts",
+        "old_path": "src/util.ts",
+        "new_path": "src/util.ts",
+        "fingerprint": "183af765c8738aaf62bb0a0e7567b29c332fe5348e8f9e77f28d21ec34896c56",
+        "comments": 0
+      },
+      {
+        "type": "done",
+        "timestamp": "2026-10-15T06:37:35Z",
+        "file_path": "src/auth.ts",
+        "old_path": "src/auth.ts",
+        "new_path": "src/auth.ts",
+        "fingerprint": "6cbfdb67c8d09a2e250ca15135fe98a9313319b7b929c218cb5c0809260b9342",
+        "comments": 2
+      },
+      {
+        "type": "done",
+        "timestamp": "2026-10-15T06:37:35Z",
+        "file_path": "src/db.ts",
+        "old_path": "src/db.ts",
+        "new_path": "src/db.ts",
+        "fingerprint": "e68536b3a711807835c6c6fcdf7586d4c858c58f4a280fc95e82401e798ab735",
+        "comments": 1
+      },
+      {
+        "type": "done",
+        "timestamp": "2026-10-15T06:37:35Z",
+        "file_path": ".gitignore",
+        "old_path": ".gitignore",
+        "new_path": ".gitignore",
+        "fingerprint": "78aa139258fb2049f5f9fec79decb8fdddab09ad6c3757b23424ce75a66408fc",
+        "comments": 0
+      }
+    ]
+  }
+}
