@@ -1454,6 +1454,7 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
     'wrong-current-head',
     'wrong-expected-head',
     'config-revision-changed',
+    'missing-proof',
   ])
     await test.test(control, async (subtest) => {
       const fixture = await publicationFindingFixture(subtest);
@@ -1563,7 +1564,7 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
       const result = await reconcilePublication(fixture.context, {
         ...absent,
         authority: scanAuthority,
-        disappearance_authority: { [issue.node_id]: proof },
+        disappearance_authority: control === 'missing-proof' ? {} : { [issue.node_id]: proof },
       });
       assert.equal(
         result.status,

@@ -17,6 +17,8 @@ import {
   parseProtocol,
   produceReceipt,
   producerActor,
+  assertParentUnused,
+  nightParentKey,
   readAuthorityArchive,
   readAuthorityLog,
   resolveReceipt,
@@ -596,7 +598,7 @@ export async function nightScan(inputContext: FactoryContext): Promise<FactoryDe
   try {
     const context = await resolveFactoryContext(inputContext);
     effectPolicy(context);
-    await verifyControlSource(context);
+    await verifyControlSource(context, false, NIGHT_REVIEW_PATH);
     const repository = stringField(context.policy, 'repository_full_name');
     if (context.job['workflow_ref'] !== `${repository}/${NIGHT_REVIEW_PATH}@refs/heads/main`)
       throw new FactoryFailure('Night scan may be requested only by the night-review run on main');
@@ -608,7 +610,7 @@ export async function nightScan(inputContext: FactoryContext): Promise<FactoryDe
     if (
       registered === undefined ||
       (typeof run['path'] === 'string' ? run['path'].split('@')[0] : null) !== NIGHT_REVIEW_PATH ||
-      (registered['id'] !== null && String(run['workflow_id']) !== registered['id']) ||
+      String(run['workflow_id']) !== registered['id'] ||
       run['head_branch'] !== 'main' ||
       !['schedule', 'workflow_dispatch'].includes(String(run['event'])) ||
       String(record(run['repository'])['id']) !== context.policy['repository_id']
@@ -663,33 +665,6 @@ function nightDraft(context: FactoryContext, request: JsonRecord): JsonRecord {
       throw new FactoryFailure('Night finding verdict must be confirmed or disputed');
   }
   return draft;
-}
-// Single use: a parent's first night receipt wins; a later run finds an earlier run's receipt with its request key.
-async function assertParentUnused(
-  context: FactoryContext,
-  parentId: string,
-  requestKey: string,
-): Promise<void> {
-  const parent = record(await githubRequest(context, `${base(context)}/actions/runs/${parentId}`));
-  const since = Date.parse(stringField(parent, 'created_at'));
-  const earlier = (await githubPages(context, `${base(context)}/actions/artifacts`, 'artifacts'))
-    .map(record)
-    .filter(
-      (artifact) =>
-        typeof artifact['name'] === 'string' &&
-        artifact['name'].startsWith('factory-v1-receipt-') &&
-        artifact['expired'] === false &&
-        String(record(artifact['workflow_run'])['id']) !== context.job['run_id'] &&
-        Date.parse(stringField(artifact, 'created_at')) >= since,
-    );
-  for (const artifact of earlier) {
-    const digest = stringField(artifact, 'digest').replace(/^sha256:/, '');
-    const prior = parseFactoryJson(
-      await readAuthorityArchive(context, String(artifact['id']), digest, 'receipt'),
-    );
-    if (prior['request_key'] === requestKey)
-      throw new FactoryFailure('Night parent_run_id already used by an earlier run');
-  }
 }
 async function prepareNightEvidence(
   context: FactoryContext,
@@ -751,14 +726,17 @@ async function prepareNightEvidence(
   );
   const payloadSha = sha256(payload);
   const actor = await producerActor(context, request, true);
-  // A bot run is keyed by its parent and phase only, so a replayed parent collides whatever draft it carries.
   const parentId = actor.actor_decision === 'owner' ? null : stringField(request, 'parent_run_id');
-  const requestKey = sha256(
+  const requestKey =
     parentId === null
-      ? { phase, run_id: context.job['run_id'], parent_run_id: null, payload_sha256: payloadSha }
-      : { phase, parent_run_id: parentId },
-  );
-  if (parentId !== null) await assertParentUnused(context, parentId, requestKey);
+      ? sha256({
+          phase,
+          run_id: context.job['run_id'],
+          parent_run_id: null,
+          payload_sha256: payloadSha,
+        })
+      : nightParentKey(phase, parentId);
+  if (parentId !== null) await assertParentUnused(context, parentId, [requestKey]);
   const receipt = produceReceipt({
     epoch_id: context.policy['epoch_id'],
     sequence: numberField(state.checkpoint, 'sequence') + 1,

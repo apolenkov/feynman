@@ -19,6 +19,9 @@ import {
   stringField,
   verifyAuthority,
   verifyControlSource,
+  producerActor,
+  assertParentUnused,
+  nightParentKey,
 } from './factory-protocol.ts';
 import type { FactoryContext, FactoryDecision, JsonRecord } from './factory-protocol.ts';
 import { isProtectedPath, isSafeRepoPath } from './factory-paths.ts';
@@ -254,10 +257,10 @@ export async function reconcilePublication(
           !compatibleOrigin(marker, scan)
         )
           continue;
-        const provenance = await verifyAuthority(
-          context,
-          record(record(scan['disappearance_authority'])[stringField(issue, 'node_id')]),
-        );
+        // No proof for this issue: leave it open rather than fail the publication.
+        const proof = record(scan['disappearance_authority'])[stringField(issue, 'node_id')];
+        if (proof === undefined) continue;
+        const provenance = await verifyAuthority(context, record(proof));
         const absenceOperation = record(provenance['operation'] ?? {});
         if (
           provenance['issue_node_id'] !== issue['node_id'] ||
@@ -560,6 +563,21 @@ export async function knownFingerprints(context: FactoryContext): Promise<JsonRe
   }
   return { fingerprint_policy_revision: revision, fingerprints: [...fingerprints].toSorted() };
 }
+// Before the model pass: only the owner, or the Actions bot with a fresh, never-used night-review parent, may
+// spend provider tokens on a night (protocol v1 section 8).
+export async function assertNightProducer(
+  inputContext: FactoryContext,
+  request: JsonRecord,
+): Promise<void> {
+  const context = await resolveFactoryContext(inputContext);
+  if ((await producerActor(context, request, true)).actor_decision === 'owner') return;
+  const parentId = stringField(request, 'parent_run_id');
+  await assertParentUnused(
+    context,
+    parentId,
+    ['verifier', 'scan'].map((phase) => nightParentKey(phase, parentId)),
+  );
+}
 // The scan record is read from the scan producer's own run: the artifact bytes plus the verified scan receipt.
 export async function loadScanRecord(
   inputContext: FactoryContext,
@@ -599,6 +617,7 @@ export async function loadScanRecord(
 if (process.argv[1] === import.meta.filename) {
   await factoryMain(async (context, input): Promise<FactoryDecision> => {
     if (input['command'] === 'known') {
+      await assertNightProducer(context, input);
       fs.writeFileSync(
         stringField(input, 'output_file'),
         JSON.stringify(await knownFingerprints(context)),

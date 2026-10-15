@@ -1691,7 +1691,7 @@ it('lets the owner but never the Actions bot reserve or settle a repair', async 
 
 // Night evidence producers: detached verifier/scan receipts and the scheduled night-scan dispatch.
 import { nightScan } from '../scripts/factory-control.ts';
-import { reconcilePublication } from '../scripts/factory-publication.ts';
+import { assertNightProducer, reconcilePublication } from '../scripts/factory-publication.ts';
 
 const NIGHT_PRINT = 'e'.repeat(64);
 const NIGHT_REVISION = 'night-scan-fp-v1';
@@ -1829,6 +1829,15 @@ it('requires the scheduled night-review parent for a bot producer and refuses a 
   assert.equal(fresh.status, 'accepted', fresh.reason);
   assert.notEqual(record(fresh.record)['request_key'], acceptedCore['request_key']);
 
+  // Before the model pass the same rules apply: a used or missing parent never reaches the provider.
+  await assert.rejects(
+    assertNightProducer(replayContext, { parent_run_id: '8800' }),
+    /already used/,
+  );
+  await assert.rejects(assertNightProducer(replayContext, {}), /parent_run_id/);
+  await assertNightProducer(replayContext, { parent_run_id: '8801' });
+  await assertNightProducer(laterContext(platform, activation, '915'), {});
+
   const withoutBudget = platform.context({ ...activation, token_budget: null }, '912');
   const noBudget = await runController(withoutBudget, {
     command: 'scan',
@@ -1950,6 +1959,42 @@ it('dispatches the controller as night-scan only from the night-review run on ma
     ref: 'main',
     inputs: { command: 'night-scan', request: JSON.stringify({ parent_run_id: '921' }) },
   });
+});
+
+it('lets the scheduled night review ask for a scan, and no other workflow or null id', async (test) => {
+  const { platform, activation } = await bootstrapped(test);
+  platform.overrides.set('/repos/apolenkov/feynman/actions/workflows/703/dispatches', null);
+  const review = platform.context(activation, '941', 'repair', 0);
+  setRun(platform, '941', { event: 'schedule' });
+  const sent = await nightScan(review);
+  assert.equal(sent.status, 'accepted', sent.reason);
+
+  // Another registered workflow on schedule is refused before any effect.
+  const other = platform.context(activation, '942', 'repair', 2);
+  setRun(platform, '942', { event: 'schedule' });
+  await assert.rejects(
+    verifyControlSource(
+      await resolveFactoryContext(other),
+      false,
+      '.github/workflows/night-review.yml',
+    ),
+    /Untrusted job/,
+  );
+  assert.equal((await nightScan(other)).status, 'denied');
+
+  // schedule is not allowed unless the caller names the workflow.
+  await assert.rejects(verifyControlSource(await resolveFactoryContext(review)), /Untrusted job/);
+
+  // A registry entry without an id never authenticates the run.
+  const unregistered = platform.activation({
+    workflow_registry: arrayField(activation, 'workflow_registry').map((entry, index) => ({
+      ...record(entry),
+      ...(index === 0 ? { id: null } : {}),
+    })),
+  });
+  const nullId = platform.context(unregistered, '943', 'repair', 0);
+  setRun(platform, '943', { event: 'schedule' });
+  assert.equal((await nightScan(nullId)).status, 'denied');
 });
 
 // End to end: recorded ocr run -> bundle -> adapt -> verifier -> scan -> publication.

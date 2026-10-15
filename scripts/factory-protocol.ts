@@ -816,9 +816,11 @@ export const CONTROL_FILES: readonly string[] = [
   'tools/ocr/package-lock.json',
   '.github/workflows/ci.yml',
 ];
+// `scheduledPath` additionally lets that one registered workflow run on `schedule` (the night review).
 export async function verifyControlSource(
   context: FactoryContext,
   stopping = false,
+  scheduledPath?: string,
 ): Promise<void> {
   // The relaxed control-closure check is for the dedicated stop role only (ADR 0007, emergency stop exception).
   if (stopping && context.role !== 'stop')
@@ -861,7 +863,12 @@ export async function verifyControlSource(
   )
     throw new FactoryFailure('Foreign/disabled job workflow');
   if (
-    attempt['event'] !== 'workflow_dispatch' ||
+    !(
+      attempt['event'] === 'workflow_dispatch' ||
+      (attempt['event'] === 'schedule' &&
+        scheduledPath !== undefined &&
+        registered['path'] === scheduledPath)
+    ) ||
     attempt['head_branch'] !== 'main' ||
     attempt['run_attempt'] !== 1 ||
     attempt['head_sha'] !== context.job['workflow_source_sha'] ||
@@ -1202,6 +1209,37 @@ export async function producerActor(
     actor_login: ACTIONS_BOT.login,
     actor_decision: 'approved-publisher',
   };
+}
+// A bot night receipt is keyed by its parent and phase only, so a replayed parent collides whatever it carries.
+export const nightParentKey = (phase: string, parentId: string): string =>
+  sha256({ phase, parent_run_id: parentId });
+// Single use: a parent's first night receipt wins; a later run finds an earlier run's receipt with its request key.
+export async function assertParentUnused(
+  context: FactoryContext,
+  parentId: string,
+  requestKeys: readonly string[],
+): Promise<void> {
+  const base = `/repos/${stringField(context.policy, 'repository_full_name')}`;
+  const parent = record(await githubRequest(context, `${base}/actions/runs/${parentId}`));
+  const since = Date.parse(stringField(parent, 'created_at'));
+  const earlier = (await githubPages(context, `${base}/actions/artifacts`, 'artifacts'))
+    .map(record)
+    .filter(
+      (artifact) =>
+        typeof artifact['name'] === 'string' &&
+        artifact['name'].startsWith('factory-v1-receipt-') &&
+        artifact['expired'] === false &&
+        String(record(artifact['workflow_run'])['id']) !== context.job['run_id'] &&
+        Date.parse(stringField(artifact, 'created_at')) >= since,
+    );
+  for (const artifact of earlier) {
+    const digest = stringField(artifact, 'digest').replace(/^sha256:/, '');
+    const prior = parseFactoryJson(
+      await readAuthorityArchive(context, String(artifact['id']), digest, 'receipt'),
+    );
+    if (requestKeys.includes(String(prior['request_key'])))
+      throw new FactoryFailure('Night parent_run_id already used by an earlier run');
+  }
 }
 export async function resolveReceipt(
   context: FactoryContext,
