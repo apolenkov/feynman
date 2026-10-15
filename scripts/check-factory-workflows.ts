@@ -393,6 +393,10 @@ const environmentName = (job: TemplateToken): string => {
     environment !== undefined && isMapping(environment) ? environment.find('name') : environment,
   );
 };
+// The whole Model pass command, byte for byte apart from the deadline, so nothing can be chained to it.
+const KEY_COMMAND =
+  /^node scripts\/factory-model\.ts run --source \. --ocr-bin "\$OCR_BIN" --known "\$RUNNER_TEMP\/night-known\/known\.json" --out "\$RUNNER_TEMP\/night-model" --deadline-seconds (\d+)$/;
+const KEY_STEP_ENV = ['OCR_BIN', 'OCR_LLM_AUTH_TOKEN', 'OPENCODE_GO_API_KEY'].join();
 // The key job: the one place a provider key may exist. Read-only token, its own environment, no tracing.
 export function validateKeyJob(content: string, name: string): void {
   const result = parseWorkflow({ name, content }, new NoOperationTraceWriter());
@@ -425,22 +429,32 @@ export function validateKeyJob(content: string, name: string): void {
     job.find('services') !== undefined
   )
     throw new Error(`${id}: key job must run on ubuntu-latest without container or services`);
-  // The key step is one fixed command: no action, no custom shell, nothing but the factory model script.
+  // The key step is one fixed command: no action, no shell override at any level, no extra env, no chained command.
+  if (result.value.find('defaults') !== undefined || job.find('defaults') !== undefined)
+    throw new Error(`${id}: defaults are forbidden around the key job`);
   const [step, ...extra] = keyStepsOf(job);
   const command = step !== undefined && isMapping(step) ? scalarText(step.find('run')) : '';
+  const env = step !== undefined && isMapping(step) ? step.find('env') : undefined;
+  const fixed = KEY_COMMAND.exec(command);
   if (
     step === undefined ||
     !isMapping(step) ||
     extra.length > 0 ||
     step.find('uses') !== undefined ||
     step.find('shell') !== undefined ||
-    !command.startsWith('node scripts/factory-model.ts run ')
+    env === undefined ||
+    !isMapping(env) ||
+    [...env]
+      .map(({ key }) => scalarText(key))
+      .toSorted()
+      .join() !== KEY_STEP_ENV ||
+    fixed === null
   )
     throw new Error(
-      `${id}: ${INERT_POSTURE.keyStep} must only run node scripts/factory-model.ts run`,
+      `${id}: ${INERT_POSTURE.keyStep} must only run node scripts/factory-model.ts run with one --deadline-seconds and the key env`,
     );
   // The model deadline must leave ten minutes of the job timeout for setup and upload.
-  const deadline = Number(/--deadline-seconds (\d+)/.exec(command)?.[1]);
+  const deadline = Number(fixed[1]);
   const timeout = Number(scalarText(job.find('timeout-minutes')));
   if (!(deadline > 0) || !(timeout > 0) || deadline + 600 > timeout * 60)
     throw new Error(`${id}: --deadline-seconds must fit timeout-minutes with ten minutes to spare`);

@@ -541,6 +541,13 @@ describe('factory-model check-tool and policy', () => {
     assert.equal((await run(['check-tool', '--policy', policy, '--prefix', prefix], env)).code, 1);
   });
 
+  it('rejects a platform without a pinned native integrity', async (t) => {
+    const dir = tmp(t);
+    const prefix = prefixWithBinary(dir);
+    const policy = writePolicy(dir, 'https://example.com/v1', { ocr_native_integrity: {} });
+    assert.equal((await run(['check-tool', '--policy', policy, '--prefix', prefix], env)).code, 1);
+  });
+
   it('rejects a non-https model endpoint', async (t) => {
     const dir = tmp(t);
     const prefix = prefixWithBinary(dir);

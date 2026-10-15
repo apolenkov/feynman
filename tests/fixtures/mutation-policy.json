@@ -485,7 +485,7 @@
       "owner": "downloadActionlint",
       "mutationHash": "8a18aadf0736a7f8ed6cf43d6969d90a1c48467d89526fe675e34d4fd535860d",
       "count": 2,
-      "reason": "Invocation-owned verified archive digest builder checks one official upstream binary before native actionlint; single/max and unrelated diagnostic controls exercise the gate.",
+      "reason": "Invocation-owned verified archive digest builder checks one official upstream binary before native actionlint and records its private directory in the process-owned memo that disposeActionlint clears; single/max and unrelated diagnostic controls exercise the gate.",
       "test": "tests/factory-operations.test.ts"
     },
     {
@@ -541,7 +541,7 @@
       "owner": "validateDispatchReachability",
       "mutationHash": "9751805e6f784a555b1ae35483a9a24f7961e43c05acdc4ee053af25f624fd1a",
       "count": 3,
-      "reason": "Invocation-owned reached-option set and loop cursor collect dispatch choices that reach a job or script handler; ghost-choice and unwired-list controls exercise it.",
+      "reason": "Invocation-owned reached-option set collects dispatch choices that reach a job or script handler; ghost-choice and unwired-list controls exercise it.",
       "test": "tests/factory-operations.test.ts"
     },
     {
@@ -565,7 +565,7 @@
       "owner": "runProcess",
       "mutationHash": "abdadf4bfaba880a29d24608418d0746668f2f10b6cca9192f7300b7e5e1c999",
       "count": 7,
-      "reason": "Invocation-owned output chunks, size counter and settle flags bound one child process; hang, oversized-output and failed-run controls exercise it.",
+      "reason": "Invocation-owned output chunks, size counter and settle flags bound one child process; hang and failed-run controls exercise it.",
       "test": "tests/factory-model.test.ts"
     },
     {
@@ -581,7 +581,7 @@
       "owner": "chat",
       "mutationHash": "cceef01605ca2436f71ba0491ddd9a603bace2adf1701b5a1e93834f5b0b9d06",
       "count": 3,
-      "reason": "Invocation-owned response chunks and size counter bound one provider reply; garbage, HTML and provider-failure controls exercise it.",
+      "reason": "Invocation-owned parsed-body slot holds one provider reply, null on invalid JSON; garbage, HTML and provider-failure controls exercise it.",
       "test": "tests/factory-model.test.ts"
     },
     {
@@ -597,7 +597,7 @@
       "owner": "parsePreview",
       "mutationHash": "e89d8b0485022f85d292e608e9d02470c8a8010f231996d2ece428b595133ad1",
       "count": 2,
-      "reason": "Invocation-owned path set and list collect the previewed files of one scan; recorded preview, empty and skipped-scan controls exercise it.",
+      "reason": "Invocation-owned file slot collects the previewed files of one scan; recorded preview, empty and skipped-scan controls exercise it.",
       "test": "tests/factory-model.test.ts"
     },
     {
@@ -637,7 +637,7 @@
       "owner": "<module>",
       "mutationHash": "fd7398cee8e8a9ce46b028b92ccf788cd03edd9f01b16f0d5e440af9fcdc260e",
       "count": 2,
-      "reason": "Module-owned request variable is replaced by the loaded scan record for one publication command; scan-run and direct-request controls exercise it.",
+      "reason": "Module-owned request variable is replaced by the loaded scan record for one publication CLI command; no test spawns the CLI, the publication and known paths behind it are exercised through their exported functions.",
       "test": "tests/night-factory-publication.test.ts"
     },
     {

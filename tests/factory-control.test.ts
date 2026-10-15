@@ -1994,7 +1994,10 @@ it('lets the scheduled night review ask for a scan, and no other workflow or nul
   });
   const nullId = platform.context(unregistered, '943', 'repair', 0);
   setRun(platform, '943', { event: 'schedule' });
-  assert.equal((await nightScan(nullId)).status, 'denied');
+  // Policy validation refuses a null registry id first; the run check in nightScan is a second guard.
+  const nullDecision = await nightScan(nullId);
+  assert.equal(nullDecision.status, 'denied');
+  assert.match(nullDecision.reason, /Invalid protocol field id/);
 });
 
 // End to end: recorded ocr run -> bundle -> adapt -> verifier -> scan -> publication.

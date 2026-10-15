@@ -312,7 +312,8 @@ export function checkTool(policy: NightScanPolicy, prefix: string): string {
     main['integrity'] !== policy.ocr_lock_integrity ||
     native['version'] !== policy.ocr_version ||
     typeof native['integrity'] !== 'string' ||
-    (pinned !== undefined && native['integrity'] !== pinned)
+    pinned === undefined ||
+    native['integrity'] !== pinned
   )
     throw new FactoryFailure('ocr lock does not match the pinned policy');
   const installed = readJsonFile(
@@ -733,7 +734,8 @@ export async function runModel(options: RunOptions): Promise<void> {
         comments,
         comments_truncated: commentsTruncated,
         auth_fallback_used: authFallbackUsed,
-        deadline_hit: scan.timedOut || deadlineHit,
+        // A call cut short by the deadline still ends the run incomplete.
+        deadline_hit: scan.timedOut || deadlineHit || remaining() <= 0,
       }),
       'verdicts.json': JSON.stringify({
         schema: VERDICTS_SCHEMA,

