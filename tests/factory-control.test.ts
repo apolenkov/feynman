@@ -477,6 +477,30 @@ import { pathToFileURL } from 'node:url';
 import { gitFixtureEnvironment } from './helpers/git-environment.ts';
 import { authorityMarker, emitAuthority } from '../scripts/factory-protocol.ts';
 
+it('accepts the run-start retention clock and denies a changed retention setting', async (test) => {
+  const { platform, activation } = await bootstrapped(test);
+  const context = laterContext(platform, activation, '902');
+  const artifact = platform.artifacts.find((candidate) =>
+    String(candidate['name']).includes('-checkpoint-'),
+  );
+  assert.ok(artifact !== undefined);
+  const route = `/repos/apolenkov/feynman/actions/artifacts/${String(artifact['id'])}`;
+  const created = Date.parse(String(artifact['created_at']));
+  assert.ok(Date.parse(String(artifact['expires_at'])) < created + 90 * 86400000);
+  assert.equal((await runController(context, { command: 'recover' })).status, 'accepted');
+  for (const [name, expiry] of [
+    ['30-day retention', created + 30 * 86400000],
+    ['89-day retention', created + 89 * 86400000],
+    ['91-day retention', created + 91 * 86400000],
+  ] as const)
+    await test.test(name, async () => {
+      platform.facts.set(route, { ...artifact, expires_at: new Date(expiry).toISOString() });
+      const result = await runController(context, { command: 'recover' });
+      assert.equal(result.status, 'denied');
+      assert.match(result.reason, /retention drift/);
+    });
+});
+
 it('binds every checkpoint marker and core field to independent Git and actual run facts after legitimate transport rehash', async (test) => {
   const { platform, activation, genesis, receipt } = await bootstrapped(test);
   const context = laterContext(platform, activation, '902');

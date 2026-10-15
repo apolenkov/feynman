@@ -1482,10 +1482,12 @@ export async function verifyArchiveAuthority(
     throw new FactoryFailure('Artifact name collision or producer identity mismatch');
   const created = Date.parse(stringField(artifact, 'created_at'));
   const expiry = Date.parse(stringField(artifact, 'expires_at'));
-  if (
-    !Number.isFinite(expiry) ||
-    expiry - created !== numberField(p, 'artifact_retention_days') * 86400000
-  )
+  // GitHub counts retention from the run start, not from the upload; a changed setting moves it by whole days.
+  const drift =
+    expiry -
+    Date.parse(stringField(attempt, 'run_started_at')) -
+    numberField(p, 'artifact_retention_days') * 86400000;
+  if (!Number.isFinite(drift) || Math.abs(drift) >= 43_200_000)
     throw new FactoryFailure('Authority artifact retention drift');
   if (!(
     created >= Date.parse(stringField(job, 'started_at')) &&
