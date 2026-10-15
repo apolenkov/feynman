@@ -296,6 +296,22 @@ describe('adapt', () => {
     assert.deepEqual(draft['findings'], []);
     assert.deepEqual(draft['deferred_findings'], []);
   });
+  it('retains a confirmed finding whose fingerprint also appears in known presence', () => {
+    const duplicate = { ...c0, index: 5 };
+    const { draft, selected } = adapt(
+      rawScan({}, [c0, duplicate]),
+      verdicts([[duplicate, 'confirmed']], { known_skipped: [0] }),
+    );
+    assert.equal(selected, true);
+    assert.equal(draft['successful'], true);
+    assert.equal(draft['truncated'], false);
+    assert.deepEqual(draft['known_present'], [fp(c0)]);
+    assert.deepEqual(
+      rows(draft['findings']).map((finding) => finding['fingerprint']),
+      [fp(c0)],
+    );
+    assert.deepEqual(draft['deferred_findings'], []);
+  });
   it('known presence leaves the V1 slot to new findings and retains cap overflow', () => {
     for (const fresh of [[c1], [c1, c2]]) {
       const { draft, selected } = adapt(

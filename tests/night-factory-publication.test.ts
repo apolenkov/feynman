@@ -1599,6 +1599,37 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
     });
 });
 
+it('binds known presence to the signed scan and publishes a shared fingerprint only once', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const { authority: _authority, ...document } = fixture.scan;
+  const scan = { ...document, known_present: [fixture.fingerprint] };
+  const authority = fixture.authority(
+    'scan',
+    'complete',
+    fixture.baseline,
+    sha256(scan),
+    'reviewed-v1',
+  );
+  const before = fixture.platform.requests.length;
+  const tampered = await reconcilePublication(fixture.context, {
+    ...scan,
+    known_present: ['f'.repeat(64)],
+    authority,
+  });
+  assert.equal(tampered.status, 'needs-human');
+  assert.match(tampered.reason, /Scan source\/policy provenance mismatch/);
+  assert.deepEqual(
+    fixture.platform.requests.slice(before).filter((r) => r.method !== 'GET'),
+    [],
+  );
+  assert.equal(fixture.platform.issues.length, 0);
+  const accepted = await reconcilePublication(fixture.context, { ...scan, authority });
+  assert.equal(accepted.status, 'accepted', accepted.reason);
+  assert.deepEqual(accepted.presence, [fixture.fingerprint]);
+  assert.equal(accepted.issues.length, 1);
+  assert.equal(fixture.platform.issues.length, 1);
+});
+
 it('rejects malformed known presence before any publication writes', async (test) => {
   const fixture = await publicationFindingFixture(test);
   const { authority: _authority, ...document } = fixture.scan;
