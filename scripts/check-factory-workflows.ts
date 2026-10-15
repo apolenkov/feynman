@@ -116,7 +116,8 @@ export const INERT_POSTURE: {
   keyJob: 'night-model',
   keyStep: 'Model pass',
   keyEnvironment: 'ci',
-  // Every byte of the key job (earlier steps, $GITHUB_ENV writes, env values) is pinned; it changes only in a reviewed diff.
+  // The parsed structure of the key job (earlier steps, $GITHUB_ENV writes, env values) is pinned; it changes only in a
+  // reviewed diff. Comments, quoting and scalar types are not part of it.
   keyJobSha256: 'b2b4677e30fdf126f48c3aab7625019ddd518283e9b6bc145532a22123ae696b',
 };
 // Text of a scalar workflow token (expressions keep their `${{ }}` form); structures are not text.
@@ -379,13 +380,13 @@ export function validateFactoryHardening(content: string, name: string): void {
       throw new Error(`${id}: factory job requires explicit actions permission`);
   }
 }
-// Every key and scalar of a token tree as one text, for patterns that may hide in any position.
-// Lossless structure of a workflow token, for pinning: mappings keep their key/value pairs.
+// Type-erasing structure of a workflow token, for pinning: mappings keep their key/value pairs in order.
 function tokenTree(token: TemplateToken): unknown {
   if (isMapping(token))
     return [...token].map(({ key, value }) => [scalarText(key), tokenTree(value)]);
   return isSequence(token) ? [...token].map(tokenTree) : scalarText(token);
 }
+// Every key and scalar of a token tree as one text, for patterns that may hide in any position.
 function tokenText(token: TemplateToken): string {
   if (isMapping(token))
     return [...token].map(({ key, value }) => `${scalarText(key)}\n${tokenText(value)}`).join('\n');
