@@ -451,7 +451,7 @@
     {
       "file": "scripts/factory-publication.ts",
       "owner": "reconcilePublication",
-      "mutationHash": "eb248ded3b09b10f6e844a93ae89d3f0f3a96ba4f14dfd25fc3a81f0c4884404",
+      "mutationHash": "ef4d05812c9af7c09988e82af15ef76877f8972fbc8edd33f2f527ce3e524991",
       "count": 21,
       "reason": "Invocation-owned presence, creation counter and issue/pending/closure collections reconcile authenticated findings; Opus regressions prove author filtering, proof prevalidation, label add/remove that never replaces the owner label set, safe failure reporting with preserved partial effects and the three-new-issue cap.",
       "test": "tests/night-factory-publication.test.ts"
