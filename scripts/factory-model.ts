@@ -521,14 +521,17 @@ export async function runModel(options: RunOptions): Promise<void> {
     throw new FactoryFailure('known.json was built for another fingerprint policy revision');
   const knownSet = new Set(arrayField(known, 'fingerprints').map(String));
 
-  const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+  // An inherited GIT_DIR or GIT_INDEX_FILE (a hook, a wrapper) would point git at another repository than source.
+  const git = {
     cwd: source,
-    encoding: 'utf8',
-  }).trim();
+    encoding: 'utf8' as const,
+    env: Object.fromEntries(
+      Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')),
+    ),
+  };
+  const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], git).trim();
   if (!/^[0-9a-f]{40}$/.test(sourceSha)) throw new FactoryFailure('Invalid source commit');
-  if (
-    execFileSync('git', ['status', '--porcelain'], { cwd: source, encoding: 'utf8' }).trim() !== ''
-  )
+  if (execFileSync('git', ['status', '--porcelain'], git).trim() !== '')
     throw new FactoryFailure('Source checkout is not clean');
   const binaryLine = assertBinaryMatches(policy, options.ocrBin);
 
