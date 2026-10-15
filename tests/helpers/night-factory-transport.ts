@@ -61,9 +61,13 @@ export class FactoryPlatform {
       'scripts/factory-writer.ts',
       'scripts/factory-operations.ts',
       'scripts/factory-preservation.ts',
+      'scripts/factory-model.ts',
+      'scripts/factory-scan-record.ts',
       'scripts/check-factory-workflows.ts',
       'package.json',
       'package-lock.json',
+      'tools/ocr/package.json',
+      'tools/ocr/package-lock.json',
     ];
     const contents = new Map(
       files.map((file) => [file, fileOverrides.get(file) ?? fs.readFileSync(file)]),

@@ -1824,3 +1824,106 @@ it('dispatches the controller as night-scan only from the night-review run on ma
     inputs: { command: 'night-scan', request: JSON.stringify({ parent_run_id: '921' }) },
   });
 });
+
+// End to end: recorded ocr run -> bundle -> adapt -> verifier -> scan -> publication.
+import { agreeable, scenario as modelScenario } from './helpers/night-model-scenario.ts';
+
+it('publishes exactly one issue from a recorded night run and leaks no key canary', async (test) => {
+  const canaries = {
+    OCR_LLM_AUTH_TOKEN: 'canary-primary-7f3a9c1e5b2d4086a1c3e5f7092b4d6f',
+    OPENCODE_GO_API_KEY: 'canary-fallback-0d8c6b4a2f1e3579b7d5f3a1c9e7b5d3',
+    GITHUB_TOKEN: 'canary-github-5e1f9a3c7b2d4680c2e4a6b8d0f1e3a5',
+  };
+  const { platform, activation } = await bootstrapped(test);
+  const context = laterContext(platform, activation, '930');
+  const model = await modelScenario(test, 'ok1', agreeable, {
+    revision: 'reviewed-v1',
+    keys: canaries,
+  });
+  const modelRun = await model.exec();
+  assert.equal(modelRun.code, 0, modelRun.stderr);
+  // The canary really reached the tool, so its absence below is a property of the pipeline.
+  assert.ok(
+    model.stub
+      .invocations()
+      .some((call) => call.env['OCR_LLM_TOKEN'] === canaries.OCR_LLM_AUTH_TOKEN),
+  );
+  // The recorded run was made on its own checkout; the factory binds the draft to this one.
+  for (const name of ['scan-raw.json', 'verdicts.json', 'acceptance.json']) {
+    const file = path.join(model.out, name);
+    fs.writeFileSync(
+      file,
+      fs
+        .readFileSync(file, 'utf8')
+        .replace(/"source_sha":"[0-9a-f]{40}"/g, `"source_sha":"${platform.release}"`),
+    );
+  }
+  const draft = path.join(platform.root, 'night-draft.json');
+  const adapted = execFileSync(
+    process.execPath,
+    [
+      'scripts/factory-scan-record.ts',
+      'adapt',
+      '--bundle',
+      model.out,
+      '--out',
+      draft,
+      '--revision',
+      'reviewed-v1',
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(adapted.trim(), 'selected=true');
+  assert.equal(arrayField(parseFactoryJson(fs.readFileSync(draft)), 'findings').length, 1);
+
+  const output = path.join(platform.root, 'receipt.json');
+  const recordFile = path.join(platform.root, 'scan.json');
+  const verifier = await runController(context, {
+    command: 'verifier',
+    draft_file: draft,
+    output_file: output,
+  });
+  assert.equal(verifier.status, 'accepted', verifier.reason);
+  const verifierCore = record(verifier.record);
+  platform.upload(verifierCore, 'receipt', stringField(verifierCore, 'transition_id'), 'verifier');
+  const scan = await runController(context, {
+    command: 'scan',
+    draft_file: draft,
+    output_file: output,
+    record_file: recordFile,
+  });
+  assert.equal(scan.status, 'accepted', scan.reason);
+  const scanCore = record(scan.record);
+  const scanEnvelope = platform.upload(
+    scanCore,
+    'receipt',
+    stringField(scanCore, 'transition_id'),
+    'scan',
+  );
+  const scanRecord = parseFactoryJson(fs.readFileSync(recordFile));
+  const published = await reconcilePublication(context, { ...scanRecord, authority: scanEnvelope });
+  assert.equal(published.status, 'accepted', published.reason);
+  assert.equal(published.issues.length, 1);
+  assert.equal(platform.issues.length, 1);
+  assert.equal(
+    platform.requests.filter(
+      (request) => request.method === 'POST' && request.path.endsWith('/issues'),
+    ).length,
+    1,
+  );
+
+  const outputs = [
+    ...fs.readdirSync(model.out).map((name) => fs.readFileSync(path.join(model.out, name), 'utf8')),
+    fs.readFileSync(draft, 'utf8'),
+    JSON.stringify([verifierCore, scanCore, scanEnvelope]),
+    fs.readFileSync(recordFile, 'utf8'),
+    modelRun.stdout,
+    modelRun.stderr,
+    JSON.stringify(platform.issues),
+    JSON.stringify(platform.requests.filter((request) => request.method !== 'GET')),
+  ];
+  for (const secret of Object.values(canaries))
+    outputs.forEach((text, index) => {
+      assert.equal(text.includes(secret), false, `canary leaked into output ${index}`);
+    });
+});

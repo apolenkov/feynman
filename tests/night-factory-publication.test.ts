@@ -2525,7 +2525,11 @@ it('lists every canonical fingerprint of the current revision, closed ones inclu
     fingerprint_policy_revision: 'reviewed-v1',
     fingerprints: ['a'.repeat(64), 'b'.repeat(64)],
   });
-  await assert.rejects(knownFingerprints(fixture.context), /revision/);
+  const { night_scan: _removed, ...withoutNightScan } = fixture.context.staticPolicy;
+  await assert.rejects(
+    knownFingerprints({ ...fixture.context, staticPolicy: withoutNightScan }),
+    /revision/,
+  );
 });
 
 it('loads the scan record from its run artifact with the verified scan receipt and publishes it; refuses missing or ambiguous artifacts', async (test) => {

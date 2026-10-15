@@ -768,7 +768,7 @@ async function main(argv: readonly string[]): Promise<void> {
   });
 }
 
-if (process.argv[1] === import.meta.filename) {
+async function cliMain(): Promise<void> {
   try {
     await main(process.argv.slice(2));
   } catch (error: unknown) {
@@ -776,3 +776,5 @@ if (process.argv[1] === import.meta.filename) {
     process.exitCode = 1;
   }
 }
+
+if (process.argv[1] === import.meta.filename) await cliMain();

@@ -27,6 +27,15 @@
 - [ ] 5.2 Run existing `npm ci`, full `npm run ci`, normal commit/pre-push hooks and exact-tree checks; preserve all failure/RED/GREEN receipts and collect final SHA for one source PR. No providers, activation, hosted dispatch or protection changes.
 - [ ] 5.3 Receive independent final Opus review on the exact PR head and resolve findings before coordinator merge; retain genuine/hosted and additional-target boundaries as explicitly unexercised/Waiting.
 
+## 6. Night scan (PR-B)
+
+- [x] 6.1 Add the pinned OCR tool (`tools/ocr`, exact 1.13.0 with lock integrity, signatures verified by `npm audit signatures`) and `scripts/factory-model.ts`: scan, verifier and analyst passes with allowlisted environment, throwaway HOME, budgets and deadline; verify in `tests/factory-model.test.ts` against recorded OCR runs in `tests/fixtures/ocr`.
+- [x] 6.2 Add `scripts/factory-scan-record.ts` (`adapt`, `fingerprintFinding`): bundle to scan draft with at most one finding per night (V1-1), incomplete scans never close findings; verify in `tests/factory-scan-record.test.ts`.
+- [x] 6.3 Add `night-scan` dispatch and the verifier and scan receipt producers to `scripts/factory-control.ts` (bot-actor bound to the scheduled `night-review.yml` parent run) and the `scan` archive kind; verify in `tests/factory-control.test.ts`, including the end-to-end canary test (recorded run, adapt, verifier, scan, one issue, no key value in any output).
+- [x] 6.4 Wire `night-known`, `night-model` (environment `ci`), `night-adapter`, `factory-authority-verifier`, `factory-authority-scan` and the `{scan_run_id}` publication input into `factory-control.yml`; `night-review.yml` runs on one daily cron and dispatches the controller as `night-scan`; extend the workflow gate (`validateKeyJob`, `validateSecretIsolation`, `timeout-minutes`); `factory-publication.ts` no longer fails a full scan whose open issue has no disappearance proof, it just keeps the issue open.
+- [x] 6.5 Register the new control files in `CONTROL_FILES` and the transport fixture manifest; pin `actions/upload-artifact` v7.0.2, `actions/setup-node` v7.1.0 and `actions/download-artifact` v8.0.2 by SHA.
+- [ ] 6.6 Hosted proof (outside this source delivery): key-job run in environment `ci`, first scheduled `night-scan`, artifact retention and `needs.*.result` semantics on the real runner.
+
 ## Workflow follow-up
 
 ### Opus PR54 prerequisites before activation
@@ -48,7 +57,7 @@ These findings are deferred from the disabled source PR by the coordinator on 20
   - Source done: `npm ci --ignore-scripts` in all factory jobs, `environment: factory-privileged` on every write-token job, explicit `actions` permission, gate `validateFactoryHardening`. Still open: trusted pinned admission before repository code (candidate: custom deployment protection rule on the environment).
 - [ ] Activation checklist (owner): create environment `factory-privileged` with deployment branch policy `main` (decide required reviewers: they gate every privileged run and hold the `factory-control-v1` queue; self-review prevention blocks a single owner), verify `protection_rules` are non-empty in preflight, and keep `FACTORY_*` variables out of the environment so they cannot shadow repository variables such as `FACTORY_ACTIVATION_POLICY_PIN`.
 
-- [ ] Night-review rollout checklist (owner/coordinator): the model key `OCR_LLM_AUTH_TOKEN` lives only in the existing environment `ci` (custom branch policy `main`); the key-job declares `environment: ci`; the unused `OPENCODE_GO_API_KEY` in `ci` is removed; environment `factory-privileged` is created main-only before the first PR-B run and never holds the key; repository variables `FACTORY_PRIVILEGED_JOBS_ENABLED` and `FACTORY_ACTIVATION_POLICY_PIN` are set only by the owner/coordinator after "ready", with the pin approved by independent review; the writer environment (`factory-writer`, owner approval per repair) is decided before PR-C.
+- [ ] Night-review rollout checklist (owner/coordinator): the model key `OCR_LLM_AUTH_TOKEN` lives only in the existing environment `ci` (custom branch policy `main`); the key-job declares `environment: ci`; `OPENCODE_GO_API_KEY` in `ci` stays as the owner-approved 401 fallback and is read only by the same key-job (never removed, never used elsewhere); environment `factory-privileged` is created main-only before the first PR-B run and never holds the key; repository variables `FACTORY_PRIVILEGED_JOBS_ENABLED` and `FACTORY_ACTIVATION_POLICY_PIN` are set only by the owner/coordinator after "ready", with the pin approved by independent review; the writer environment (`factory-writer`, owner approval per repair) is decided before PR-C.
 
 - Coordinator alone authorizes merge; no source merge without his word.
 - Hosted H1/H2/H3, bootstrap/activation/provider calls, genuine scan→issue→PR→merge→closure and 14-day/three-update observation require later assignments and are outside this disabled source delivery.

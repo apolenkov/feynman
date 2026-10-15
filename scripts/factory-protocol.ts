@@ -807,9 +807,13 @@ export const CONTROL_FILES: readonly string[] = [
   'scripts/factory-writer.ts',
   'scripts/factory-operations.ts',
   'scripts/factory-preservation.ts',
+  'scripts/factory-model.ts',
+  'scripts/factory-scan-record.ts',
   'scripts/check-factory-workflows.ts',
   'package.json',
   'package-lock.json',
+  'tools/ocr/package.json',
+  'tools/ocr/package-lock.json',
   '.github/workflows/ci.yml',
 ];
 export async function verifyControlSource(

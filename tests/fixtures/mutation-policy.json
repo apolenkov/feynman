@@ -485,7 +485,7 @@
       "owner": "downloadActionlint",
       "mutationHash": "8a18aadf0736a7f8ed6cf43d6969d90a1c48467d89526fe675e34d4fd535860d",
       "count": 2,
-      "reason": "Invocation-owned verified archive digest builder checks one official upstream binary before native actionlint and records its private tool directory in the process-owned memo for disposal; single/max and unrelated diagnostic controls exercise the gate.",
+      "reason": "Invocation-owned verified archive digest builder checks one official upstream binary before native actionlint; single/max and unrelated diagnostic controls exercise the gate.",
       "test": "tests/factory-operations.test.ts"
     },
     {
@@ -501,7 +501,7 @@
       "owner": "validateFactoryHardening",
       "mutationHash": "c7b9d7d8025ebbb810509f499e29f89e02036e1942e9d2ad141cee22d262ab60",
       "count": 2,
-      "reason": "Invocation-owned authentication flag and step cursor scan one parsed workflow for write-token environment (workflow, job and step env, with inputs, run text), ignore-scripts installs and explicit actions permission; real workflow and per-rule mutation controls exercise the gate.",
+      "reason": "Invocation-owned loop flag and step cursor scan one parsed workflow for write-token environment, ignore-scripts installs and explicit actions permission; real workflow and per-rule mutation controls exercise the gate.",
       "test": "tests/factory-operations.test.ts"
     },
     {
@@ -533,7 +533,7 @@
       "owner": "expressionBodies",
       "mutationHash": "4eea209cd66279d84ed7276e2aaa7068edeef84331435b286ab7a9082117c5a4",
       "count": 13,
-      "reason": "Invocation-owned scanner cursor and body buffer walk one workflow text once, skipping quoted literals so a quoted '}}' cannot end an expression; quoted, unterminated and multi-expression controls exercise the gate.",
+      "reason": "Invocation-owned cursor and body buffer extract expression bodies from one workflow text, skipping quoted literals; secret-isolation and key-job gate controls with quoted braces exercise it.",
       "test": "tests/factory-operations.test.ts"
     },
     {
@@ -541,7 +541,7 @@
       "owner": "validateDispatchReachability",
       "mutationHash": "9751805e6f784a555b1ae35483a9a24f7961e43c05acdc4ee053af25f624fd1a",
       "count": 3,
-      "reason": "Invocation-owned reached-option set collects dispatch choices named by job conditions or handler branches of one parsed workflow; dead, undeclared and stale-unwired controls exercise the gate.",
+      "reason": "Invocation-owned reached-option set and loop cursor collect dispatch choices that reach a job or script handler; ghost-choice and unwired-list controls exercise it.",
       "test": "tests/factory-operations.test.ts"
     },
     {
@@ -549,8 +549,120 @@
       "owner": "disposeActionlint",
       "mutationHash": "80f3d5afd83b0e21888ef40fbeee08ab7616ddef1ea75ab8d0c16bc680f46127",
       "count": 2,
-      "reason": "Process-owned memo slots are cleared after the last validation or at exit so the verified actionlint binary and its private directory never outlive the process; native queue controls dispose after use.",
+      "reason": "Process-owned memo of the verified actionlint download is cleared and its private directory removed after validation; repeated-validation controls exercise it.",
       "test": "tests/factory-operations.test.ts"
+    },
+    {
+      "file": "scripts/factory-control.ts",
+      "owner": "prepareNightEvidence",
+      "mutationHash": "3227c316061389006dee829f2aac399e235a3535a81ee3ab123664c2f237966b",
+      "count": 13,
+      "reason": "Invocation-owned receipt fields and the scan record are assembled for one verifier or scan receipt; verifier, scan, null-budget and tampered-record controls exercise it.",
+      "test": "tests/factory-control.test.ts"
+    },
+    {
+      "file": "scripts/factory-model.ts",
+      "owner": "runProcess",
+      "mutationHash": "abdadf4bfaba880a29d24608418d0746668f2f10b6cca9192f7300b7e5e1c999",
+      "count": 7,
+      "reason": "Invocation-owned output chunks, size counter and settle flags bound one child process; hang, oversized-output and failed-run controls exercise it.",
+      "test": "tests/factory-model.test.ts"
+    },
+    {
+      "file": "scripts/factory-model.ts",
+      "owner": "finish",
+      "mutationHash": "b4d4876451d8e84a1083131fb1303564d2c1afe9c37ac1e9352e46be4202253f",
+      "count": 1,
+      "reason": "Closure-owned settle flag makes one child result resolve exactly once; hang and failed-run controls exercise it.",
+      "test": "tests/factory-model.test.ts"
+    },
+    {
+      "file": "scripts/factory-model.ts",
+      "owner": "chat",
+      "mutationHash": "cceef01605ca2436f71ba0491ddd9a603bace2adf1701b5a1e93834f5b0b9d06",
+      "count": 3,
+      "reason": "Invocation-owned response chunks and size counter bound one provider reply; garbage, HTML and provider-failure controls exercise it.",
+      "test": "tests/factory-model.test.ts"
+    },
+    {
+      "file": "scripts/factory-model.ts",
+      "owner": "binaryVersion",
+      "mutationHash": "6554b9f77db7be97964f0b6045efd867f408584b211181ece0c59112bd2b430a",
+      "count": 2,
+      "reason": "Invocation-owned output buffer reads the version of the pinned binary; pinned and foreign-build controls exercise it.",
+      "test": "tests/factory-model.test.ts"
+    },
+    {
+      "file": "scripts/factory-model.ts",
+      "owner": "parsePreview",
+      "mutationHash": "e89d8b0485022f85d292e608e9d02470c8a8010f231996d2ece428b595133ad1",
+      "count": 2,
+      "reason": "Invocation-owned path set and list collect the previewed files of one scan; recorded preview, empty and skipped-scan controls exercise it.",
+      "test": "tests/factory-model.test.ts"
+    },
+    {
+      "file": "scripts/factory-model.ts",
+      "owner": "parseComments",
+      "mutationHash": "01fc3bdbd440c9d2631b7717b575c8cbe7b06826d23cb052328d956958714740",
+      "count": 1,
+      "reason": "Invocation-owned list collects validated review comments of one scan; recorded and garbage-output controls exercise it.",
+      "test": "tests/factory-model.test.ts"
+    },
+    {
+      "file": "scripts/factory-model.ts",
+      "owner": "runModel",
+      "mutationHash": "8b5e2229bac6a3d0f7289543b3413f5ba951ad93216d6e7baf8d77fea0997edc",
+      "count": 19,
+      "reason": "Invocation-owned token counters, finding lists and bundle records build one night bundle under finite budgets; budget, verify-cap, deadline and canary controls exercise it.",
+      "test": "tests/factory-model.test.ts"
+    },
+    {
+      "file": "scripts/factory-model.ts",
+      "owner": "cliMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "The single named main boundary sets the process exit code from a failed model command; failed and refused runs exercise it.",
+      "test": "tests/factory-model.test.ts"
+    },
+    {
+      "file": "scripts/factory-publication.ts",
+      "owner": "knownFingerprints",
+      "mutationHash": "e17a8dbeb0c4c9d0c3ebebaac215a71efeb10c3e9f16d42e4cfe4b32ceeb21df",
+      "count": 1,
+      "reason": "Invocation-owned fingerprint list collects the fingerprints of known night findings; known-list controls exercise it.",
+      "test": "tests/night-factory-publication.test.ts"
+    },
+    {
+      "file": "scripts/factory-publication.ts",
+      "owner": "<module>",
+      "mutationHash": "fd7398cee8e8a9ce46b028b92ccf788cd03edd9f01b16f0d5e440af9fcdc260e",
+      "count": 2,
+      "reason": "Module-owned request variable is replaced by the loaded scan record for one publication command; scan-run and direct-request controls exercise it.",
+      "test": "tests/night-factory-publication.test.ts"
+    },
+    {
+      "file": "scripts/factory-scan-record.ts",
+      "owner": "buildScanDraft",
+      "mutationHash": "f79f40fd34a68e0d98c64ea3f232bb134af2e355149c1ff3f9d2273a70f7e8ab",
+      "count": 8,
+      "reason": "Invocation-owned finding, deferral and token lists build one scan draft; selection, truncation and unknown-field controls exercise it.",
+      "test": "tests/factory-scan-record.test.ts"
+    },
+    {
+      "file": "scripts/factory-scan-record.ts",
+      "owner": "adaptMain",
+      "mutationHash": "b1285d6207e0cecffd91fb20af01f17c78f3ff3b6d30363a5f16b7fc37f82f15",
+      "count": 2,
+      "reason": "Invocation-owned optional acceptance value is read once from the bundle; missing and invalid acceptance controls exercise it.",
+      "test": "tests/factory-scan-record.test.ts"
+    },
+    {
+      "file": "scripts/factory-scan-record.ts",
+      "owner": "cliMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "The single named main boundary sets the process exit code from a failed adapt command; the CLI control exercises it.",
+      "test": "tests/factory-scan-record.test.ts"
     }
   ]
 }

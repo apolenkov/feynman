@@ -374,7 +374,7 @@ function adaptMain(argv: readonly string[]): void {
   fs.writeFileSync(out, canonicalBytes(draft));
   console.log(`selected=${String(selected)}`);
 }
-if (process.argv[1] === import.meta.filename) {
+function cliMain(): void {
   try {
     adaptMain(process.argv.slice(2));
   } catch (error: unknown) {
@@ -382,3 +382,5 @@ if (process.argv[1] === import.meta.filename) {
     process.exitCode = 1;
   }
 }
+
+if (process.argv[1] === import.meta.filename) cliMain();
