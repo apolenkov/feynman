@@ -139,6 +139,7 @@ export function buildScanDraft(
       'preview',
       'session',
       'comments',
+      'comments_truncated',
       'auth_fallback_used',
       'deadline_hit',
     ],
@@ -185,9 +186,6 @@ export function buildScanDraft(
     if (!['confirmed', 'disputed', 'refuted'].includes(String(v['verdict']))) fail('verdict');
     verdictByIndex.set(count(v['index'], 'verdict index'), v);
   }
-  const knownSkipped = new Set(
-    (Array.isArray(verdicts['known_skipped']) ? verdicts['known_skipped'] : []).map(Number),
-  );
   // Acceptance criteria are a courtesy: an invalid file only drops them.
   const criteria = new Map<number, string[]>();
   let acceptanceTokens = 0;
@@ -269,9 +267,20 @@ export function buildScanDraft(
         candidates.push({ comment, fingerprint, verdict });
         continue;
       }
-    } else if (knownSkipped.has(comment.index) && fingerprint !== null) continue;
+    }
+    // Known-skipped and unverified findings are deferred, never silently dropped.
     deferred.push({ fingerprint, path: comment.path, severity });
   }
+  // Slot choice: confirmed before disputed, then severity, then comment index.
+  const rank = (c: (typeof candidates)[number]): readonly [number, number, number] => [
+    c.verdict['verdict'] === 'confirmed' ? 0 : 1,
+    SEVERITIES.indexOf(c.comment.severity),
+    c.comment.index,
+  ];
+  candidates.sort((a, b) => {
+    const [x, y] = [rank(a), rank(b)];
+    return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+  });
   const [first, ...rest] = candidates;
   for (const { comment, fingerprint } of rest)
     deferred.push({ fingerprint, path: comment.path, severity: comment.severity });
@@ -295,6 +304,7 @@ export function buildScanDraft(
   const truncated =
     flag(raw['budget_exceeded'], 'budget_exceeded') ||
     flag(raw['deadline_hit'], 'deadline_hit') ||
+    flag(raw['comments_truncated'], 'comments_truncated') ||
     unreached.length > 0 ||
     deferred.length > 0;
   const successful =
@@ -354,7 +364,10 @@ function nightScanRevision(): string {
   return typeof configured === 'string' && configured !== '' ? configured : fail('policy revision');
 }
 function adaptMain(argv: readonly string[]): void {
-  const arg = (name: string): string | undefined => argv[argv.indexOf(name) + 1];
+  const arg = (name: string): string | undefined => {
+    const i = argv.indexOf(name);
+    return i < 1 ? undefined : argv[i + 1];
+  };
   const bundle = arg('--bundle');
   const out = arg('--out');
   if (argv[0] !== 'adapt' || bundle === undefined || out === undefined) fail('usage');

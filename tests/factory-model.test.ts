@@ -5,7 +5,7 @@ import { describe, it } from 'node:test';
 import { arrayField, record, stringField } from '../scripts/factory-protocol.ts';
 import type { LlmReply } from './helpers/fake-llm.ts';
 import { buildScanDraft, fingerprintFinding } from '../scripts/factory-scan-record.ts';
-import { VERIFIER_INSTRUCTION } from '../scripts/factory-model.ts';
+import { VERIFIER_INSTRUCTION, loadNightPolicy, runModel } from '../scripts/factory-model.ts';
 import {
   FALLBACK,
   FIXTURES,
@@ -199,6 +199,20 @@ describe('factory-model run: recorded ocr outputs', () => {
     ).draft;
     assert.equal(draft['successful'], false);
     assert.deepEqual(draft['failed'], ['src/db.ts']);
+  });
+
+  it('more than 200 comments are cut and the cut is recorded', async (t) => {
+    const first = ok1Comments[0];
+    assert.ok(first !== undefined);
+    const stdout = { ...record(ok1['stdout']), comments: Array.from({ length: 201 }, () => first) };
+    const s = await scenario(t, 'ok1', agreeable, { fixture: { ...ok1, stdout } });
+    assert.equal((await s.exec()).code, 0);
+    const raw = bundle(s.out, 'scan-raw.json');
+    assert.equal(arrayField(raw, 'comments').length, 200);
+    assert.equal(raw['comments_truncated'], true);
+    const exact = await scenario(t, 'ok1', agreeable);
+    assert.equal((await exact.exec()).code, 0);
+    assert.equal(bundle(exact.out, 'scan-raw.json')['comments_truncated'], false);
   });
 
   it('reports an exceeded budget', async (t) => {
@@ -421,6 +435,46 @@ describe('factory-model run: verification and acceptance', () => {
   });
 });
 
+describe('factory-model run: shared deadline', () => {
+  const direct = (s: Awaited<ReturnType<typeof scenario>>, clock: () => number): Promise<void> =>
+    runModel({
+      source: path.join(s.dir, 'repo'),
+      ocrBin: s.stub.bin,
+      knownFile: path.join(s.dir, 'known.json'),
+      outDir: s.out,
+      policy: loadNightPolicy(path.join(s.dir, 'policy.json')),
+      env: { PATH: process.env['PATH'] ?? '', RUNNER_TEMP: s.dir, OCR_LLM_AUTH_TOKEN: PRIMARY },
+      deadlineSeconds: 100,
+      clock,
+    });
+  const scanned = (s: Awaited<ReturnType<typeof scenario>>): boolean =>
+    s.stub.invocations().some((call) => call.argv.includes('--max-tokens-budget'));
+
+  it('a deadline spent by the scan skips verification and acceptance but still writes the bundle', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable);
+    await direct(s, () => (scanned(s) ? 1e12 : 0));
+    assert.deepEqual(s.llm.requests.map(kindOf), ['probe']);
+    assert.equal(bundle(s.out, 'scan-raw.json')['deadline_hit'], true);
+    assert.deepEqual(arrayField(bundle(s.out, 'verdicts.json'), 'verdicts'), []);
+    assert.deepEqual(arrayField(bundle(s.out, 'acceptance.json'), 'items'), []);
+  });
+
+  it('a deadline spent mid-verification stops before the next call and before the analyst', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable);
+    await direct(s, () => (s.llm.requests.some((r) => kindOf(r) === 'verify') ? 1e12 : 0));
+    assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'verify').length, 1);
+    assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'analyst').length, 0);
+    assert.equal(bundle(s.out, 'scan-raw.json')['deadline_hit'], true);
+    assert.equal(arrayField(bundle(s.out, 'verdicts.json'), 'verdicts').length, 1);
+  });
+
+  it('refuses a non-positive --deadline-seconds', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable);
+    assert.equal((await s.exec(['--deadline-seconds', '0'])).code, 1);
+    assert.equal(fs.existsSync(s.out), false);
+  });
+});
+
 describe('factory-model check-tool and policy', () => {
   function prefixWithBinary(
     dir: string,
@@ -474,6 +528,15 @@ describe('factory-model check-tool and policy', () => {
     const prefix = prefixWithBinary(dir);
     const policy = writePolicy(dir, 'https://example.com/v1', {
       ocr_lock_integrity: 'sha512-AAAA',
+    });
+    assert.equal((await run(['check-tool', '--policy', policy, '--prefix', prefix], env)).code, 1);
+  });
+
+  it('rejects a native binary whose lock integrity differs from the pinned one', async (t) => {
+    const dir = tmp(t);
+    const prefix = prefixWithBinary(dir);
+    const policy = writePolicy(dir, 'https://example.com/v1', {
+      ocr_native_integrity: { [`${process.platform}-${process.arch}`]: 'sha512-AAAA' },
     });
     assert.equal((await run(['check-tool', '--policy', policy, '--prefix', prefix], env)).code, 1);
   });

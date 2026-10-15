@@ -47,6 +47,7 @@ import type { JsonRecord } from '../scripts/factory-protocol.ts';
 
 const rows = (value: unknown): JsonRecord[] => arrayField({ value }, 'value').map(record);
 import { buildScanDraft } from '../scripts/factory-scan-record.ts';
+import { loadFactoryPolicy } from '../scripts/factory-protocol.ts';
 
 const SHA = 'a'.repeat(40);
 const REV = 'night-v1';
@@ -111,6 +112,7 @@ function rawScan(overrides: JsonRecord = {}, comments: JsonRecord[] = []): JsonR
       { type: 'done', file_path: 'b.ts' },
     ],
     comments,
+    comments_truncated: false,
     auth_fallback_used: false,
     deadline_hit: false,
     ...overrides,
@@ -171,6 +173,27 @@ describe('adapt', () => {
     assert.deepEqual(draft['excluded'], [{ path: 'package-lock.json', reason: 'excluded' }]);
     assert.ok(!('token_budget' in draft) && !('authority' in draft));
   });
+  it('slot goes to confirmed, then severity, then index', () => {
+    const critical = comment(2, 'b.ts', 'run(z)', { severity: 'critical' });
+    const medium = comment(1, 'b.ts', 'exec(y)', { severity: 'medium' });
+    const disputedCritical = comment(0, 'a.ts', 'eval(x)', { severity: 'critical' });
+    const { draft } = adapt(
+      rawScan({}, [disputedCritical, medium, critical]),
+      verdicts([
+        [disputedCritical, 'disputed'],
+        [medium, 'confirmed'],
+        [critical, 'confirmed'],
+      ]),
+    );
+    assert.deepEqual(
+      rows(draft['findings']).map((f) => f['fingerprint']),
+      [fp(critical)],
+    );
+    assert.deepEqual(
+      rows(draft['deferred_findings']).map((f) => f['fingerprint']),
+      [fp(medium), fp(disputedCritical)],
+    );
+  });
   it('single finding on a full scan is complete and criteria belong to confirmed only', () => {
     const one = adapt(rawScan({}, [c0]), verdicts([[c0, 'disputed']]), acceptance([0]));
     assert.equal(one.draft['truncated'], false);
@@ -187,6 +210,7 @@ describe('adapt', () => {
     for (const overrides of [
       { budget_exceeded: true },
       { deadline_hit: true },
+      { comments_truncated: true },
       { session: [{ type: 'done', file_path: 'a.ts' }] },
     ]) {
       const { draft } = adapt(rawScan(overrides, [c0]), verdicts([[c0, 'confirmed']]));
@@ -234,7 +258,7 @@ describe('adapt', () => {
     assert.equal(draft['truncated'], true);
     assert.deepEqual(draft['covered'], []);
   });
-  it('known-skipped comments are dropped, unverified or unidentifiable ones are deferred', () => {
+  it('known-skipped, unverified and unidentifiable comments are all deferred', () => {
     const lineZero = comment(3, 'a.ts', 'q()', { start_line: 0 });
     const badSeverity = comment(4, 'a.ts', 'w()', { severity: 'urgent' });
     const { draft, selected } = adapt(
@@ -242,7 +266,9 @@ describe('adapt', () => {
       verdicts([[badSeverity, 'confirmed']], { known_skipped: [0] }),
     );
     assert.equal(selected, false);
+    assert.equal(draft['truncated'], true);
     assert.deepEqual(draft['deferred_findings'], [
+      { fingerprint: fp(c0), path: 'a.ts', severity: 'high' },
       { fingerprint: fp(c1), path: 'b.ts', severity: 'high' },
       { fingerprint: null, path: 'a.ts', severity: 'high' },
       { fingerprint: fp(badSeverity), path: 'a.ts', severity: null },
@@ -270,6 +296,23 @@ describe('adapt', () => {
         },
         verdicts([]),
       ).draft['config_revision'],
+      base,
+    );
+  });
+  it('config revision follows meaningful flags and exclude set, not their order or run knobs', () => {
+    const raw = rawScan({}, []);
+    const config = record(raw['config']);
+    const revision = (patch: JsonRecord): unknown =>
+      adapt({ ...raw, config: { ...config, ...patch } }, verdicts([])).draft['config_revision'];
+    const base = revision({ exclude: ['a/**', 'b/**'], flags: ['--no-summary', '--x'] });
+    assert.equal(
+      revision({ exclude: ['b/**', 'a/**'], flags: ['--x', '--no-summary', '--concurrency=8'] }),
+      base,
+    );
+    assert.notEqual(revision({ exclude: ['a/**'], flags: ['--no-summary', '--x'] }), base);
+    assert.notEqual(revision({ exclude: ['a/**', 'b/**'], flags: ['--no-summary'] }), base);
+    assert.notEqual(
+      revision({ exclude: ['a/**', 'b/**'], flags: ['--no-summary', '--x', '--y'] }),
       base,
     );
   });
@@ -308,5 +351,37 @@ describe('adapt', () => {
     const bad = run('other-rev');
     assert.equal(bad.status, 1);
     assert.equal(bad.stdout, '');
+  });
+  it('CLI takes the revision from policy without --revision and demands --bundle/--out', (test) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scan-record-'));
+    test.after(() => {
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+    const policyRevision = String(
+      record(loadFactoryPolicy()['night_scan'])['fingerprint_policy_revision'],
+    );
+    const fingerprint = fingerprintFinding(policyRevision, {
+      path: 'a.ts',
+      category: 'bug',
+      existing_code: 'eval(x)',
+      start_line: 10,
+    });
+    fs.writeFileSync(path.join(dir, 'scan-raw.json'), JSON.stringify(rawScan({}, [c0])));
+    fs.writeFileSync(
+      path.join(dir, 'verdicts.json'),
+      JSON.stringify({
+        ...verdicts([[c0, 'confirmed']]),
+        verdicts: [{ index: 0, fingerprint, verdict: 'confirmed', reason: 'why' }],
+      }),
+    );
+    const cli = (...args: string[]) =>
+      spawnSync(process.execPath, ['scripts/factory-scan-record.ts', 'adapt', ...args], {
+        encoding: 'utf8',
+      });
+    const out = path.join(dir, 'd.json');
+    const ok = cli('--bundle', dir, '--out', out);
+    assert.equal(ok.stdout.trim(), 'selected=true', ok.stderr);
+    assert.equal(cli('--out', out).status, 1);
+    assert.equal(cli('--bundle', dir).status, 1);
   });
 });

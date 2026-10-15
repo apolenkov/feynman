@@ -13,6 +13,9 @@
     "ocr_version": "1.13.0",
     "ocr_git_head": "1672852136fc87748249d22bce0819f33419ea79",
     "ocr_lock_integrity": "sha512-H35yl2HwU7rAIcsnSa/CaDUAUJ3yZKLBpQU5XXwtBEeB8RVAXYrzqDVb+7QQmKTLMuzBO9N3v9dSibGv5NIo9w==",
+    "ocr_native_integrity": {
+      "linux-x64": "sha512-LKXWi/QbVuShUTF3DfrtpBLVlTGMX7Rq2xG9PyR5Y1herS7EP9twvkALNSfRZ7dtpjcqkeoiNgnl1dNiWfoxMA=="
+    },
     "fingerprint_policy_revision": "v1"
   }
 }

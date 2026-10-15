@@ -52,7 +52,10 @@ const VERDICTS = ['confirmed', 'disputed', 'refuted'];
 const MAX_COMMENTS = 200;
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
 const CALL_TIMEOUT_MS = 60_000;
-const DEFAULT_DEADLINE_SECONDS = 2400;
+// Whole model pass; the key job's timeout-minutes (45) must cover this plus setup and upload.
+const DEFAULT_DEADLINE_SECONDS = 2100;
+// The scan may use at most this share of the deadline so verification and acceptance still get a turn.
+const SCAN_DEADLINE_SHARE = 0.75;
 const DEFAULT_POLICY = path.join(import.meta.dirname, 'factory-policy.json');
 
 export interface NightScanPolicy {
@@ -69,6 +72,8 @@ export interface NightScanPolicy {
   readonly ocr_version: string;
   readonly ocr_git_head: string;
   readonly ocr_lock_integrity: string;
+  /** Lock integrity of the native binary, by `<platform>-<arch>`; checked where a platform is listed. */
+  readonly ocr_native_integrity: Readonly<Record<string, string>>;
   readonly fingerprint_policy_revision: string;
 }
 
@@ -90,6 +95,7 @@ export function loadNightPolicy(file = DEFAULT_POLICY): NightScanPolicy {
     )
   )
     throw new FactoryFailure('Invalid night_scan.exclude');
+  const native = record(block['ocr_native_integrity']);
   const gitHead = stringField(block, 'ocr_git_head');
   if (!/^[0-9a-f]{40}$/.test(gitHead)) throw new FactoryFailure('Invalid night_scan.ocr_git_head');
   return {
@@ -106,6 +112,9 @@ export function loadNightPolicy(file = DEFAULT_POLICY): NightScanPolicy {
     ocr_version: stringField(block, 'ocr_version'),
     ocr_git_head: gitHead,
     ocr_lock_integrity: stringField(block, 'ocr_lock_integrity'),
+    ocr_native_integrity: Object.fromEntries(
+      Object.keys(native).map((name) => [name, stringField(native, name)]),
+    ),
     fingerprint_policy_revision: stringField(block, 'fingerprint_policy_revision'),
   };
 }
@@ -205,14 +214,19 @@ interface ChatResult {
   readonly tokens: number;
 }
 // shortcut: the response body is read unbounded; the provider is a trusted, TLS-pinned origin, bound it if that changes.
-async function chat(url: string, key: string, payload: JsonRecord): Promise<ChatResult> {
+async function chat(
+  url: string,
+  key: string,
+  payload: JsonRecord,
+  timeoutMs = CALL_TIMEOUT_MS,
+): Promise<ChatResult> {
   const request = JSON.stringify(payload);
   try {
     const response = await fetch(`${url}/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
       body: request,
-      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+      signal: AbortSignal.timeout(Math.max(1, timeoutMs)),
     });
     const text = await response.text();
     let body: unknown = null;
@@ -292,11 +306,13 @@ export function checkTool(policy: NightScanPolicy, prefix: string): string {
   const native = record(
     lock[`node_modules/@alibaba-group/ocr-${process.platform}-${process.arch}`],
   );
+  const pinned = policy.ocr_native_integrity[`${process.platform}-${process.arch}`];
   if (
     main['version'] !== policy.ocr_version ||
     main['integrity'] !== policy.ocr_lock_integrity ||
     native['version'] !== policy.ocr_version ||
-    typeof native['integrity'] !== 'string'
+    typeof native['integrity'] !== 'string' ||
+    (pinned !== undefined && native['integrity'] !== pinned)
   )
     throw new FactoryFailure('ocr lock does not match the pinned policy');
   const installed = readJsonFile(
@@ -334,6 +350,8 @@ export interface RunOptions {
   readonly policy: NightScanPolicy;
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly deadlineSeconds?: number;
+  /** Millisecond clock; only tests replace it. */
+  readonly clock?: () => number;
 }
 
 function parsePreview(stdout: string): PreviewEntry[] {
@@ -355,13 +373,17 @@ function parsePreview(stdout: string): PreviewEntry[] {
     };
   });
 }
-function parseComments(raw: unknown, reviewable: ReadonlySet<string>): Comment[] {
-  if (!Array.isArray(raw)) return [];
+function parseComments(
+  raw: unknown,
+  reviewable: ReadonlySet<string>,
+): { comments: Comment[]; truncated: boolean } {
+  if (!Array.isArray(raw)) return { comments: [], truncated: false };
   const result: Comment[] = [];
   for (const entry of raw) {
     const comment = tryRecord(entry);
     const filePath = comment === null ? null : comment['path'];
     if (comment === null || typeof filePath !== 'string' || !reviewable.has(filePath)) continue;
+    if (result.length === MAX_COMMENTS) return { comments: result, truncated: true };
     const category = clip(comment['category'], 64).toLowerCase();
     const severity = clip(comment['severity'], 16).toLowerCase();
     result.push({
@@ -374,9 +396,8 @@ function parseComments(raw: unknown, reviewable: ReadonlySet<string>): Comment[]
       existing_code: clip(comment['existing_code'], 4000),
       content: clip(comment['content'], 2000),
     });
-    if (result.length === MAX_COMMENTS) break;
   }
-  return result;
+  return { comments: result, truncated: false };
 }
 function parseWarnings(raw: unknown): { file: string | null; type: string }[] {
   if (!Array.isArray(raw)) return [];
@@ -479,6 +500,20 @@ function leaks(outputs: Readonly<Record<string, string>>, keys: readonly string[
 
 export async function runModel(options: RunOptions): Promise<void> {
   const { policy, source } = options;
+  const clock = options.clock ?? Date.now;
+  const started = clock();
+  const deadline = started + (options.deadlineSeconds ?? DEFAULT_DEADLINE_SECONDS) * 1000;
+  const remaining = (): number => deadline - clock();
+  // A call never outlives the shared deadline; the first one that finds it spent marks the run incomplete.
+  let deadlineHit = false;
+  const budget = (limitMs: number): number | null => {
+    const left = remaining();
+    if (left <= 0) {
+      deadlineHit = true;
+      return null;
+    }
+    return Math.min(limitMs, left);
+  };
   const known = parseFactoryJson(fs.readFileSync(options.knownFile));
   const rev = policy.fingerprint_policy_revision;
   if (stringField(known, 'fingerprint_policy_revision') !== rev)
@@ -532,6 +567,8 @@ export async function runModel(options: RunOptions): Promise<void> {
     };
     const exclude = policy.exclude.length > 0 ? ['--exclude', policy.exclude.join(',')] : [];
 
+    const previewMs = budget(120_000);
+    if (previewMs === null) throw new FactoryFailure('Deadline spent before the scan started');
     const preview = parsePreview(
       (
         await runProcess(
@@ -539,7 +576,7 @@ export async function runModel(options: RunOptions): Promise<void> {
           ['scan', '--preview', '--format', 'json', ...exclude],
           source,
           baseEnv,
-          120_000,
+          previewMs,
         )
       ).stdout,
     );
@@ -558,13 +595,11 @@ export async function runModel(options: RunOptions): Promise<void> {
       ...exclude,
       ...SCAN_FLAGS,
     ];
-    const scan = await runProcess(
-      options.ocrBin,
-      scanArgs,
-      source,
-      scanEnv,
-      (options.deadlineSeconds ?? DEFAULT_DEADLINE_SECONDS) * 1000,
+    const scanMs = budget(
+      (options.deadlineSeconds ?? DEFAULT_DEADLINE_SECONDS) * 1000 * SCAN_DEADLINE_SHARE,
     );
+    if (scanMs === null) throw new FactoryFailure('Deadline spent before the scan started');
+    const scan = await runProcess(options.ocrBin, scanArgs, source, scanEnv, scanMs);
     let output: JsonRecord | null = null;
     try {
       output = tryRecord(JSON.parse(scan.stdout));
@@ -576,7 +611,8 @@ export async function runModel(options: RunOptions): Promise<void> {
     const status = output?.['status'];
     const sessionId = output?.['session_id'];
     let session: ReturnType<typeof parseSession> = null;
-    if (typeof sessionId === 'string' && /^[0-9a-f-]{8,64}$/.test(sessionId))
+    const sessionMs = typeof sessionId === 'string' ? budget(60_000) : null;
+    if (typeof sessionId === 'string' && sessionMs !== null && /^[0-9a-f-]{8,64}$/.test(sessionId))
       session = parseSession(
         (
           await runProcess(
@@ -584,11 +620,14 @@ export async function runModel(options: RunOptions): Promise<void> {
             ['session', 'show', sessionId, '--json'],
             source,
             baseEnv,
-            60_000,
+            sessionMs,
           )
         ).stdout,
       );
-    const comments = parseComments(output?.['comments'], reviewable);
+    const { comments, truncated: commentsTruncated } = parseComments(
+      output?.['comments'],
+      reviewable,
+    );
     const fingerprints = comments.map((comment) => fingerprintFinding(rev, comment));
 
     const knownSkipped = comments
@@ -623,10 +662,13 @@ export async function runModel(options: RunOptions): Promise<void> {
         verifierTokens >= policy.verifier_token_budget
       )
         break;
+      const callMs = budget(CALL_TIMEOUT_MS);
+      if (callMs === null) break;
       const result = await chat(
         policy.llm_url,
         activeKey,
         llmRequest(policy.verifier_model, VERIFIER_INSTRUCTION, findingData(source, first)),
+        callMs,
       );
       verifierTokens += result.tokens;
       verified += 1;
@@ -641,6 +683,8 @@ export async function runModel(options: RunOptions): Promise<void> {
     for (const [, members, reason] of confirmed) {
       const first = members[0];
       if (first === undefined || analystTokens >= policy.analyst_token_budget) break;
+      const callMs = budget(CALL_TIMEOUT_MS);
+      if (callMs === null) break;
       const result = await chat(
         policy.llm_url,
         activeKey,
@@ -648,6 +692,7 @@ export async function runModel(options: RunOptions): Promise<void> {
           ...findingData(source, first),
           verifier_reason: reason,
         }),
+        callMs,
       );
       analystTokens += result.tokens;
       const criteria = parseCriteria(result);
@@ -686,8 +731,9 @@ export async function runModel(options: RunOptions): Promise<void> {
         preview,
         session,
         comments,
+        comments_truncated: commentsTruncated,
         auth_fallback_used: authFallbackUsed,
-        deadline_hit: scan.timedOut,
+        deadline_hit: scan.timedOut || deadlineHit,
       }),
       'verdicts.json': JSON.stringify({
         schema: VERDICTS_SCHEMA,
@@ -757,6 +803,8 @@ async function main(argv: readonly string[]): Promise<void> {
       'usage: run --source <dir> --ocr-bin <path> --known <file> --out <dir>',
     );
   const deadline = values['deadline-seconds'];
+  if (deadline !== undefined && !(Number(deadline) > 0))
+    throw new FactoryFailure('--deadline-seconds must be a positive number');
   await runModel({
     source,
     ocrBin,

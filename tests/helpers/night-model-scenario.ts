@@ -97,9 +97,9 @@ export interface Stub {
 export function stubOcr(
   dir: string,
   scenario: string,
-  options: { hang?: boolean; version?: string } = {},
+  options: { hang?: boolean; version?: string; fixture?: JsonRecord } = {},
 ): Stub {
-  const fixture = readRecord(path.join(FIXTURES, `${scenario}.json`));
+  const fixture = options.fixture ?? readRecord(path.join(FIXTURES, `${scenario}.json`));
   const preview = readRecord(path.join(FIXTURES, `${stringField(fixture, 'preview')}.json`));
   const log = path.join(dir, 'stub.log');
   const config = path.join(dir, 'stub-config.json');
@@ -127,8 +127,8 @@ if (argv[0] === '--version') { console.log(cfg.version); process.exit(0); }
 if (argv[0] === 'session') { if (cfg.session === null) process.exit(1); console.log(JSON.stringify(cfg.session)); process.exit(0); }
 if (argv.includes('--preview')) { console.log(JSON.stringify(cfg.preview)); process.exit(0); }
 if (cfg.hang) { setInterval(() => {}, 1000); } else {
+  process.exitCode = cfg.exit_code;
   if (cfg.stdout !== '') process.stdout.write(JSON.stringify(cfg.stdout));
-  process.exit(cfg.exit_code);
 }
 `,
     { mode: 0o755 },
@@ -183,6 +183,7 @@ export async function scenario(
     known?: string[];
     policy?: Record<string, unknown>;
     hang?: boolean;
+    fixture?: JsonRecord;
     keys?: Record<string, string>;
     revision?: string;
   } = {},
@@ -193,7 +194,10 @@ export async function scenario(
     await llm.close();
   });
   const repo = makeRepo(dir);
-  const stub = stubOcr(dir, name, options.hang === true ? { hang: true } : {});
+  const stub = stubOcr(dir, name, {
+    ...(options.hang === true ? { hang: true } : {}),
+    ...(options.fixture === undefined ? {} : { fixture: options.fixture }),
+  });
   const policy = writePolicy(dir, llm.url, {
     ...options.policy,
     ...(options.revision === undefined ? {} : { fingerprint_policy_revision: options.revision }),

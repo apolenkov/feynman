@@ -1010,6 +1010,10 @@ it('night-scan policy: the secret names, model block and OCR pin agree with the 
   const main = record(lock['node_modules/@alibaba-group/open-code-review']);
   assert.equal(main['version'], night.ocr_version);
   assert.equal(main['integrity'], night.ocr_lock_integrity);
+  assert.equal(
+    record(lock['node_modules/@alibaba-group/ocr-linux-x64'])['integrity'],
+    night.ocr_native_integrity['linux-x64'],
+  );
   assert.equal(policy['activation'], false);
 });
 
