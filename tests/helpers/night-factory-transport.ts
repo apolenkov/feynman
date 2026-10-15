@@ -325,7 +325,8 @@ export class FactoryPlatform {
       expired: false,
       digest: `sha256:${digest}`,
       created_at: createdAt,
-      expires_at: new Date(started + 500 + 90 * 86400000).toISOString(),
+      // As on GitHub: retention counts from the run start, before the upload.
+      expires_at: new Date(runStarted + 90 * 86400000).toISOString(),
       workflow_run: {
         id: Number(core['run_id']),
         repository_id: 1230959148,
