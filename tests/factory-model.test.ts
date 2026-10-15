@@ -262,15 +262,6 @@ describe('factory-model run: recorded ocr outputs', () => {
     assert.equal(built.draft['successful'], true);
   });
 
-  it('an ocr that hangs hits the deadline and leaves an incomplete record', async (t) => {
-    const s = await scenario(t, 'ok1', agreeable, { hang: true });
-    const result = await s.exec(['--deadline-seconds', '1']);
-    assert.equal(result.code, 0, result.stderr);
-    const raw = bundle(s.out, 'scan-raw.json');
-    assert.equal(raw['deadline_hit'], true);
-    assert.equal(raw['stdout_json'], false);
-  });
-
   it('refuses a known list built for another fingerprint revision', async (t) => {
     const s = await scenario(t, 'ok1', agreeable, {
       policy: { fingerprint_policy_revision: 'v2' },
@@ -487,7 +478,11 @@ describe('factory-model run: verification and acceptance', () => {
 });
 
 describe('factory-model run: shared deadline', () => {
-  const direct = (s: Awaited<ReturnType<typeof scenario>>, clock: () => number): Promise<void> =>
+  const direct = (
+    s: Awaited<ReturnType<typeof scenario>>,
+    clock: () => number,
+    deadlineSeconds = 100,
+  ): Promise<void> =>
     runModel({
       source: path.join(s.dir, 'repo'),
       ocrBin: s.stub.bin,
@@ -495,11 +490,24 @@ describe('factory-model run: shared deadline', () => {
       outDir: s.out,
       policy: loadNightPolicy(path.join(s.dir, 'policy.json')),
       env: { PATH: process.env['PATH'] ?? '', RUNNER_TEMP: s.dir, OCR_LLM_AUTH_TOKEN: PRIMARY },
-      deadlineSeconds: 100,
+      deadlineSeconds,
       clock,
     });
   const scanned = (s: Awaited<ReturnType<typeof scenario>>): boolean =>
     s.stub.invocations().some((call) => call.argv.includes('--max-tokens-budget'));
+
+  it(
+    'an ocr that hangs is killed at its share of the deadline and leaves an incomplete record',
+    { timeout: 10_000 },
+    async (t) => {
+      const s = await scenario(t, 'ok1', agreeable, { hang: true });
+      // A frozen clock keeps setup from spending the deadline under load; only the scan's kill timer runs.
+      await direct(s, () => 0, 1);
+      const raw = bundle(s.out, 'scan-raw.json');
+      assert.equal(raw['deadline_hit'], true);
+      assert.equal(raw['stdout_json'], false);
+    },
+  );
 
   it('a deadline spent by the scan skips verification and acceptance but still writes the bundle', async (t) => {
     const s = await scenario(t, 'ok1', agreeable);
