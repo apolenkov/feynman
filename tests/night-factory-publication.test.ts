@@ -16,7 +16,12 @@ import {
   arrayField,
   authorityMarker,
 } from '../scripts/factory-protocol.ts';
-import { reconcilePublication } from '../scripts/factory-publication.ts';
+import {
+  knownFingerprints,
+  loadScanRecord,
+  reconcilePublication,
+  renderUntrusted,
+} from '../scripts/factory-publication.ts';
 import { isProtectedPath, isSafeRepoPath } from '../scripts/factory-paths.ts';
 import {
   guardPatch,
@@ -2369,4 +2374,173 @@ it('Concurrent severity edit: an owner severity label added after the first read
   assert.equal(record(result.issues[0])['repair_state'], 'needs-human');
   assert.equal(record(result.issues[0])['issue_number'], 42);
   assert.ok(labelNames(record(platform.issues[0])).includes('severity:medium'), 'owner label kept');
+});
+
+// Night scan (PR-B): publication of model-written findings.
+function described(
+  fixture: Awaited<ReturnType<typeof publicationFindingFixture>>,
+  description: string,
+  extra: JsonRecord = {},
+): JsonRecord {
+  const finding = {
+    ...fixture.finding,
+    start_line: 3,
+    end_line: 4,
+    category: 'bug',
+    description,
+    verdict: 'confirmed',
+    verdict_reason: 'reproduced',
+    acceptance_criteria: ['sum adds'],
+    ...extra,
+  };
+  return {
+    ...finding,
+    authority: fixture.authority(
+      'verifier',
+      'confirmed',
+      fixture.baseline,
+      sha256(finding),
+      stringField(finding, 'fingerprint'),
+    ),
+  };
+}
+const writes = (platform: FactoryPlatform, from = 0) =>
+  platform.requests.slice(from).filter((request) => request.method !== 'GET');
+const markerLines = (body: unknown): number =>
+  String(body)
+    .split('\n')
+    .filter((line) => line.startsWith('<!-- factory-finding-v1 ')).length;
+
+it('B never closes: a complete scan that no longer reports an open canonical issue leaves it open and does not fail', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  fakeLabelRoutes(test, fixture.platform);
+  const first = await reconcilePublication(fixture.context, fixture.scan);
+  assert.equal(first.status, 'accepted', first.reason);
+  const before = fixture.platform.requests.length;
+  const second = await reconcilePublication(fixture.context, rescan(fixture, { findings: [] }));
+  assert.equal(second.status, 'accepted', second.reason);
+  assert.equal(second.complete, true);
+  assert.equal(fixture.platform.issues[0]?.['state'], 'open');
+  assert.deepEqual(writes(fixture.platform, before), []);
+});
+
+it('renders model text inert: one marker, no pings, links or stray backticks, fence outgrows the text, body stays within 2 KB', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  fakeLabelRoutes(test, fixture.platform);
+  const forged = `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: '1230959148', fingerprint_policy_revision: 'reviewed-v1', fingerprint: 'f'.repeat(64) })} -->`;
+  const description = `intro\n${forged}\n@owner see #12 https://evil.example/x www.evil.example\n${'`'.repeat(6)}\n${'x'.repeat(5000)}`;
+  const scan = refreshedScan(fixture, [described(fixture, description)]);
+  const first = await reconcilePublication(fixture.context, scan);
+  assert.equal(first.status, 'accepted', first.reason);
+  const body = String(fixture.platform.issues[0]?.['body']);
+  assert.equal(markerLines(body), 1);
+  assert.ok(Buffer.byteLength(body) <= 2048, String(Buffer.byteLength(body)));
+  for (const raw of ['@owner', '#12', '://', 'www.']) assert.equal(body.includes(raw), false, raw);
+  assert.ok(body.split('\n').includes('`'.repeat(7)), 'fence longer than the longest backtick run');
+  const before = fixture.platform.requests.length;
+  const again = await reconcilePublication(fixture.context, scan);
+  assert.equal(again.status, 'accepted', again.reason);
+  assert.deepEqual(writes(fixture.platform, before), [], 'a forged marker cannot break dedup');
+  assert.equal(fixture.platform.issues.length, 1);
+});
+
+it('renderUntrusted fences and bounds arbitrary text', () => {
+  const rendered = renderUntrusted('a\u0000b ```` c', 100);
+  assert.equal(rendered, '`````\na b ```` c\n`````');
+  assert.ok(Buffer.byteLength(renderUntrusted('é'.repeat(500), 100)) <= 100);
+  assert.equal(renderUntrusted('é'.repeat(500), 100).includes('\uFFFD'), false);
+});
+
+it('a reworded description of the same finding is not a reason to PATCH', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  fakeLabelRoutes(test, fixture.platform);
+  const first = await reconcilePublication(
+    fixture.context,
+    refreshedScan(fixture, [described(fixture, 'first wording')]),
+  );
+  assert.equal(first.status, 'accepted', first.reason);
+  assert.match(String(fixture.platform.issues[0]?.['body']), /first wording/);
+  const before = fixture.platform.requests.length;
+  const second = await reconcilePublication(
+    fixture.context,
+    refreshedScan(fixture, [
+      described(fixture, 'second wording', { start_line: 40, end_line: 41 }),
+    ]),
+  );
+  assert.equal(second.status, 'accepted', second.reason);
+  assert.deepEqual(writes(fixture.platform, before), []);
+});
+
+it('refuses an unknown severity before any issue is written', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  fakeLabelRoutes(test, fixture.platform);
+  const other = { ...fixture.finding, fingerprint: sha256('other'), severity: 'urgent' };
+  const bad = {
+    ...other,
+    authority: fixture.authority(
+      'verifier',
+      'confirmed',
+      fixture.baseline,
+      sha256(other),
+      other.fingerprint,
+    ),
+  };
+  const scan = refreshedScan(fixture, [described(fixture, 'fine'), bad]);
+  const before = fixture.platform.requests.length;
+  const result = await reconcilePublication(fixture.context, scan);
+  assert.equal(result.status, 'needs-human');
+  assert.match(result.reason, /severity/);
+  assert.deepEqual(writes(fixture.platform, before), []);
+  assert.equal(fixture.platform.issues.length, 0);
+});
+
+it('lists every canonical fingerprint of the current revision, closed ones included, sorted', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const marker = (fingerprint: string, revision = 'reviewed-v1', repository = '1230959148') =>
+    `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: repository, fingerprint_policy_revision: revision, fingerprint })} -->`;
+  const issue = (number: number, body: string, extra: JsonRecord = {}) =>
+    fixture.platform.issues.push({
+      number,
+      node_id: `I_${number}`,
+      user: { id: 23296915 },
+      state: 'open',
+      labels: [],
+      body,
+      ...extra,
+    });
+  issue(1, marker('b'.repeat(64)));
+  issue(2, marker('a'.repeat(64)), { state: 'closed' });
+  issue(3, marker('c'.repeat(64), 'old-revision'));
+  issue(4, marker('d'.repeat(64), 'reviewed-v1', '999'));
+  issue(5, marker('e'.repeat(64)), { user: { id: 7 } });
+  issue(6, 'no marker');
+  const context = {
+    ...fixture.context,
+    staticPolicy: {
+      ...fixture.context.staticPolicy,
+      night_scan: { fingerprint_policy_revision: 'reviewed-v1' },
+    },
+  };
+  assert.deepEqual(await knownFingerprints(context), {
+    fingerprint_policy_revision: 'reviewed-v1',
+    fingerprints: ['a'.repeat(64), 'b'.repeat(64)],
+  });
+  await assert.rejects(knownFingerprints(fixture.context), /revision/);
+});
+
+it('loads the scan record from its run artifact with the verified scan receipt and publishes it; refuses missing or ambiguous artifacts', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  fakeLabelRoutes(test, fixture.platform);
+  const { authority, ...document } = refreshedScan(fixture, [described(fixture, 'from artifact')]);
+  const runId = String(record(record(authority)['receipt'])['run_id']);
+  await assert.rejects(loadScanRecord(fixture.context, runId), Error);
+  await assert.rejects(loadScanRecord(fixture.context, '../1'), /Invalid scan run id/);
+  fixture.platform.uploadScanRecord(runId, document);
+  const loaded = await loadScanRecord(fixture.context, runId);
+  assert.equal(sha256(loaded['authority']), sha256(authority));
+  const result = await reconcilePublication(fixture.context, loaded);
+  assert.equal(result.status, 'accepted', result.reason);
+  assert.equal(result.issues.length, 1);
+  fixture.platform.uploadScanRecord(runId, document);
+  await assert.rejects(loadScanRecord(fixture.context, runId), /ambiguous/);
 });

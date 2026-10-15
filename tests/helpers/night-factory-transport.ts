@@ -343,6 +343,40 @@ export class FactoryPlatform {
       },
     };
   }
+  // The night scan record: an artifact of the scan producer's own run, listed under that run.
+  uploadScanRecord(runId: string, scan: JsonRecord): JsonRecord {
+    const artifactId = String(this.counter++);
+    const directory = path.join(this.root, `scan-record-${artifactId}`);
+    fs.mkdirSync(directory);
+    fs.writeFileSync(path.join(directory, 'scan.json'), canonicalBytes(scan));
+    const archive = execFileSync(
+      'bsdtar',
+      ['--format=zip', '-cf', '-', '-C', directory, 'scan.json'],
+      {
+        maxBuffer: 2_000_000,
+      },
+    );
+    this.archives.set(artifactId, archive);
+    const artifact = {
+      id: Number(artifactId),
+      name: `factory-night-scan-${runId}`,
+      expired: false,
+      digest: `sha256:${sha256(archive)}`,
+      workflow_run: {
+        id: Number(runId),
+        repository_id: 1230959148,
+        head_repository_id: 1230959148,
+      },
+    };
+    const route = `${REPOSITORY}/actions/runs/${runId}/artifacts`;
+    const previous = this.facts.get(route);
+    const artifacts = [
+      ...(previous === undefined ? [] : arrayField(record(previous), 'artifacts')),
+      artifact,
+    ];
+    this.facts.set(route, { artifacts, total_count: artifacts.length });
+    return artifact;
+  }
   async fetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
     return await Promise.resolve(this.response(input, init));
   }
