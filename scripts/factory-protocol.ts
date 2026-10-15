@@ -1079,7 +1079,7 @@ export async function readAuthorityArchive(
   context: FactoryContext,
   artifactId: string,
   archiveSha: string,
-  kind: 'receipt' | 'checkpoint',
+  kind: 'receipt' | 'checkpoint' | 'scan',
 ): Promise<Buffer> {
   if (
     context.policy['api_origin'] !== 'https://api.github.com' ||
@@ -1115,8 +1115,76 @@ export async function readAuthorityArchive(
     maxBuffer: 100_000,
   });
   if (!types.startsWith('-')) throw new FactoryFailure('Unsafe archive member type');
-  return execFileSync('bsdtar', ['-xOf', '-', basename], { input: archive, maxBuffer: 1_000_000 });
+  try {
+    return execFileSync('bsdtar', ['-xOf', '-', basename], {
+      input: archive,
+      maxBuffer: 1_000_000,
+    });
+  } catch {
+    throw new FactoryFailure('Archive member unreadable or too large');
+  }
 }
+export async function resolveReceipt(
+  context: FactoryContext,
+  runId: string,
+  phase: string,
+): Promise<JsonRecord> {
+  if (
+    ![
+      'reserve',
+      'outcome',
+      'bootstrap',
+      'retry-claim',
+      'publication',
+      'scan',
+      'verifier',
+      'patch',
+      'register',
+      'operation-intent',
+      'operation-outcome',
+    ].includes(phase)
+  )
+    throw new FactoryFailure('Unapproved producer phase');
+  const jobs = (
+    await githubPages(
+      context,
+      `/repos/${stringField(context.policy, 'repository_full_name')}/actions/runs/${runId}/attempts/1/jobs`,
+      'jobs',
+    )
+  )
+    .map(record)
+    .filter((job) => job['name'] === `factory-authority-${phase}`);
+  const job = jobs[0];
+  if (jobs.length !== 1 || job?.['status'] !== 'completed' || job['conclusion'] !== 'success')
+    throw new FactoryFailure('Prior authority producer not completed uniquely');
+  const log = await readAuthorityLog(context, String(job['id']));
+  const marker = authorityMarker(log);
+  if (marker['run_id'] !== runId || marker['phase'] !== phase || marker['kind'] !== 'receipt')
+    throw new FactoryFailure('Wrong prior producer marker');
+  const core = parseProtocol(
+    await readAuthorityArchive(
+      context,
+      stringField(marker, 'artifact_id'),
+      stringField(marker, 'archive_sha256'),
+      'receipt',
+    ),
+    'receipt',
+  );
+  const envelope = {
+    schema: 'factory/v1',
+    receipt: core,
+    receipt_sha256: sha256(core),
+    transport: {
+      artifact_id: marker['artifact_id'],
+      archive_sha256: marker['archive_sha256'],
+      producer_job_id: String(job['id']),
+      producer_log_sha256: sha256(log),
+    },
+  };
+  await verifyAuthority(context, envelope);
+  return envelope;
+}
+
 export async function verifyArchiveAuthority(
   context: FactoryContext,
   core: JsonRecord,

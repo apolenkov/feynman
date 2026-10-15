@@ -62,6 +62,8 @@ import {
   githubRequest,
   githubPages,
   verifyAuthority,
+  readAuthorityArchive,
+  resolveReceipt,
 } from '../scripts/factory-protocol.ts';
 import type { JsonRecord } from '../scripts/factory-protocol.ts';
 import type { TestContext } from 'node:test';
@@ -1446,4 +1448,43 @@ it('Opus F1 bootstraps only numeric trusted authors and skips foreign duplicate 
       );
       assert.equal(record(lineage['identity'])['issue_node_id'], 'I_TRUSTED_LEGACY');
     });
+});
+
+function archiveOf(platform: FactoryPlatform, member: string, bytes: Buffer): [string, string] {
+  const directory = fs.mkdtempSync(path.join(platform.root, 'archive-'));
+  fs.writeFileSync(path.join(directory, member), bytes);
+  const archive = execFileSync('bsdtar', ['--format=zip', '-cf', '-', '-C', directory, member], {
+    maxBuffer: 2_000_000,
+  });
+  const artifactId = String(7000 + platform.archives.size);
+  platform.archives.set(artifactId, archive);
+  return [artifactId, sha256(archive)];
+}
+
+it('reads a scan record archive only as scan.json and caps extraction at 1 MB', async (test) => {
+  const { platform, activation } = await bootstrapped(test);
+  const context = await resolveFactoryContext(laterContext(platform, activation, '903'));
+  const scan = Buffer.from('{"findings":[]}');
+  const [okId, okSha] = archiveOf(platform, 'scan.json', scan);
+  assert.deepEqual(await readAuthorityArchive(context, okId, okSha, 'scan'), scan);
+  const [receiptId, receiptSha] = archiveOf(platform, 'receipt.json', scan);
+  await assert.rejects(readAuthorityArchive(context, receiptId, receiptSha, 'scan'), /Unsafe/);
+  await assert.rejects(readAuthorityArchive(context, okId, okSha, 'receipt'), /Unsafe/);
+  const [bigId, bigSha] = archiveOf(platform, 'scan.json', Buffer.alloc(1_000_001, 97));
+  await assert.rejects(readAuthorityArchive(context, bigId, bigSha, 'scan'), /too large/);
+  const [edgeId, edgeSha] = archiveOf(platform, 'scan.json', Buffer.alloc(1_000_000, 97));
+  assert.equal((await readAuthorityArchive(context, edgeId, edgeSha, 'scan')).length, 1_000_000);
+});
+
+it('resolves a prior producer receipt through the protocol module', async (test) => {
+  const { platform, activation, genesis } = await bootstrapped(test);
+  const context = laterContext(platform, activation, '904');
+  const core = findingReceipt(platform, activation, genesis, '904', 'reserve', {
+    reservation_number: 1,
+    expected_transition: 'reserved',
+    outcome: 'consumed',
+  });
+  const envelope = platform.upload(core, 'receipt', stringField(core, 'transition_id'), 'reserve');
+  const resolved = await resolveReceipt(await resolveFactoryContext(context), '904', 'reserve');
+  assert.deepEqual(resolved, envelope);
 });
