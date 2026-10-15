@@ -1813,6 +1813,16 @@ it('requires the scheduled night-review parent for a bot producer and refuses a 
   const replay = await runController(replayContext, { ...request, parent_run_id: '8800' });
   assert.equal(replay.status, 'denied');
   assert.match(replay.reason, /already used/);
+  // A different draft does not make a used parent fresh again.
+  const otherDraft = await runController(replayContext, {
+    ...request,
+    draft_file: nightDraft(platform, [
+      nightFinding({ description: 'Another reading of the input.' }),
+    ]),
+    parent_run_id: '8800',
+  });
+  assert.equal(otherDraft.status, 'denied');
+  assert.match(otherDraft.reason, /already used/);
   // A fresh parent in the same context still succeeds, and the same run keeps its own receipt.
   parentRun(platform, { created_at: '2026-10-12T00:02:10Z' }, '8801');
   const fresh = await runController(replayContext, { ...request, parent_run_id: '8801' });

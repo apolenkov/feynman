@@ -751,14 +751,13 @@ async function prepareNightEvidence(
   );
   const payloadSha = sha256(payload);
   const actor = await producerActor(context, request, true);
-  // A bot run is keyed by its parent, not its own run id, so a replayed parent yields the same request key.
+  // A bot run is keyed by its parent and phase only, so a replayed parent collides whatever draft it carries.
   const parentId = actor.actor_decision === 'owner' ? null : stringField(request, 'parent_run_id');
-  const requestKey = sha256({
-    phase,
-    run_id: parentId === null ? context.job['run_id'] : null,
-    parent_run_id: parentId,
-    payload_sha256: payloadSha,
-  });
+  const requestKey = sha256(
+    parentId === null
+      ? { phase, run_id: context.job['run_id'], parent_run_id: null, payload_sha256: payloadSha }
+      : { phase, parent_run_id: parentId },
+  );
   if (parentId !== null) await assertParentUnused(context, parentId, requestKey);
   const receipt = produceReceipt({
     epoch_id: context.policy['epoch_id'],
