@@ -470,8 +470,11 @@ interface Verdict {
   readonly verdict: string;
   readonly reason: string;
 }
+const FINDING_REFUSALS: readonly number[] = [400, 413, 422];
 // Anything but a closed {verdict, reason} object is a non-decision: disputed, never confirmed.
 function parseVerdict(result: ChatResult): Verdict {
+  if (result.status !== 200)
+    return { verdict: 'disputed', reason: `Verifier refused: HTTP ${String(result.status)}` };
   const reply = onlyKeys(replyJson(result), ['verdict', 'reason']);
   const verdict = reply?.['verdict'];
   const reason = reply?.['reason'];
@@ -675,9 +678,10 @@ export async function runModel(options: RunOptions): Promise<void> {
         callMs,
       );
       verifierTokens += result.tokens;
-      // A provider failure is no decision: stop verifying, leave this and later findings unverified (deferred)
-      // so they are retried another night instead of being fixed as disputed.
-      if (result.status !== 200) break;
+      // Only a refusal about this one finding (bad request, too large, content filter) becomes disputed, so it
+      // cannot block the queue every night. Any other failure (network, 401/403/404, 429, 5xx) hits the whole
+      // run: stop verifying and leave this and later findings unverified (deferred) for another night.
+      if (result.status !== 200 && !FINDING_REFUSALS.includes(result.status)) break;
       verified += 1;
       const decision = parseVerdict(result);
       for (const member of members)

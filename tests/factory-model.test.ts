@@ -66,7 +66,11 @@ describe('factory-model run: environment and secrets', () => {
     // coverage run; neither is ours.
     assert.deepEqual(
       Object.keys(scan.env)
-        .filter((name) => !['__CF_USER_TEXT_ENCODING', 'NODE_V8_COVERAGE'].includes(name))
+        .filter(
+          (name) =>
+            name !== '__CF_USER_TEXT_ENCODING' &&
+            !(name === 'NODE_V8_COVERAGE' && scan.env[name] === process.env[name]),
+        )
         .toSorted(),
       [
         'HOME',
@@ -329,15 +333,50 @@ describe('factory-model run: verification and acceptance', () => {
     assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'analyst').length, 0);
   });
 
-  it('stops verifying on a provider failure and leaves the findings unverified', async (t) => {
+  for (const [name, failure] of [
+    ['a 5xx', { status: 502, raw: '<html>bad gateway</html>' }],
+    ['a 429', { status: 429, raw: '{"error":"rate limited"}' }],
+    ['a network failure', { drop: true }],
+    ['a 403', { status: 403, raw: '{"error":"model not in plan"}' }],
+  ] as const)
+    it(`stops verifying on ${name} and leaves the findings unverified`, async (t) => {
+      const s = await scenario(t, 'ok1', (request) =>
+        kindOf(request) === 'verify' ? failure : agreeable(request),
+      );
+      assert.equal((await s.exec()).code, 0);
+      assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'verify').length, 1);
+      assert.deepEqual(arrayField(bundle(s.out, 'verdicts.json'), 'verdicts'), []);
+    });
+
+  it('keeps the verdict before a provider failure and defers the rest', async (t) => {
+    let verifies = 0;
+    const s = await scenario(t, 'ok1', (request) => {
+      if (kindOf(request) !== 'verify') return agreeable(request);
+      verifies += 1;
+      return verifies === 1 ? verdictReply('disputed') : { status: 502, raw: '' };
+    });
+    assert.equal((await s.exec()).code, 0);
+    assert.equal(verifies, 2);
+    const verdicts = arrayField(bundle(s.out, 'verdicts.json'), 'verdicts').map(record);
+    assert.equal(verdicts.length, 1);
+    assert.equal(verdicts[0]?.['verdict'], 'disputed');
+  });
+
+  it('turns a per-finding refusal (400) into disputed and keeps verifying', async (t) => {
     const s = await scenario(t, 'ok1', (request) =>
       kindOf(request) === 'verify'
-        ? { status: 502, raw: '<html>bad gateway</html>' }
+        ? { status: 400, raw: '{"error":"content filtered"}' }
         : agreeable(request),
     );
     assert.equal((await s.exec()).code, 0);
-    assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'verify').length, 1);
-    assert.deepEqual(arrayField(bundle(s.out, 'verdicts.json'), 'verdicts'), []);
+    assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'verify').length, 3);
+    const verdicts = arrayField(bundle(s.out, 'verdicts.json'), 'verdicts').map(record);
+    assert.ok(
+      verdicts.length === 3 &&
+        verdicts.every(
+          (v) => v['verdict'] === 'disputed' && v['reason'] === 'Verifier refused: HTTP 400',
+        ),
+    );
   });
 
   it('treats an HTML body with status 200 as disputed', async (t) => {
