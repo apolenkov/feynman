@@ -329,10 +329,21 @@ describe('factory-model run: verification and acceptance', () => {
     assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'analyst').length, 0);
   });
 
-  it('treats a provider failure or an HTML body as disputed', async (t) => {
+  it('stops verifying on a provider failure and leaves the findings unverified', async (t) => {
     const s = await scenario(t, 'ok1', (request) =>
       kindOf(request) === 'verify'
         ? { status: 502, raw: '<html>bad gateway</html>' }
+        : agreeable(request),
+    );
+    assert.equal((await s.exec()).code, 0);
+    assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'verify').length, 1);
+    assert.deepEqual(arrayField(bundle(s.out, 'verdicts.json'), 'verdicts'), []);
+  });
+
+  it('treats an HTML body with status 200 as disputed', async (t) => {
+    const s = await scenario(t, 'ok1', (request) =>
+      kindOf(request) === 'verify'
+        ? { status: 200, raw: '<html>not json</html>' }
         : agreeable(request),
     );
     assert.equal((await s.exec()).code, 0);

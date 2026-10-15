@@ -675,6 +675,9 @@ export async function runModel(options: RunOptions): Promise<void> {
         callMs,
       );
       verifierTokens += result.tokens;
+      // A provider failure is no decision: stop verifying, leave this and later findings unverified (deferred)
+      // so they are retried another night instead of being fixed as disputed.
+      if (result.status !== 200) break;
       verified += 1;
       const decision = parseVerdict(result);
       for (const member of members)
