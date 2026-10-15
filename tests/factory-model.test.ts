@@ -1,0 +1,713 @@
+import assert from 'node:assert/strict';
+import { execFile, execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, it } from 'node:test';
+import type { TestContext } from 'node:test';
+import { arrayField, record, stringField } from '../scripts/factory-protocol.ts';
+import type { JsonRecord } from '../scripts/factory-protocol.ts';
+import { buildScanDraft, fingerprintFinding } from '../scripts/factory-scan-record.ts';
+import { ANALYST_INSTRUCTION, VERIFIER_INSTRUCTION } from '../scripts/factory-model.ts';
+import { gitFixtureEnvironment } from './helpers/git-environment.ts';
+import { startFakeLlm } from './helpers/fake-llm.ts';
+import type { FakeLlm, LlmReply, LlmRequest } from './helpers/fake-llm.ts';
+
+const SCRIPT = path.join(import.meta.dirname, '..', 'scripts', 'factory-model.ts');
+const FIXTURES = path.join(import.meta.dirname, 'fixtures', 'ocr');
+const LOCK = path.join(import.meta.dirname, '..', 'tools', 'ocr', 'package-lock.json');
+const PRIMARY = 'sk-primary-0123456789abcdef0123456789abcdef';
+const FALLBACK = 'sk-fallback-fedcba9876543210fedcba9876543210';
+const POLICY_INTEGRITY =
+  'sha512-H35yl2HwU7rAIcsnSa/CaDUAUJ3yZKLBpQU5XXwtBEeB8RVAXYrzqDVb+7QQmKTLMuzBO9N3v9dSibGv5NIo9w==';
+const SECRET_ENV = ['OCR_LLM_AUTH_TOKEN', 'OPENCODE_GO_API_KEY', 'GITHUB_TOKEN'];
+
+const REPO_FILES: Readonly<Record<string, string>> = {
+  '.gitignore': 'node_modules\n',
+  'docs/notes.md': '# notes\n\ntext\n',
+  'src/auth.ts': `import { createHash } from 'node:crypto';
+
+export function hashPassword(password: string): string {
+  return createHash('md5').update(password).digest('hex');
+}
+
+export function isAdmin(user: { role?: string }): boolean {
+  return user.role == 'admin';
+}
+`,
+  'src/db.ts': `export function findUser(db: { query: (sql: string) => unknown }, name: string): unknown {
+  return db.query("SELECT * FROM users WHERE name = '" + name + "'");
+}
+`,
+  'src/util.ts': 'export const sum = (a: number[]): number => a.reduce((x, y) => x + y, 0);\n',
+  'test/auth.test.ts': "import './x';\n",
+};
+
+function tmp(t: TestContext): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'factory-model-'));
+  t.after(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  return dir;
+}
+function readRecord(file: string): JsonRecord {
+  const value: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
+  return record(value);
+}
+function makeRepo(dir: string): string {
+  const repo = path.join(dir, 'repo');
+  for (const [name, content] of Object.entries(REPO_FILES)) {
+    fs.mkdirSync(path.dirname(path.join(repo, name)), { recursive: true });
+    fs.writeFileSync(path.join(repo, name), content);
+  }
+  const env = gitFixtureEnvironment();
+  const git = (...args: string[]): void => {
+    execFileSync('git', args, { cwd: repo, env, stdio: 'ignore' });
+  };
+  git('init', '-q', '-b', 'main');
+  git('add', '.');
+  git('-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', 'init');
+  return repo;
+}
+function writePolicy(dir: string, llmUrl: string, overrides: Record<string, unknown> = {}): string {
+  const base = readRecord(path.join(FIXTURES, 'policy.json'));
+  const file = path.join(dir, 'policy.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      night_scan: { ...record(base['night_scan']), llm_url: llmUrl, ...overrides },
+    }),
+  );
+  return file;
+}
+function writeKnown(dir: string, fingerprints: string[] = []): string {
+  const file = path.join(dir, 'known.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({ fingerprint_policy_revision: 'v1', fingerprints: fingerprints.toSorted() }),
+  );
+  return file;
+}
+
+interface Stub {
+  readonly bin: string;
+  readonly invocations: () => { argv: string[]; env: Record<string, string> }[];
+}
+// A native-binary stand-in: replays a recorded ocr run and logs its argv and its own environment.
+function stubOcr(
+  dir: string,
+  scenario: string,
+  options: { hang?: boolean; version?: string } = {},
+): Stub {
+  const fixture = readRecord(path.join(FIXTURES, `${scenario}.json`));
+  const preview = readRecord(path.join(FIXTURES, `${stringField(fixture, 'preview')}.json`));
+  const log = path.join(dir, 'stub.log');
+  const config = path.join(dir, 'stub-config.json');
+  fs.writeFileSync(
+    config,
+    JSON.stringify({
+      log,
+      preview,
+      stdout: fixture['stdout'],
+      session: fixture['session'],
+      exit_code: fixture['exit_code'],
+      hang: options.hang === true,
+      version: options.version ?? 'open-code-review v1.13.0 (1672852) test/stub',
+    }),
+  );
+  const bin = path.join(dir, 'ocr-stub');
+  fs.writeFileSync(
+    bin,
+    `#!/usr/bin/env node
+const fs = require('node:fs');
+const cfg = JSON.parse(fs.readFileSync(${JSON.stringify(config)}, 'utf8'));
+const argv = process.argv.slice(2);
+fs.appendFileSync(cfg.log, JSON.stringify({ argv, env: process.env }) + '\\n');
+if (argv[0] === '--version') { console.log(cfg.version); process.exit(0); }
+if (argv[0] === 'session') { if (cfg.session === null) process.exit(1); console.log(JSON.stringify(cfg.session)); process.exit(0); }
+if (argv.includes('--preview')) { console.log(JSON.stringify(cfg.preview)); process.exit(0); }
+if (cfg.hang) { setInterval(() => {}, 1000); } else {
+  if (cfg.stdout !== '') process.stdout.write(JSON.stringify(cfg.stdout));
+  process.exit(cfg.exit_code);
+}
+`,
+    { mode: 0o755 },
+  );
+  return {
+    bin,
+    invocations: () =>
+      fs.existsSync(log)
+        ? fs
+            .readFileSync(log, 'utf8')
+            .trim()
+            .split('\n')
+            .map((line) => {
+              const entry = record(JSON.parse(line) as unknown);
+              return {
+                argv: arrayField(entry, 'argv').map(String),
+                env: Object.fromEntries(
+                  Object.entries(record(entry['env'])).map(([k, v]) => [k, String(v)]),
+                ),
+              };
+            })
+        : [],
+  };
+}
+
+interface RunResult {
+  readonly code: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+function run(args: string[], env: Record<string, string>): Promise<RunResult> {
+  return new Promise((resolve) => {
+    execFile(process.execPath, [SCRIPT, ...args], { env }, (error, stdout, stderr) => {
+      const code = error === null ? 0 : typeof error.code === 'number' ? error.code : 1;
+      resolve({ code, stdout, stderr });
+    });
+  });
+}
+
+interface Scenario {
+  readonly dir: string;
+  readonly out: string;
+  readonly stub: Stub;
+  readonly llm: FakeLlm;
+  readonly exec: (extra?: string[], env?: Record<string, string>) => Promise<RunResult>;
+}
+async function scenario(
+  t: TestContext,
+  name: string,
+  handler: (request: LlmRequest, count: number) => LlmReply,
+  options: {
+    known?: string[];
+    policy?: Record<string, unknown>;
+    hang?: boolean;
+    keys?: Record<string, string>;
+  } = {},
+): Promise<Scenario> {
+  const dir = tmp(t);
+  const llm = await startFakeLlm(handler);
+  t.after(async () => {
+    await llm.close();
+  });
+  const repo = makeRepo(dir);
+  const stub = stubOcr(dir, name, options.hang === true ? { hang: true } : {});
+  const policy = writePolicy(dir, llm.url, options.policy);
+  const known = writeKnown(dir, options.known);
+  const out = path.join(dir, 'out');
+  const hostHome = path.join(dir, 'host-home');
+  fs.mkdirSync(hostHome);
+  const env = {
+    PATH: process.env['PATH'] ?? '',
+    HOME: hostHome,
+    RUNNER_TEMP: dir,
+    GITHUB_TOKEN: 'ghs_hosttoken0123456789',
+    OCR_LLM_AUTH_TOKEN: PRIMARY,
+    OPENCODE_GO_API_KEY: FALLBACK,
+    ...options.keys,
+  };
+  return {
+    dir,
+    out,
+    stub,
+    llm,
+    exec: (extra = [], overrides = {}) =>
+      run(
+        [
+          'run',
+          '--policy',
+          policy,
+          '--source',
+          repo,
+          '--ocr-bin',
+          stub.bin,
+          '--known',
+          known,
+          '--out',
+          out,
+          ...extra,
+        ],
+        { ...env, ...overrides },
+      ),
+  };
+}
+
+type Kind = 'probe' | 'verify' | 'analyst';
+function kindOf(request: LlmRequest): Kind {
+  if (request.body['max_tokens'] === 1) return 'probe';
+  const messages = arrayField(request.body, 'messages').map(record);
+  return messages[0]?.['content'] === ANALYST_INSTRUCTION ? 'analyst' : 'verify';
+}
+function claimOf(request: LlmRequest): string {
+  const messages = arrayField(request.body, 'messages').map(record);
+  const user = record(JSON.parse(stringField(messages[1] ?? {}, 'content')) as unknown);
+  return stringField(record(user['finding']), 'claim');
+}
+const verdictReply = (verdict: string, reason = 'looks right'): LlmReply => ({
+  content: JSON.stringify({ verdict, reason }),
+});
+const criteriaReply: LlmReply = {
+  content: JSON.stringify({ criteria: ['No md5 in password hashing'] }),
+};
+// Every call answered "confirmed" / valid criteria.
+const agreeable = (request: LlmRequest): LlmReply =>
+  kindOf(request) === 'analyst' ? criteriaReply : verdictReply('confirmed');
+
+const ok1 = readRecord(path.join(FIXTURES, 'ok1.json'));
+const ok1Comments = arrayField(record(ok1['stdout']), 'comments').map(record);
+function ok1Fingerprint(index: number): string {
+  const comment = ok1Comments[index];
+  assert.ok(comment !== undefined);
+  const fingerprint = fingerprintFinding('v1', {
+    path: stringField(comment, 'path'),
+    category: stringField(comment, 'category'),
+    existing_code: stringField(comment, 'existing_code'),
+    start_line: Number(comment['start_line']),
+  });
+  assert.ok(fingerprint !== null);
+  return fingerprint;
+}
+const bundle = (out: string, name: string): JsonRecord => readRecord(path.join(out, name));
+
+describe('factory-model run: environment and secrets', () => {
+  it('gives ocr only the allowlisted environment and a throwaway HOME that is removed', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable);
+    const result = await s.exec();
+    assert.equal(result.code, 0, result.stderr);
+    const calls = s.stub.invocations();
+    assert.ok(calls.length >= 3);
+    for (const call of calls) {
+      for (const name of SECRET_ENV) assert.equal(call.env[name], undefined, name);
+      assert.notEqual(call.env['HOME'], path.join(s.dir, 'host-home'));
+      const home = call.env['HOME'];
+      if (call.argv[0] === '--version') assert.equal(home, undefined);
+      else assert.equal(home?.startsWith(path.join(s.dir, 'ocr-home-')), true);
+      if (!call.argv.includes('--max-tokens-budget'))
+        assert.equal(call.env['OCR_LLM_TOKEN'], undefined);
+    }
+    const scan = calls.find((call) => call.argv.includes('--max-tokens-budget'));
+    assert.ok(scan !== undefined);
+    // macOS injects __CF_USER_TEXT_ENCODING into every process; it is not ours.
+    assert.deepEqual(
+      Object.keys(scan.env)
+        .filter((name) => name !== '__CF_USER_TEXT_ENCODING')
+        .toSorted(),
+      [
+        'HOME',
+        'OCR_LLM_MODEL',
+        'OCR_LLM_PROTOCOL',
+        'OCR_LLM_TOKEN',
+        'OCR_LLM_URL',
+        'OCR_NO_UPDATE',
+        'PATH',
+      ],
+    );
+    assert.equal(scan.env['OCR_LLM_TOKEN'], PRIMARY);
+    assert.equal(scan.env['OCR_LLM_PROTOCOL'], 'openai');
+    assert.equal(scan.env['OCR_LLM_MODEL'], 'glm-5.3');
+    assert.equal(scan.env['OCR_NO_UPDATE'], '1');
+    assert.equal(scan.env['OCR_LLM_URL'], s.llm.url);
+    assert.deepEqual(scan.argv.slice(0, 6), [
+      'scan',
+      '--format',
+      'json',
+      '--concurrency',
+      '4',
+      '--max-tokens-budget',
+    ]);
+    assert.ok(scan.argv.includes('**/package-lock.json'));
+    assert.equal(fs.existsSync(scan.env['HOME'] ?? ''), false);
+    for (const name of ['scan-raw.json', 'verdicts.json', 'acceptance.json']) {
+      const text = fs.readFileSync(path.join(s.out, name), 'utf8');
+      assert.equal(text.includes(PRIMARY) || text.includes(FALLBACK), false, name);
+    }
+  });
+
+  for (const [label, echoed] of [
+    ['primary', PRIMARY],
+    ['fallback', FALLBACK],
+  ] as const) {
+    it(`refuses to write any artifact when the verifier echoes the ${label} key`, async (t) => {
+      const s = await scenario(t, 'ok1', (request) =>
+        kindOf(request) === 'verify'
+          ? verdictReply('confirmed', `rejected key ${echoed}`)
+          : agreeable(request),
+      );
+      const result = await s.exec();
+      assert.equal(result.code, 1);
+      assert.equal(fs.existsSync(s.out), false);
+      assert.equal(result.stdout.includes(echoed) || result.stderr.includes(echoed), false);
+    });
+  }
+
+  it('falls back to the second key only on 401 and records it', async (t) => {
+    const s = await scenario(t, 'ok1', (request) =>
+      request.authorization === `Bearer ${PRIMARY}`
+        ? { status: 401, raw: '{}' }
+        : agreeable(request),
+    );
+    const result = await s.exec();
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(bundle(s.out, 'scan-raw.json')['auth_fallback_used'], true);
+    const scan = s.stub.invocations().find((call) => call.argv.includes('--max-tokens-budget'));
+    assert.equal(scan?.env['OCR_LLM_TOKEN'], FALLBACK);
+    assert.equal(s.llm.requests[0]?.authorization, `Bearer ${PRIMARY}`);
+    assert.ok(s.llm.requests.slice(1).every((r) => r.authorization === `Bearer ${FALLBACK}`));
+  });
+
+  it('keeps the primary key when it works', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable);
+    assert.equal((await s.exec()).code, 0);
+    assert.equal(bundle(s.out, 'scan-raw.json')['auth_fallback_used'], false);
+  });
+
+  it('stops before scanning when no key is accepted', async (t) => {
+    const s = await scenario(t, 'ok1', () => ({ status: 401, raw: '{}' }));
+    const result = await s.exec();
+    assert.equal(result.code, 1);
+    assert.equal(fs.existsSync(s.out), false);
+    assert.equal(
+      s.stub.invocations().some((call) => call.argv.includes('--max-tokens-budget')),
+      false,
+    );
+  });
+
+  it('stops when no key is configured at all', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable, {
+      keys: { OCR_LLM_AUTH_TOKEN: '', OPENCODE_GO_API_KEY: '' },
+    });
+    assert.equal((await s.exec()).code, 1);
+    assert.equal(s.llm.requests.length, 0);
+  });
+});
+
+describe('factory-model run: recorded ocr outputs', () => {
+  it('a failed run (429, rc=1, empty stdout) is incomplete, not zero findings', async (t) => {
+    const s = await scenario(t, 'e429', agreeable);
+    const result = await s.exec();
+    assert.equal(result.code, 0, result.stderr);
+    const raw = bundle(s.out, 'scan-raw.json');
+    assert.equal(raw['stdout_json'], false);
+    assert.equal(raw['exit_code'], 1);
+    assert.equal(raw['status'], null);
+    assert.deepEqual(raw['comments'], []);
+    assert.equal(raw['session'], null);
+    assert.deepEqual(arrayField(bundle(s.out, 'verdicts.json'), 'verdicts'), []);
+    assert.equal(s.llm.requests.filter((r) => kindOf(r) !== 'probe').length, 0);
+  });
+
+  it('unparseable ocr stdout is a failed run too', async (t) => {
+    const s = await scenario(t, 'egarb', agreeable);
+    assert.equal((await s.exec()).code, 0);
+    assert.equal(bundle(s.out, 'scan-raw.json')['stdout_json'], false);
+  });
+
+  it('keeps warnings without their message and the session without errors', async (t) => {
+    const s = await scenario(t, 'partial', agreeable);
+    assert.equal((await s.exec()).code, 0);
+    const raw = bundle(s.out, 'scan-raw.json');
+    assert.equal(raw['status'], 'completed_with_errors');
+    assert.deepEqual(raw['warnings'], [{ file: 'src/db.ts', type: 'scan_subtask_error' }]);
+    assert.deepEqual(raw['session'], [
+      { type: 'failed', file_path: 'src/db.ts' },
+      { type: 'done', file_path: 'src/util.ts' },
+      { type: 'done', file_path: 'src/auth.ts' },
+      { type: 'done', file_path: '.gitignore' },
+    ]);
+    assert.equal(raw['total_tokens'], 16396);
+    const draft = buildScanDraft(
+      raw,
+      bundle(s.out, 'verdicts.json'),
+      bundle(s.out, 'acceptance.json'),
+      'v1',
+      '1230959148',
+    ).draft;
+    assert.equal(draft['successful'], false);
+    assert.deepEqual(draft['failed'], ['src/db.ts']);
+  });
+
+  it('reports an exceeded budget', async (t) => {
+    const s = await scenario(t, 'c1', agreeable);
+    assert.equal((await s.exec()).code, 0);
+    const raw = bundle(s.out, 'scan-raw.json');
+    assert.equal(raw['budget_exceeded'], true);
+    assert.equal(raw['total_tokens'], 64800);
+  });
+
+  it('a skipped scan has no session and no comments', async (t) => {
+    const s = await scenario(t, 'nofiles', agreeable);
+    assert.equal((await s.exec()).code, 0);
+    const raw = bundle(s.out, 'scan-raw.json');
+    assert.equal(raw['status'], 'skipped');
+    assert.deepEqual(raw['comments'], []);
+    assert.deepEqual(raw['preview'], [
+      { path: 'docs/notes.md', will_review: false, exclude_reason: 'unsupported_ext' },
+    ]);
+  });
+
+  it('a clean run produces a bundle the record adapter accepts as successful', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable);
+    assert.equal((await s.exec()).code, 0);
+    const raw = bundle(s.out, 'scan-raw.json');
+    assert.equal(raw['schema'], 'factory-night-scan-raw/v1');
+    assert.equal(arrayField(raw, 'comments').length, 3);
+    assert.deepEqual(record(raw['tool']), {
+      version: '1.13.0',
+      git_head: '1672852',
+      lock_integrity: POLICY_INTEGRITY,
+      binary_version: 'open-code-review v1.13.0 (1672852) test/stub',
+    });
+    const built = buildScanDraft(
+      raw,
+      bundle(s.out, 'verdicts.json'),
+      bundle(s.out, 'acceptance.json'),
+      'v1',
+      '1230959148',
+    );
+    assert.equal(built.selected, true);
+    assert.equal(built.draft['successful'], true);
+  });
+
+  it('an ocr that hangs hits the deadline and leaves an incomplete record', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable, { hang: true });
+    const result = await s.exec(['--deadline-seconds', '1']);
+    assert.equal(result.code, 0, result.stderr);
+    const raw = bundle(s.out, 'scan-raw.json');
+    assert.equal(raw['deadline_hit'], true);
+    assert.equal(raw['stdout_json'], false);
+  });
+
+  it('refuses a known list built for another fingerprint revision', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable, {
+      policy: { fingerprint_policy_revision: 'v2' },
+    });
+    assert.equal((await s.exec()).code, 1);
+    assert.equal(fs.existsSync(s.out), false);
+  });
+
+  it('refuses a dirty checkout', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable);
+    fs.writeFileSync(path.join(s.dir, 'repo', 'untracked.ts'), 'export {};\n');
+    assert.equal((await s.exec()).code, 1);
+    assert.equal(fs.existsSync(s.out), false);
+  });
+
+  it('refuses a binary that is not the pinned build', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable);
+    const wrongDir = tmp(t);
+    const wrong = stubOcr(wrongDir, 'ok1', {
+      version: 'open-code-review v1.13.0 (deadbee) test/stub',
+    });
+    const result = await run(
+      [
+        'run',
+        '--policy',
+        path.join(s.dir, 'policy.json'),
+        '--source',
+        path.join(s.dir, 'repo'),
+        '--ocr-bin',
+        wrong.bin,
+        '--known',
+        path.join(s.dir, 'known.json'),
+        '--out',
+        s.out,
+      ],
+      { PATH: process.env['PATH'] ?? '', OCR_LLM_AUTH_TOKEN: PRIMARY },
+    );
+    assert.equal(result.code, 1);
+    assert.equal(fs.existsSync(s.out), false);
+  });
+});
+
+describe('factory-model run: verification and acceptance', () => {
+  it('turns a garbage verifier answer into disputed, never confirmed', async (t) => {
+    const answers: LlmReply[] = [
+      { content: 'sure, it is a bug!' },
+      { content: JSON.stringify({ verdict: 'confirmed', reason: 'x', extra: 1 }) },
+      verdictReply('definitely'),
+    ];
+    let next = 0;
+    const s = await scenario(t, 'ok1', (request) =>
+      kindOf(request) === 'verify'
+        ? (answers[next++] ?? { status: 500, raw: '' })
+        : agreeable(request),
+    );
+    assert.equal((await s.exec()).code, 0);
+    const verdicts = arrayField(bundle(s.out, 'verdicts.json'), 'verdicts').map(record);
+    assert.equal(verdicts.length, 3);
+    assert.ok(verdicts.every((v) => v['verdict'] === 'disputed'));
+    assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'analyst').length, 0);
+  });
+
+  it('treats a provider failure or an HTML body as disputed', async (t) => {
+    const s = await scenario(t, 'ok1', (request) =>
+      kindOf(request) === 'verify'
+        ? { status: 502, raw: '<html>bad gateway</html>' }
+        : agreeable(request),
+    );
+    assert.equal((await s.exec()).code, 0);
+    const verdicts = arrayField(bundle(s.out, 'verdicts.json'), 'verdicts').map(record);
+    assert.ok(verdicts.length === 3 && verdicts.every((v) => v['verdict'] === 'disputed'));
+  });
+
+  it('sends the finding as data under a fixed system instruction', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable);
+    assert.equal((await s.exec()).code, 0);
+    const first = s.llm.requests.find((r) => kindOf(r) === 'verify');
+    assert.ok(first !== undefined);
+    const messages = arrayField(first.body, 'messages').map(record);
+    assert.equal(messages.length, 2);
+    assert.deepEqual(messages[0], { role: 'system', content: VERIFIER_INSTRUCTION });
+    assert.equal(messages[1]?.['role'], 'user');
+    const user = record(JSON.parse(stringField(record(messages[1]), 'content')) as unknown);
+    assert.deepEqual(Object.keys(user), ['finding']);
+    assert.equal(first.body['model'], 'kimi-k3');
+    assert.match(stringField(record(user['finding']), 'excerpt'), /createHash|query/);
+  });
+
+  it('stops verifying once the verifier budget is spent', async (t) => {
+    const s = await scenario(
+      t,
+      'ok1',
+      (request) =>
+        kindOf(request) === 'verify'
+          ? { ...verdictReply('disputed'), tokens: 100 }
+          : agreeable(request),
+      {
+        policy: { verifier_token_budget: 100 },
+      },
+    );
+    assert.equal((await s.exec()).code, 0);
+    const verdicts = bundle(s.out, 'verdicts.json');
+    assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'verify').length, 1);
+    // The most severe finding (critical, index 2) is verified first; the rest stay unverified.
+    assert.deepEqual(
+      arrayField(verdicts, 'verdicts').map((v) => record(v)['index']),
+      [2],
+    );
+    assert.equal(verdicts['token_usage'], 100);
+    assert.equal(verdicts['token_budget'], 100);
+  });
+
+  it('honours verify_cap', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable, { policy: { verify_cap: 2 } });
+    assert.equal((await s.exec()).code, 0);
+    assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'verify').length, 2);
+  });
+
+  it('skips fingerprints the factory already knows', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable, { known: [ok1Fingerprint(2)] });
+    assert.equal((await s.exec()).code, 0);
+    const verdicts = bundle(s.out, 'verdicts.json');
+    assert.deepEqual(verdicts['known_skipped'], [2]);
+    assert.deepEqual(
+      arrayField(verdicts, 'verdicts').map((v) => record(v)['index']),
+      [0, 1],
+    );
+    assert.equal(s.llm.requests.filter((r) => kindOf(r) === 'verify').length, 2);
+    assert.ok(
+      s.llm.requests
+        .filter((r) => kindOf(r) === 'verify')
+        .every((r) => !claimOf(r).includes('SQL')),
+    );
+  });
+
+  it('asks the analyst only about confirmed findings', async (t) => {
+    const s = await scenario(t, 'ok1', (request) => {
+      const kind = kindOf(request);
+      if (kind === 'analyst') return criteriaReply;
+      if (kind === 'probe') return { content: 'ok' };
+      return claimOf(request).includes('MD5') ? verdictReply('confirmed') : verdictReply('refuted');
+    });
+    assert.equal((await s.exec()).code, 0);
+    const analystCalls = s.llm.requests.filter((r) => kindOf(r) === 'analyst');
+    assert.equal(analystCalls.length, 1);
+    const [analystCall] = analystCalls;
+    assert.ok(analystCall !== undefined);
+    assert.match(claimOf(analystCall), /MD5/);
+    const acceptance = bundle(s.out, 'acceptance.json');
+    assert.deepEqual(arrayField(acceptance, 'items'), [
+      { index: 0, criteria: ['No md5 in password hashing'] },
+    ]);
+    assert.equal(acceptance['token_usage'], 50);
+    assert.equal(acceptance['analyst_model'], 'kimi-k3');
+  });
+
+  it('drops invalid acceptance criteria instead of failing', async (t) => {
+    const bad = ['{"criteria":[]}', '{"criteria":["a","b","c","d","e","f"]}', '{"criteria":[1]}'];
+    let next = 0;
+    const s = await scenario(t, 'ok1', (request) =>
+      kindOf(request) === 'analyst'
+        ? { content: bad[next++] ?? 'nope' }
+        : verdictReply('confirmed'),
+    );
+    assert.equal((await s.exec()).code, 0);
+    assert.deepEqual(arrayField(bundle(s.out, 'acceptance.json'), 'items'), []);
+  });
+});
+
+describe('factory-model check-tool and policy', () => {
+  function prefixWithBinary(
+    dir: string,
+    version = 'open-code-review v1.13.0 (1672852) x/y',
+  ): string {
+    const prefix = path.join(dir, 'prefix');
+    const pkg = path.join(prefix, 'node_modules', '@alibaba-group');
+    fs.mkdirSync(path.join(pkg, 'open-code-review'), { recursive: true });
+    fs.writeFileSync(path.join(pkg, 'open-code-review', 'package.json'), '{"version":"1.13.0"}');
+    fs.copyFileSync(LOCK, path.join(prefix, 'package-lock.json'));
+    const bin = path.join(pkg, `ocr-${process.platform}-${process.arch}`, 'bin', 'opencodereview');
+    fs.mkdirSync(path.dirname(bin), { recursive: true });
+    fs.writeFileSync(bin, `#!/bin/sh\necho '${version}'\n`, { mode: 0o755 });
+    return prefix;
+  }
+  const policyFile = path.join(FIXTURES, 'policy.json');
+  const env = { PATH: process.env['PATH'] ?? '' };
+
+  it('the committed lock pins the policy integrity and ships every platform binary', () => {
+    const lock = record(readRecord(LOCK)['packages']);
+    assert.equal(
+      record(lock['node_modules/@alibaba-group/open-code-review'])['integrity'],
+      POLICY_INTEGRITY,
+    );
+    for (const platform of ['linux-x64', 'darwin-arm64'])
+      assert.ok(`node_modules/@alibaba-group/ocr-${platform}` in lock, platform);
+    const pkg = readRecord(path.join(path.dirname(LOCK), 'package.json'));
+    assert.equal(pkg['private'], true);
+    assert.equal(pkg['scripts'], undefined);
+    assert.deepEqual(pkg['dependencies'], { '@alibaba-group/open-code-review': '1.13.0' });
+  });
+
+  it('accepts the pinned install and prints the native binary', async (t) => {
+    const dir = tmp(t);
+    const prefix = prefixWithBinary(dir);
+    const result = await run(['check-tool', '--policy', policyFile, '--prefix', prefix], env);
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stdout, /^ocr_bin=.*opencodereview\n$/);
+  });
+
+  it('rejects a binary built from another commit', async (t) => {
+    const prefix = prefixWithBinary(tmp(t), 'open-code-review v1.13.0 (deadbee) x/y');
+    assert.equal(
+      (await run(['check-tool', '--policy', policyFile, '--prefix', prefix], env)).code,
+      1,
+    );
+  });
+
+  it('rejects a lock whose integrity differs from the policy', async (t) => {
+    const dir = tmp(t);
+    const prefix = prefixWithBinary(dir);
+    const policy = writePolicy(dir, 'https://example.com/v1', {
+      ocr_lock_integrity: 'sha512-AAAA',
+    });
+    assert.equal((await run(['check-tool', '--policy', policy, '--prefix', prefix], env)).code, 1);
+  });
+
+  it('rejects a non-https model endpoint', async (t) => {
+    const dir = tmp(t);
+    const prefix = prefixWithBinary(dir);
+    const policy = writePolicy(dir, 'http://models.example.com/v1');
+    assert.equal((await run(['check-tool', '--policy', policy, '--prefix', prefix], env)).code, 1);
+  });
+});
