@@ -50,14 +50,22 @@ export function prepareTarget(policy: FactoryPolicy): PreparedTarget {
   )
     reasons.push('Unknown complete stop registry');
   const checks = arrayField(policy, 'required_checks').map(record);
+  // A null app_id is observed, not invented: its origin is authenticated through the approved CI workflow identity.
+  const ciIdentity =
+    typeof policy['ci_workflow_id'] === 'string' &&
+    /^[1-9]\d*$/.test(policy['ci_workflow_id']) &&
+    typeof policy['ci_workflow_path'] === 'string' &&
+    policy['ci_workflow_path'].startsWith('.github/workflows/');
   if (
     checks.length === 0 ||
     checks.some(
       (check) =>
         typeof check['context'] !== 'string' ||
-        typeof check['app_id'] !== 'number' ||
-        !Number.isSafeInteger(check['app_id']) ||
-        check['app_id'] <= 0,
+        (check['app_id'] === null
+          ? !ciIdentity
+          : typeof check['app_id'] !== 'number' ||
+            !Number.isSafeInteger(check['app_id']) ||
+            check['app_id'] <= 0),
     )
   )
     reasons.push('Unknown trusted check origin');
@@ -290,6 +298,9 @@ export function observeFactory(
             (check) =>
               check['context'] === stringField(expected, 'context') &&
               check['app_id'] === expected['app_id'] &&
+              (expected['app_id'] !== null ||
+                (String(check['workflow_id']) === policy['ci_workflow_id'] &&
+                  check['workflow_path'] === policy['ci_workflow_path'])) &&
               check['head_sha'] === update['head_sha'] &&
               check['conclusion'] === 'success',
           ),

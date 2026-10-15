@@ -26,6 +26,7 @@ import type {
 } from './factory-protocol.ts';
 import { runController } from './factory-control.ts';
 import { preserveOrRemoveBranch } from './factory-preservation.ts';
+import { isProtectedPath, isSafeRepoPath } from './factory-paths.ts';
 
 export function guardPatch(policy: FactoryPolicy, changes: readonly JsonRecord[]): FactoryDecision {
   if (changes.length === 0 || changes.length > numberField(policy, 'patch_files_cap'))
@@ -34,13 +35,7 @@ export function guardPatch(policy: FactoryPolicy, changes: readonly JsonRecord[]
   const seen = new Set<string>();
   for (const change of changes) {
     const file = stringField(change, 'path');
-    if (
-      seen.has(file) ||
-      file.startsWith('/') ||
-      file.split('/').some((part) => part === '..' || part === '.' || part === '') ||
-      file.includes('\\') ||
-      /[\x00-\x1f]/.test(file)
-    )
+    if (seen.has(file) || !isSafeRepoPath(file))
       return { status: 'denied', reason: 'Unsafe or duplicate path' };
     seen.add(file);
     if (change['status'] === 'D') return { status: 'denied', reason: 'Patch deletion refused' };
@@ -53,18 +48,7 @@ export function guardPatch(policy: FactoryPolicy, changes: readonly JsonRecord[]
       (change['old_mode'] !== '100644' && change['old_mode'] !== '000000')
     )
       return { status: 'denied', reason: 'Patch symlink/submodule/executable mode refused' };
-    if (
-      arrayField(policy, 'protected_paths').some(
-        (pattern) =>
-          typeof pattern === 'string' &&
-          (pattern.endsWith('/**')
-            ? file.startsWith(pattern.slice(0, -2))
-            : pattern.endsWith('*')
-              ? file.startsWith(pattern.slice(0, -1))
-              : file === pattern),
-      )
-    )
-      return { status: 'denied', reason: 'Patch protected path' };
+    if (isProtectedPath(policy, file)) return { status: 'denied', reason: 'Patch protected path' };
     lines += numberField(change, 'added') + numberField(change, 'removed');
   }
   if (lines > numberField(policy, 'patch_lines_cap'))

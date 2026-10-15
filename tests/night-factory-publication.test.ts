@@ -17,6 +17,7 @@ import {
   authorityMarker,
 } from '../scripts/factory-protocol.ts';
 import { reconcilePublication } from '../scripts/factory-publication.ts';
+import { isProtectedPath, isSafeRepoPath } from '../scripts/factory-paths.ts';
 import {
   guardPatch,
   runReproduction,
@@ -72,6 +73,23 @@ it('retains four finding identities before selecting three and never closes on i
   assert.equal(result.complete, false);
   assert.equal(result.pending.length, 4);
   assert.deepEqual(calls, []); // Disabled source cannot publish even in the manual path.
+});
+
+it('matches protected paths on basename for slash-free patterns and refuses unsafe paths', () => {
+  const policy = loadFactoryPolicy();
+  for (const path of [
+    '.env',
+    '.env.local',
+    'config/.env.local',
+    'a/b/package.json',
+    'scripts/x.ts',
+  ])
+    assert.equal(isProtectedPath(policy, path), true, path);
+  for (const path of ['bin/example.ts', 'src/env.ts', 'docs/environment.md'])
+    assert.equal(isProtectedPath(policy, path), false, path);
+  for (const path of ['./.env', 'scripts//x.ts', 'a/../b', '/abs', 'a\\b', 'a/\u0001', ''])
+    assert.equal(isSafeRepoPath(path), false, path);
+  assert.equal(isSafeRepoPath('config/.env.local'), true);
 });
 
 it('rejects protected, oversized and non-text changes while allowing a bounded application patch', () => {
@@ -1298,6 +1316,79 @@ it('AC03–05 refuses ambiguous failed POST adoption from a foreign repository m
   );
 });
 
+function rescan(
+  fixture: Awaited<ReturnType<typeof publicationFindingFixture>>,
+  overrides: JsonRecord,
+): JsonRecord {
+  const { authority: _authority, ...document } = fixture.scan;
+  const next = { ...document, ...overrides };
+  return {
+    ...next,
+    authority: fixture.authority('scan', 'complete', fixture.baseline, sha256(next), 'reviewed-v1'),
+  };
+}
+
+it('Opus F5 never makes a finding with an unsafe or basename-protected path eligible for repair', async (test) => {
+  for (const [path, eligible] of [
+    ['bin/application.mjs', true],
+    ['./.env', false],
+    ['scripts//x.ts', false],
+    ['bin/../scripts/x.ts', false],
+    ['/etc/passwd', false],
+    ['bin\\x.ts', false],
+    ['config/.env.local', false],
+  ] as const)
+    await test.test(path, async (subtest) => {
+      const fixture = await publicationFindingFixture(subtest);
+      fakeLabelRoutes(subtest, fixture.platform);
+      const finding = { ...fixture.finding, path };
+      const verifier = fixture.authority(
+        'verifier',
+        'confirmed',
+        fixture.baseline,
+        sha256(finding),
+        fixture.fingerprint,
+      );
+      const result = await reconcilePublication(
+        fixture.context,
+        rescan(fixture, {
+          inventory: [path],
+          inventory_sha256: sha256([path]),
+          covered: [path],
+          findings: [{ ...finding, authority: verifier }],
+        }),
+      );
+      assert.equal(result.status, 'accepted', result.reason);
+      assert.equal(record(result.issues[0])['repair_state'], eligible ? 'eligible' : 'needs-human');
+      assert.equal(result.dispatch.length, eligible ? 1 : 0);
+    });
+});
+
+it('Opus F9 does not rewrite an unchanged issue when only the scan inventory digest moved', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const { platform } = fixture;
+  fakeLabelRoutes(test, platform);
+  const first = await reconcilePublication(fixture.context, fixture.scan);
+  assert.equal(first.status, 'accepted', first.reason);
+  const patches = (before: number): number =>
+    platform.requests.slice(before).filter((request) => request.method === 'PATCH').length;
+  const grown = ['bin/application.mjs', 'docs/new.md'];
+  const before = platform.requests.length;
+  const second = await reconcilePublication(
+    fixture.context,
+    rescan(fixture, { inventory: grown, inventory_sha256: sha256(grown), covered: grown }),
+  );
+  assert.equal(second.status, 'accepted', second.reason);
+  assert.equal(patches(before), 0, 'inventory digest alone is not a reason to PATCH');
+  const afterGrowth = platform.requests.length;
+  const third = await reconcilePublication(
+    fixture.context,
+    rescan(fixture, { tool_revision: 'fixture-scanner-v2' }),
+  );
+  assert.equal(third.status, 'accepted', third.reason);
+  assert.equal(patches(afterGrowth), 1, 'a tool revision change still refreshes the body');
+});
+
 it('AC03–05 retains a human-closed canonical finding and never reopens it merely because a new scan still finds the bug', async (test) => {
   const fixture = await publicationFindingFixture(test);
   const { platform } = fixture;
@@ -1323,8 +1414,38 @@ it('AC03–05 retains a human-closed canonical finding and never reopens it mere
   );
 });
 
+// Origin persisted in the marker by the scan that last saw the finding (matches the fixture scan).
+const absenceOrigin = {
+  scope: 'bin/application.mjs',
+  inventory_sha256: sha256(['bin/application.mjs']),
+  tool_revision: 'fixture-scanner-v1',
+  config_revision: 'fixture-app-scope-v1',
+};
+// An absence proof carries the operation of the scan it was produced for.
+const absenceOperation = (head: string, target: string, payload: string): JsonRecord => ({
+  initial_claimed: true,
+  retry_claimed: false,
+  status: 'succeeded',
+  payload_sha256: payload,
+  target_id: target,
+  expected_head: head,
+  result_id: null,
+  reason: null,
+});
+
 it('AC04–05 requires complete actual scan coverage and independently bound absence proof before closing a missing canonical finding', async (test) => {
-  for (const control of ['complete-absence', 'incomplete-coverage', 'wrong-issue-proof'])
+  for (const control of [
+    'complete-absence',
+    'incomplete-coverage',
+    'wrong-issue-proof',
+    'narrowed-scan',
+    'tool-revision-changed',
+    'unbound-proof',
+    'marker-without-origin',
+    'wrong-current-head',
+    'wrong-expected-head',
+    'config-revision-changed',
+  ])
     await test.test(control, async (subtest) => {
       const fixture = await publicationFindingFixture(subtest);
       const { platform } = fixture;
@@ -1338,7 +1459,7 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
         node_id: 'I_ABSENT',
         user: { id: 23296915, login: 'apolenkov' },
         state: 'open',
-        body: `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->`,
+        body: `<!-- factory-finding-v1 ${JSON.stringify(control === 'marker-without-origin' ? identity : { ...identity, origin: absenceOrigin })} -->`,
       };
       platform.issues.push(issue);
       platform.facts.set('/repos/apolenkov/feynman/issues/42', issue);
@@ -1364,6 +1485,22 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
       assert.equal(green.status, 'accepted', green.reason);
       platform.git(['fetch', '--quiet', fixture.root, repaired]);
       platform.git(['update-ref', 'refs/heads/main', repaired]);
+      const { authority: _scan, ...document } = fixture.scan;
+      const narrowed = ['docs/other.md'];
+      const absent = {
+        ...document,
+        source_sha: repaired,
+        findings: [],
+        covered: control === 'incomplete-coverage' ? [] : ['bin/application.mjs'],
+        failed: control === 'incomplete-coverage' ? ['bin/application.mjs'] : [],
+        ...(control === 'narrowed-scan'
+          ? { inventory: narrowed, inventory_sha256: sha256(narrowed), covered: narrowed }
+          : {}),
+        ...(control === 'tool-revision-changed' ? { tool_revision: 'fixture-scanner-v2' } : {}),
+        ...(control === 'config-revision-changed'
+          ? { config_revision: 'fixture-app-scope-v2' }
+          : {}),
+      };
       const runId = '9890';
       platform.context(fixture.activation, runId);
       const {
@@ -1388,8 +1525,13 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
         fingerprint_policy_revision: identity.fingerprint_policy_revision,
         fingerprint: identity.fingerprint,
         baseline_sha: repaired,
-        current_source_head: repaired,
+        current_source_head: control === 'wrong-current-head' ? '1'.repeat(40) : repaired,
         expected_transition: 'closed',
+        operation: absenceOperation(
+          control === 'wrong-expected-head' ? '2'.repeat(40) : repaired,
+          identity.fingerprint,
+          control === 'unbound-proof' ? sha256('another scan') : sha256(absent),
+        ),
         outcome: 'complete-absence',
         aliases: [
           { kind: 'issue', id: '42', head: null, original_identity_sha256: sha256(stable) },
@@ -1401,14 +1543,6 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
         stringField(absentProof, 'transition_id'),
         'verifier',
       );
-      const { authority: _scan, ...document } = fixture.scan;
-      const absent = {
-        ...document,
-        source_sha: repaired,
-        findings: [],
-        covered: control === 'incomplete-coverage' ? [] : ['bin/application.mjs'],
-        failed: control === 'incomplete-coverage' ? ['bin/application.mjs'] : [],
-      };
       const scanAuthority = fixture.authority(
         'scan',
         control === 'incomplete-coverage' ? 'partial' : 'complete',
@@ -1424,9 +1558,18 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
       });
       assert.equal(
         result.status,
-        control === 'wrong-issue-proof' ? 'needs-human' : 'accepted',
+        [
+          'wrong-issue-proof',
+          'unbound-proof',
+          'wrong-current-head',
+          'wrong-expected-head',
+        ].includes(control)
+          ? 'needs-human'
+          : 'accepted',
         result.reason,
       );
+      if (['wrong-current-head', 'wrong-expected-head'].includes(control))
+        assert.match(result.reason, /Unproven disappearance/);
       assert.equal(
         record(platform.facts.get('/repos/apolenkov/feynman/issues/42'))['state'],
         control === 'complete-absence' ? 'closed' : 'open',
@@ -1441,9 +1584,16 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
 function refreshedScan(
   fixture: Awaited<ReturnType<typeof publicationFindingFixture>>,
   findings: readonly JsonRecord[],
+  inventory?: readonly string[],
 ): JsonRecord {
   const { authority: _authority, ...document } = fixture.scan;
-  const next = { ...document, findings };
+  const next = {
+    ...document,
+    ...(inventory === undefined
+      ? {}
+      : { inventory, inventory_sha256: sha256(inventory), covered: inventory }),
+    findings,
+  };
   return {
     ...next,
     authority: fixture.authority('scan', 'complete', fixture.baseline, sha256(next), 'reviewed-v1'),
@@ -1779,12 +1929,24 @@ it('Opus F2 authenticates both missing-issue proofs before any closure or existi
           node_id: `I_ABSENT_${number}`,
           user: { id: 41898282 },
           state: 'open',
-          body: `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->`,
+          body: `<!-- factory-finding-v1 ${JSON.stringify({ ...identity, origin: absenceOrigin })} -->`,
         };
         platform.issues.push(issue);
         platform.facts.set(`/repos/apolenkov/feynman/issues/${number}`, issue);
         return { issue, identity };
       });
+      const finding = {
+        ...fixture.finding,
+        authority: fixture.authority(
+          'verifier',
+          'confirmed',
+          repaired,
+          sha256(fixture.finding),
+          fixture.fingerprint,
+        ),
+      };
+      const { authority: _scan, ...document } = fixture.scan;
+      const scan = { ...document, source_sha: repaired, findings: [finding] };
       const disappearance: Record<string, JsonRecord> = {};
       const artifactIds: string[] = [];
       for (const [index, item] of missing.entries()) {
@@ -1817,6 +1979,7 @@ it('Opus F2 authenticates both missing-issue proofs before any closure or existi
           baseline_sha: repaired,
           current_source_head: repaired,
           expected_transition: 'closed',
+          operation: absenceOperation(repaired, fingerprint, sha256(scan)),
           outcome: 'complete-absence',
           aliases: [
             {
@@ -1836,18 +1999,6 @@ it('Opus F2 authenticates both missing-issue proofs before any closure or existi
         disappearance[item.issue.node_id] = envelope;
         artifactIds.push(stringField(record(envelope['transport']), 'artifact_id'));
       }
-      const finding = {
-        ...fixture.finding,
-        authority: fixture.authority(
-          'verifier',
-          'confirmed',
-          repaired,
-          sha256(fixture.finding),
-          fixture.fingerprint,
-        ),
-      };
-      const { authority: _scan, ...document } = fixture.scan;
-      const scan = { ...document, source_sha: repaired, findings: [finding] };
       const authority = fixture.authority(
         'scan',
         'complete',
@@ -2167,4 +2318,55 @@ it('Opus catch reports every identified finding pending and no selected work aft
         false,
       );
     });
+});
+
+it('F10 shares one protected-path matcher: .env* findings are needs-human in publication and denied by the writer', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const change = {
+    path: '.env.local',
+    old_mode: '100644',
+    new_mode: '100644',
+    status: 'M',
+    added: 1,
+    removed: 0,
+    binary: false,
+  };
+  assert.match(guardPatch(fixture.context.policy, [change]).reason, /protected/);
+  const finding = { ...fixture.finding, path: change.path };
+  const authority = fixture.authority(
+    'verifier',
+    'confirmed',
+    fixture.baseline,
+    sha256(finding),
+    fixture.fingerprint,
+  );
+  const result = await reconcilePublication(
+    fixture.context,
+    refreshedScan(fixture, [{ ...finding, authority }], [change.path]),
+  );
+  assert.equal(result.status, 'accepted', result.reason);
+  assert.equal(record(result.issues[0])['repair_state'], 'needs-human');
+  assert.deepEqual(result.dispatch, []);
+});
+
+it('Concurrent severity edit: an owner severity label added after the first read is a needs-human conflict', async (test) => {
+  const fixture = await labelRefreshFixture(test);
+  const { platform } = fixture;
+  fakeLabelRoutes(test, platform, {
+    beforeWrite: () => {
+      const racing = {
+        ...record(platform.issues[0]),
+        labels: [...arrayField(record(platform.issues[0]), 'labels'), { name: 'severity:medium' }],
+      };
+      platform.issues[0] = racing;
+      platform.facts.set('/repos/apolenkov/feynman/issues/42', racing);
+    },
+  });
+  const result = await reconcilePublication(fixture.context, fixture.scan);
+  assert.equal(result.status, 'needs-human');
+  assert.match(result.reason, /Concurrent severity edit/);
+  assert.deepEqual(result.dispatch, []);
+  assert.equal(record(result.issues[0])['repair_state'], 'needs-human');
+  assert.equal(record(result.issues[0])['issue_number'], 42);
+  assert.ok(labelNames(record(platform.issues[0])).includes('severity:medium'), 'owner label kept');
 });
