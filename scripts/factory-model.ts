@@ -171,7 +171,11 @@ const STDERR_PHRASES = [
 ] as const;
 export function stderrSignals(text: string): { http_statuses: number[]; messages: string[] } {
   const statuses = [
-    ...text.matchAll(/\b(?:status(?: code)?|HTTP(?:\/[\d.]+)?)\D{0,3}([45]\d\d)\b/gi),
+    ...text.matchAll(/\b(?:status(?:[ _]?code)?|HTTP(?:\/[\d.]+)?)\D{0,3}([45]\d\d)\b/gi),
+    // openai-go prints `POST "<url>": 404 Not Found`.
+    ...text.matchAll(
+      /\b([45]\d\d) (?:Bad Request|Unauthorized|Payment Required|Forbidden|Not Found|Request Timeout|Conflict|Payload Too Large|Unprocessable Entity|Too Many Requests|Internal Server Error|Bad Gateway|Service Unavailable|Gateway Timeout)\b/gi,
+    ),
   ]
     .map((match) => Number(match[1]))
     .filter((code, index, all) => all.indexOf(code) === index)
@@ -200,10 +204,13 @@ function runProcess(
     const chunks: Buffer[] = [];
     const errors: Buffer[] = [];
     let errorSize = 0;
+    // A Go CLI prints its fatal line last: keep the newest bytes, but always drain so the child never blocks.
     child.stderr.on('data', (chunk: Buffer) => {
-      if (errorSize >= MAX_STDERR_BYTES) return;
-      errorSize += chunk.length;
       errors.push(chunk);
+      errorSize += chunk.length;
+      while (errorSize > MAX_STDERR_BYTES && errors.length > 1) {
+        errorSize -= errors.shift()?.length ?? 0;
+      }
     });
     let size = 0;
     let timedOut = false;
@@ -227,7 +234,7 @@ function runProcess(
         code,
         stdout: Buffer.concat(chunks).toString('utf8'),
         timedOut,
-        stderr: Buffer.concat(errors).toString('utf8'),
+        stderr: Buffer.concat(errors).subarray(-MAX_STDERR_BYTES).toString('utf8'),
       });
     };
     child.stdout.on('data', (chunk: Buffer) => {
