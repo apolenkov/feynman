@@ -62,10 +62,11 @@ describe('factory-model run: environment and secrets', () => {
     }
     const scan = calls.find((call) => call.argv.includes('--max-tokens-budget'));
     assert.ok(scan !== undefined);
-    // macOS injects __CF_USER_TEXT_ENCODING into every process; it is not ours.
+    // macOS injects __CF_USER_TEXT_ENCODING into every process, and Node adds NODE_V8_COVERAGE to children of a
+    // coverage run; neither is ours.
     assert.deepEqual(
       Object.keys(scan.env)
-        .filter((name) => name !== '__CF_USER_TEXT_ENCODING')
+        .filter((name) => !['__CF_USER_TEXT_ENCODING', 'NODE_V8_COVERAGE'].includes(name))
         .toSorted(),
       [
         'HOME',
