@@ -611,9 +611,9 @@
     {
       "file": "scripts/factory-model.ts",
       "owner": "runModel",
-      "mutationHash": "535e08d78e8efcb1e13f99bb78c2b3f0de2704d50279fd9220c9d20132368103",
-      "count": 22,
-      "reason": "Invocation-owned token counters, probe status, finding lists, deadline flag and bundle records build one night bundle under finite budgets and one shared deadline; budget, verify-cap, deadline, stderr-signal and canary controls exercise it.",
+      "mutationHash": "44014c6eb998af5002885619b95d6a4da08693a0267a280dd5c16c40a8117bcd",
+      "count": 24,
+      "reason": "Invocation-owned token counters, probe status and error, finding lists, deadline flag and bundle records build one night bundle under finite budgets and one shared deadline; budget, verify-cap, deadline, stderr-signal, provider-error allowlist and canary controls exercise it.",
       "test": "tests/factory-model.test.ts"
     },
     {

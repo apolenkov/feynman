@@ -139,7 +139,49 @@ describe('factory-model run: environment and secrets', () => {
     const s = await scenario(t, 'ok1', agreeable);
     assert.equal((await s.exec()).code, 0);
     assert.equal(bundle(s.out, 'scan-raw.json')['auth_fallback_used'], false);
+    assert.deepEqual(bundle(s.out, 'scan-raw.json')['probe_error'], { code: null, type: null });
   });
+
+  for (const [label, error, expected] of [
+    [
+      'known error',
+      { code: 'model_not_found', type: 'invalid_request_error', message: PRIMARY },
+      { code: 'model_not_found', type: 'invalid_request_error' },
+    ],
+    ['echoed secrets', { code: PRIMARY, type: FALLBACK }, { code: null, type: null }],
+    [
+      'unknown strings',
+      { code: 'new_provider_code', type: 'secret_looking_value' },
+      { code: null, type: null },
+    ],
+    ['wrong types', { code: { key: PRIMARY }, type: ['api_error'] }, { code: null, type: null }],
+    ['missing error', null, { code: null, type: null }],
+  ] as const) {
+    it(`records only allowlisted probe diagnostics: ${label}`, async (t) => {
+      const s = await scenario(t, 'nofiles', () => ({
+        status: 400,
+        raw: JSON.stringify({ error }),
+      }));
+      const result = await s.exec();
+      assert.equal(result.code, 0, result.stderr);
+      const raw = bundle(s.out, 'scan-raw.json');
+      assert.equal(raw['probe_status'], 400);
+      assert.deepEqual(raw['probe_error'], expected);
+      assert.equal(raw['auth_fallback_used'], false);
+      assert.equal(s.llm.requests.length, 1);
+      const text = fs.readFileSync(path.join(s.out, 'scan-raw.json'), 'utf8');
+      assert.ok(!text.includes(PRIMARY) && !text.includes(FALLBACK));
+      assert.doesNotThrow(() =>
+        buildScanDraft(
+          raw,
+          bundle(s.out, 'verdicts.json'),
+          bundle(s.out, 'acceptance.json'),
+          'v1',
+          '1230959148',
+        ),
+      );
+    });
+  }
 
   it('stops before scanning when no key is accepted', async (t) => {
     const s = await scenario(t, 'ok1', () => ({ status: 401, raw: '{}' }));
