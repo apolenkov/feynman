@@ -59,10 +59,18 @@ export const FACTORY_WORKFLOWS: readonly string[] = [
   'night-review.yml',
 ];
 export const FACTORY_ENVIRONMENT = 'factory-privileged';
-// A factory-* workflow outside the list would skip every gate below.
-export function validateFactoryWorkflowSet(files: readonly string[]): void {
+const FACTORY_REFERENCE = /scripts\/factory-|check-factory-workflows|FACTORY_/;
+// A workflow outside the list skips every gate below, so anything that looks like or reaches the factory must be listed.
+export function validateFactoryWorkflowSet(
+  files: readonly string[],
+  read: (file: string) => string = () => '',
+): void {
   for (const file of files)
-    if (/^factory-.*\.ya?ml$/.test(file) && !FACTORY_WORKFLOWS.includes(file))
+    if (
+      /\.ya?ml$/.test(file) &&
+      !FACTORY_WORKFLOWS.includes(file) &&
+      (file.startsWith('factory-') || FACTORY_REFERENCE.test(read(file)))
+    )
       throw new Error(`${file}: factory workflow is not listed in FACTORY_WORKFLOWS`);
 }
 // shortcut: npm subcommand is the first non-option word, so `npm --prefix dir ci` and `echo npm i` misjudge; use a shell parser if that matters.
@@ -402,8 +410,10 @@ async function workflowMain(): Promise<void> {
     );
     const directory = path.resolve(import.meta.dirname, '..', '.github', 'workflows');
     const listed = fs.readdirSync(directory);
-    validateFactoryWorkflowSet(listed);
-    for (const file of listed.filter((file) => file.endsWith('.yml')).toSorted()) {
+    validateFactoryWorkflowSet(listed, (file) =>
+      fs.readFileSync(path.join(directory, file), 'utf8'),
+    );
+    for (const file of listed.filter((file) => /\.ya?ml$/.test(file)).toSorted()) {
       const content = fs.readFileSync(path.join(directory, file), 'utf8');
       await validateNativeWorkflow(content, file);
       if (FACTORY_WORKFLOWS.includes(file)) {

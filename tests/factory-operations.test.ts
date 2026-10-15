@@ -733,7 +733,16 @@ it('inert gate allows only the workflow_dispatch trigger and no stray factory wo
       on,
     );
   validateInertWorkflow(inertWorkflow(step, 'on:\n  workflow_dispatch:'), 'i.yml');
-  validateFactoryWorkflowSet(fs.readdirSync('.github/workflows'));
+  validateFactoryWorkflowSet(fs.readdirSync('.github/workflows'), (file) =>
+    fs.readFileSync(path.join('.github/workflows', file), 'utf8'),
+  );
+  assert.throws(() => {
+    validateFactoryWorkflowSet(['nightly.yaml'], () => 'run: node scripts/factory-control.ts');
+  }, /nightly\.yaml/);
+  assert.throws(() => {
+    validateFactoryWorkflowSet(['other.yml'], () => 'if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED');
+  }, /other\.yml/);
+  validateFactoryWorkflowSet(['ci.yml'], () => 'run: npm run ci');
   assert.throws(() => {
     validateFactoryWorkflowSet([...FACTORY_WORKFLOWS, 'factory-extra.yml']);
   }, /factory-extra\.yml/);
@@ -998,7 +1007,7 @@ it('every local import between factory scripts is a controlled manifest file', (
   for (const file of scripts) {
     assert.ok(CONTROL_FILES.includes(`scripts/${file}`), `${file} itself`);
     const source = fs.readFileSync(path.join('scripts', file), 'utf8');
-    for (const [, imported = ''] of source.matchAll(/from '\.\/(factory-[\w-]+\.ts)'/g))
+    for (const [, imported = ''] of source.matchAll(/from '\.\/([^']+)'/g))
       assert.ok(CONTROL_FILES.includes(`scripts/${imported}`), `${file} imports ${imported}`);
   }
 });

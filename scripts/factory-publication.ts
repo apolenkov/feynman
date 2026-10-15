@@ -285,6 +285,7 @@ export async function reconcilePublication(
           (typeof stored === 'object' &&
             stored !== null &&
             !Array.isArray(stored) &&
+            /^[a-f0-9]{64}$/.test(String(record(stored)['inventory_sha256'])) &&
             current['body'] === bodyFor(record(stored)['inventory_sha256']))
         );
       };
