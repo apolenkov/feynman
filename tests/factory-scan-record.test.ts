@@ -267,7 +267,7 @@ describe('adapt', () => {
     assert.equal(draft['truncated'], true);
     assert.deepEqual(draft['covered'], []);
   });
-  it('known-skipped, unverified and unidentifiable comments are all deferred', () => {
+  it('known presence does not hide unverified or unidentifiable comments', () => {
     const lineZero = comment(3, 'a.ts', 'q()', { start_line: 0 });
     const badSeverity = comment(4, 'a.ts', 'w()', { severity: 'urgent' });
     const { draft, selected } = adapt(
@@ -276,12 +276,67 @@ describe('adapt', () => {
     );
     assert.equal(selected, false);
     assert.equal(draft['truncated'], true);
+    assert.deepEqual(draft['known_present'], [fp(c0)]);
     assert.deepEqual(draft['deferred_findings'], [
-      { fingerprint: fp(c0), path: 'a.ts', severity: 'high' },
       { fingerprint: fp(c1), path: 'b.ts', severity: 'high' },
       { fingerprint: null, path: 'a.ts', severity: 'high' },
       { fingerprint: fp(badSeverity), path: 'a.ts', severity: null },
     ]);
+  });
+  it('known-only full scan stays complete and retains deduplicated presence without a slot', () => {
+    const duplicate = { ...c0, index: 5 };
+    const { draft, selected } = adapt(
+      rawScan({}, [c1, duplicate, c0]),
+      verdicts([], { known_skipped: [5, 1, 0] }),
+    );
+    assert.equal(selected, false);
+    assert.equal(draft['successful'], true);
+    assert.equal(draft['truncated'], false);
+    assert.deepEqual(draft['known_present'], [fp(c0), fp(c1)].toSorted());
+    assert.deepEqual(draft['findings'], []);
+    assert.deepEqual(draft['deferred_findings'], []);
+  });
+  it('known presence leaves the V1 slot to new findings and retains cap overflow', () => {
+    for (const fresh of [[c1], [c1, c2]]) {
+      const { draft, selected } = adapt(
+        rawScan({}, [c0, ...fresh]),
+        verdicts(
+          fresh.map((c) => [c, 'confirmed']),
+          { known_skipped: [0] },
+        ),
+      );
+      assert.equal(selected, true);
+      assert.deepEqual(draft['known_present'], [fp(c0)]);
+      assert.deepEqual(
+        rows(draft['findings']).map((f) => f['fingerprint']),
+        [fp(c1)],
+      );
+      assert.deepEqual(
+        draft['deferred_findings'],
+        fresh.length === 1 ? [] : [{ fingerprint: fp(c2), path: 'b.ts', severity: 'high' }],
+      );
+      assert.equal(draft['truncated'], fresh.length > 1);
+    }
+  });
+  it('rejects malformed or ambiguous known-skipped indexes rather than dropping findings', () => {
+    for (const known_skipped of [null, {}, '0', [-1], [0.5], ['0'], [99], [0, 0]])
+      assert.throws(
+        () => adapt(rawScan({}, [c0]), verdicts([], { known_skipped })),
+        /known.skipped/,
+      );
+    assert.throws(
+      () => adapt(rawScan({}, [c0]), verdicts([[c0, 'refuted']], { known_skipped: [0] })),
+      /known.skipped/,
+    );
+    assert.throws(
+      () => adapt(rawScan({}, [c0, { ...c1, index: 0 }]), verdicts([], { known_skipped: [0] })),
+      /known.skipped/,
+    );
+    const unidentifiable = comment(0, 'a.ts', 'x()', { start_line: 0 });
+    assert.throws(
+      () => adapt(rawScan({}, [unidentifiable]), verdicts([], { known_skipped: [0] })),
+      /known.skipped/,
+    );
   });
   it('rejects mismatched sources and unknown fields', () => {
     assert.throws(() =>

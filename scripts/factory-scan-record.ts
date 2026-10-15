@@ -212,6 +212,22 @@ export function buildScanDraft(
   }
 
   const comments = parseComments(raw['comments']);
+  if (!Array.isArray(verdicts['known_skipped'])) fail('known_skipped');
+  const knownIndexes = verdicts['known_skipped'].map((index) =>
+    count(index, 'known_skipped index'),
+  );
+  if (new Set(knownIndexes).size !== knownIndexes.length) fail('known_skipped duplicate');
+  const knownPresent = [
+    ...new Set(
+      knownIndexes.map((index) => {
+        const matching = comments.filter((comment) => comment.index === index);
+        const [comment] = matching;
+        if (matching.length !== 1 || comment === undefined || verdictByIndex.has(index))
+          return fail('known_skipped comment');
+        return fingerprintFinding(rev, comment) ?? fail('known_skipped fingerprint');
+      }),
+    ),
+  ].toSorted();
   const preview = items(raw['preview'], 'preview').map((entry) => {
     const p = closedObject(entry, ['path', 'will_review', 'exclude_reason'], 'preview entry');
     return {
@@ -257,6 +273,7 @@ export function buildScanDraft(
   const candidates: { comment: Comment; fingerprint: string; verdict: JsonRecord }[] = [];
   const deferred: JsonRecord[] = [];
   for (const comment of comments.toSorted((a, b) => a.index - b.index)) {
+    if (knownIndexes.includes(comment.index)) continue;
     const fingerprint = fingerprintFinding(rev, comment);
     const severity = SEVERITIES.includes(comment.severity) ? comment.severity : null;
     const verdict = verdictByIndex.get(comment.index);
@@ -271,7 +288,7 @@ export function buildScanDraft(
         continue;
       }
     }
-    // Known-skipped and unverified findings are deferred, never silently dropped.
+    // Unverified findings are deferred, never silently dropped.
     deferred.push({ fingerprint, path: comment.path, severity });
   }
   // Slot choice: confirmed before disputed, then severity, then comment index.
@@ -357,6 +374,7 @@ export function buildScanDraft(
       tool_revision: toolRevision,
       config_revision: configRevision,
       findings,
+      known_present: knownPresent,
       deferred_findings: deferred,
     },
   };

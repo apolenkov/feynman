@@ -27,6 +27,15 @@ The system SHALL establish complete compatible presence before applying severity
 - **WHEN** a scan is truncated, failed, tokenless, missing coverage or incompatible with the last scan
 - **THEN** no absence-based issue closure occurs
 
+#### Scenario: Previously known findings remain present
+- **WHEN** a successful full scan observes an identifiable finding whose fingerprint was already known and skips its repeated verification
+- **THEN** the scan preserves that fingerprint as presence without consuming the single new-finding slot or declaring truncation solely for that skip
+- **AND** presence alone does not create, refresh, reopen, confirm or authorize repair of an issue
+
+#### Scenario: Invalid known presence is refused
+- **WHEN** known-skipped indices do not identify scan comments, overlap verification verdicts, or the publication presence contains a malformed fingerprint
+- **THEN** the input is refused before publication effects; unverified and unidentifiable findings still make the scan incomplete
+
 ### Requirement: Bounded selection
 The system SHALL preserve all identified presence and create at most three new canonical issues per publication run. Existing issue refreshes and refuted findings SHALL NOT consume that creation cap. This cap clarification is the coordinator's 2026-10-13 F6 decision; the accepted protocol import remains unchanged.
 
