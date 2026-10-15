@@ -64,6 +64,7 @@ import {
   verifyAuthority,
   readAuthorityArchive,
   resolveReceipt,
+  producerActor,
 } from '../scripts/factory-protocol.ts';
 import type { JsonRecord } from '../scripts/factory-protocol.ts';
 import type { TestContext } from 'node:test';
@@ -1487,4 +1488,101 @@ it('resolves a prior producer receipt through the protocol module', async (test)
   const envelope = platform.upload(core, 'receipt', stringField(core, 'transition_id'), 'reserve');
   const resolved = await resolveReceipt(await resolveFactoryContext(context), '904', 'reserve');
   assert.deepEqual(resolved, envelope);
+});
+
+const BOT = { id: 41898282, login: 'github-actions[bot]' };
+const RUNS = '/repos/apolenkov/feynman/actions/runs';
+const NIGHT_REVIEW = { workflow_id: 701, path: '.github/workflows/night-review.yml' };
+
+function setRun(platform: FactoryPlatform, runId: string, patch: JsonRecord): void {
+  const run = { ...record(platform.facts.get(`${RUNS}/${runId}`)), ...patch };
+  platform.facts.set(`${RUNS}/${runId}`, run);
+  platform.facts.set(`${RUNS}/${runId}/attempts/1`, run);
+}
+function parentRun(platform: FactoryPlatform, patch: JsonRecord = {}): void {
+  platform.facts.set(`${RUNS}/8800`, {
+    id: 8800,
+    ...NIGHT_REVIEW,
+    event: 'schedule',
+    head_branch: 'main',
+    repository: { id: 1230959148 },
+    head_repository: { id: 1230959148 },
+    created_at: '2026-10-12T00:02:00Z',
+    ...patch,
+  });
+}
+async function botContext(test: TestContext, actor: JsonRecord = BOT) {
+  const { platform, activation, genesis } = await bootstrapped(test);
+  const context = laterContext(platform, activation, '906');
+  setRun(platform, '906', { actor, created_at: '2026-10-12T00:03:00Z' });
+  return { platform, activation, genesis, context: await resolveFactoryContext(context) };
+}
+
+it('authenticates the producer actor as the owner or a bot parented by the scheduled review run', async (test) => {
+  const { platform, context } = await botContext(test, { id: 23296915, login: 'apolenkov' });
+  assert.deepEqual(await producerActor(context, {}), {
+    actor_id: '23296915',
+    actor_login: 'apolenkov',
+    actor_decision: 'owner',
+  });
+  setRun(platform, '906', { actor: BOT });
+  parentRun(platform);
+  const approved = {
+    actor_id: '41898282',
+    actor_login: 'github-actions[bot]',
+    actor_decision: 'approved-publisher',
+  };
+  assert.deepEqual(await producerActor(context, { parent_run_id: '8800' }), approved);
+  parentRun(platform, { event: 'workflow_dispatch' });
+  assert.deepEqual(await producerActor(context, { parent_run_id: '8800' }), approved);
+});
+
+it('refuses a bot or third actor without a valid scheduled night-review parent on main', async (test) => {
+  const { platform, context } = await botContext(test);
+  for (const [request, parent] of [
+    [{}, {}],
+    [{ parent_run_id: 8800 }, {}],
+    [{ parent_run_id: '906' }, {}],
+    [{ parent_run_id: '8800' }, { path: '.github/workflows/ci.yml', workflow_id: 272235418 }],
+    [{ parent_run_id: '8800' }, { workflow_id: 999 }],
+    [{ parent_run_id: '8800' }, { head_branch: 'feat/x' }],
+    [{ parent_run_id: '8800' }, { event: 'push' }],
+    [{ parent_run_id: '8800' }, { repository: { id: 1 } }],
+    [{ parent_run_id: '8800' }, { head_repository: { id: 1 } }],
+    [{ parent_run_id: '8800' }, { created_at: '2026-10-12T00:04:00Z' }],
+  ] as const) {
+    parentRun(platform, parent);
+    await assert.rejects(producerActor(context, request), /actor|parent/i);
+  }
+  parentRun(platform);
+  setRun(platform, '906', { actor: { id: 777, login: 'mallory' } });
+  await assert.rejects(producerActor(context, { parent_run_id: '8800' }), /actor/i);
+});
+
+it('accepts approved-publisher receipts only from the owner or the Actions bot', async (test) => {
+  for (const [actor, ok] of [
+    [{ id: 23296915, login: 'apolenkov' }, true],
+    [BOT, true],
+    [{ id: 777, login: 'mallory' }, false],
+    [{ id: 41898282, login: 'impostor' }, false],
+  ] as const) {
+    await test.test(`actor ${actor.login}`, async (subtest) => {
+      const { platform, activation, genesis, context } = await botContext(subtest, actor);
+      const core = findingReceipt(platform, activation, genesis, '906', 'reserve', {
+        actor_id: String(actor.id),
+        actor_login: actor.login,
+        reservation_number: 1,
+        expected_transition: 'reserved',
+        outcome: 'consumed',
+      });
+      const envelope = platform.upload(
+        core,
+        'receipt',
+        stringField(core, 'transition_id'),
+        'reserve',
+      );
+      if (ok) assert.deepEqual(await verifyAuthority(context, envelope), core);
+      else await assert.rejects(verifyAuthority(context, envelope), /actor/i);
+    });
+  }
 });

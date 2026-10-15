@@ -1124,6 +1124,68 @@ export async function readAuthorityArchive(
     throw new FactoryFailure('Archive member unreadable or too large');
   }
 }
+const ACTIONS_BOT = { id: '41898282', login: 'github-actions[bot]' } as const;
+export function isApprovedPublisher(policy: FactoryPolicy, id: unknown, login: unknown): boolean {
+  return (
+    (id === policy['owner_id'] && login === policy['owner_login']) ||
+    (id === ACTIONS_BOT.id && login === ACTIONS_BOT.login)
+  );
+}
+// Owner runs sign as owner; the scheduled review's Actions bot signs as approved-publisher only
+// when its dispatching run proves a main-branch night-review parent that started earlier.
+export async function producerActor(
+  context: FactoryContext,
+  request: JsonRecord,
+): Promise<{
+  actor_id: string;
+  actor_login: string;
+  actor_decision: 'owner' | 'approved-publisher';
+}> {
+  const p = context.policy;
+  const base = `/repos/${stringField(p, 'repository_full_name')}/actions/runs`;
+  const run = record(
+    await githubRequest(context, `${base}/${stringField(context.job, 'run_id')}/attempts/1`),
+  );
+  const actor = record(run['actor']);
+  const actorId = String(actor['id']);
+  const actorLogin = actor['login'];
+  if (actorId === p['owner_id'] && actorLogin === p['owner_login'])
+    return {
+      actor_id: actorId,
+      actor_login: stringField(p, 'owner_login'),
+      actor_decision: 'owner',
+    };
+  if (!isApprovedPublisher(p, actorId, actorLogin))
+    throw new FactoryFailure('Producer actor not authorized');
+  const parentId = request['parent_run_id'];
+  if (
+    typeof parentId !== 'string' ||
+    !/^[1-9]\d{0,18}$/u.test(parentId) ||
+    parentId === context.job['run_id']
+  )
+    throw new FactoryFailure('Bot producer requires a distinct parent_run_id');
+  const parent = record(await githubRequest(context, `${base}/${parentId}`));
+  const night = arrayField(p, 'workflow_registry')
+    .map(record)
+    .find((entry) => entry['path'] === '.github/workflows/night-review.yml');
+  const parentPath = typeof parent['path'] === 'string' ? parent['path'].split('@')[0] : null;
+  if (
+    night === undefined ||
+    parentPath !== night['path'] ||
+    (night['id'] !== null && String(parent['workflow_id']) !== night['id']) ||
+    parent['head_branch'] !== 'main' ||
+    !['schedule', 'workflow_dispatch'].includes(String(parent['event'])) ||
+    String(record(parent['repository'])['id']) !== p['repository_id'] ||
+    String(record(parent['head_repository'])['id']) !== p['repository_id'] ||
+    !(Date.parse(stringField(parent, 'created_at')) < Date.parse(stringField(run, 'created_at')))
+  )
+    throw new FactoryFailure('Bot producer parent is not a scheduled night-review run on main');
+  return {
+    actor_id: actorId,
+    actor_login: ACTIONS_BOT.login,
+    actor_decision: 'approved-publisher',
+  };
+}
 export async function resolveReceipt(
   context: FactoryContext,
   runId: string,
@@ -1265,7 +1327,9 @@ export async function verifyArchiveAuthority(
       record(attempt['actor'])['login'] !== core['actor_login'] ||
       core['actor_decision'] === 'denied' ||
       (core['actor_decision'] === 'owner' &&
-        (core['actor_id'] !== p['owner_id'] || core['actor_login'] !== p['owner_login'])))
+        (core['actor_id'] !== p['owner_id'] || core['actor_login'] !== p['owner_login'])) ||
+      (core['actor_decision'] === 'approved-publisher' &&
+        !isApprovedPublisher(p, core['actor_id'], core['actor_login'])))
   )
     throw new FactoryFailure('Receipt actor/event/epoch authority mismatch');
   for (const entry of arrayField(p, 'control_manifest').map(record)) {
