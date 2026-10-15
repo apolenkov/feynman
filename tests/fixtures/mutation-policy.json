@@ -501,7 +501,7 @@
       "owner": "validateFactoryHardening",
       "mutationHash": "c7b9d7d8025ebbb810509f499e29f89e02036e1942e9d2ad141cee22d262ab60",
       "count": 2,
-      "reason": "Invocation-owned loop flag and step cursor scan one parsed workflow for write-token environment, ignore-scripts installs and explicit actions permission; real workflow and per-rule mutation controls exercise the gate.",
+      "reason": "Invocation-owned authentication flag scans one parsed workflow for write-token environment, ignore-scripts installs and explicit actions permission; real workflow and per-rule mutation controls exercise the gate.",
       "test": "tests/factory-operations.test.ts"
     },
     {
@@ -611,9 +611,9 @@
     {
       "file": "scripts/factory-model.ts",
       "owner": "runModel",
-      "mutationHash": "8b5e2229bac6a3d0f7289543b3413f5ba951ad93216d6e7baf8d77fea0997edc",
-      "count": 19,
-      "reason": "Invocation-owned token counters, finding lists and bundle records build one night bundle under finite budgets; budget, verify-cap, deadline and canary controls exercise it.",
+      "mutationHash": "932cda95917cefb1806a03040692e0289e27eb16d835c3be6d2003815c17b88b",
+      "count": 20,
+      "reason": "Invocation-owned token counters, finding lists, deadline flag and bundle records build one night bundle under finite budgets and one shared deadline; budget, verify-cap, deadline and canary controls exercise it.",
       "test": "tests/factory-model.test.ts"
     },
     {
@@ -643,9 +643,9 @@
     {
       "file": "scripts/factory-scan-record.ts",
       "owner": "buildScanDraft",
-      "mutationHash": "f79f40fd34a68e0d98c64ea3f232bb134af2e355149c1ff3f9d2273a70f7e8ab",
-      "count": 8,
-      "reason": "Invocation-owned finding, deferral and token lists build one scan draft; selection, truncation and unknown-field controls exercise it.",
+      "mutationHash": "e0a5fac9681564e0554a0476f6ec58d8a085c648c27ae4bc6606474f5439fba6",
+      "count": 9,
+      "reason": "Invocation-owned finding, deferral and token lists, sorted in place by the slot rank, build one scan draft; selection order, deferred known findings, truncation and unknown-field controls exercise it.",
       "test": "tests/factory-scan-record.test.ts"
     },
     {
@@ -663,6 +663,14 @@
       "count": 1,
       "reason": "The single named main boundary sets the process exit code from a failed adapt command; the CLI control exercises it.",
       "test": "tests/factory-scan-record.test.ts"
+    },
+    {
+      "file": "scripts/factory-model.ts",
+      "owner": "budget",
+      "mutationHash": "e30fb76135dad89016f70745e7c224904788eea1a1968dda4c6e1481356150c4",
+      "count": 1,
+      "reason": "Closure over the invocation-owned deadline flag of one runModel call records that a call found the shared deadline spent; exhausted-after-scan and mid-verify deadline controls exercise it.",
+      "test": "tests/factory-model.test.ts"
     }
   ]
 }
