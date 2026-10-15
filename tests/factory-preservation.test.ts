@@ -519,6 +519,33 @@ it('preserves unique, moved, open and unproved remote ownership while allowing n
   }
 });
 
+it('preserves a squash-delivered branch: squash history has no ancestry to the branch head, so no DELETE is attempted', async (t) => {
+  const fixture = await remoteFixture(t);
+  const files = new Map(
+    fixture.platform.manifest.map((entry) => [
+      stringField(entry, 'path'),
+      fs.readFileSync(stringField(entry, 'path')),
+    ]),
+  );
+  files.set('application.ts', Buffer.from('export const repaired = true;\n'));
+  const squash = fixture.platform.commitFiles(files, [fixture.platform.release]);
+  fixture.platform.git(['update-ref', 'refs/heads/main', squash]);
+  const pr = fixture.platform.pulls[0];
+  assert.ok(pr);
+  fixture.platform.pulls.splice(0, 1, { ...pr, merge_commit_sha: squash });
+  const result = await preserveOrRemoveBranch(fixture.context, {
+    ...fixture.input,
+    delivered_head: squash,
+  });
+  assert.equal(result.status, 'preserved', result.reason);
+  assert.match(result.reason, /unproven squash delivery/);
+  assert.equal(fixture.platform.git(['rev-parse', `refs/heads/${fixture.branch}`]), fixture.head);
+  assert.equal(
+    fixture.platform.requests.some((request) => request.method === 'DELETE'),
+    false,
+  );
+});
+
 it('preserves a remote head moved by another writer after the delivery check', async (t) => {
   const fixture = await remoteFixture(t);
   const fetch = fixture.platform.fetch.bind(fixture.platform);

@@ -862,6 +862,9 @@ export async function verifyControlSource(
     `${stringField(p, 'repository_full_name')}/${stringField(registered, 'path')}@refs/heads/main`
   )
     throw new FactoryFailure('Untrusted workflow ref');
+  // Emergency stop only disables, cancels and unarms: it keeps the repository, owner, actor, registry and
+  // run identity checks above but must not depend on the control files still matching the release.
+  if (stopping) return;
   const live = stringField(
     record(record(await githubRequest(context, `${base}/git/ref/heads/main`))['object']),
     'sha',
@@ -891,7 +894,8 @@ export async function verifyControlSource(
         throw new FactoryFailure('Changed approved control blob');
     }
   }
-  if (stopping || context.role === 'stop' || context.role === 'bootstrap') return;
+  if (context.role === 'stop' || context.role === 'bootstrap') return;
+  // Fail closed: an absent, unreadable or non-false stop.json denies ordinary effects.
   const stop = record(await githubRequest(context, `${base}/contents/stop.json?ref=factory-state`));
   const stopped: unknown = JSON.parse(
     Buffer.from(stringField(stop, 'content'), 'base64').toString('utf8'),

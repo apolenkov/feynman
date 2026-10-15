@@ -17,6 +17,7 @@ import {
   verifyControlSource,
 } from './factory-protocol.ts';
 import type { FactoryContext, FactoryDecision, JsonRecord } from './factory-protocol.ts';
+import { isProtectedPath } from './factory-paths.ts';
 
 export interface PublicationResult {
   readonly presence: readonly string[];
@@ -114,6 +115,22 @@ function labelNames(issue: JsonRecord): string[] {
     typeof label === 'string' ? label : stringField(record(label), 'name'),
   );
 }
+// Absence may close an issue only when the current scan is compatible with the scan that last saw
+// the finding: same tool/config revisions and the finding's scope covered. Pre-origin markers never close.
+function compatibleOrigin(marker: JsonRecord, scan: JsonRecord): boolean {
+  const origin = marker['origin'];
+  if (typeof origin !== 'object' || origin === null || Array.isArray(origin)) return false;
+  const seen = record(origin);
+  const scope = seen['scope'];
+  return (
+    typeof scope === 'string' &&
+    typeof seen['inventory_sha256'] === 'string' &&
+    /^[a-f0-9]{64}$/.test(seen['inventory_sha256']) &&
+    seen['tool_revision'] === scan['tool_revision'] &&
+    seen['config_revision'] === scan['config_revision'] &&
+    arrayField(scan, 'covered').includes(scope)
+  );
+}
 function partialEffect(identity: JsonRecord, issue: JsonRecord, confidence: string): JsonRecord {
   return {
     ...identity,
@@ -183,17 +200,23 @@ export async function reconcilePublication(
           marker['repository_id'] !== context.policy['repository_id'] ||
           marker['fingerprint_policy_revision'] !== scan['fingerprint_policy_revision'] ||
           issue['state'] !== 'open' ||
-          presence.includes(stringField(marker, 'fingerprint'))
+          presence.includes(stringField(marker, 'fingerprint')) ||
+          !compatibleOrigin(marker, scan)
         )
           continue;
         const provenance = await verifyAuthority(
           context,
           record(record(scan['disappearance_authority'])[stringField(issue, 'node_id')]),
         );
+        const absenceOperation = record(provenance['operation'] ?? {});
         if (
           provenance['issue_node_id'] !== issue['node_id'] ||
           provenance['fingerprint'] !== marker['fingerprint'] ||
-          provenance['outcome'] !== 'complete-absence'
+          provenance['outcome'] !== 'complete-absence' ||
+          provenance['current_source_head'] !== scan['source_sha'] ||
+          absenceOperation['expected_head'] !== scan['source_sha'] ||
+          absenceOperation['target_id'] !== marker['fingerprint'] ||
+          absenceOperation['payload_sha256'] !== scanOperation['payload_sha256']
         )
           throw new FactoryFailure('Unproven disappearance');
         closing.push(issue);
@@ -239,15 +262,15 @@ export async function reconcilePublication(
         continue;
       }
       processed.push(finding);
-      const protectedPath = arrayField(context.policy, 'protected_paths').some(
-        (pattern) =>
-          typeof pattern === 'string' &&
-          (pattern.endsWith('/**')
-            ? stringField(finding, 'path').startsWith(pattern.slice(0, -2))
-            : finding['path'] === pattern),
-      );
+      const protectedPath = isProtectedPath(context.policy, stringField(finding, 'path'));
       const repairState = confidence === 'disputed' || protectedPath ? 'needs-human' : 'eligible';
-      const body = `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->\nConfidence: ${confidence}\nRepair: ${repairState}\nAuthenticated receipt: ${sha256(proof)}`;
+      const origin = {
+        scope: stringField(finding, 'path'),
+        inventory_sha256: scan['inventory_sha256'],
+        tool_revision: scan['tool_revision'],
+        config_revision: scan['config_revision'],
+      };
+      const body = `<!-- factory-finding-v1 ${JSON.stringify({ ...identity, origin })} -->\nConfidence: ${confidence}\nRepair: ${repairState}\nAuthenticated receipt: ${sha256(proof)}`;
       const title = `[factory:${confidence}] ${fingerprint.slice(0, 16)}`;
       const findingLabels = [`severity:${stringField(finding, 'severity')}`, 'source:ocr-scan'];
       if (issue === undefined) {
@@ -348,6 +371,10 @@ export async function reconcilePublication(
             'DELETE',
           );
         }
+        // Not atomic: an owner severity label added after the first read survives the writes above.
+        const settled = record(await githubRequest(context, `${route}/${issueNumber}`));
+        if (labelDelta(labelNames(settled)).remove.length > 0)
+          throw new FactoryFailure('Concurrent severity edit; needs-human conflict');
       }
       const stableIdentity = { ...identity, issue_node_id: stringField(issue, 'node_id') };
       const registration = produceReceipt({

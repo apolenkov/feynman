@@ -46,7 +46,7 @@ Remaining ambiguous authority is denied and recorded as a deployment prerequisit
 | Initial policy | disabled, no configured provider/budget, no additional targets; subsequent targets are outside this initial delivery |
 | Gate | existing `npm ci`, full `npm run ci`, normal hooks, original coverage/security contexts |
 
-Unassigned fields remain unknown in the disabled-policy variant and cannot form a valid active policy. Published control never imports former host IDs as runtime authority. Required checks preserve null app IDs rather than inventing an origin; execution proves the actual trusted check source under the accepted linkage contract.
+Unassigned fields remain unknown in the disabled-policy variant and cannot form a valid active policy. Published control never imports former host IDs as runtime authority. Required checks preserve null app IDs rather than inventing an origin; a null tuple is accepted only together with the approved CI workflow identity (`ci_workflow_id`, `ci_workflow_path`), which execution proves against the actual check run under the accepted linkage contract.
 
 ### First full-cycle deployment contract
 
@@ -76,6 +76,9 @@ Coordinator-approved validation uses upstream `rhysd/actionlint` v1.7.12 with ex
 
 - Expiring/missing artifact or job log → deny and retain consumed/unknown history, never fall back to a convenient older checkpoint.
 - Fast-forward ref publication is not expected-old CAS → native serialization plus complete continuity/readback; preserve siblings/conflicts and report needs-human.
+- Squash-only history gives no ancestry between a factory branch head and its delivered squash commit → remote branch cleanup (`expected...delivered` must be `ahead|identical`) preserves the branch after a squash delivery. The REST ref DELETE has no expected-old CAS; neither a CAS guarantee nor automatic cleanup after squash is claimed. Cleanup stays human-driven and the DELETE path is reachable only if the repository ever delivers by non-squash merge.
+- Emergency stop verifies repository, owner, actor, registry and run identity but not control-file equality, so it still works when control files drifted from the approved release; ordinary effects keep the full control closure and fail closed on an absent or non-false `stop.json`. The authoritative stop state is the readback of disabled mutating workflows, cancelled runs and unarmed PRs; the stop role has no contents write and does not set `stop.json`.
+- Dispatch choices `admit`, `operation-intent`, `operation-outcome` and `retry-claim` have no hosted job yet; the workflow gate lists them as explicitly unwired until the repair delivery wires them. The static gate also asserts the disabled posture (inactive policy, no schedule or non-token secret, no `FACTORY_*` set true), that every token-authenticating job grants `actions` explicitly and that every controller step receives the repository-variable policy pin. Actual token access and trusted pinned admission before checked-out repository code are hosted conditions.
 - Bot-token PR workflows may require human approval and closed events do not cascade → actual hosted permission/CI/closure proof remains separate; explicit dispatch/sweep contract.
 - No transport/budget/active deployment yet → source and local positive fixtures only; provider effects remain denied.
 
