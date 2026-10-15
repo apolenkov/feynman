@@ -528,7 +528,10 @@ it('preserves a squash-delivered branch: squash history has no ancestry to the b
     ]),
   );
   files.set('application.ts', Buffer.from('export const repaired = true;\n'));
+  // A squash on the release with the branch's exact tree in the same second would be the branch head itself.
+  files.set('SQUASHED', Buffer.from('squash\n'));
   const squash = fixture.platform.commitFiles(files, [fixture.platform.release]);
+  assert.notEqual(squash, fixture.head);
   fixture.platform.git(['update-ref', 'refs/heads/main', squash]);
   const pr = fixture.platform.pulls[0];
   assert.ok(pr);
