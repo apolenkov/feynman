@@ -260,6 +260,26 @@ interface ChatResult {
   readonly body: unknown;
   readonly tokens: number;
 }
+// Only fixed identifiers may leave the provider response; messages can echo credentials or prompts.
+function providerErrorSignal(value: unknown): string | null {
+  const allowed = [
+    'invalid_request_error',
+    'authentication_error',
+    'permission_error',
+    'rate_limit_error',
+    'api_error',
+    'invalid_api_key',
+    'model_not_found',
+    'invalid_model',
+    'unsupported_parameter',
+    'unsupported_value',
+    'context_length_exceeded',
+    'insufficient_quota',
+    'rate_limit_exceeded',
+    'backend_error',
+  ];
+  return typeof value === 'string' && allowed.includes(value) ? value : null;
+}
 // shortcut: the response body is read unbounded; the provider is a trusted, TLS-pinned origin, bound it if that changes.
 async function chat(
   url: string,
@@ -596,6 +616,7 @@ export async function runModel(options: RunOptions): Promise<void> {
   let key: string | null = null;
   let authFallbackUsed = false;
   let probeStatus = 0;
+  let probeError: unknown = null;
   for (const candidate of keys) {
     const probe = await chat(policy.llm_url, candidate.value, {
       model: policy.scan_model,
@@ -603,6 +624,7 @@ export async function runModel(options: RunOptions): Promise<void> {
       max_tokens: 1,
     });
     probeStatus = probe.status;
+    probeError = tryRecord(probe.body)?.['error'];
     if (probe.status === 401) continue;
     key = candidate.value;
     authFallbackUsed = candidate.fallback;
@@ -610,6 +632,7 @@ export async function runModel(options: RunOptions): Promise<void> {
   }
   if (key === null) throw new FactoryFailure('No model key was accepted by the provider');
   const activeKey = key;
+  const probeMessage = tryRecord(probeError)?.['message'];
 
   const home = fs.mkdtempSync(path.join(options.env['RUNNER_TEMP'] ?? os.tmpdir(), 'ocr-home-'));
   try {
@@ -794,6 +817,18 @@ export async function runModel(options: RunOptions): Promise<void> {
         comments_truncated: commentsTruncated,
         auth_fallback_used: authFallbackUsed,
         probe_status: probeStatus,
+        probe_error: {
+          code: providerErrorSignal(tryRecord(probeError)?.['code']),
+          type: providerErrorSignal(tryRecord(probeError)?.['type']),
+          message_signals:
+            typeof probeMessage === 'string'
+              ? ['max_tokens', 'model', 'messages', 'context_length', 'content_filter'].filter(
+                  (word) => probeMessage.toLowerCase().includes(word),
+                )
+              : [],
+          message_length: typeof probeMessage === 'string' ? probeMessage.length : null,
+          key_source: authFallbackUsed ? 'fallback' : 'primary',
+        },
         stderr_signals: stderrSignals(scan.stderr),
         // A call cut short by the deadline still ends the run incomplete.
         deadline_hit: scan.timedOut || deadlineHit || remaining() <= 0,
