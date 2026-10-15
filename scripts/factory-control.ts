@@ -13,6 +13,7 @@ import {
   githubPages,
   githubRequest,
   numberField,
+  parseFactoryJson,
   parseProtocol,
   produceReceipt,
   producerActor,
@@ -588,6 +589,186 @@ export async function submitIngress(
     return { status: 'denied', reason: safeReason(error) };
   }
 }
+const NIGHT_REVIEW_PATH = '.github/workflows/night-review.yml';
+// The scheduled review asks the native controller for a night scan; only its own main run may.
+export async function nightScan(inputContext: FactoryContext): Promise<FactoryDecision> {
+  try {
+    const context = await resolveFactoryContext(inputContext);
+    effectPolicy(context);
+    await verifyControlSource(context);
+    const repository = stringField(context.policy, 'repository_full_name');
+    if (context.job['workflow_ref'] !== `${repository}/${NIGHT_REVIEW_PATH}@refs/heads/main`)
+      throw new FactoryFailure('Night scan may be requested only by the night-review run on main');
+    const runId = stringField(context.job, 'run_id');
+    const run = record(await githubRequest(context, `${base(context)}/actions/runs/${runId}`));
+    const registered = arrayField(context.policy, 'workflow_registry')
+      .map(record)
+      .find((entry) => entry['path'] === NIGHT_REVIEW_PATH);
+    if (
+      registered === undefined ||
+      (typeof run['path'] === 'string' ? run['path'].split('@')[0] : null) !== NIGHT_REVIEW_PATH ||
+      (registered['id'] !== null && String(run['workflow_id']) !== registered['id']) ||
+      run['head_branch'] !== 'main' ||
+      !['schedule', 'workflow_dispatch'].includes(String(run['event'])) ||
+      String(record(run['repository'])['id']) !== context.policy['repository_id']
+    )
+      throw new FactoryFailure('Current run is not the night-review workflow on main');
+    await githubRequest(
+      context,
+      `${base(context)}/actions/workflows/${stringField(context.policy, 'controller_workflow_id')}/dispatches`,
+      'POST',
+      {
+        ref: 'main',
+        inputs: { command: 'night-scan', request: JSON.stringify({ parent_run_id: runId }) },
+      },
+    );
+    return { status: 'accepted', reason: 'Night scan dispatched; completion not inferred' };
+  } catch (error: unknown) {
+    return { status: 'denied', reason: safeReason(error) };
+  }
+}
+const NIGHT_VERDICTS = ['confirmed', 'disputed'];
+const NIGHT_RECORD_LIMIT = 1_000_000;
+// shortcut: one finding per night because a run carries one verifier receipt (F1); lift with protocol v2.
+function nightDraft(context: FactoryContext, request: JsonRecord): JsonRecord {
+  const file = stringField(request, 'draft_file');
+  if (fs.statSync(file).size > NIGHT_RECORD_LIMIT)
+    throw new FactoryFailure('Night draft too large');
+  const draft = parseFactoryJson(fs.readFileSync(file));
+  const findings = arrayField(draft, 'findings').map(record);
+  if (findings.length > 1) throw new FactoryFailure('Night draft may carry at most one finding');
+  if (
+    ['token_budget', 'authority', 'disappearance_authority', 'reopen_authority'].some(
+      (key) => draft[key] !== undefined,
+    ) ||
+    findings.some((finding) => finding['authority'] !== undefined)
+  )
+    throw new FactoryFailure('Night draft must not carry token_budget or authority');
+  if (
+    draft['source_sha'] !== context.job['workflow_source_sha'] ||
+    draft['repository_id'] !== context.policy['repository_id']
+  )
+    throw new FactoryFailure('Night draft source_sha differs from the checked-out workflow sha');
+  if (stringField(draft, 'fingerprint_policy_revision') === '')
+    throw new FactoryFailure('Night draft lacks fingerprint policy revision');
+  for (const finding of findings) {
+    if (!/^[0-9a-f]{64}$/.test(stringField(finding, 'fingerprint')))
+      throw new FactoryFailure('Night finding fingerprint invalid');
+    if (!NIGHT_VERDICTS.includes(String(finding['verdict'])))
+      throw new FactoryFailure('Night finding verdict must be confirmed or disputed');
+  }
+  return draft;
+}
+async function prepareNightEvidence(
+  context: FactoryContext,
+  state: StateSnapshot,
+  checkpoint: CheckpointCore,
+  request: JsonRecord,
+  phase: 'verifier' | 'scan',
+): Promise<FactoryDecision> {
+  const draft = nightDraft(context, request);
+  const finding = arrayField(draft, 'findings').map(record)[0];
+  const sourceSha = stringField(draft, 'source_sha');
+  let payload: JsonRecord;
+  let target: string;
+  let outcome: string;
+  let scanRecord: JsonRecord | null = null;
+  if (phase === 'verifier') {
+    if (finding === undefined) throw new FactoryFailure('Night verifier needs exactly one finding');
+    payload = finding;
+    target = stringField(finding, 'fingerprint');
+    outcome = stringField(finding, 'verdict');
+  } else {
+    const budget = context.policy['token_budget'];
+    if (typeof budget !== 'number' || !Number.isSafeInteger(budget) || budget <= 0)
+      throw new FactoryFailure('Activation policy token_budget unknown');
+    let findings: JsonRecord[] = [];
+    if (finding !== undefined) {
+      // The scan record carries the same-run verifier receipt so its hash covers the adjudication.
+      const verifier = await resolveReceipt(
+        context,
+        stringField(context.job, 'run_id'),
+        'verifier',
+      );
+      const proof = record(verifier['receipt']);
+      const operation = record(proof['operation']);
+      if (
+        proof['outcome'] !== finding['verdict'] ||
+        operation['target_id'] !== finding['fingerprint'] ||
+        operation['payload_sha256'] !== sha256(finding) ||
+        operation['expected_head'] !== sourceSha
+      )
+        throw new FactoryFailure('Verifier receipt does not bind the draft finding');
+      findings = [{ ...finding, authority: verifier }];
+    }
+    scanRecord = { ...draft, token_budget: budget, findings };
+    if (canonicalBytes(scanRecord).length > NIGHT_RECORD_LIMIT)
+      throw new FactoryFailure('Scan record exceeds 1 MB');
+    payload = scanRecord;
+    target = stringField(draft, 'fingerprint_policy_revision');
+    outcome =
+      draft['successful'] === true &&
+      draft['truncated'] === false &&
+      arrayField(draft, 'failed').length === 0
+        ? 'complete'
+        : 'incomplete';
+  }
+  const defaultHead = stringField(
+    record(record(await githubRequest(context, `${base(context)}/git/ref/heads/main`))['object']),
+    'sha',
+  );
+  const payloadSha = sha256(payload);
+  const receipt = produceReceipt({
+    epoch_id: context.policy['epoch_id'],
+    sequence: numberField(state.checkpoint, 'sequence') + 1,
+    parent_head: state.head,
+    parent_checkpoint_head: checkpoint['state_head'],
+    repository_id: context.policy['repository_id'],
+    repository_full_name: context.policy['repository_full_name'],
+    workflow_id: context.policy['controller_workflow_id'],
+    workflow_path: context.policy['controller_workflow_path'],
+    workflow_source_sha: context.job['workflow_source_sha'],
+    control_release_sha: context.policy['control_release_sha'],
+    control_manifest_sha256: sha256(context.policy['control_manifest']),
+    default_ref: context.policy['default_ref'],
+    default_head: defaultHead,
+    run_id: context.job['run_id'],
+    run_attempt: 1,
+    event: 'workflow_dispatch',
+    ...(await producerActor(context, request)),
+    producer_phase: phase,
+    request_key: sha256({ phase, run_id: context.job['run_id'], payload_sha256: payloadSha }),
+    lineage_id: null,
+    issue_node_id: null,
+    issue_number: null,
+    fingerprint_policy_revision: null,
+    fingerprint: null,
+    baseline_sha: null,
+    current_source_head: null,
+    expected_transition: 'detached',
+    reservation_number: null,
+    operation: {
+      initial_claimed: true,
+      retry_claimed: false,
+      status: 'succeeded',
+      payload_sha256: payloadSha,
+      target_id: target,
+      expected_head: sourceSha,
+      result_id: null,
+      reason: null,
+    },
+    aliases: [],
+    outcome,
+    evidence: { scan: null, verifier: null },
+  });
+  if (scanRecord !== null && request['record_file'] !== undefined)
+    fs.writeFileSync(stringField(request, 'record_file'), canonicalBytes(scanRecord));
+  return {
+    status: 'accepted',
+    reason: `Detached ${phase} receipt prepared; authority exists only after immutable upload`,
+    record: receipt,
+  };
+}
 export async function runController(
   inputContext: FactoryContext,
   request: JsonRecord,
@@ -699,6 +880,8 @@ export async function runController(
     if (command === 'checkpoint') return checkpointResult(context, state);
     if (command === 'register')
       return await prepareRegistration(context, state, checkpoint, request);
+    if (command === 'verifier' || command === 'scan')
+      return await prepareNightEvidence(context, state, checkpoint, request, command);
     const lineage = await canonicalLineage(context, state, request);
     const reservations = arrayField(lineage, 'reservations');
     if (command === 'effect-gate')
@@ -1437,6 +1620,7 @@ async function appendTransition(
 if (process.argv[1] === import.meta.filename) {
   await factoryMain(async (context, input): Promise<FactoryDecision> => {
     if (input['command'] === 'ingress') return await submitIngress(context, input);
+    if (input['command'] === 'night-scan') return await nightScan(context);
     const request =
       input['command'] === 'bootstrap' && input['commit_bootstrap'] === true
         ? {

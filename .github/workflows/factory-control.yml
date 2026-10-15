@@ -25,6 +25,7 @@ on:
             operation-intent,
             operation-outcome,
             retry-claim,
+            night-scan,
           ]
         default: preflight
       request:
@@ -44,6 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       authorized: ${{ steps.gate.outputs.authorized }}
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -117,6 +119,7 @@ jobs:
     needs: preflight
     if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'bootstrap'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -218,6 +221,7 @@ jobs:
     needs: preflight
     if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'register'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -319,6 +323,7 @@ jobs:
     needs: preflight
     if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'reserve'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -420,6 +425,7 @@ jobs:
     needs: preflight
     if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'outcome'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -521,6 +527,7 @@ jobs:
     needs: [preflight, append-bootstrap, append-register, append-reserve, append-outcome]
     if: always() && needs.preflight.outputs.authorized == 'true' && (inputs.command == 'checkpoint' || needs.append-bootstrap.result == 'success' || needs.append-register.result == 'success' || needs.append-reserve.result == 'success' || needs.append-outcome.result == 'success')
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -577,12 +584,296 @@ jobs:
           FACTORY_ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
           FACTORY_ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
         run: node scripts/factory-protocol.ts emit factory/checkpoint.json
-  publication:
+  night-known:
     needs: preflight
+    if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'night-scan'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci --ignore-scripts
+      - name: List known finding fingerprints
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+        run: |
+          printf '%s' '{"output_file":"known.json"}' > factory-input.json
+          node scripts/factory-publication.ts known factory-input.json
+      - name: Upload known fingerprints
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: factory-night-known-${{ github.run_id }}
+          path: known.json
+          if-no-files-found: error
+          retention-days: 7
+  night-model:
+    needs: [preflight, night-known]
     # shortcut: unset flag denies; owner enables only after trusted bootstrap.
-    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.preflight.outputs.authorized == 'true' && (inputs.command == 'publication'))
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && needs.preflight.outputs.authorized == 'true' && inputs.command == 'night-scan'
+    runs-on: ubuntu-latest
+    # The only job that holds model-provider secrets, and only in the env of the "Model pass" step.
+    environment: ci
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci --ignore-scripts
+      - name: Require a clean checkout
+        run: test -z "$(git status --porcelain)"
+      - name: Download known fingerprints
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: factory-night-known-${{ github.run_id }}
+          path: ${{ runner.temp }}/night-known
+      - name: Stage pinned OCR manifest outside the checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/ocr"
+          cp tools/ocr/package.json tools/ocr/package-lock.json "$RUNNER_TEMP/ocr/"
+      - name: Install pinned OCR without lifecycle scripts
+        run: npm ci --ignore-scripts --prefix "$RUNNER_TEMP/ocr"
+      - name: Verify OCR registry signatures
+        run: npm audit signatures --prefix "$RUNNER_TEMP/ocr"
+      - id: tool
+        name: Check pinned OCR tool
+        run: node scripts/factory-model.ts check-tool --prefix "$RUNNER_TEMP/ocr" >> "$GITHUB_OUTPUT"
+      - name: Model pass
+        env:
+          OCR_LLM_AUTH_TOKEN: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
+          OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
+          OCR_BIN: ${{ steps.tool.outputs.ocr_bin }}
+        run: node scripts/factory-model.ts run --source . --ocr-bin "$OCR_BIN" --known "$RUNNER_TEMP/night-known/known.json" --out "$RUNNER_TEMP/night-model"
+      - name: Upload model bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: factory-night-model-${{ github.run_id }}
+          path: ${{ runner.temp }}/night-model
+          if-no-files-found: ignore
+          retention-days: 7
+  night-adapter:
+    needs: [preflight, night-model]
+    if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'night-scan'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      selected: ${{ steps.adapt.outputs.selected }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci --ignore-scripts
+      - name: Download model bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: factory-night-model-${{ github.run_id }}
+          path: ${{ runner.temp }}/night-model
+      - id: adapt
+        name: Adapt bundle into a scan draft
+        run: node scripts/factory-scan-record.ts adapt --bundle "$RUNNER_TEMP/night-model" --out scan-draft.json >> "$GITHUB_OUTPUT"
+      - name: Upload scan draft
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: factory-night-draft-${{ github.run_id }}
+          path: scan-draft.json
+          if-no-files-found: error
+          retention-days: 7
+  authority-verifier:
+    name: factory-authority-verifier
+    needs: [preflight, night-adapter]
+    if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'night-scan' && needs.night-adapter.outputs.selected == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci --ignore-scripts
+      - name: Download night draft
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: factory-night-draft-${{ github.run_id }}
+          path: night-draft
+      - id: prepare
+        name: Prepare canonical verifier core without mutation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          mkdir -p factory
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const value = parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, draft_file: 'night-draft/scan-draft.json', output_file: 'factory/receipt.json' }));
+          NODE
+          node scripts/factory-control.ts verifier factory-input.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const core = parseFactoryJson(fs.readFileSync('factory/receipt.json'));
+          const transition = core.kind === 'checkpoint' ? fs.readFileSync('factory/checkpoint.json.transition', 'utf8') : core.transition_id;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `transition_id=${transition}\n`);
+          NODE
+      - name: Upload authority
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: factory-v1-receipt-${{ github.run_id }}-1-${{ steps.prepare.outputs.transition_id }}
+          path: factory/receipt.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Emit authority
+        env:
+          FACTORY_ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          FACTORY_ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: node scripts/factory-protocol.ts emit factory/receipt.json
+  authority-scan:
+    name: factory-authority-scan
+    needs: [preflight, night-adapter, authority-verifier]
+    if: always() && needs.preflight.outputs.authorized == 'true' && inputs.command == 'night-scan' && needs.night-adapter.result == 'success' && (needs.night-adapter.outputs.selected != 'true' || needs.authority-verifier.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci --ignore-scripts
+      - name: Download night draft
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: factory-night-draft-${{ github.run_id }}
+          path: night-draft
+      - id: prepare
+        name: Prepare canonical scan core without mutation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          mkdir -p factory
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const value = parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...value, draft_file: 'night-draft/scan-draft.json', output_file: 'factory/receipt.json', record_file: 'factory/scan.json' }));
+          NODE
+          node scripts/factory-control.ts scan factory-input.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          const core = parseFactoryJson(fs.readFileSync('factory/receipt.json'));
+          const transition = core.kind === 'checkpoint' ? fs.readFileSync('factory/checkpoint.json.transition', 'utf8') : core.transition_id;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `transition_id=${transition}\n`);
+          NODE
+      - name: Upload authority
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: factory-v1-receipt-${{ github.run_id }}-1-${{ steps.prepare.outputs.transition_id }}
+          path: factory/receipt.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload scan record
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: factory-night-scan-${{ github.run_id }}
+          path: factory/scan.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Emit authority
+        env:
+          FACTORY_ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          FACTORY_ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: node scripts/factory-protocol.ts emit factory/receipt.json
+  publication:
+    needs: [preflight, authority-scan]
+    # shortcut: unset flag denies; owner enables only after trusted bootstrap.
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && always() && needs.preflight.outputs.authorized == 'true' && (inputs.command == 'publication' || (inputs.command == 'night-scan' && needs.authority-scan.result == 'success'))
     runs-on: ubuntu-latest
     environment: factory-privileged
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -608,13 +899,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
-          FACTORY_COMMAND: ${{ inputs.command }}
+          FACTORY_COMMAND: ${{ inputs.command == 'night-scan' && 'publication' || inputs.command }}
           FACTORY_INPUT: ${{ inputs.request }}
+          FACTORY_SCAN_RUN_ID: ${{ inputs.command == 'night-scan' && github.run_id || '' }}
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           import { parseFactoryJson } from './scripts/factory-protocol.ts';
-          fs.writeFileSync('factory-input.json', JSON.stringify(parseFactoryJson(process.env.FACTORY_INPUT || '{}')));
+          const scanRunId = process.env.FACTORY_SCAN_RUN_ID;
+          const value = scanRunId ? { scan_run_id: scanRunId } : parseFactoryJson(process.env.FACTORY_INPUT || '{}');
+          fs.writeFileSync('factory-input.json', JSON.stringify(value));
           NODE
           node scripts/factory-publication.ts "$FACTORY_COMMAND" factory-input.json
   repro:

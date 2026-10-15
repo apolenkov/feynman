@@ -1,11 +1,13 @@
 name: Night review ingress
 
 on:
+  schedule:
+    - cron: '17 2 * * *'
   workflow_dispatch:
     inputs:
       command:
         type: choice
-        options: [preflight, ingress]
+        options: [preflight, ingress, night-scan]
         default: preflight
       request:
         type: string
@@ -20,6 +22,7 @@ jobs:
     if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true'
     runs-on: ubuntu-latest
     environment: factory-privileged
+    timeout-minutes: 10
     permissions:
       contents: read
       actions: write
@@ -44,7 +47,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
-          FACTORY_COMMAND: ${{ inputs.command }}
+          FACTORY_COMMAND: ${{ github.event_name == 'schedule' && 'night-scan' || inputs.command }}
           FACTORY_INPUT: ${{ inputs.request }}
         run: |
           node --input-type=module <<'NODE'

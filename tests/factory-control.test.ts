@@ -65,6 +65,7 @@ import {
   readAuthorityArchive,
   resolveReceipt,
   producerActor,
+  parseFactoryJson,
 } from '../scripts/factory-protocol.ts';
 import type { JsonRecord } from '../scripts/factory-protocol.ts';
 import type { TestContext } from 'node:test';
@@ -1585,4 +1586,241 @@ it('accepts approved-publisher receipts only from the owner or the Actions bot',
       else await assert.rejects(verifyAuthority(context, envelope), /actor/i);
     });
   }
+});
+
+// Night evidence producers: detached verifier/scan receipts and the scheduled night-scan dispatch.
+import { nightScan } from '../scripts/factory-control.ts';
+import { reconcilePublication } from '../scripts/factory-publication.ts';
+
+const NIGHT_PRINT = 'e'.repeat(64);
+function nightFinding(overrides: JsonRecord = {}): JsonRecord {
+  return {
+    fingerprint: NIGHT_PRINT,
+    path: 'bin/application.ts',
+    start_line: 3,
+    end_line: 5,
+    severity: 'high',
+    category: 'bug',
+    description: 'Unchecked input reaches a shell.',
+    verdict: 'confirmed',
+    verdict_reason: 'The call path was read end to end.',
+    acceptance_criteria: ['Input is validated before use.'],
+    ...overrides,
+  };
+}
+let drafts = 0;
+function nightDraft(
+  platform: FactoryPlatform,
+  findings: readonly JsonRecord[] = [nightFinding()],
+  overrides: JsonRecord = {},
+): string {
+  const inventory = ['bin/application.ts'];
+  const file = path.join(platform.root, `draft-${drafts++}.json`);
+  fs.writeFileSync(
+    file,
+    canonicalBytes({
+      repository_id: '1230959148',
+      source_sha: platform.release,
+      fingerprint_policy_revision: 'reviewed-v1',
+      inventory,
+      inventory_sha256: sha256(inventory),
+      covered: inventory,
+      excluded: [],
+      failed: [],
+      token_usage: 100,
+      truncated: false,
+      successful: true,
+      tool_revision: 'open-code-review@1.13.0+test',
+      config_revision: 'c'.repeat(64),
+      findings,
+      deferred_findings: [],
+      ...overrides,
+    }),
+  );
+  return file;
+}
+function nonGetCount(platform: FactoryPlatform): number {
+  return platform.requests.filter((request) => request.method !== 'GET').length;
+}
+
+it('refuses a night draft with two findings, a foreign source_sha or a verdict outside confirmed|disputed', async (test) => {
+  const { platform, activation } = await bootstrapped(test);
+  const context = laterContext(platform, activation, '910');
+  const head = platform.git(['rev-parse', 'refs/heads/factory-state']);
+  const writes = nonGetCount(platform);
+  const second = nightFinding({ fingerprint: 'f'.repeat(64) });
+  for (const [findings, overrides, reason] of [
+    [[nightFinding(), second], {}, /one finding/],
+    [[nightFinding()], { source_sha: 'a'.repeat(40) }, /source_sha/],
+    [[nightFinding({ verdict: 'refuted' })], {}, /verdict/],
+    [[nightFinding({ verdict: 'unknown' })], {}, /verdict/],
+    [[nightFinding({ verdict: null })], {}, /verdict/],
+    [[], {}, /one finding/],
+    [[nightFinding({ authority: {} })], {}, /authority/],
+    [[nightFinding()], { token_budget: 1 }, /token_budget/],
+  ] as const) {
+    const draft = nightDraft(platform, findings, overrides);
+    const output = path.join(platform.root, 'receipt.json');
+    const verifier = await runController(context, {
+      command: 'verifier',
+      draft_file: draft,
+      output_file: output,
+    });
+    assert.equal(verifier.status, 'denied');
+    assert.match(verifier.reason, reason);
+  }
+  const twoScan = await runController(context, {
+    command: 'scan',
+    draft_file: nightDraft(platform, [nightFinding(), second]),
+    output_file: path.join(platform.root, 'receipt.json'),
+  });
+  assert.equal(twoScan.status, 'denied');
+  assert.match(twoScan.reason, /one finding/);
+  assert.equal(nonGetCount(platform), writes);
+  assert.equal(platform.git(['rev-parse', 'refs/heads/factory-state']), head);
+});
+
+it('requires the scheduled night-review parent for a bot producer and refuses a null token budget', async (test) => {
+  const { platform, activation } = await bootstrapped(test);
+  const context = laterContext(platform, activation, '911');
+  setRun(platform, '911', { actor: BOT, created_at: '2026-10-12T00:03:00Z' });
+  const request = {
+    command: 'verifier',
+    draft_file: nightDraft(platform),
+    output_file: path.join(platform.root, 'receipt.json'),
+  };
+  const missing = await runController(context, request);
+  assert.equal(missing.status, 'denied');
+  assert.match(missing.reason, /parent_run_id/);
+  parentRun(platform, { path: '.github/workflows/ci.yml', workflow_id: 272235418 });
+  const foreign = await runController(context, { ...request, parent_run_id: '8800' });
+  assert.equal(foreign.status, 'denied');
+  assert.match(foreign.reason, /parent/);
+  parentRun(platform);
+  const accepted = await runController(context, { ...request, parent_run_id: '8800' });
+  assert.equal(accepted.status, 'accepted', accepted.reason);
+  assert.equal(record(accepted.record)['actor_decision'], 'approved-publisher');
+  assert.equal(record(accepted.record)['actor_id'], '41898282');
+
+  const withoutBudget = platform.context({ ...activation, token_budget: null }, '912');
+  const noBudget = await runController(withoutBudget, {
+    command: 'scan',
+    draft_file: nightDraft(platform, []),
+    output_file: path.join(platform.root, 'receipt.json'),
+  });
+  assert.equal(noBudget.status, 'denied');
+  assert.match(noBudget.reason, /token_budget|budget/i);
+});
+
+it('issues verifier then scan receipts that verifyAuthority and publication accept', async (test) => {
+  const { platform, activation } = await bootstrapped(test);
+  const context = laterContext(platform, activation, '913');
+  const resolved = await resolveFactoryContext(context);
+  const output = path.join(platform.root, 'receipt.json');
+  const recordFile = path.join(platform.root, 'scan.json');
+  const draft = nightDraft(platform);
+
+  const early = await runController(context, {
+    command: 'scan',
+    draft_file: draft,
+    output_file: output,
+    record_file: recordFile,
+  });
+  assert.equal(early.status, 'denied', 'scan needs the verifier receipt of the same run');
+  assert.equal(fs.existsSync(recordFile), false);
+
+  const verifier = await runController(context, {
+    command: 'verifier',
+    draft_file: draft,
+    output_file: output,
+  });
+  assert.equal(verifier.status, 'accepted', verifier.reason);
+  const verifierCore = record(verifier.record);
+  const finding = nightFinding();
+  assert.equal(verifierCore['producer_phase'], 'verifier');
+  assert.equal(verifierCore['lineage_id'], null);
+  assert.equal(verifierCore['outcome'], 'confirmed');
+  assert.deepEqual(record(verifierCore['operation']), {
+    initial_claimed: true,
+    retry_claimed: false,
+    status: 'succeeded',
+    payload_sha256: sha256(finding),
+    target_id: NIGHT_PRINT,
+    expected_head: platform.release,
+    result_id: null,
+    reason: null,
+  });
+  const verifierEnvelope = platform.upload(
+    verifierCore,
+    'receipt',
+    stringField(verifierCore, 'transition_id'),
+    'verifier',
+  );
+  assert.deepEqual(await verifyAuthority(resolved, verifierEnvelope), verifierCore);
+
+  const scan = await runController(context, {
+    command: 'scan',
+    draft_file: draft,
+    output_file: output,
+    record_file: recordFile,
+  });
+  assert.equal(scan.status, 'accepted', scan.reason);
+  const scanCore = record(scan.record);
+  assert.equal(scanCore['producer_phase'], 'scan');
+  assert.equal(scanCore['outcome'], 'complete');
+  const scanRecord = parseFactoryJson(fs.readFileSync(recordFile));
+  assert.equal(scanRecord['token_budget'], activation['token_budget']);
+  assert.equal(scanRecord['authority'], undefined);
+  assert.deepEqual(record(arrayField(scanRecord, 'findings')[0])['authority'], verifierEnvelope);
+  assert.equal(record(scanCore['operation'])['payload_sha256'], sha256(scanRecord));
+  assert.equal(record(scanCore['operation'])['target_id'], 'reviewed-v1');
+  const scanEnvelope = platform.upload(
+    scanCore,
+    'receipt',
+    stringField(scanCore, 'transition_id'),
+    'scan',
+  );
+  assert.deepEqual(await verifyAuthority(resolved, scanEnvelope), scanCore);
+
+  const published = await reconcilePublication(context, { ...scanRecord, authority: scanEnvelope });
+  assert.equal(published.status, 'accepted', published.reason);
+  assert.equal(published.complete, true);
+  assert.equal(published.issues.length, 1);
+  assert.equal(record(published.issues[0])['confidence'], 'confirmed');
+  const tampered = await reconcilePublication(context, {
+    ...scanRecord,
+    token_budget: 2000,
+    authority: scanEnvelope,
+  });
+  assert.equal(tampered.status, 'needs-human');
+  assert.match(tampered.reason, /Scan source\/policy/);
+});
+
+it('dispatches the controller as night-scan only from the night-review run on main', async (test) => {
+  const { platform, activation } = await bootstrapped(test);
+  platform.overrides.set('/repos/apolenkov/feynman/actions/workflows/703/dispatches', null);
+  const writes = nonGetCount(platform);
+  const fromController = await nightScan(laterContext(platform, activation, '920'));
+  assert.equal(fromController.status, 'denied');
+  assert.match(fromController.reason, /night-review/);
+  assert.equal(nonGetCount(platform), writes);
+
+  const review = platform.context(activation, '921', 'repair', 0);
+  setRun(platform, '921', { head_branch: 'feat/x' });
+  const feature = await nightScan(review);
+  assert.equal(feature.status, 'denied');
+  assert.match(feature.reason, /main|Untrusted job/);
+  assert.equal(nonGetCount(platform), writes);
+
+  setRun(platform, '921', { head_branch: 'main' });
+  const sent = await nightScan(review);
+  assert.equal(sent.status, 'accepted', sent.reason);
+  assert.equal(nonGetCount(platform), writes + 1);
+  const dispatch = platform.requests.filter((request) => request.method !== 'GET').at(-1);
+  assert.equal(dispatch?.method, 'POST');
+  assert.equal(dispatch.path, '/repos/apolenkov/feynman/actions/workflows/703/dispatches');
+  assert.deepEqual(dispatch.body, {
+    ref: 'main',
+    inputs: { command: 'night-scan', request: JSON.stringify({ parent_run_id: '921' }) },
+  });
 });
