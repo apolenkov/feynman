@@ -251,13 +251,14 @@ const { Binary, ContextAccess, IndexAccess, Literal, Logical, Grouping } =
 const PRIVILEGED_FLAG = 'FACTORY_PRIVILEGED_JOBS_ENABLED';
 const OWNER_GATE = `vars.${PRIVILEGED_FLAG} == 'true'`;
 
-// The job status function is the only function a factory job condition may call besides the built-ins.
+// The job status functions are the only functions a factory job condition may call besides the built-ins.
 const ALWAYS = { name: 'always', minArgs: 0, maxArgs: 0 };
+const CANCELLED = { name: 'cancelled', minArgs: 0, maxArgs: 0 };
 function ownerJobExpression(condition: string) {
   return new Parser(
     new Lexer(condition).lex().tokens,
     ['vars', 'needs', 'inputs', 'github'],
-    [ALWAYS],
+    [ALWAYS, CANCELLED],
   ).parse();
 }
 function evaluateOwnerJob(condition: string, flag: string | undefined): string {
@@ -279,7 +280,10 @@ function evaluateOwnerJob(condition: string, flag: string | undefined): string {
   return new Evaluator(
     ownerJobExpression(condition),
     context,
-    new Map([['always', { ...ALWAYS, call: () => new data.BooleanData(true) }]]),
+    new Map([
+      ['always', { ...ALWAYS, call: () => new data.BooleanData(true) }],
+      ['cancelled', { ...CANCELLED, call: () => new data.BooleanData(false) }],
+    ]),
   )
     .evaluate()
     .coerceString();
@@ -825,6 +829,47 @@ it('night-scan gate: the key job needs the ci environment, exact read-only permi
       keyJob('run: npm audit signatures', 'run: set -o xtrace && npm audit signatures'),
       /tracing/,
     ],
+    ['another runner', keyJob('runs-on: ubuntu-latest', 'runs-on: self-hosted'), /ubuntu-latest/],
+    [
+      'container',
+      keyJob('runs-on: ubuntu-latest\n', 'runs-on: ubuntu-latest\n    container: node:26\n'),
+      /container or services/,
+    ],
+    [
+      'services',
+      keyJob(
+        'runs-on: ubuntu-latest\n',
+        'runs-on: ubuntu-latest\n    services:\n      db:\n        image: postgres\n',
+      ),
+      /container or services/,
+    ],
+    [
+      'Model pass as an action',
+      keyJob(
+        '        run: node scripts/factory-model.ts run',
+        '        uses: ./.github/actions/x\n        with:\n          args: node scripts/factory-model.ts run',
+      ),
+      /must only run/,
+    ],
+    [
+      'Model pass with a custom shell',
+      keyJob(
+        '        run: node scripts/factory-model.ts run',
+        '        shell: bash\n        run: node scripts/factory-model.ts run',
+      ),
+      /must only run/,
+    ],
+    [
+      'Model pass running something else',
+      keyJob('run: node scripts/factory-model.ts run', 'run: node other.ts run'),
+      /must only run/,
+    ],
+    [
+      'deadline beyond the job timeout',
+      keyJob('--deadline-seconds 2100', '--deadline-seconds 2700'),
+      /deadline-seconds/,
+    ],
+    ['no deadline', keyJob(' --deadline-seconds 2100', ''), /deadline-seconds/],
     [
       'traced shell',
       keyJob(
@@ -906,6 +951,78 @@ it('night-scan gate: push, pull_request and every other workflow never mention t
       'factory-control.yml',
     );
   }, /environment ci is reserved/);
+});
+
+it('night-scan gate: the ci environment cannot be reached by casing, an expression or a reusable workflow', () => {
+  const ci = workflowSource('ci.yml');
+  const withJob = (job: string): string => ci.replace('jobs:\n', `jobs:\n${job}`);
+  for (const [label, content, error] of [
+    [
+      'other casing',
+      withJob(
+        '  x:\n    runs-on: ubuntu-latest\n    environment: Ci\n    steps:\n      - run: echo\n',
+      ),
+      /environment ci is reserved/,
+    ],
+    [
+      'mapping name in other casing',
+      withJob(
+        '  x:\n    runs-on: ubuntu-latest\n    environment:\n      name: CI\n    steps:\n      - run: echo\n',
+      ),
+      /environment ci is reserved/,
+    ],
+    [
+      'constant expression',
+      withJob(
+        "  x:\n    runs-on: ubuntu-latest\n    environment: ${{ 'ci' }}\n    steps:\n      - run: echo\n",
+      ),
+      /environment ci is reserved/,
+    ],
+    [
+      'run-time expression',
+      withJob(
+        '  x:\n    runs-on: ubuntu-latest\n    environment: ${{ github.ref_name }}\n    steps:\n      - run: echo\n',
+      ),
+      /must be a literal/,
+    ],
+    [
+      'external reusable workflow',
+      withJob('  x:\n    uses: octo/repo/.github/workflows/w.yml@v1\n'),
+      /reusable workflows are limited/,
+    ],
+  ] as const)
+    assert.throws(
+      () => {
+        validateSecretIsolation(content, 'ci.yml');
+      },
+      error,
+      label,
+    );
+  validateSecretIsolation(withJob('  x:\n    uses: ./.github/workflows/w.yml\n'), 'ci.yml');
+});
+
+it('night-scan gate: night, authority and publication jobs never use always(); the night key job runs only on the first attempt', () => {
+  const control = workflowSource('factory-control.yml');
+  for (const job of ['authority-scan', 'publication', 'night-adapter'])
+    assert.throws(
+      () => {
+        validateFactoryHardening(
+          editJob(control, job, (text) => text.replace(/\n {4}if: /, '\n    if: always() && ')),
+          'factory-control.yml',
+        );
+      },
+      /!cancelled\(\)/,
+      job,
+    );
+  assert.match(
+    control.slice(control.indexOf('\n  night-model:\n')),
+    /night-model:[\s\S]*?if: [^\n]*github\.run_attempt == 1/,
+  );
+  // The known list is requested with the dispatch request so the actor check sees the parent.
+  assert.match(
+    control.slice(control.indexOf('\n  night-known:\n'), control.indexOf('\n  night-model:\n')),
+    /FACTORY_INPUT: \$\{\{ inputs\.request \}\}/,
+  );
 });
 
 it('night-scan gate: a schedule exists only in night-review with exactly one cron', () => {

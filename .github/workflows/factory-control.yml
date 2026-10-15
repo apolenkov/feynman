@@ -525,7 +525,7 @@ jobs:
   authority-checkpoint:
     name: factory-authority-checkpoint
     needs: [preflight, append-bootstrap, append-register, append-reserve, append-outcome]
-    if: always() && needs.preflight.outputs.authorized == 'true' && (inputs.command == 'checkpoint' || needs.append-bootstrap.result == 'success' || needs.append-register.result == 'success' || needs.append-reserve.result == 'success' || needs.append-outcome.result == 'success')
+    if: needs.preflight.outputs.authorized == 'true' && !cancelled() && (inputs.command == 'checkpoint' || needs.append-bootstrap.result == 'success' || needs.append-register.result == 'success' || needs.append-reserve.result == 'success' || needs.append-outcome.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -614,8 +614,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_INPUT: ${{ inputs.request }}
         run: |
-          printf '%s' '{"output_file":"known.json"}' > factory-input.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseFactoryJson } from './scripts/factory-protocol.ts';
+          fs.writeFileSync('factory-input.json', JSON.stringify({ ...parseFactoryJson(process.env.FACTORY_INPUT || '{}'), output_file: 'known.json' }));
+          NODE
           node scripts/factory-publication.ts known factory-input.json
       - name: Upload known fingerprints
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -627,7 +632,7 @@ jobs:
   night-model:
     needs: [preflight, night-known]
     # shortcut: unset flag denies; owner enables only after trusted bootstrap.
-    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && needs.preflight.outputs.authorized == 'true' && inputs.command == 'night-scan'
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && needs.preflight.outputs.authorized == 'true' && inputs.command == 'night-scan' && github.run_attempt == 1
     runs-on: ubuntu-latest
     # The only job that holds model-provider secrets, and only in the env of the "Model pass" step.
     environment: ci
@@ -675,7 +680,7 @@ jobs:
           OCR_LLM_AUTH_TOKEN: ${{ secrets.OCR_LLM_AUTH_TOKEN }}
           OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
           OCR_BIN: ${{ steps.tool.outputs.ocr_bin }}
-        run: node scripts/factory-model.ts run --source . --ocr-bin "$OCR_BIN" --known "$RUNNER_TEMP/night-known/known.json" --out "$RUNNER_TEMP/night-model"
+        run: node scripts/factory-model.ts run --source . --ocr-bin "$OCR_BIN" --known "$RUNNER_TEMP/night-known/known.json" --out "$RUNNER_TEMP/night-model" --deadline-seconds 2100
       - name: Upload model bundle
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -796,7 +801,7 @@ jobs:
   authority-scan:
     name: factory-authority-scan
     needs: [preflight, night-adapter, authority-verifier]
-    if: always() && needs.preflight.outputs.authorized == 'true' && inputs.command == 'night-scan' && needs.night-adapter.result == 'success' && (needs.night-adapter.outputs.selected != 'true' || needs.authority-verifier.result == 'success')
+    if: needs.preflight.outputs.authorized == 'true' && !cancelled() && inputs.command == 'night-scan' && needs.night-adapter.result == 'success' && (needs.night-adapter.outputs.selected != 'true' || needs.authority-verifier.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -870,7 +875,7 @@ jobs:
   publication:
     needs: [preflight, authority-scan]
     # shortcut: unset flag denies; owner enables only after trusted bootstrap.
-    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && always() && needs.preflight.outputs.authorized == 'true' && (inputs.command == 'publication' || (inputs.command == 'night-scan' && needs.authority-scan.result == 'success'))
+    if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && !cancelled() && needs.preflight.outputs.authorized == 'true' && (inputs.command == 'publication' || (inputs.command == 'night-scan' && needs.authority-scan.result == 'success'))
     runs-on: ubuntu-latest
     environment: factory-privileged
     timeout-minutes: 10

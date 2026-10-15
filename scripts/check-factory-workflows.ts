@@ -206,13 +206,15 @@ function keyJobToken(workflow: TemplateToken, name: string): TemplateToken | und
   const jobs = workflow.find('jobs');
   return jobs !== undefined && isMapping(jobs) ? jobs.find(INERT_POSTURE.keyJob) : undefined;
 }
-function keyStepEnv(workflow: TemplateToken, name: string): TemplateToken | undefined {
-  const job = keyJobToken(workflow, name);
+function keyStepsOf(job: TemplateToken | undefined): TemplateToken[] {
   const steps = job !== undefined && isMapping(job) ? job.find('steps') : undefined;
-  for (const step of steps !== undefined && isSequence(steps) ? steps : [])
-    if (isMapping(step) && scalarText(step.find('name')) === INERT_POSTURE.keyStep)
-      return step.find('env');
-  return undefined;
+  return [...(steps !== undefined && isSequence(steps) ? steps : [])].filter(
+    (step) => isMapping(step) && scalarText(step.find('name')) === INERT_POSTURE.keyStep,
+  );
+}
+function keyStepEnv(workflow: TemplateToken, name: string): TemplateToken | undefined {
+  const step = keyStepsOf(keyJobToken(workflow, name))[0];
+  return step !== undefined && isMapping(step) ? step.find('env') : undefined;
 }
 // shortcut: the FACTORY_* flag is matched textually on comment-stripped lines; use the expression parser
 // if a legitimate `#` inside a string ever hides a flag.
@@ -309,6 +311,13 @@ export function validateFactoryHardening(content: string, name: string): void {
       !/^[1-9]\d*$/.test(scalarText(job.value.find('timeout-minutes')))
     )
       throw new Error(`${id}: night, authority and publication jobs require timeout-minutes`);
+    if (
+      /^(?:night-|authority-|publication$)/.test(job.key.toString()) &&
+      /\balways\s*\(/i.test(scalarText(job.value.find('if')))
+    )
+      throw new Error(
+        `${id}: night, authority and publication jobs must use !cancelled(), not always()`,
+      );
     const permissions = job.value.find('permissions');
     const granted = permissions ?? result.value.find('permissions');
     // GitHub grants the default token scope when nothing is declared; treat it as write-all.
@@ -409,6 +418,32 @@ export function validateKeyJob(content: string, name: string): void {
     throw new Error(`${id}: key job permissions must be exactly contents: read, actions: read`);
   if (SHELL_TRACE.test(tokenText(job)))
     throw new Error(`${id}: shell tracing is forbidden in the key job`);
+  // The job runs on a plain hosted runner, with no container or service that could see the step's env.
+  if (
+    scalarText(job.find('runs-on')) !== 'ubuntu-latest' ||
+    job.find('container') !== undefined ||
+    job.find('services') !== undefined
+  )
+    throw new Error(`${id}: key job must run on ubuntu-latest without container or services`);
+  // The key step is one fixed command: no action, no custom shell, nothing but the factory model script.
+  const [step, ...extra] = keyStepsOf(job);
+  const command = step !== undefined && isMapping(step) ? scalarText(step.find('run')) : '';
+  if (
+    step === undefined ||
+    !isMapping(step) ||
+    extra.length > 0 ||
+    step.find('uses') !== undefined ||
+    step.find('shell') !== undefined ||
+    !command.startsWith('node scripts/factory-model.ts run ')
+  )
+    throw new Error(
+      `${id}: ${INERT_POSTURE.keyStep} must only run node scripts/factory-model.ts run`,
+    );
+  // The model deadline must leave ten minutes of the job timeout for setup and upload.
+  const deadline = Number(/--deadline-seconds (\d+)/.exec(command)?.[1]);
+  const timeout = Number(scalarText(job.find('timeout-minutes')));
+  if (!(deadline > 0) || !(timeout > 0) || deadline + 600 > timeout * 60)
+    throw new Error(`${id}: --deadline-seconds must fit timeout-minutes with ten minutes to spare`);
 }
 // Any workflow: the provider key names live only in the key workflow, and the key environment's secrets
 // (reachable by name or by `toJSON(secrets)`) are reachable only from the key job.
@@ -421,14 +456,23 @@ export function validateSecretIsolation(content: string, name: string): void {
   result.context.errors.check('Official workflow parser');
   const jobs =
     result.value !== undefined && isMapping(result.value) ? result.value.find('jobs') : undefined;
-  for (const job of jobs !== undefined && isMapping(jobs) ? jobs : [])
+  for (const job of jobs !== undefined && isMapping(jobs) ? jobs : []) {
+    const id = `${name}/${job.key.toString()}`;
+    const environment = environmentName(job.value);
+    // Environment names are case-insensitive and an expression could pick the reserved one at run time.
+    if (environment.includes('${{')) throw new Error(`${id}: environment name must be a literal`);
+    // A called workflow runs in its own jobs and can name the reserved environment out of this gate's sight.
+    const uses = isMapping(job.value) ? scalarText(job.value.find('uses')) : '';
+    if (uses !== '' && !uses.startsWith('./.github/workflows/'))
+      throw new Error(`${id}: reusable workflows are limited to ./.github/workflows/`);
     if (
-      environmentName(job.value) === INERT_POSTURE.keyEnvironment &&
+      environment.toLowerCase() === INERT_POSTURE.keyEnvironment &&
       !(name === INERT_POSTURE.keyWorkflow && job.key.toString() === INERT_POSTURE.keyJob)
     )
       throw new Error(
-        `${name}/${job.key.toString()}: environment ${INERT_POSTURE.keyEnvironment} is reserved for ${INERT_POSTURE.keyJob}`,
+        `${id}: environment ${INERT_POSTURE.keyEnvironment} is reserved for ${INERT_POSTURE.keyJob}`,
       );
+  }
 }
 // shortcut: the hosted jobs for these dispatch choices are wired in the repair PR (PR-C); the gate pins the
 // list so it cannot go stale. Remove an entry from here when its job lands.
