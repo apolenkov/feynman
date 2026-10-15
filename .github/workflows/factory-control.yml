@@ -44,6 +44,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       authorized: ${{ steps.gate.outputs.authorized }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -60,7 +63,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install secretless development tools
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Independently verify role, public source, release and finite budget
         id: gate
         env:
@@ -82,36 +85,8 @@ jobs:
     needs: preflight
     if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'recover'
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.workflow_sha }}
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 26
-      - name: Ensure standard archive tooling
-        if: runner.os == 'Linux'
-        run: |
-          if ! command -v bsdtar >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install --yes libarchive-tools
-          fi
-      - name: Install secretless development tools
-        run: npm ci
-      - name: Recover exact independent checkpoint and intervening history
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
-          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
-          FACTORY_INPUT: ${{ inputs.request }}
-        run: node scripts/factory-control.ts recover
-  authority-bootstrap:
-    name: factory-authority-bootstrap
-    needs: preflight
-    if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'bootstrap'
-    runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -129,7 +104,39 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install secretless development tools
-        run: npm ci
+        run: npm ci --ignore-scripts
+      - name: Recover exact independent checkpoint and intervening history
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE: ${{ inputs.command == 'bootstrap' && 'bootstrap' || 'repair' }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: node scripts/factory-control.ts recover
+  authority-bootstrap:
+    name: factory-authority-bootstrap
+    needs: preflight
+    if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'bootstrap'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci --ignore-scripts
       - id: prepare
         name: Prepare canonical bootstrap core without mutation
         env:
@@ -171,7 +178,9 @@ jobs:
     # shortcut: unset flag denies; owner enables only after trusted bootstrap.
     if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.authority-bootstrap.result == 'success')
     runs-on: ubuntu-latest
+    environment: factory-privileged
     permissions:
+      actions: read
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -189,7 +198,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install secretless development tools
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Authenticate completed producer and publish one ordinary fast forward
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -210,6 +219,7 @@ jobs:
     if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'register'
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -227,7 +237,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install secretless development tools
-        run: npm ci
+        run: npm ci --ignore-scripts
       - id: prepare
         name: Prepare canonical register core without mutation
         env:
@@ -269,7 +279,9 @@ jobs:
     # shortcut: unset flag denies; owner enables only after trusted bootstrap.
     if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.authority-register.result == 'success')
     runs-on: ubuntu-latest
+    environment: factory-privileged
     permissions:
+      actions: read
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -287,7 +299,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install secretless development tools
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Authenticate completed producer and publish one ordinary fast forward
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -308,6 +320,7 @@ jobs:
     if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'reserve'
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -325,7 +338,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install secretless development tools
-        run: npm ci
+        run: npm ci --ignore-scripts
       - id: prepare
         name: Prepare canonical reserve core without mutation
         env:
@@ -367,7 +380,9 @@ jobs:
     # shortcut: unset flag denies; owner enables only after trusted bootstrap.
     if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.authority-reserve.result == 'success')
     runs-on: ubuntu-latest
+    environment: factory-privileged
     permissions:
+      actions: read
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -385,7 +400,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install secretless development tools
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Authenticate completed producer and publish one ordinary fast forward
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -406,6 +421,7 @@ jobs:
     if: needs.preflight.outputs.authorized == 'true' && inputs.command == 'outcome'
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -423,7 +439,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install secretless development tools
-        run: npm ci
+        run: npm ci --ignore-scripts
       - id: prepare
         name: Prepare canonical outcome core without mutation
         env:
@@ -465,7 +481,9 @@ jobs:
     # shortcut: unset flag denies; owner enables only after trusted bootstrap.
     if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.authority-outcome.result == 'success')
     runs-on: ubuntu-latest
+    environment: factory-privileged
     permissions:
+      actions: read
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -483,7 +501,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install secretless development tools
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Authenticate completed producer and publish one ordinary fast forward
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -504,6 +522,7 @@ jobs:
     if: always() && needs.preflight.outputs.authorized == 'true' && (inputs.command == 'checkpoint' || needs.append-bootstrap.result == 'success' || needs.append-register.result == 'success' || needs.append-reserve.result == 'success' || needs.append-outcome.result == 'success')
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -521,7 +540,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install secretless development tools
-        run: npm ci
+        run: npm ci --ignore-scripts
       - id: prepare
         name: Prepare canonical checkpoint core without mutation
         env:
@@ -563,7 +582,9 @@ jobs:
     # shortcut: unset flag denies; owner enables only after trusted bootstrap.
     if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.preflight.outputs.authorized == 'true' && (inputs.command == 'publication'))
     runs-on: ubuntu-latest
+    environment: factory-privileged
     permissions:
+      actions: read
       contents: read
       issues: write
     steps:
@@ -582,7 +603,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install development tools from approved release without credentials
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Execute fixed release role with authenticated request
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -601,6 +622,7 @@ jobs:
     if: needs.preflight.outputs.authorized == 'true' && (inputs.command == 'repro')
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -618,7 +640,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install development tools from approved release without credentials
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Execute fixed release role with authenticated request
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -637,7 +659,9 @@ jobs:
     # shortcut: unset flag denies; owner enables only after trusted bootstrap.
     if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (needs.preflight.outputs.authorized == 'true' && (inputs.command == 'push-pr' || inputs.command == 'closure' || inputs.command == 'provider-gate' || inputs.command == 'merge' || inputs.command == 'sweep'))
     runs-on: ubuntu-latest
+    environment: factory-privileged
     permissions:
+      actions: read
       contents: write
       issues: write
       pull-requests: write
@@ -657,7 +681,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install development tools from approved release without credentials
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Execute fixed release role with authenticated request
         env:
           GITHUB_TOKEN: ${{ github.token }}

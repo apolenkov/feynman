@@ -110,6 +110,7 @@ import type { JsonRecord } from '../scripts/factory-protocol.ts';
 
 it('publishes confirmed and disputed findings from detached non-lineage proofs, refutes independently and retains every pending identity', async (test) => {
   const platform = new FactoryPlatform(test);
+  fakeLabelRoutes(test, platform);
   const bootstrap = platform.activation({
     activation: false,
     bootstrap_completed: false,
@@ -1449,11 +1450,70 @@ function refreshedScan(
   };
 }
 
+function labelNames(issue: JsonRecord): string[] {
+  return arrayField(issue, 'labels').map((label) =>
+    typeof label === 'string' ? label : stringField(record(label), 'name'),
+  );
+}
+
+// The shared platform fixture has no label routes: POST adds labels, DELETE removes exactly one.
+// beforeWrite fires once before the first issue write, to model an owner label added mid-refresh.
+function fakeLabelRoutes(
+  test: TestContext,
+  platform: FactoryPlatform,
+  hooks: { readonly beforeWrite?: () => void; readonly failDelete?: number } = {},
+): void {
+  const fetch = platform.fetch.bind(platform);
+  let fired = false;
+  test.mock.method(
+    platform,
+    'fetch',
+    async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      const method = init?.method ?? 'GET';
+      const route = /^\/repos\/apolenkov\/feynman\/issues\/(\d+)(\/labels(?:\/(.+))?)?$/.exec(
+        url.pathname,
+      );
+      if (method !== 'GET' && route !== null && !fired) {
+        fired = true;
+        hooks.beforeWrite?.();
+      }
+      if (route?.[2] === undefined || method === 'GET') return await fetch(input, init);
+      platform.requests.push({
+        method,
+        path: url.pathname,
+        body: typeof init?.body === 'string' ? JSON.parse(init.body) : null,
+      });
+      if (method === 'DELETE' && hooks.failDelete !== undefined)
+        return new Response('{}', { status: hooks.failDelete });
+      const index = platform.issues.findIndex((issue) => issue['number'] === Number(route[1]));
+      const issue = platform.issues[index];
+      if (issue === undefined) return new Response('{}', { status: 404 });
+      const names = labelNames(issue);
+      const added =
+        method === 'POST' && typeof init?.body === 'string'
+          ? arrayField(record(JSON.parse(init.body)), 'labels').map(String)
+          : [];
+      const removed =
+        method === 'DELETE' && route[3] !== undefined ? decodeURIComponent(route[3]) : '';
+      const labels = [
+        ...names.filter((name) => name !== removed),
+        ...added.filter((n) => !names.includes(n)),
+      ];
+      const updated = { ...issue, labels: labels.map((name) => ({ name })) };
+      platform.issues.splice(index, 1, updated);
+      platform.facts.set(`/repos/apolenkov/feynman/issues/${String(route[1])}`, updated);
+      return Response.json(updated.labels);
+    },
+  );
+}
+
 it('Opus F1 skips foreign valid and malformed issue markers before canonical publication or disappearance', async (test) => {
   for (const trustedId of [23296915, 41898282, null])
     await test.test(`canonical author ${trustedId ?? 'foreign-only'}`, async (subtest) => {
       const fixture = await publicationFindingFixture(subtest);
       const { platform } = fixture;
+      fakeLabelRoutes(subtest, platform);
       const identity = {
         repository_id: '1230959148',
         fingerprint_policy_revision: 'reviewed-v1',
@@ -1516,7 +1576,10 @@ it('Opus F1 skips foreign valid and malformed issue markers before canonical pub
       else assert.equal(canonical['issue_node_id'], 'I_TRUSTED');
       const effects = platform.requests.slice(before).filter((request) => request.method !== 'GET');
       assert.equal(
-        effects.filter((request) => request.method === 'POST').length,
+        effects.filter(
+          (request) =>
+            request.method === 'POST' && request.path === '/repos/apolenkov/feynman/issues',
+        ).length,
         trustedId === null ? 1 : 0,
       );
       assert.equal(
@@ -1535,6 +1598,7 @@ it('Opus F1 skips foreign valid and malformed issue markers before canonical pub
 
 it('Opus F3 refreshes disputed to confirmed on the same issue with current severity/source labels and preserves unrelated labels', async (test) => {
   const fixture = await publicationFindingFixture(test);
+  fakeLabelRoutes(test, fixture.platform);
   const finding = { ...fixture.finding, severity: 'low' };
   const disputed = {
     ...finding,
@@ -1579,7 +1643,7 @@ it('Opus F3 refreshes disputed to confirmed on the same issue with current sever
   const current = record(fixture.platform.issues[0]);
   assert.equal(current['title'], `[factory:confirmed] ${fixture.fingerprint.slice(0, 16)}`);
   assert.match(stringField(current, 'body'), /Confidence: confirmed\nRepair: eligible/);
-  assert.deepEqual(arrayField(current, 'labels').toSorted(), [
+  assert.deepEqual(labelNames(current).toSorted(), [
     'factory-fix',
     'owner-note',
     'severity:high',
@@ -1605,6 +1669,7 @@ it('Opus F3 refreshes disputed to confirmed on the same issue with current sever
 
 it('Opus F6 caps only three new issues while existing first findings and refuted verdicts consume no creation allowance', async (test) => {
   const fixture = await publicationFindingFixture(test);
+  fakeLabelRoutes(test, fixture.platform);
   const findings: JsonRecord[] = [];
   for (let index = 0; index < 8; index++) {
     const finding = { ...fixture.finding, fingerprint: sha256(`creation-cap-${index}`) };
@@ -1669,6 +1734,7 @@ it('Opus F2 authenticates both missing-issue proofs before any closure or existi
     await test.test(control, async (subtest) => {
       const fixture = await publicationFindingFixture(subtest);
       const { platform } = fixture;
+      fakeLabelRoutes(subtest, platform);
       const red = fixture.authority(
         'verifier',
         'behavioral-red',
@@ -1841,6 +1907,7 @@ it('Opus F14 preserves owner labels added after the encoded snapshot and refuses
     await test.test(control, async (subtest) => {
       const fixture = await publicationFindingFixture(subtest);
       const { platform } = fixture;
+      fakeLabelRoutes(subtest, platform);
       const identity = {
         repository_id: '1230959148',
         fingerprint_policy_revision: 'reviewed-v1',
@@ -1903,7 +1970,7 @@ it('Opus F14 preserves owner labels added after the encoded snapshot and refuses
       const current = record(platform.issues[0]);
       if (control === 'labels-added' || control === 'labels-removed') {
         assert.equal(result.status, 'accepted', result.reason);
-        assert.deepEqual(arrayField(current, 'labels').toSorted(), [
+        assert.deepEqual(labelNames(current).toSorted(), [
           ...(control === 'labels-removed' ? [] : ['factory-fix']),
           'owner-note',
           'severity:high',
@@ -1933,10 +2000,140 @@ it('Opus F14 preserves owner labels added after the encoded snapshot and refuses
         );
       }
       assert.equal(
-        effects.some((request) => request.method === 'POST'),
+        effects.some(
+          (request) =>
+            request.method === 'POST' && request.path === '/repos/apolenkov/feynman/issues',
+        ),
         false,
       );
     });
+});
+
+async function labelRefreshFixture(test: TestContext) {
+  const fixture = await publicationFindingFixture(test);
+  const issue = {
+    number: 42,
+    node_id: 'I_LABEL_REFRESH',
+    user: { id: 23296915 },
+    state: 'open',
+    title: 'stale title',
+    labels: [{ name: 'severity:low' }, { name: 'source:ocr-scan' }, { name: 'owner-note' }],
+    body: `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: '1230959148', fingerprint_policy_revision: 'reviewed-v1', fingerprint: fixture.fingerprint })} -->`,
+  };
+  fixture.platform.issues.push(issue);
+  fixture.platform.facts.set('/repos/apolenkov/feynman/issues/42', issue);
+  return fixture;
+}
+
+it('Opus F14 refresh never replaces labels: a concurrent owner label and factory-fix survive and only the replaced severity is removed', async (test) => {
+  const fixture = await labelRefreshFixture(test);
+  const { platform } = fixture;
+  fakeLabelRoutes(test, platform, {
+    beforeWrite: () => {
+      const racing = {
+        ...record(platform.issues[0]),
+        labels: [...arrayField(record(platform.issues[0]), 'labels'), { name: 'factory-fix' }],
+      };
+      platform.issues[0] = racing;
+      platform.facts.set('/repos/apolenkov/feynman/issues/42', racing);
+    },
+  });
+  const before = platform.requests.length;
+  const result = await reconcilePublication(fixture.context, fixture.scan);
+  assert.equal(result.status, 'accepted', result.reason);
+  assert.deepEqual(labelNames(record(platform.issues[0])).toSorted(), [
+    'factory-fix',
+    'owner-note',
+    'severity:high',
+    'source:ocr-scan',
+  ]);
+  const effects = platform.requests.slice(before).filter((request) => request.method !== 'GET');
+  assert.equal(
+    effects.some((request) => request.method === 'PATCH' && 'labels' in record(request.body)),
+    false,
+    'PATCH carries title/body only',
+  );
+  assert.deepEqual(
+    effects
+      .filter((request) => request.method !== 'PATCH')
+      .map((request) => [request.method, request.path, request.body]),
+    [
+      ['POST', '/repos/apolenkov/feynman/issues/42/labels', { labels: ['severity:high'] }],
+      ['DELETE', '/repos/apolenkov/feynman/issues/42/labels/severity%3Alow', null],
+    ],
+  );
+});
+
+it('Opus F14 keeps an applied label POST visible when the following DELETE fails', async (test) => {
+  const fixture = await labelRefreshFixture(test);
+  const { platform } = fixture;
+  fakeLabelRoutes(test, platform, { failDelete: 503 });
+  const result = await reconcilePublication(fixture.context, fixture.scan);
+  assert.equal(result.status, 'needs-human');
+  assert.deepEqual(labelNames(record(platform.issues[0])).toSorted(), [
+    'owner-note',
+    'severity:high',
+    'severity:low',
+    'source:ocr-scan',
+  ]);
+  assert.deepEqual(result.issues, [
+    {
+      repository_id: '1230959148',
+      fingerprint_policy_revision: 'reviewed-v1',
+      fingerprint: fixture.fingerprint,
+      issue_number: 42,
+      issue_node_id: 'I_LABEL_REFRESH',
+      confidence: 'confirmed',
+      repair_state: 'needs-human',
+      reason: 'Partial publication; earlier effects preserved',
+    },
+  ]);
+  assert.deepEqual(result.dispatch, []);
+  assert.deepEqual(result.selected, []);
+  assert.deepEqual(result.pending, [
+    {
+      fingerprint: fixture.fingerprint,
+      path: fixture.finding.path,
+      adjudication: 'unvalidated-pending',
+    },
+  ]);
+});
+
+it('Opus F14 keeps a created issue visible when the post-creation issue list read fails', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const { platform } = fixture;
+  const fetch = platform.fetch.bind(platform);
+  let created = false;
+  test.mock.method(
+    platform,
+    'fetch',
+    async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      const method = init?.method ?? 'GET';
+      if (created && method === 'GET' && url.pathname === '/repos/apolenkov/feynman/issues')
+        return new Response('{}', { status: 503 });
+      const response = await fetch(input, init);
+      if (method === 'POST' && url.pathname === '/repos/apolenkov/feynman/issues') created = true;
+      return response;
+    },
+  );
+  const result = await reconcilePublication(fixture.context, fixture.scan);
+  const issue = record(platform.issues[0]);
+  assert.equal(created, true);
+  assert.equal(result.status, 'needs-human');
+  assert.deepEqual(result.issues, [
+    {
+      repository_id: '1230959148',
+      fingerprint_policy_revision: 'reviewed-v1',
+      fingerprint: fixture.fingerprint,
+      issue_number: issue['number'],
+      issue_node_id: issue['node_id'],
+      confidence: 'confirmed',
+      repair_state: 'needs-human',
+      reason: 'Partial publication; earlier effects preserved',
+    },
+  ]);
+  assert.deepEqual(result.dispatch, []);
 });
 
 it('Opus catch reports every identified finding pending and no selected work after invalid scan or unknown caller cap', async (test) => {

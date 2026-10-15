@@ -6,10 +6,17 @@ import { createJiti } from 'jiti';
 import type { TemplateToken } from '@actions/workflow-parser/templates/tokens/template-token';
 
 // The official package imports JSON without Node's required attribute; use the standard loader.
-const { isBoolean, isMapping, isString, NoOperationTraceWriter, parseWorkflow } = await createJiti(
-  import.meta.url,
-  { tryNative: false },
-).import<typeof import('@actions/workflow-parser')>('@actions/workflow-parser');
+const {
+  isBoolean,
+  isMapping,
+  isScalar,
+  isSequence,
+  isString,
+  NoOperationTraceWriter,
+  parseWorkflow,
+} = await createJiti(import.meta.url, { tryNative: false }).import<
+  typeof import('@actions/workflow-parser')
+>('@actions/workflow-parser');
 
 const RELEASE = '1.7.12';
 const ARCHIVE_DIGESTS: Readonly<Record<string, string>> = Object.freeze({
@@ -45,7 +52,94 @@ export function validateWorkflowSchema(content: string, name: string): void {
   if (jobs !== undefined && isMapping(jobs))
     for (const job of jobs) if (isMapping(job.value)) checkQueue(job.value.find('concurrency'));
 }
-export async function actionlintBinary(): Promise<string> {
+export const FACTORY_WORKFLOWS: readonly string[] = [
+  'factory-control.yml',
+  'factory-ingress.yml',
+  'factory-operations.yml',
+  'night-review.yml',
+];
+export const FACTORY_ENVIRONMENT = 'factory-privileged';
+// shortcut: npm subcommand is the first non-option word, so `npm --prefix dir ci` and `echo npm i` misjudge; use a shell parser if that matters.
+const NPM_INSTALL =
+  /(?:^|[\s'"(])npm((?:\s+-\S+)*)\s+(ci|cit|ic|clean-install|clean-install-test|install-ci-test|install-clean|install-test|it|add|i|in|ins|inst|insta|instal|install|isnt|isnta|isntal|isntall)(?=[\s'")]|$)/;
+// Every npm install-like command must carry a final truthy --ignore-scripts, outside comments.
+function installsWithScripts(run: string): boolean {
+  return run
+    .replaceAll(/\\\r?\n/g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/(^|\s)#.*/, ''))
+    .flatMap((line) => line.split(/&&|\|\||[;|]/))
+    .some((segment) => {
+      if (!NPM_INSTALL.test(segment)) return false;
+      const flag = segment
+        .split(/[\s'"(),]+/)
+        .findLast((token) => /^--(?:no-)?ignore-scripts(?:=|$)/.test(token));
+      return flag !== '--ignore-scripts' && flag !== '--ignore-scripts=true';
+    });
+}
+// Static floor only: a token-holding job needs a protected environment, no lifecycle scripts at install,
+// and an explicit actions grant where it reads runs/jobs/logs/artifacts. Trusted pinned admission stays open.
+export function validateFactoryHardening(content: string, name: string): void {
+  const result = parseWorkflow({ name, content }, new NoOperationTraceWriter());
+  result.context.errors.check('Official workflow parser');
+  if (result.value === undefined || !isMapping(result.value))
+    throw new Error('Workflow mapping absent');
+  const jobs = result.value.find('jobs');
+  if (jobs === undefined || !isMapping(jobs)) throw new Error(`${name}: jobs absent`);
+  const levels = (permissions: TemplateToken): string[] =>
+    isString(permissions)
+      ? [permissions.value]
+      : isMapping(permissions)
+        ? [...permissions].flatMap(({ value }) => (isString(value) ? [value.value] : []))
+        : [];
+  for (const job of jobs) {
+    if (!isMapping(job.value)) continue;
+    const id = `${name}/${job.key.toString()}`;
+    const permissions = job.value.find('permissions');
+    const granted = permissions ?? result.value.find('permissions');
+    // GitHub grants the default token scope when nothing is declared; treat it as write-all.
+    const effective = granted === undefined ? ['write-all'] : levels(granted);
+    const environment = job.value.find('environment');
+    const environmentName =
+      environment !== undefined && isMapping(environment) ? environment.find('name') : environment;
+    if (
+      (effective.includes('write') || effective.includes('write-all')) &&
+      !(
+        environmentName !== undefined &&
+        isString(environmentName) &&
+        environmentName.value === FACTORY_ENVIRONMENT
+      )
+    )
+      throw new Error(`${id}: write-token job requires environment ${FACTORY_ENVIRONMENT}`);
+    const steps = job.value.find('steps');
+    let factory = false;
+    for (const step of steps !== undefined && isSequence(steps) ? steps : []) {
+      const token = isMapping(step) ? step.find('run') : undefined;
+      // An expression run is not a string token; its text form keeps the literal command.
+      if (token === undefined || !isScalar(token)) continue;
+      const run = token.toString();
+      if (installsWithScripts(run)) throw new Error(`${id}: npm ci must use --ignore-scripts`);
+      factory ||= run.includes('scripts/factory-');
+    }
+    const actions =
+      permissions !== undefined && isMapping(permissions) ? permissions.find('actions') : undefined;
+    if (
+      factory &&
+      !(actions !== undefined && isString(actions) && ['read', 'write'].includes(actions.value))
+    )
+      throw new Error(`${id}: factory job requires explicit actions permission`);
+  }
+}
+const verified: { binary?: Promise<string> | undefined } = {};
+// shortcut: one verified download per process; the private tool directory is not cleaned (F8), upgrade with cleanup.
+export function actionlintBinary(): Promise<string> {
+  verified.binary ??= downloadActionlint().catch((error: unknown) => {
+    verified.binary = undefined;
+    throw error;
+  });
+  return verified.binary;
+}
+async function downloadActionlint(): Promise<string> {
   const platform = `${process.platform}_${process.arch === 'x64' ? 'amd64' : process.arch}`;
   const expected = ARCHIVE_DIGESTS[platform];
   if (expected === undefined)
@@ -88,8 +182,11 @@ async function workflowMain(): Promise<void> {
     for (const file of fs
       .readdirSync(directory)
       .filter((file) => file.endsWith('.yml'))
-      .toSorted())
-      await validateNativeWorkflow(fs.readFileSync(path.join(directory, file), 'utf8'), file);
+      .toSorted()) {
+      const content = fs.readFileSync(path.join(directory, file), 'utf8');
+      await validateNativeWorkflow(content, file);
+      if (FACTORY_WORKFLOWS.includes(file)) validateFactoryHardening(content, file);
+    }
     console.log(
       'Official schema + pinned upstream actionlint passed; only exact queue diagnostic excepted',
     );
