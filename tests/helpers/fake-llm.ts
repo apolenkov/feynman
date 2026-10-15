@@ -13,6 +13,8 @@ export interface LlmReply {
   readonly raw?: string;
   /** usage.total_tokens; null omits the usage object. Default 50. */
   readonly tokens?: number | null;
+  /** Drop the connection without an answer (a network failure for the client). */
+  readonly drop?: boolean;
 }
 export interface FakeLlm {
   readonly url: string;
@@ -37,6 +39,10 @@ export async function startFakeLlm(
       const request = { authorization: incoming.headers.authorization ?? '', body };
       requests.push(request);
       const reply = handler(request, requests.length);
+      if (reply.drop === true) {
+        incoming.socket.destroy();
+        return;
+      }
       response.writeHead(reply.status ?? 200, { 'content-type': 'application/json' });
       if (reply.raw !== undefined) {
         response.end(reply.raw);
