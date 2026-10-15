@@ -468,6 +468,17 @@ describe('factory-model run: shared deadline', () => {
     assert.equal(arrayField(bundle(s.out, 'verdicts.json'), 'verdicts').length, 1);
   });
 
+  it('a deadline spent by the last call still marks the run incomplete', async (t) => {
+    const baseline = await scenario(t, 'ok1', agreeable);
+    await direct(baseline, () => 0);
+    const calls = baseline.llm.requests.length;
+    const s = await scenario(t, 'ok1', agreeable);
+    await direct(s, () => (s.llm.requests.length >= calls ? 1e12 : 0));
+    assert.equal(s.llm.requests.length, calls);
+    assert.equal(bundle(baseline.out, 'scan-raw.json')['deadline_hit'], false);
+    assert.equal(bundle(s.out, 'scan-raw.json')['deadline_hit'], true);
+  });
+
   it('refuses a non-positive --deadline-seconds', async (t) => {
     const s = await scenario(t, 'ok1', agreeable);
     assert.equal((await s.exec(['--deadline-seconds', '0'])).code, 1);

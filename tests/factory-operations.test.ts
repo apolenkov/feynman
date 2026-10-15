@@ -886,6 +886,37 @@ it('night-scan gate: the key job needs the ci environment, exact read-only permi
       /must only run/,
     ],
     [
+      'earlier step writing NODE_OPTIONS to GITHUB_ENV',
+      keyJob(
+        '      - id: tool\n',
+        '      - run: echo "NODE_OPTIONS=--require ./x.js" >> "$GITHUB_ENV"\n      - id: tool\n',
+      ),
+      /reviewed pin/,
+    ],
+    [
+      'substituted OCR_BIN value',
+      keyJob('OCR_BIN: ${{ steps.tool.outputs.ocr_bin }}', 'OCR_BIN: ./tools/fake'),
+      /reviewed pin/,
+    ],
+    [
+      'working-directory on the model pass',
+      keyJob(
+        '      - name: Model pass\n',
+        '      - name: Model pass\n        working-directory: other\n',
+      ),
+      /reviewed pin/,
+    ],
+    [
+      'workflow defaults',
+      control.replace('\njobs:\n', '\ndefaults:\n  run:\n    shell: bash\njobs:\n'),
+      /defaults/,
+    ],
+    [
+      'workflow env',
+      control.replace('\njobs:\n', '\nenv:\n  BASH_ENV: ./x.sh\njobs:\n'),
+      /workflow env/,
+    ],
+    [
       'job defaults',
       keyJob(
         '    environment: ci\n',

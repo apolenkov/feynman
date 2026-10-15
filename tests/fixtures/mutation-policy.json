@@ -671,6 +671,14 @@
       "count": 1,
       "reason": "Closure over the invocation-owned deadline flag of one runModel call records that a call found the shared deadline spent; exhausted-after-scan and mid-verify deadline controls exercise it.",
       "test": "tests/factory-model.test.ts"
+    },
+    {
+      "file": "scripts/check-factory-workflows.ts",
+      "owner": "validateKeyJob",
+      "mutationHash": "11505ea97af6edcc4b5b7b0cee9ec7b61d7a04518e779a741aaef3df362a082f",
+      "count": 1,
+      "reason": "Invocation-owned hash builder digests the canonical structure of one key job to compare it with the reviewed pin; earlier-step GITHUB_ENV, substituted env value and working-directory controls exercise the pin.",
+      "test": "tests/factory-operations.test.ts"
     }
   ]
 }

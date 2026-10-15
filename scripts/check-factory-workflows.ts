@@ -105,6 +105,7 @@ export const INERT_POSTURE: {
   readonly keyJob: string;
   readonly keyStep: string;
   readonly keyEnvironment: string;
+  readonly keyJobSha256: string;
 } = {
   activation: false,
   triggers: ['workflow_dispatch'],
@@ -115,6 +116,8 @@ export const INERT_POSTURE: {
   keyJob: 'night-model',
   keyStep: 'Model pass',
   keyEnvironment: 'ci',
+  // Every byte of the key job (earlier steps, $GITHUB_ENV writes, env values) is pinned; it changes only in a reviewed diff.
+  keyJobSha256: 'b2b4677e30fdf126f48c3aab7625019ddd518283e9b6bc145532a22123ae696b',
 };
 // Text of a scalar workflow token (expressions keep their `${{ }}` form); structures are not text.
 const scalarText = (token: TemplateToken | undefined): string =>
@@ -377,6 +380,12 @@ export function validateFactoryHardening(content: string, name: string): void {
   }
 }
 // Every key and scalar of a token tree as one text, for patterns that may hide in any position.
+// Lossless structure of a workflow token, for pinning: mappings keep their key/value pairs.
+function tokenTree(token: TemplateToken): unknown {
+  if (isMapping(token))
+    return [...token].map(({ key, value }) => [scalarText(key), tokenTree(value)]);
+  return isSequence(token) ? [...token].map(tokenTree) : scalarText(token);
+}
 function tokenText(token: TemplateToken): string {
   if (isMapping(token))
     return [...token].map(({ key, value }) => `${scalarText(key)}\n${tokenText(value)}`).join('\n');
@@ -432,6 +441,8 @@ export function validateKeyJob(content: string, name: string): void {
   // The key step is one fixed command: no action, no shell override at any level, no extra env, no chained command.
   if (result.value.find('defaults') !== undefined || job.find('defaults') !== undefined)
     throw new Error(`${id}: defaults are forbidden around the key job`);
+  if (result.value.find('env') !== undefined)
+    throw new Error(`${id}: workflow env is forbidden around the key job`);
   const [step, ...extra] = keyStepsOf(job);
   const command = step !== undefined && isMapping(step) ? scalarText(step.find('run')) : '';
   const env = step !== undefined && isMapping(step) ? step.find('env') : undefined;
@@ -458,6 +469,12 @@ export function validateKeyJob(content: string, name: string): void {
   const timeout = Number(scalarText(job.find('timeout-minutes')));
   if (!(deadline > 0) || !(timeout > 0) || deadline + 600 > timeout * 60)
     throw new Error(`${id}: --deadline-seconds must fit timeout-minutes with ten minutes to spare`);
+  const digest = crypto
+    .createHash('sha256')
+    .update(JSON.stringify(tokenTree(job)))
+    .digest('hex');
+  if (digest !== INERT_POSTURE.keyJobSha256)
+    throw new Error(`${id}: key job differs from the reviewed pin (sha256 ${digest})`);
 }
 // Any workflow: the provider key names live only in the key workflow, and the key environment's secrets
 // (reachable by name or by `toJSON(secrets)`) are reachable only from the key job.
