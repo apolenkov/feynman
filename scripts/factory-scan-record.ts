@@ -141,6 +141,8 @@ export function buildScanDraft(
       'comments',
       'comments_truncated',
       'auth_fallback_used',
+      'probe_status',
+      'stderr_signals',
       'deadline_hit',
     ],
     'scan-raw',

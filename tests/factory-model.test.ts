@@ -262,6 +262,38 @@ describe('factory-model run: recorded ocr outputs', () => {
     assert.equal(built.draft['successful'], true);
   });
 
+  it('keeps only HTTP codes and known phrases from a failing ocr stderr, never its text', async (t) => {
+    const s = await scenario(t, 'ok1', agreeable, {
+      fixture: { ...readRecord(path.join(FIXTURES, 'ok1.json')), stdout: '', exit_code: 1 },
+      stderr: `scan failed: all 2 file scan(s) failed: POST /chat/completions: 404 Not Found {"error":"model not found: glm-x","key":"${PRIMARY}"} status code: 404\n`,
+    });
+    assert.equal((await s.exec()).code, 0);
+    const raw = bundle(s.out, 'scan-raw.json');
+    assert.equal(raw['probe_status'], 200);
+    assert.deepEqual(raw['stderr_signals'], {
+      http_statuses: [404],
+      messages: ['scan failed', 'model not found'],
+    });
+    const text = fs.readFileSync(path.join(s.out, 'scan-raw.json'), 'utf8');
+    assert.ok(!text.includes(PRIMARY) && !text.includes('glm-x'));
+  });
+
+  it('reads the status of an openai-go error line and keeps the newest stderr when it is huge', async (t) => {
+    const noise = 'progress: reviewing a file\n'.repeat(8000);
+    const s = await scenario(t, 'ok1', agreeable, {
+      fixture: { ...readRecord(path.join(FIXTURES, 'ok1.json')), stdout: '', exit_code: 1 },
+      stderr: `${noise}Scan subtask error: POST "https://x/v1/chat/completions": 429 Too Many Requests\n`,
+    });
+    const result = await s.exec();
+    assert.equal(result.code, 0, result.stderr);
+    const raw = bundle(s.out, 'scan-raw.json');
+    assert.equal(raw['deadline_hit'], false);
+    assert.deepEqual(raw['stderr_signals'], {
+      http_statuses: [429],
+      messages: ['Scan subtask error'],
+    });
+  });
+
   it('refuses a known list built for another fingerprint revision', async (t) => {
     const s = await scenario(t, 'ok1', agreeable, {
       policy: { fingerprint_policy_revision: 'v2' },

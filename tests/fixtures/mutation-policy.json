@@ -483,9 +483,9 @@
     {
       "file": "scripts/check-factory-workflows.ts",
       "owner": "downloadActionlint",
-      "mutationHash": "8a18aadf0736a7f8ed6cf43d6969d90a1c48467d89526fe675e34d4fd535860d",
-      "count": 2,
-      "reason": "Invocation-owned verified archive digest builder checks one official upstream binary before native actionlint and records its private directory in the process-owned memo that disposeActionlint clears; single/max and unrelated diagnostic controls exercise the gate.",
+      "mutationHash": "b224a4475944e85995e70ec9a04ab71fdbfe56418dc2dc16bbcde4a59b86763a",
+      "count": 8,
+      "reason": "Invocation-owned download buffer, response slot and attempt counter retry a stalled or 5xx fetch up to three times, then the verified archive digest builder checks one official upstream binary before native actionlint and records its private directory in the process-owned memo that disposeActionlint clears; retry, 5xx, checksum-mismatch, single/max and unrelated diagnostic controls exercise the gate.",
       "test": "tests/factory-operations.test.ts"
     },
     {
@@ -563,9 +563,9 @@
     {
       "file": "scripts/factory-model.ts",
       "owner": "runProcess",
-      "mutationHash": "abdadf4bfaba880a29d24608418d0746668f2f10b6cca9192f7300b7e5e1c999",
-      "count": 7,
-      "reason": "Invocation-owned output chunks, size counter and settle flags bound one child process; hang and failed-run controls exercise it.",
+      "mutationHash": "7ae7b456dd8022872a776fb206c7d2eef5f6fe52031328a32bb6b85d5655e906",
+      "count": 12,
+      "reason": "Invocation-owned output chunks and a newest-bytes stderr window with size counters and settle flags bound one child process; stderr is only reduced to fixed signals; hang, failed-run and huge-stderr controls exercise it.",
       "test": "tests/factory-model.test.ts"
     },
     {
@@ -611,9 +611,9 @@
     {
       "file": "scripts/factory-model.ts",
       "owner": "runModel",
-      "mutationHash": "932cda95917cefb1806a03040692e0289e27eb16d835c3be6d2003815c17b88b",
-      "count": 20,
-      "reason": "Invocation-owned token counters, finding lists, deadline flag and bundle records build one night bundle under finite budgets and one shared deadline; budget, verify-cap, deadline and canary controls exercise it.",
+      "mutationHash": "535e08d78e8efcb1e13f99bb78c2b3f0de2704d50279fd9220c9d20132368103",
+      "count": 22,
+      "reason": "Invocation-owned token counters, probe status, finding lists, deadline flag and bundle records build one night bundle under finite budgets and one shared deadline; budget, verify-cap, deadline, stderr-signal and canary controls exercise it.",
       "test": "tests/factory-model.test.ts"
     },
     {
