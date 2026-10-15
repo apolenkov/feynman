@@ -632,6 +632,7 @@ export async function runModel(options: RunOptions): Promise<void> {
   }
   if (key === null) throw new FactoryFailure('No model key was accepted by the provider');
   const activeKey = key;
+  const probeMessage = tryRecord(probeError)?.['message'];
 
   const home = fs.mkdtempSync(path.join(options.env['RUNNER_TEMP'] ?? os.tmpdir(), 'ocr-home-'));
   try {
@@ -819,6 +820,14 @@ export async function runModel(options: RunOptions): Promise<void> {
         probe_error: {
           code: providerErrorSignal(tryRecord(probeError)?.['code']),
           type: providerErrorSignal(tryRecord(probeError)?.['type']),
+          message_signals:
+            typeof probeMessage === 'string'
+              ? ['max_tokens', 'model', 'messages', 'context_length', 'content_filter'].filter(
+                  (word) => probeMessage.toLowerCase().includes(word),
+                )
+              : [],
+          message_length: typeof probeMessage === 'string' ? probeMessage.length : null,
+          key_source: authFallbackUsed ? 'fallback' : 'primary',
         },
         stderr_signals: stderrSignals(scan.stderr),
         // A call cut short by the deadline still ends the run incomplete.

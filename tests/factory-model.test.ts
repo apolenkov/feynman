@@ -139,14 +139,55 @@ describe('factory-model run: environment and secrets', () => {
     const s = await scenario(t, 'ok1', agreeable);
     assert.equal((await s.exec()).code, 0);
     assert.equal(bundle(s.out, 'scan-raw.json')['auth_fallback_used'], false);
-    assert.deepEqual(bundle(s.out, 'scan-raw.json')['probe_error'], { code: null, type: null });
+    assert.deepEqual(bundle(s.out, 'scan-raw.json')['probe_error'], {
+      code: null,
+      type: null,
+      message_signals: [],
+      message_length: null,
+      key_source: 'primary',
+    });
+  });
+
+  it('attributes a 400 after primary 401 to fallback and keeps only final message signals', async (t) => {
+    const message = `MAX_TOKENS messages model context_length model 🧪 ${FALLBACK}`;
+    const s = await scenario(t, 'nofiles', (request) =>
+      request.authorization === `Bearer ${PRIMARY}`
+        ? { status: 401, raw: JSON.stringify({ error: { message: `content_filter ${PRIMARY}` } }) }
+        : {
+            status: 400,
+            raw: JSON.stringify({ error: { type: 'invalid_request_error', message } }),
+          },
+    );
+    const result = await s.exec();
+    assert.equal(result.code, 0, result.stderr);
+    const raw = bundle(s.out, 'scan-raw.json');
+    assert.equal(raw['probe_status'], 400);
+    assert.equal(raw['auth_fallback_used'], true);
+    assert.deepEqual(raw['probe_error'], {
+      code: null,
+      type: 'invalid_request_error',
+      message_signals: ['max_tokens', 'model', 'messages', 'context_length'],
+      message_length: message.length,
+      key_source: 'fallback',
+    });
+    assert.deepEqual(
+      s.llm.requests.map((r) => r.authorization),
+      [`Bearer ${PRIMARY}`, `Bearer ${FALLBACK}`],
+    );
+    const scan = s.stub.invocations().find((call) => call.argv.includes('--max-tokens-budget'));
+    assert.equal(scan?.env['OCR_LLM_TOKEN'], FALLBACK);
+    for (const name of ['scan-raw.json', 'verdicts.json', 'acceptance.json']) {
+      const text = fs.readFileSync(path.join(s.out, name), 'utf8');
+      assert.ok(!text.includes(PRIMARY) && !text.includes(FALLBACK) && !text.includes(message));
+    }
+    assert.ok(!result.stdout.includes(FALLBACK) && !result.stderr.includes(FALLBACK));
   });
 
   for (const [label, error, expected] of [
     [
       'known error',
       { code: 'model_not_found', type: 'invalid_request_error', message: PRIMARY },
-      { code: 'model_not_found', type: 'invalid_request_error' },
+      { code: 'model_not_found', type: 'invalid_request_error', message_length: PRIMARY.length },
     ],
     ['echoed secrets', { code: PRIMARY, type: FALLBACK }, { code: null, type: null }],
     [
@@ -154,7 +195,16 @@ describe('factory-model run: environment and secrets', () => {
       { code: 'new_provider_code', type: 'secret_looking_value' },
       { code: null, type: null },
     ],
-    ['wrong types', { code: { key: PRIMARY }, type: ['api_error'] }, { code: null, type: null }],
+    [
+      'wrong types',
+      { code: { key: PRIMARY }, type: ['api_error'], message: { key: PRIMARY } },
+      { code: null, type: null },
+    ],
+    [
+      'content filter',
+      { message: 'CONTENT_FILTER' },
+      { code: null, type: null, message_signals: ['content_filter'], message_length: 14 },
+    ],
     ['missing error', null, { code: null, type: null }],
   ] as const) {
     it(`records only allowlisted probe diagnostics: ${label}`, async (t) => {
@@ -166,7 +216,12 @@ describe('factory-model run: environment and secrets', () => {
       assert.equal(result.code, 0, result.stderr);
       const raw = bundle(s.out, 'scan-raw.json');
       assert.equal(raw['probe_status'], 400);
-      assert.deepEqual(raw['probe_error'], expected);
+      assert.deepEqual(raw['probe_error'], {
+        message_signals: [],
+        message_length: null,
+        key_source: 'primary',
+        ...expected,
+      });
       assert.equal(raw['auth_fallback_used'], false);
       assert.equal(s.llm.requests.length, 1);
       const text = fs.readFileSync(path.join(s.out, 'scan-raw.json'), 'utf8');
