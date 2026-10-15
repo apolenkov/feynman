@@ -275,9 +275,9 @@ export async function reconcilePublication(
             throw new FactoryFailure('Ambiguous issue publication; no blind retry');
           issue = discovered[0];
         }
+        inFlight = partialEffect(identity, issue, confidence);
         snapshot = (await githubPages(context, `${route}?state=all`)).map(record);
         created++;
-        inFlight = partialEffect(identity, issue, confidence);
       }
       if (!isCanonicalIssueAuthor(context, issue))
         throw new FactoryFailure('Issue publication author untrusted');

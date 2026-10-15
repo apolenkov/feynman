@@ -2099,6 +2099,43 @@ it('Opus F14 keeps an applied label POST visible when the following DELETE fails
   ]);
 });
 
+it('Opus F14 keeps a created issue visible when the post-creation issue list read fails', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const { platform } = fixture;
+  const fetch = platform.fetch.bind(platform);
+  let created = false;
+  test.mock.method(
+    platform,
+    'fetch',
+    async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      const method = init?.method ?? 'GET';
+      if (created && method === 'GET' && url.pathname === '/repos/apolenkov/feynman/issues')
+        return new Response('{}', { status: 503 });
+      const response = await fetch(input, init);
+      if (method === 'POST' && url.pathname === '/repos/apolenkov/feynman/issues') created = true;
+      return response;
+    },
+  );
+  const result = await reconcilePublication(fixture.context, fixture.scan);
+  const issue = record(platform.issues[0]);
+  assert.equal(created, true);
+  assert.equal(result.status, 'needs-human');
+  assert.deepEqual(result.issues, [
+    {
+      repository_id: '1230959148',
+      fingerprint_policy_revision: 'reviewed-v1',
+      fingerprint: fixture.fingerprint,
+      issue_number: issue['number'],
+      issue_node_id: issue['node_id'],
+      confidence: 'confirmed',
+      repair_state: 'needs-human',
+      reason: 'Partial publication; earlier effects preserved',
+    },
+  ]);
+  assert.deepEqual(result.dispatch, []);
+});
+
 it('Opus catch reports every identified finding pending and no selected work after invalid scan or unknown caller cap', async (test) => {
   const fixture = await publicationFindingFixture(test);
   const findings = Array.from({ length: 4 }, (_, index) => ({
