@@ -97,7 +97,7 @@ export interface Stub {
 export function stubOcr(
   dir: string,
   scenario: string,
-  options: { hang?: boolean; version?: string; fixture?: JsonRecord } = {},
+  options: { hang?: boolean; version?: string; fixture?: JsonRecord; stderr?: string } = {},
 ): Stub {
   const fixture = options.fixture ?? readRecord(path.join(FIXTURES, `${scenario}.json`));
   const preview = readRecord(path.join(FIXTURES, `${stringField(fixture, 'preview')}.json`));
@@ -112,6 +112,7 @@ export function stubOcr(
       session: fixture['session'],
       exit_code: fixture['exit_code'],
       hang: options.hang === true,
+      stderr: options.stderr ?? '',
       version: options.version ?? 'open-code-review v1.13.0 (1672852) test/stub',
     }),
   );
@@ -126,6 +127,7 @@ fs.appendFileSync(cfg.log, JSON.stringify({ argv, env: process.env }) + '\\n');
 if (argv[0] === '--version') { console.log(cfg.version); process.exit(0); }
 if (argv[0] === 'session') { if (cfg.session === null) process.exit(1); console.log(JSON.stringify(cfg.session)); process.exit(0); }
 if (argv.includes('--preview')) { console.log(JSON.stringify(cfg.preview)); process.exit(0); }
+if (cfg.stderr !== '') process.stderr.write(cfg.stderr);
 if (cfg.hang) { setInterval(() => {}, 1000); } else {
   process.exitCode = cfg.exit_code;
   if (cfg.stdout !== '') process.stdout.write(JSON.stringify(cfg.stdout));
@@ -183,6 +185,7 @@ export async function scenario(
     known?: string[];
     policy?: Record<string, unknown>;
     hang?: boolean;
+    stderr?: string;
     fixture?: JsonRecord;
     keys?: Record<string, string>;
     revision?: string;
@@ -197,6 +200,7 @@ export async function scenario(
   const stub = stubOcr(dir, name, {
     ...(options.hang === true ? { hang: true } : {}),
     ...(options.fixture === undefined ? {} : { fixture: options.fixture }),
+    ...(options.stderr === undefined ? {} : { stderr: options.stderr }),
   });
   const policy = writePolicy(dir, llm.url, {
     ...options.policy,

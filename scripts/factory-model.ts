@@ -35,6 +35,7 @@ export const ANALYST_INSTRUCTION =
   'Reply with exactly one JSON object and nothing else: {"criteria":["<testable condition>", ...]} with 1 to 5 criteria.';
 
 const SCAN_FLAGS = ['--no-summary', '--no-dedup'];
+const MAX_STDERR_BYTES = 65_536;
 const PROTOCOL = 'openai';
 const STATUSES = ['success', 'completed_with_warnings', 'completed_with_errors', 'skipped'];
 const CATEGORIES = [
@@ -153,6 +154,34 @@ interface ProcessResult {
   readonly code: number;
   readonly stdout: string;
   readonly timedOut: boolean;
+  /** Bounded stderr; it may echo a provider body (and so a key): only stderrSignals() may read it. */
+  readonly stderr: string;
+}
+// Phrases ocr prints on fatal errors; the bundle keeps only these and HTTP codes, never stderr text.
+const STDERR_PHRASES = [
+  'no valid LLM endpoint configured',
+  'scan failed',
+  'Scan subtask error',
+  'scan plan failed',
+  'context deadline exceeded',
+  'connection refused',
+  'no such host',
+  'certificate',
+  'model not found',
+] as const;
+export function stderrSignals(text: string): { http_statuses: number[]; messages: string[] } {
+  const statuses = [
+    ...text.matchAll(/\b(?:status(?: code)?|HTTP(?:\/[\d.]+)?)\D{0,3}([45]\d\d)\b/gi),
+  ]
+    .map((match) => Number(match[1]))
+    .filter((code, index, all) => all.indexOf(code) === index)
+    .toSorted((a, b) => a - b)
+    .slice(0, 10);
+  const lower = text.toLowerCase();
+  return {
+    http_statuses: statuses,
+    messages: STDERR_PHRASES.filter((phrase) => lower.includes(phrase.toLowerCase())),
+  };
 }
 function runProcess(
   bin: string,
@@ -162,14 +191,20 @@ function runProcess(
   timeoutMs: number,
 ): Promise<ProcessResult> {
   return new Promise((resolve) => {
-    // stderr is discarded: provider error bodies (which may echo a key) land there.
     const child = spawn(bin, args, {
       cwd,
       env,
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
     });
     const chunks: Buffer[] = [];
+    const errors: Buffer[] = [];
+    let errorSize = 0;
+    child.stderr.on('data', (chunk: Buffer) => {
+      if (errorSize >= MAX_STDERR_BYTES) return;
+      errorSize += chunk.length;
+      errors.push(chunk);
+    });
     let size = 0;
     let timedOut = false;
     let settled = false;
@@ -188,7 +223,12 @@ function runProcess(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve({ code, stdout: Buffer.concat(chunks).toString('utf8'), timedOut });
+      resolve({
+        code,
+        stdout: Buffer.concat(chunks).toString('utf8'),
+        timedOut,
+        stderr: Buffer.concat(errors).toString('utf8'),
+      });
     };
     child.stdout.on('data', (chunk: Buffer) => {
       size += chunk.length;
@@ -548,12 +588,14 @@ export async function runModel(options: RunOptions): Promise<void> {
   // The primary key is tried first; the fallback is used only when the provider answers 401 to the primary.
   let key: string | null = null;
   let authFallbackUsed = false;
+  let probeStatus = 0;
   for (const candidate of keys) {
     const probe = await chat(policy.llm_url, candidate.value, {
       model: policy.scan_model,
       messages: [{ role: 'user', content: 'ping' }],
       max_tokens: 1,
     });
+    probeStatus = probe.status;
     if (probe.status === 401) continue;
     key = candidate.value;
     authFallbackUsed = candidate.fallback;
@@ -744,6 +786,8 @@ export async function runModel(options: RunOptions): Promise<void> {
         comments,
         comments_truncated: commentsTruncated,
         auth_fallback_used: authFallbackUsed,
+        probe_status: probeStatus,
+        stderr_signals: stderrSignals(scan.stderr),
         // A call cut short by the deadline still ends the run incomplete.
         deadline_hit: scan.timedOut || deadlineHit || remaining() <= 0,
       }),

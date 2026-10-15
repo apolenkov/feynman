@@ -563,9 +563,9 @@
     {
       "file": "scripts/factory-model.ts",
       "owner": "runProcess",
-      "mutationHash": "abdadf4bfaba880a29d24608418d0746668f2f10b6cca9192f7300b7e5e1c999",
-      "count": 7,
-      "reason": "Invocation-owned output chunks, size counter and settle flags bound one child process; hang and failed-run controls exercise it.",
+      "mutationHash": "45b6ae8e7e4d962a2fe7b1f313d8248aa6607c6c21f7c3f427da579c484346a7",
+      "count": 10,
+      "reason": "Invocation-owned output and bounded stderr chunks, size counters and settle flags bound one child process; stderr is only reduced to fixed signals; hang, failed-run and stderr-signal controls exercise it.",
       "test": "tests/factory-model.test.ts"
     },
     {
@@ -611,9 +611,9 @@
     {
       "file": "scripts/factory-model.ts",
       "owner": "runModel",
-      "mutationHash": "932cda95917cefb1806a03040692e0289e27eb16d835c3be6d2003815c17b88b",
-      "count": 20,
-      "reason": "Invocation-owned token counters, finding lists, deadline flag and bundle records build one night bundle under finite budgets and one shared deadline; budget, verify-cap, deadline and canary controls exercise it.",
+      "mutationHash": "535e08d78e8efcb1e13f99bb78c2b3f0de2704d50279fd9220c9d20132368103",
+      "count": 22,
+      "reason": "Invocation-owned token counters, probe status, finding lists, deadline flag and bundle records build one night bundle under finite budgets and one shared deadline; budget, verify-cap, deadline, stderr-signal and canary controls exercise it.",
       "test": "tests/factory-model.test.ts"
     },
     {
