@@ -114,6 +114,8 @@ function rawScan(overrides: JsonRecord = {}, comments: JsonRecord[] = []): JsonR
     comments,
     comments_truncated: false,
     auth_fallback_used: false,
+    probe_status: 200,
+    stderr_signals: { http_statuses: [], messages: [] },
     deadline_hit: false,
     ...overrides,
   };

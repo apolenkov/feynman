@@ -329,6 +329,8 @@ async function discoverCheckpoint(
     for (const producer of attempt.jobs.filter(
       (job) =>
         job['name'] === 'factory-authority-reserve' &&
+        // GitHub lists a job whose `if` was false as completed/skipped; it never ran, so it reserved nothing.
+        job['conclusion'] !== 'skipped' &&
         (job['status'] !== 'completed' ||
           Date.parse(stringField(job, 'completed_at')) > latest.completed),
     )) {

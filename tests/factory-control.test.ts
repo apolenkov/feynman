@@ -477,6 +477,26 @@ import { pathToFileURL } from 'node:url';
 import { gitFixtureEnvironment } from './helpers/git-environment.ts';
 import { authorityMarker, emitAuthority } from '../scripts/factory-protocol.ts';
 
+it('ignores a reserve job GitHub lists as skipped in a later controller run', async (test) => {
+  const { platform, activation } = await bootstrapped(test);
+  const context = laterContext(platform, activation, '902');
+  const route = '/repos/apolenkov/feynman/actions/runs/902/attempts/1/jobs';
+  const skipped = (status: string, conclusion: string | null) => ({
+    id: 90299,
+    name: 'factory-authority-reserve',
+    status,
+    conclusion,
+    started_at: '2026-10-12T00:03:01Z',
+    completed_at: '2026-10-12T00:03:01Z',
+  });
+  platform.facts.set(route, { jobs: [skipped('completed', 'skipped')], total_count: 1 });
+  assert.equal((await runController(context, { command: 'recover' })).status, 'accepted');
+  platform.facts.set(route, { jobs: [skipped('in_progress', null)], total_count: 1 });
+  const inFlight = await runController(context, { command: 'recover' });
+  assert.equal(inFlight.status, 'denied');
+  assert.match(inFlight.reason, /In-flight reservation producer/);
+});
+
 it('accepts the run-start retention clock and denies a changed retention setting', async (test) => {
   const { platform, activation } = await bootstrapped(test);
   const context = laterContext(platform, activation, '902');

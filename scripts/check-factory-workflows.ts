@@ -600,12 +600,24 @@ async function downloadActionlint(): Promise<string> {
   const expected = ARCHIVE_DIGESTS[platform];
   if (expected === undefined)
     throw new Error('Unsupported actionlint platform; no unverified fallback');
-  const response = await fetch(
-    `https://github.com/rhysd/actionlint/releases/download/v${RELEASE}/actionlint_${RELEASE}_${platform}.tar.gz`,
-    { signal: AbortSignal.timeout(30000) },
-  );
-  if (!response.ok) throw new Error('Pinned upstream actionlint download failed');
-  const bytes = Buffer.from(await response.arrayBuffer());
+  const url = `https://github.com/rhysd/actionlint/releases/download/v${RELEASE}/actionlint_${RELEASE}_${platform}.tar.gz`;
+  // A network stall or a 5xx is retried; any answer is still checked against the pinned digest below.
+  let bytes: Buffer | undefined;
+  for (let attempt = 1; bytes === undefined; attempt++) {
+    let response: Response | undefined;
+    try {
+      response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      if (response.ok) bytes = Buffer.from(await response.arrayBuffer());
+    } catch (error: unknown) {
+      if (attempt === 3) throw error;
+      continue;
+    }
+    if (bytes === undefined) {
+      if (response.status < 500 || attempt === 3)
+        throw new Error('Pinned upstream actionlint download failed');
+      await response.body?.cancel();
+    }
+  }
   if (crypto.createHash('sha256').update(bytes).digest('hex') !== expected)
     throw new Error('Pinned upstream actionlint checksum mismatch');
   const executable = execFileSync('tar', ['-xzOf', '-', 'actionlint'], {

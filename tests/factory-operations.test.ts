@@ -190,6 +190,54 @@ it('rejects unverified actionlint download bytes before creating any archive or 
   assert.deepEqual(fs.readdirSync(path.join(directory, 'scripts')), ['check-factory-workflows.ts']);
 });
 
+it('retries a stalled actionlint download but never a refused one, and still checks the digest', (test) => {
+  const root = process.cwd();
+  fs.mkdirSync(path.join(root, '.worktrees'), { recursive: true });
+  const directory = fs.mkdtempSync(path.join(root, '.worktrees/factory-retry-'));
+  test.after(() => {
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+  fs.mkdirSync(path.join(directory, 'scripts'));
+  fs.copyFileSync(
+    path.join(root, 'scripts/check-factory-workflows.ts'),
+    path.join(directory, 'scripts/check-factory-workflows.ts'),
+  );
+  fs.symlinkSync(path.join(root, 'node_modules'), path.join(directory, 'node_modules'), 'dir');
+  const result = spawnSync(process.execPath, ['--input-type=module'], {
+    cwd: directory,
+    encoding: 'utf8',
+    timeout: 30_000,
+    input: `
+      import assert from 'node:assert/strict';
+      import { actionlintBinary, disposeActionlint } from './scripts/check-factory-workflows.ts';
+      let calls = 0;
+      globalThis.fetch = async () => {
+        calls += 1;
+        if (calls < 3) throw new TypeError('fetch failed');
+        return new Response('UNVERIFIED_ACTIONLINT_TEST_BYTES');
+      };
+      await assert.rejects(actionlintBinary(), /checksum mismatch/);
+      assert.equal(calls, 3);
+      calls = 0;
+      globalThis.fetch = async () => { calls += 1; return new Response('', { status: 404 }); };
+      await assert.rejects(actionlintBinary(), /download failed/);
+      assert.equal(calls, 1);
+      calls = 0;
+      globalThis.fetch = async () => { calls += 1; throw new TypeError('fetch failed'); };
+      await assert.rejects(actionlintBinary(), /fetch failed/);
+      assert.equal(calls, 3);
+      calls = 0;
+      globalThis.fetch = async () => { calls += 1; return new Response('', { status: 503 }); };
+      await assert.rejects(actionlintBinary(), /download failed/);
+      assert.equal(calls, 3);
+      disposeActionlint();
+    `,
+    env: { PATH: process.env['PATH'] },
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0, result.stderr);
+});
+
 it('downloads actionlint once per process and leaves no private tool directory after disposal or exit', (test) => {
   const root = process.cwd();
   fs.mkdirSync(path.join(root, '.worktrees'), { recursive: true });
@@ -206,7 +254,7 @@ it('downloads actionlint once per process and leaves no private tool directory a
   const result = spawnSync(process.execPath, ['--input-type=module'], {
     cwd: directory,
     encoding: 'utf8',
-    timeout: 120_000,
+    timeout: 200_000,
     input: `
       import assert from 'node:assert/strict';
       import fs from 'node:fs';
@@ -214,8 +262,9 @@ it('downloads actionlint once per process and leaves no private tool directory a
       const fetchOriginal = globalThis.fetch;
       let downloads = 0;
       globalThis.fetch = async (...args) => {
-        downloads++;
-        return await fetchOriginal(...args);
+        const response = await fetchOriginal(...args);
+        if (response.ok) downloads++;
+        return response;
       };
       const [first, second] = await Promise.all([actionlintBinary(), actionlintBinary()]);
       assert.equal(first, second);
