@@ -175,5 +175,13 @@ activation; unknown provider, budget or deployment authority denies effects.
 A single native controller coordinates durable lineage accounting and authenticated
 checkpoints. Separate jobs isolate model access, secretless repro/gates and trusted
 data/Git publication. Source fault fixtures do not establish hosted or genuine-finding
-acceptance. See [ADR0007](adr/0007-disabled-issue-driven-night-factory.md) and the
+acceptance.
+
+Branch preservation limit: the repository merges by squash only, so a merged factory
+branch head is never an ancestor of the delivered commit. Remote branch cleanup requires
+that ancestry, hence a squash delivery always preserves the branch. The REST ref DELETE
+has no expected-old compare-and-swap, so no such guarantee and no automatic cleanup after
+squash is claimed; removing a delivered branch is a human decision.
+
+See [ADR0007](adr/0007-disabled-issue-driven-night-factory.md) and the
 [change design](../openspec/changes/issue-driven-night-factory/design.md).

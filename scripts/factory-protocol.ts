@@ -585,17 +585,7 @@ export async function resolveFactoryContext(context: FactoryContext): Promise<Fa
   const manifest = arrayField(activation, 'control_manifest').map(record);
   const requiredManifest = [
     ...staticRegistry.map((entry) => stringField(entry, 'path')),
-    'scripts/factory-policy.json',
-    'scripts/factory-protocol.ts',
-    'scripts/factory-control.ts',
-    'scripts/factory-publication.ts',
-    'scripts/factory-writer.ts',
-    'scripts/factory-operations.ts',
-    'scripts/factory-preservation.ts',
-    'scripts/check-factory-workflows.ts',
-    'package.json',
-    'package-lock.json',
-    '.github/workflows/ci.yml',
+    ...CONTROL_FILES,
   ];
   if (
     manifest.length !== requiredManifest.length ||
@@ -807,10 +797,28 @@ export async function githubPages(
   }
   throw new FactoryFailure('Incomplete pagination ceiling');
 }
+// Controlled files beyond the workflow registry; every local import of a factory script must be listed.
+export const CONTROL_FILES: readonly string[] = [
+  'scripts/factory-policy.json',
+  'scripts/factory-protocol.ts',
+  'scripts/factory-paths.ts',
+  'scripts/factory-control.ts',
+  'scripts/factory-publication.ts',
+  'scripts/factory-writer.ts',
+  'scripts/factory-operations.ts',
+  'scripts/factory-preservation.ts',
+  'scripts/check-factory-workflows.ts',
+  'package.json',
+  'package-lock.json',
+  '.github/workflows/ci.yml',
+];
 export async function verifyControlSource(
   context: FactoryContext,
   stopping = false,
 ): Promise<void> {
+  // The relaxed control-closure check is for the dedicated stop role only (ADR 0007, emergency stop exception).
+  if (stopping && context.role !== 'stop')
+    throw new FactoryFailure('Emergency stop verification requires the stop role');
   effectPolicy(context);
   const p = context.policy;
   const base = `/repos/${stringField(p, 'repository_full_name')}`;
@@ -862,6 +870,9 @@ export async function verifyControlSource(
     `${stringField(p, 'repository_full_name')}/${stringField(registered, 'path')}@refs/heads/main`
   )
     throw new FactoryFailure('Untrusted workflow ref');
+  // Emergency stop only disables, cancels and unarms: it keeps the repository, owner, actor, registry and
+  // run identity checks above but must not depend on the control files still matching the release.
+  if (stopping) return;
   const live = stringField(
     record(record(await githubRequest(context, `${base}/git/ref/heads/main`))['object']),
     'sha',
@@ -891,7 +902,8 @@ export async function verifyControlSource(
         throw new FactoryFailure('Changed approved control blob');
     }
   }
-  if (stopping || context.role === 'stop' || context.role === 'bootstrap') return;
+  if (context.role === 'stop' || context.role === 'bootstrap') return;
+  // Fail closed: an absent, unreadable or non-false stop.json denies ordinary effects.
   const stop = record(await githubRequest(context, `${base}/contents/stop.json?ref=factory-state`));
   const stopped: unknown = JSON.parse(
     Buffer.from(stringField(stop, 'content'), 'base64').toString('utf8'),

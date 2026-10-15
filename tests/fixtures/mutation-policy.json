@@ -483,9 +483,9 @@
     {
       "file": "scripts/check-factory-workflows.ts",
       "owner": "downloadActionlint",
-      "mutationHash": "7d0cdd85226b7b919d9c45be714e4df73805d761702c02f6f78520db65cf5583",
-      "count": 1,
-      "reason": "Invocation-owned verified archive digest builder checks one official upstream binary before native actionlint; single/max and unrelated diagnostic controls exercise the gate.",
+      "mutationHash": "8a18aadf0736a7f8ed6cf43d6969d90a1c48467d89526fe675e34d4fd535860d",
+      "count": 2,
+      "reason": "Invocation-owned verified archive digest builder checks one official upstream binary before native actionlint and records its private tool directory in the process-owned memo for disposal; single/max and unrelated diagnostic controls exercise the gate.",
       "test": "tests/factory-operations.test.ts"
     },
     {
@@ -499,9 +499,9 @@
     {
       "file": "scripts/check-factory-workflows.ts",
       "owner": "validateFactoryHardening",
-      "mutationHash": "f2355e43960fd4cce425563e292f835e6143bdb7add1a11031c47bfe0b0d2305",
+      "mutationHash": "c7b9d7d8025ebbb810509f499e29f89e02036e1942e9d2ad141cee22d262ab60",
       "count": 2,
-      "reason": "Invocation-owned loop flag and step cursor scan one parsed workflow for write-token environment, ignore-scripts installs and explicit actions permission; real workflow and per-rule mutation controls exercise the gate.",
+      "reason": "Invocation-owned authentication flag and step cursor scan one parsed workflow for write-token environment (workflow, job and step env, with inputs, run text), ignore-scripts installs and explicit actions permission; real workflow and per-rule mutation controls exercise the gate.",
       "test": "tests/factory-operations.test.ts"
     },
     {
@@ -526,6 +526,30 @@
       "mutationHash": "5a8ab74193021216a545c771c2ff29a7ee25f21ee257998c9916ebd00e7f9d8f",
       "count": 2,
       "reason": "Invocation-owned memo slot keeps one verified actionlint download per process and clears it on failure so a bad checksum is never cached; native queue controls reuse the same verified binary.",
+      "test": "tests/factory-operations.test.ts"
+    },
+    {
+      "file": "scripts/check-factory-workflows.ts",
+      "owner": "expressionBodies",
+      "mutationHash": "4eea209cd66279d84ed7276e2aaa7068edeef84331435b286ab7a9082117c5a4",
+      "count": 13,
+      "reason": "Invocation-owned scanner cursor and body buffer walk one workflow text once, skipping quoted literals so a quoted '}}' cannot end an expression; quoted, unterminated and multi-expression controls exercise the gate.",
+      "test": "tests/factory-operations.test.ts"
+    },
+    {
+      "file": "scripts/check-factory-workflows.ts",
+      "owner": "validateDispatchReachability",
+      "mutationHash": "9751805e6f784a555b1ae35483a9a24f7961e43c05acdc4ee053af25f624fd1a",
+      "count": 3,
+      "reason": "Invocation-owned reached-option set collects dispatch choices named by job conditions or handler branches of one parsed workflow; dead, undeclared and stale-unwired controls exercise the gate.",
+      "test": "tests/factory-operations.test.ts"
+    },
+    {
+      "file": "scripts/check-factory-workflows.ts",
+      "owner": "disposeActionlint",
+      "mutationHash": "80f3d5afd83b0e21888ef40fbeee08ab7616ddef1ea75ab8d0c16bc680f46127",
+      "count": 2,
+      "reason": "Process-owned memo slots are cleared after the last validation or at exit so the verified actionlint binary and its private directory never outlive the process; native queue controls dispose after use.",
       "test": "tests/factory-operations.test.ts"
     }
   ]

@@ -55,6 +55,7 @@ export class FactoryPlatform {
       '.github/workflows/factory-operations.yml',
       'scripts/factory-policy.json',
       'scripts/factory-protocol.ts',
+      'scripts/factory-paths.ts',
       'scripts/factory-control.ts',
       'scripts/factory-publication.ts',
       'scripts/factory-writer.ts',
