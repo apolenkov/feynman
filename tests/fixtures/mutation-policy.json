@@ -482,7 +482,7 @@
     },
     {
       "file": "scripts/check-factory-workflows.ts",
-      "owner": "actionlintBinary",
+      "owner": "downloadActionlint",
       "mutationHash": "7d0cdd85226b7b919d9c45be714e4df73805d761702c02f6f78520db65cf5583",
       "count": 1,
       "reason": "Invocation-owned verified archive digest builder checks one official upstream binary before native actionlint; single/max and unrelated diagnostic controls exercise the gate.",
@@ -519,6 +519,14 @@
       "count": 4,
       "reason": "Invocation-owned expected/live head slots classify immutable remote transport and canonical PR state; primary actual Git existing-head recovery and foreign head/body/repository/origin controls exercise reuse and denial without a network push.",
       "test": "tests/night-factory-publication.test.ts"
+    },
+    {
+      "file": "scripts/check-factory-workflows.ts",
+      "owner": "actionlintBinary",
+      "mutationHash": "5a8ab74193021216a545c771c2ff29a7ee25f21ee257998c9916ebd00e7f9d8f",
+      "count": 2,
+      "reason": "Invocation-owned memo slot keeps one verified actionlint download per process and clears it on failure so a bad checksum is never cached; native queue controls reuse the same verified binary.",
+      "test": "tests/factory-operations.test.ts"
     }
   ]
 }

@@ -130,7 +130,16 @@ export function validateFactoryHardening(content: string, name: string): void {
       throw new Error(`${id}: factory job requires explicit actions permission`);
   }
 }
-export async function actionlintBinary(): Promise<string> {
+const verified: { binary?: Promise<string> | undefined } = {};
+// shortcut: one verified download per process; the private tool directory is not cleaned (F8), upgrade with cleanup.
+export function actionlintBinary(): Promise<string> {
+  verified.binary ??= downloadActionlint().catch((error: unknown) => {
+    verified.binary = undefined;
+    throw error;
+  });
+  return verified.binary;
+}
+async function downloadActionlint(): Promise<string> {
   const platform = `${process.platform}_${process.arch === 'x64' ? 'amd64' : process.arch}`;
   const expected = ARCHIVE_DIGESTS[platform];
   if (expected === undefined)
