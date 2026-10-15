@@ -30,9 +30,13 @@ import {
   validateFactoryWorkflowSet,
   validateInertPolicy,
   validateInertWorkflow,
+  validateKeyJob,
   validateNativeWorkflow,
+  validateNightParentWindow,
+  validateSecretIsolation,
   validateWorkflowSchema,
 } from '../scripts/check-factory-workflows.ts';
+import { loadNightPolicy } from '../scripts/factory-model.ts';
 it('native factory workflow JSON boundaries reject malformed input without exposing bytes or writing outputs', async (test) => {
   const root = process.cwd();
   fs.mkdirSync(path.join(root, '.worktrees'), { recursive: true });
@@ -247,11 +251,14 @@ const { Binary, ContextAccess, IndexAccess, Literal, Logical, Grouping } =
 const PRIVILEGED_FLAG = 'FACTORY_PRIVILEGED_JOBS_ENABLED';
 const OWNER_GATE = `vars.${PRIVILEGED_FLAG} == 'true'`;
 
+// The job status functions are the only functions a factory job condition may call besides the built-ins.
+const ALWAYS = { name: 'always', minArgs: 0, maxArgs: 0 };
+const CANCELLED = { name: 'cancelled', minArgs: 0, maxArgs: 0 };
 function ownerJobExpression(condition: string) {
   return new Parser(
     new Lexer(condition).lex().tokens,
     ['vars', 'needs', 'inputs', 'github'],
-    [],
+    [ALWAYS, CANCELLED],
   ).parse();
 }
 function evaluateOwnerJob(condition: string, flag: string | undefined): string {
@@ -270,7 +277,16 @@ function evaluateOwnerJob(condition: string, flag: string | undefined): string {
       }),
     },
   );
-  return new Evaluator(ownerJobExpression(condition), context).evaluate().coerceString();
+  return new Evaluator(
+    ownerJobExpression(condition),
+    context,
+    new Map([
+      ['always', { ...ALWAYS, call: () => new data.BooleanData(true) }],
+      ['cancelled', { ...CANCELLED, call: () => new data.BooleanData(false) }],
+    ]),
+  )
+    .evaluate()
+    .coerceString();
 }
 
 function assertFactoryWriteJobsDisabled(content: string, name: string): number {
@@ -568,6 +584,22 @@ it('factory hardening requires actions: read wherever a job authenticates with t
   // Real token access (runs, jobs, logs, artifacts) is a hosted condition: no local fixture proves it.
 });
 
+it('ties the bot parent window to the night-review job timeout plus five minutes', () => {
+  const review = fs.readFileSync('.github/workflows/night-review.yml', 'utf8');
+  const window = record(loadFactoryPolicy()['night_scan'])['parent_window_minutes'];
+  validateNightParentWindow(window, review);
+  for (const wrong of [5, 10, 16, undefined])
+    assert.throws(() => {
+      validateNightParentWindow(wrong, review);
+    }, /parent_window_minutes/);
+  assert.throws(() => {
+    validateNightParentWindow(window, review.replace('timeout-minutes: 10', 'timeout-minutes: 20'));
+  }, /parent_window_minutes/);
+  assert.throws(() => {
+    validateNightParentWindow(window, review.replace('    timeout-minutes: 10\n', ''));
+  }, /parent_window_minutes/);
+});
+
 it('PR-A enables nothing: inactive policy, no schedule, no secrets beyond the workflow token and no FACTORY_* set true', () => {
   validateInertPolicy(loadFactoryPolicy());
   assert.throws(() => {
@@ -631,6 +663,529 @@ it('PR-A enables nothing: inactive policy, no schedule, no secrets beyond the wo
     control.replace('FACTORY_INPUT: ${{ inputs.request }}', 'T: ${{ secrets.GITHUB_TOKEN }}'),
     'factory-control.yml',
   );
+});
+
+const workflowSource = (name: string): string =>
+  fs.readFileSync(path.join('.github/workflows', name), 'utf8');
+// One job's text, from its id line to the next job; `edit` rewrites only that job.
+function editJob(content: string, job: string, edit: (text: string) => string): string {
+  const start = content.indexOf(`\n  ${job}:\n`) + 1;
+  assert.ok(start > 0, `${job} present`);
+  const next = content.slice(start + 1).search(/\n {2}[\w-]+:\n/);
+  const end = next === -1 ? content.length : start + 1 + next + 1;
+  const edited = edit(content.slice(start, end));
+  assert.notEqual(edited, content.slice(start, end), `${job} edit applied`);
+  return content.slice(0, start) + edited + content.slice(end);
+}
+const keyGate = (content: string, name = 'factory-control.yml'): void => {
+  validateInertWorkflow(content, name);
+  validateKeyJob(content, name);
+  validateSecretIsolation(content, name);
+  validateFactoryHardening(content, name);
+};
+
+it('night-scan gate: the real workflows pass and only the key job, in one step, holds provider keys', () => {
+  validateInertPolicy(loadFactoryPolicy());
+  for (const name of fs.readdirSync('.github/workflows').filter((file) => /\.ya?ml$/.test(file)))
+    validateSecretIsolation(workflowSource(name), name);
+  for (const name of FACTORY_WORKFLOWS) keyGate(workflowSource(name), name);
+  const control = workflowSource('factory-control.yml');
+  assert.deepEqual(
+    [...control.matchAll(/secrets\.(\w+)/g)].map(([, secret]) => secret),
+    ['OCR_LLM_AUTH_TOKEN', 'OPENCODE_GO_API_KEY'],
+  );
+  assert.equal(workflowSource('night-review.yml').match(/cron:/g)?.length, 1);
+  for (const [job, name] of [
+    ['authority-verifier', 'factory-authority-verifier'],
+    ['authority-scan', 'factory-authority-scan'],
+  ] as const)
+    assert.ok(
+      control.includes(`  ${job}:\n    name: ${name}\n`),
+      `${job} keeps the protocol job name`,
+    );
+});
+
+it('night-scan gate: a provider key outside the Model pass env of the key job is rejected', () => {
+  const control = workflowSource('factory-control.yml');
+  const key = '${{ secrets.OCR_LLM_AUTH_TOKEN }}';
+  const mutations: [string, string][] = [
+    [
+      'another job',
+      editJob(control, 'night-adapter', (text) =>
+        text.replace(
+          '      - id: adapt\n',
+          `      - id: adapt\n        env:\n          K: ${key}\n`,
+        ),
+      ),
+    ],
+    [
+      'job env of the key job',
+      editJob(control, 'night-model', (text) =>
+        text.replace('    environment: ci\n', `    environment: ci\n    env:\n      K: ${key}\n`),
+      ),
+    ],
+    [
+      'run of the Model pass step',
+      editJob(control, 'night-model', (text) =>
+        text.replace(
+          'run: node scripts/factory-model.ts run',
+          `run: echo ${key}; node scripts/factory-model.ts run`,
+        ),
+      ),
+    ],
+    [
+      'with of another step of the key job',
+      editJob(control, 'night-model', (text) =>
+        text.replace(
+          '          path: ${{ runner.temp }}/night-known\n',
+          `          path: \${{ runner.temp }}/night-known\n          github-token: ${key}\n`,
+        ),
+      ),
+    ],
+    [
+      'env of another step of the key job',
+      editJob(control, 'night-model', (text) =>
+        text.replace(
+          '      - name: Require a clean checkout\n',
+          `      - name: Require a clean checkout\n        env:\n          K: ${key}\n`,
+        ),
+      ),
+    ],
+    [
+      'the fallback key outside the key job',
+      editJob(control, 'publication', (text) =>
+        text.replace(
+          'FACTORY_INPUT: ${{ inputs.request }}',
+          'FACTORY_INPUT: ${{ secrets.OPENCODE_GO_API_KEY }}',
+        ),
+      ),
+    ],
+  ];
+  for (const [label, content] of mutations)
+    assert.throws(
+      () => {
+        validateInertWorkflow(content, 'factory-control.yml');
+      },
+      /secret use/,
+      label,
+    );
+});
+
+it('night-scan gate: the key job needs the ci environment, exact read-only permissions and no tracing', () => {
+  const control = workflowSource('factory-control.yml');
+  const keyJob = (from: string, to: string): string =>
+    editJob(control, 'night-model', (text) => text.replace(from, to));
+  const mutations: [string, string, RegExp][] = [
+    [
+      'privileged environment',
+      keyJob('environment: ci\n', 'environment: factory-privileged\n'),
+      /requires environment ci/,
+    ],
+    ['no environment', keyJob('    environment: ci\n', ''), /requires environment ci/],
+    [
+      'issues write',
+      keyJob(
+        '      actions: read\n    steps:',
+        '      actions: read\n      issues: write\n    steps:',
+      ),
+      /permissions must be exactly/,
+    ],
+    [
+      'actions write',
+      keyJob('      actions: read\n    steps:', '      actions: write\n    steps:'),
+      /permissions must be exactly/,
+    ],
+    [
+      'no permissions',
+      keyJob('    permissions:\n      contents: read\n      actions: read\n', ''),
+      /permissions must be exactly/,
+    ],
+    [
+      'step debug variable',
+      keyJob(
+        '        env:\n          OCR_LLM_AUTH_TOKEN',
+        '        env:\n          ACTIONS_STEP_DEBUG: true\n          OCR_LLM_AUTH_TOKEN',
+      ),
+      /debug logging/,
+    ],
+    [
+      'runner debug at workflow level',
+      control.replace(
+        'permissions:\n  contents: read\n',
+        'permissions:\n  contents: read\nenv:\n  ACTIONS_RUNNER_DEBUG: 1\n',
+      ),
+      /debug logging/,
+    ],
+    [
+      'set -x',
+      keyJob(
+        'run: test -z "$(git status --porcelain)"',
+        'run: set -x; test -z "$(git status --porcelain)"',
+      ),
+      /tracing/,
+    ],
+    [
+      'xtrace option',
+      keyJob('run: npm audit signatures', 'run: set -o xtrace && npm audit signatures'),
+      /tracing/,
+    ],
+    ['another runner', keyJob('runs-on: ubuntu-latest', 'runs-on: self-hosted'), /ubuntu-latest/],
+    [
+      'container',
+      keyJob('runs-on: ubuntu-latest\n', 'runs-on: ubuntu-latest\n    container: node:26\n'),
+      /container or services/,
+    ],
+    [
+      'services',
+      keyJob(
+        'runs-on: ubuntu-latest\n',
+        'runs-on: ubuntu-latest\n    services:\n      db:\n        image: postgres\n',
+      ),
+      /container or services/,
+    ],
+    [
+      'Model pass as an action',
+      keyJob(
+        '        run: node scripts/factory-model.ts run',
+        '        uses: ./.github/actions/x\n        with:\n          args: node scripts/factory-model.ts run',
+      ),
+      /must only run/,
+    ],
+    [
+      'Model pass with a custom shell',
+      keyJob(
+        '        run: node scripts/factory-model.ts run',
+        '        shell: bash\n        run: node scripts/factory-model.ts run',
+      ),
+      /must only run/,
+    ],
+    [
+      'Model pass running something else',
+      keyJob('run: node scripts/factory-model.ts run', 'run: node other.ts run'),
+      /must only run/,
+    ],
+    [
+      'deadline beyond the job timeout',
+      keyJob('--deadline-seconds 2100', '--deadline-seconds 2700'),
+      /deadline-seconds/,
+    ],
+    ['no deadline', keyJob(' --deadline-seconds 2100', ''), /deadline-seconds/],
+    [
+      'command chained after the model pass',
+      keyJob('--deadline-seconds 2100', '--deadline-seconds 2100; curl -d "$OCR_LLM_AUTH_TOKEN" x'),
+      /must only run/,
+    ],
+    [
+      'repeated deadline flag',
+      keyJob('--deadline-seconds 2100', '--deadline-seconds 2100 --deadline-seconds 99999'),
+      /must only run/,
+    ],
+    [
+      'extra env on the model pass',
+      keyJob('          OCR_BIN:', '          NODE_OPTIONS: --require ./x.js\n          OCR_BIN:'),
+      /must only run/,
+    ],
+    [
+      'earlier step writing NODE_OPTIONS to GITHUB_ENV',
+      keyJob(
+        '      - id: tool\n',
+        '      - run: echo "NODE_OPTIONS=--require ./x.js" >> "$GITHUB_ENV"\n      - id: tool\n',
+      ),
+      /reviewed pin/,
+    ],
+    [
+      'substituted OCR_BIN value',
+      keyJob('OCR_BIN: ${{ steps.tool.outputs.ocr_bin }}', 'OCR_BIN: ./tools/fake'),
+      /reviewed pin/,
+    ],
+    [
+      'working-directory on the model pass',
+      keyJob(
+        '      - name: Model pass\n',
+        '      - name: Model pass\n        working-directory: other\n',
+      ),
+      /reviewed pin/,
+    ],
+    [
+      'workflow defaults',
+      control.replace('\njobs:\n', '\ndefaults:\n  run:\n    shell: bash\njobs:\n'),
+      /defaults/,
+    ],
+    [
+      'workflow env',
+      control.replace('\njobs:\n', '\nenv:\n  BASH_ENV: ./x.sh\njobs:\n'),
+      /workflow env/,
+    ],
+    [
+      'job defaults',
+      keyJob(
+        '    environment: ci\n',
+        '    environment: ci\n    defaults:\n      run:\n        shell: bash\n',
+      ),
+      /defaults/,
+    ],
+    [
+      'traced shell',
+      keyJob(
+        '      - name: Require a clean checkout\n',
+        '      - name: Require a clean checkout\n        shell: bash -xe {0}\n',
+      ),
+      /tracing/,
+    ],
+  ];
+  for (const [label, content, error] of mutations)
+    assert.throws(
+      () => {
+        validateKeyJob(content, 'factory-control.yml');
+      },
+      error,
+      label,
+    );
+  assert.throws(() => {
+    validateKeyJob(control.replace('  night-model:\n', '  night-modul:\n'), 'factory-control.yml');
+  }, /key job absent/);
+});
+
+it('night-scan gate: push, pull_request and every other workflow never mention the provider keys or the ci environment', () => {
+  const ci = workflowSource('ci.yml');
+  for (const [label, content, name] of [
+    [
+      'ci env',
+      ci.replace(
+        'jobs:\n',
+        'jobs:\n  x:\n    runs-on: ubuntu-latest\n    env:\n      K: ${{ secrets.OCR_LLM_AUTH_TOKEN }}\n    steps:\n      - run: echo\n',
+      ),
+      'ci.yml',
+    ],
+    [
+      'push workflow',
+      'name: p\non: push\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ${{ secrets.OPENCODE_GO_API_KEY }}\n',
+      'p.yml',
+    ],
+    [
+      'pull_request_target',
+      'name: p\non: pull_request_target\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo "$OCR_LLM_AUTH_TOKEN"\n',
+      'q.yml',
+    ],
+    [
+      'workflow_run',
+      'name: p\non:\n  workflow_run:\n    workflows: [x]\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ${{ secrets.OCR_LLM_AUTH_TOKEN }}\n',
+      'r.yml',
+    ],
+    [
+      'factory workflow other than the key one',
+      workflowSource('night-review.yml').replace(
+        'FACTORY_INPUT: ${{ inputs.request }}',
+        'K: ${{ secrets.OCR_LLM_AUTH_TOKEN }}',
+      ),
+      'night-review.yml',
+    ],
+  ] as const)
+    assert.throws(
+      () => {
+        validateSecretIsolation(content, name);
+      },
+      /provider secret names may appear only/,
+      label,
+    );
+  assert.throws(() => {
+    validateSecretIsolation(
+      ci.replace(
+        'jobs:\n',
+        'jobs:\n  x:\n    runs-on: ubuntu-latest\n    environment: ci\n    steps:\n      - run: echo ${{ toJSON(secrets) }}\n',
+      ),
+      'ci.yml',
+    );
+  }, /environment ci is reserved/);
+  assert.throws(() => {
+    validateSecretIsolation(
+      editJob(workflowSource('factory-control.yml'), 'night-adapter', (text) =>
+        text.replace('    runs-on:', '    environment: ci\n    runs-on:'),
+      ),
+      'factory-control.yml',
+    );
+  }, /environment ci is reserved/);
+});
+
+it('night-scan gate: the ci environment cannot be reached by casing, an expression or a reusable workflow', () => {
+  const ci = workflowSource('ci.yml');
+  const withJob = (job: string): string => ci.replace('jobs:\n', `jobs:\n${job}`);
+  for (const [label, content, error] of [
+    [
+      'other casing',
+      withJob(
+        '  x:\n    runs-on: ubuntu-latest\n    environment: Ci\n    steps:\n      - run: echo\n',
+      ),
+      /environment ci is reserved/,
+    ],
+    [
+      'mapping name in other casing',
+      withJob(
+        '  x:\n    runs-on: ubuntu-latest\n    environment:\n      name: CI\n    steps:\n      - run: echo\n',
+      ),
+      /environment ci is reserved/,
+    ],
+    [
+      'constant expression',
+      withJob(
+        "  x:\n    runs-on: ubuntu-latest\n    environment: ${{ 'ci' }}\n    steps:\n      - run: echo\n",
+      ),
+      /environment ci is reserved/,
+    ],
+    [
+      'run-time expression',
+      withJob(
+        '  x:\n    runs-on: ubuntu-latest\n    environment: ${{ github.ref_name }}\n    steps:\n      - run: echo\n',
+      ),
+      /must be a literal/,
+    ],
+    [
+      'external reusable workflow',
+      withJob('  x:\n    uses: octo/repo/.github/workflows/w.yml@v1\n'),
+      /reusable workflows are limited/,
+    ],
+  ] as const)
+    assert.throws(
+      () => {
+        validateSecretIsolation(content, 'ci.yml');
+      },
+      error,
+      label,
+    );
+  validateSecretIsolation(withJob('  x:\n    uses: ./.github/workflows/w.yml\n'), 'ci.yml');
+});
+
+it('night-scan gate: night, authority and publication jobs never use always(); the night key job runs only on the first attempt', () => {
+  const control = workflowSource('factory-control.yml');
+  for (const job of ['authority-scan', 'publication', 'night-adapter'])
+    assert.throws(
+      () => {
+        validateFactoryHardening(
+          editJob(control, job, (text) => text.replace(/\n {4}if: /, '\n    if: always() && ')),
+          'factory-control.yml',
+        );
+      },
+      /!cancelled\(\)/,
+      job,
+    );
+  assert.match(
+    control.slice(control.indexOf('\n  night-model:\n')),
+    /night-model:[\s\S]*?if: [^\n]*github\.run_attempt == 1/,
+  );
+  // The known list is requested with the dispatch request so the actor check sees the parent.
+  assert.match(
+    control.slice(control.indexOf('\n  night-known:\n'), control.indexOf('\n  night-model:\n')),
+    /FACTORY_INPUT: \$\{\{ inputs\.request \}\}/,
+  );
+});
+
+it('night-scan gate: a schedule exists only in night-review with exactly one cron', () => {
+  const review = workflowSource('night-review.yml');
+  validateInertWorkflow(review, 'night-review.yml');
+  assert.throws(() => {
+    validateInertWorkflow(
+      review.replace(
+        "    - cron: '17 2 * * *'\n",
+        "    - cron: '17 2 * * *'\n    - cron: '17 3 * * *'\n",
+      ),
+      'night-review.yml',
+    );
+  }, /exactly one cron/);
+  assert.throws(() => {
+    validateInertWorkflow(
+      review.replace(
+        "    - cron: '17 2 * * *'\n",
+        "    - cron: '17 2 * * *'\n      timezone: UTC\n",
+      ),
+      'night-review.yml',
+    );
+  }, /exactly one cron/);
+  for (const name of ['factory-control.yml', 'factory-ingress.yml', 'factory-operations.yml'])
+    assert.throws(
+      () => {
+        validateInertWorkflow(
+          workflowSource(name).replace('on:\n', "on:\n  schedule:\n    - cron: '17 2 * * *'\n"),
+          name,
+        );
+      },
+      /schedule trigger is not enabled/,
+      name,
+    );
+  for (const trigger of ['push', 'pull_request', 'pull_request_target', 'workflow_run'])
+    assert.throws(
+      () => {
+        validateInertWorkflow(review.replace('on:\n', `on:\n  ${trigger}:\n`), 'night-review.yml');
+      },
+      /trigger is not enabled/,
+      trigger,
+    );
+});
+
+it('night-scan gate: night, authority and publication jobs require timeout-minutes', () => {
+  const control = workflowSource('factory-control.yml');
+  for (const job of [
+    'night-known',
+    'night-model',
+    'night-adapter',
+    'authority-verifier',
+    'authority-scan',
+    'authority-bootstrap',
+    'authority-checkpoint',
+    'publication',
+  ])
+    assert.throws(
+      () => {
+        validateFactoryHardening(
+          editJob(control, job, (text) => text.replace(/ {4}timeout-minutes: \d+\n/, '')),
+          'factory-control.yml',
+        );
+      },
+      /require timeout-minutes/,
+      job,
+    );
+  assert.throws(() => {
+    validateFactoryHardening(
+      editJob(control, 'night-known', (text) =>
+        text.replace(/timeout-minutes: \d+/, 'timeout-minutes: 0'),
+      ),
+      'factory-control.yml',
+    );
+  }, /require timeout-minutes/);
+});
+
+it('night-scan policy: the secret names, model block and OCR pin agree with the lock file', () => {
+  const policy = loadFactoryPolicy();
+  assert.deepEqual(policy['secret_names'], ['OCR_LLM_AUTH_TOKEN', 'OPENCODE_GO_API_KEY']);
+  for (const names of [
+    ['OCR_LLM_AUTH_TOKEN'],
+    ['OCR_LLM_AUTH_TOKEN', 'OPENCODE_GO_API_KEY', 'X'],
+    [],
+  ])
+    assert.throws(() => {
+      validateInertPolicy({ ...policy, secret_names: names });
+    }, /secret_names must be exactly/);
+  const night = loadNightPolicy();
+  assert.equal(night.scan_model, 'glm-5.3');
+  assert.equal(night.verifier_model, 'kimi-k3');
+  assert.equal(night.analyst_model, 'kimi-k3');
+  assert.equal(night.llm_url, 'https://opencode.ai/inference/go/v1');
+  assert.deepEqual(
+    [night.ocr_token_budget, night.verifier_token_budget, night.analyst_token_budget],
+    [3_000_000, 300_000, 100_000],
+  );
+  assert.deepEqual([night.verify_cap, night.concurrency], [6, 4]);
+  assert.equal(night.fingerprint_policy_revision, 'night-scan-fp-v1');
+  const lock = record(
+    record(JSON.parse(fs.readFileSync('tools/ocr/package-lock.json', 'utf8')))['packages'],
+  );
+  const main = record(lock['node_modules/@alibaba-group/open-code-review']);
+  assert.equal(main['version'], night.ocr_version);
+  assert.equal(main['integrity'], night.ocr_lock_integrity);
+  assert.equal(
+    record(lock['node_modules/@alibaba-group/ocr-linux-x64'])['integrity'],
+    night.ocr_native_integrity['linux-x64'],
+  );
+  assert.equal(policy['activation'], false);
 });
 
 it('factory dispatch choices reach a job, a no-filter script command, or an explicitly unwired list', () => {

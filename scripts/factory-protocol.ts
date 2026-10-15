@@ -807,14 +807,20 @@ export const CONTROL_FILES: readonly string[] = [
   'scripts/factory-writer.ts',
   'scripts/factory-operations.ts',
   'scripts/factory-preservation.ts',
+  'scripts/factory-model.ts',
+  'scripts/factory-scan-record.ts',
   'scripts/check-factory-workflows.ts',
   'package.json',
   'package-lock.json',
+  'tools/ocr/package.json',
+  'tools/ocr/package-lock.json',
   '.github/workflows/ci.yml',
 ];
+// `scheduledPath` additionally lets that one registered workflow run on `schedule` (the night review).
 export async function verifyControlSource(
   context: FactoryContext,
   stopping = false,
+  scheduledPath?: string,
 ): Promise<void> {
   // The relaxed control-closure check is for the dedicated stop role only (ADR 0007, emergency stop exception).
   if (stopping && context.role !== 'stop')
@@ -857,7 +863,12 @@ export async function verifyControlSource(
   )
     throw new FactoryFailure('Foreign/disabled job workflow');
   if (
-    attempt['event'] !== 'workflow_dispatch' ||
+    !(
+      attempt['event'] === 'workflow_dispatch' ||
+      (attempt['event'] === 'schedule' &&
+        scheduledPath !== undefined &&
+        registered['path'] === scheduledPath)
+    ) ||
     attempt['head_branch'] !== 'main' ||
     attempt['run_attempt'] !== 1 ||
     attempt['head_sha'] !== context.job['workflow_source_sha'] ||
@@ -1079,7 +1090,7 @@ export async function readAuthorityArchive(
   context: FactoryContext,
   artifactId: string,
   archiveSha: string,
-  kind: 'receipt' | 'checkpoint',
+  kind: 'receipt' | 'checkpoint' | 'scan',
 ): Promise<Buffer> {
   if (
     context.policy['api_origin'] !== 'https://api.github.com' ||
@@ -1115,8 +1126,182 @@ export async function readAuthorityArchive(
     maxBuffer: 100_000,
   });
   if (!types.startsWith('-')) throw new FactoryFailure('Unsafe archive member type');
-  return execFileSync('bsdtar', ['-xOf', '-', basename], { input: archive, maxBuffer: 1_000_000 });
+  try {
+    return execFileSync('bsdtar', ['-xOf', '-', basename], {
+      input: archive,
+      maxBuffer: 1_000_000,
+    });
+  } catch {
+    throw new FactoryFailure('Archive member unreadable or too large');
+  }
 }
+const ACTIONS_BOT = { id: '41898282', login: 'github-actions[bot]' } as const;
+export function isApprovedPublisher(policy: FactoryPolicy, id: unknown, login: unknown): boolean {
+  return (
+    (id === policy['owner_id'] && login === policy['owner_login']) ||
+    (id === ACTIONS_BOT.id && login === ACTIONS_BOT.login)
+  );
+}
+// Phases the scheduled review's Actions bot may sign; repair reservations stay owner-only.
+const BOT_PHASES = ['scan', 'verifier', 'publication'];
+// Owner runs sign as owner; the Actions bot signs as approved-publisher only where `allowBot` is set and its
+// dispatching run proves a fresh main-branch night-review parent. parent_run_id is a correlation bound by
+// freshness and single use (the producer refuses a replayed parent), not authentication: the trust
+// boundary of approved-publisher is push access to the repository (ADR 0007).
+export async function producerActor(
+  context: FactoryContext,
+  request: JsonRecord,
+  allowBot: boolean,
+): Promise<{
+  actor_id: string;
+  actor_login: string;
+  actor_decision: 'owner' | 'approved-publisher';
+}> {
+  const p = context.policy;
+  const base = `/repos/${stringField(p, 'repository_full_name')}/actions/runs`;
+  const run = record(
+    await githubRequest(context, `${base}/${stringField(context.job, 'run_id')}/attempts/1`),
+  );
+  const actor = record(run['actor']);
+  const actorId = String(actor['id']);
+  const actorLogin = actor['login'];
+  if (actorId === p['owner_id'] && actorLogin === p['owner_login'])
+    return {
+      actor_id: actorId,
+      actor_login: stringField(p, 'owner_login'),
+      actor_decision: 'owner',
+    };
+  if (!isApprovedPublisher(p, actorId, actorLogin))
+    throw new FactoryFailure('Producer actor not authorized');
+  if (!allowBot) throw new FactoryFailure('This phase accepts only the owner actor');
+  const parentId = request['parent_run_id'];
+  if (
+    typeof parentId !== 'string' ||
+    !/^[1-9]\d{0,18}$/u.test(parentId) ||
+    parentId === context.job['run_id']
+  )
+    throw new FactoryFailure('Bot producer requires a distinct parent_run_id');
+  const parent = record(await githubRequest(context, `${base}/${parentId}`));
+  const night = arrayField(p, 'workflow_registry')
+    .map(record)
+    .find((entry) => entry['path'] === '.github/workflows/night-review.yml');
+  const parentPath = typeof parent['path'] === 'string' ? parent['path'].split('@')[0] : null;
+  const window = record(p['night_scan'] ?? {})['parent_window_minutes'];
+  if (typeof window !== 'number' || !Number.isSafeInteger(window) || window <= 0)
+    throw new FactoryFailure('Night parent window unknown');
+  const created = Date.parse(stringField(run, 'created_at'));
+  const parentCreated = Date.parse(stringField(parent, 'created_at'));
+  if (
+    night === undefined ||
+    parentPath !== night['path'] ||
+    String(parent['workflow_id']) !== night['id'] ||
+    parent['head_branch'] !== 'main' ||
+    !['schedule', 'workflow_dispatch'].includes(String(parent['event'])) ||
+    String(record(parent['repository'])['id']) !== p['repository_id'] ||
+    String(record(parent['head_repository'])['id']) !== p['repository_id'] ||
+    !(parentCreated < created) ||
+    !(created <= Date.parse(stringField(parent, 'updated_at'))) ||
+    created - parentCreated > window * 60_000
+  )
+    throw new FactoryFailure('Bot producer parent is not a fresh night-review run on main');
+  return {
+    actor_id: actorId,
+    actor_login: ACTIONS_BOT.login,
+    actor_decision: 'approved-publisher',
+  };
+}
+// A bot night receipt is keyed by its parent and phase only, so a replayed parent collides whatever it carries.
+export const nightParentKey = (phase: string, parentId: string): string =>
+  sha256({ phase, parent_run_id: parentId });
+// Single use: a parent's first night receipt wins; a later run finds an earlier run's receipt with its request key.
+export async function assertParentUnused(
+  context: FactoryContext,
+  parentId: string,
+  requestKeys: readonly string[],
+): Promise<void> {
+  const base = `/repos/${stringField(context.policy, 'repository_full_name')}`;
+  const parent = record(await githubRequest(context, `${base}/actions/runs/${parentId}`));
+  const since = Date.parse(stringField(parent, 'created_at'));
+  const earlier = (await githubPages(context, `${base}/actions/artifacts`, 'artifacts'))
+    .map(record)
+    .filter(
+      (artifact) =>
+        typeof artifact['name'] === 'string' &&
+        artifact['name'].startsWith('factory-v1-receipt-') &&
+        artifact['expired'] === false &&
+        String(record(artifact['workflow_run'])['id']) !== context.job['run_id'] &&
+        Date.parse(stringField(artifact, 'created_at')) >= since,
+    );
+  for (const artifact of earlier) {
+    const digest = stringField(artifact, 'digest').replace(/^sha256:/, '');
+    const prior = parseFactoryJson(
+      await readAuthorityArchive(context, String(artifact['id']), digest, 'receipt'),
+    );
+    if (requestKeys.includes(String(prior['request_key'])))
+      throw new FactoryFailure('Night parent_run_id already used by an earlier run');
+  }
+}
+export async function resolveReceipt(
+  context: FactoryContext,
+  runId: string,
+  phase: string,
+): Promise<JsonRecord> {
+  if (
+    ![
+      'reserve',
+      'outcome',
+      'bootstrap',
+      'retry-claim',
+      'publication',
+      'scan',
+      'verifier',
+      'patch',
+      'register',
+      'operation-intent',
+      'operation-outcome',
+    ].includes(phase)
+  )
+    throw new FactoryFailure('Unapproved producer phase');
+  const jobs = (
+    await githubPages(
+      context,
+      `/repos/${stringField(context.policy, 'repository_full_name')}/actions/runs/${runId}/attempts/1/jobs`,
+      'jobs',
+    )
+  )
+    .map(record)
+    .filter((job) => job['name'] === `factory-authority-${phase}`);
+  const job = jobs[0];
+  if (jobs.length !== 1 || job?.['status'] !== 'completed' || job['conclusion'] !== 'success')
+    throw new FactoryFailure('Prior authority producer not completed uniquely');
+  const log = await readAuthorityLog(context, String(job['id']));
+  const marker = authorityMarker(log);
+  if (marker['run_id'] !== runId || marker['phase'] !== phase || marker['kind'] !== 'receipt')
+    throw new FactoryFailure('Wrong prior producer marker');
+  const core = parseProtocol(
+    await readAuthorityArchive(
+      context,
+      stringField(marker, 'artifact_id'),
+      stringField(marker, 'archive_sha256'),
+      'receipt',
+    ),
+    'receipt',
+  );
+  const envelope = {
+    schema: 'factory/v1',
+    receipt: core,
+    receipt_sha256: sha256(core),
+    transport: {
+      artifact_id: marker['artifact_id'],
+      archive_sha256: marker['archive_sha256'],
+      producer_job_id: String(job['id']),
+      producer_log_sha256: sha256(log),
+    },
+  };
+  await verifyAuthority(context, envelope);
+  return envelope;
+}
+
 export async function verifyArchiveAuthority(
   context: FactoryContext,
   core: JsonRecord,
@@ -1197,7 +1382,10 @@ export async function verifyArchiveAuthority(
       record(attempt['actor'])['login'] !== core['actor_login'] ||
       core['actor_decision'] === 'denied' ||
       (core['actor_decision'] === 'owner' &&
-        (core['actor_id'] !== p['owner_id'] || core['actor_login'] !== p['owner_login'])))
+        (core['actor_id'] !== p['owner_id'] || core['actor_login'] !== p['owner_login'])) ||
+      (core['actor_decision'] === 'approved-publisher' &&
+        (!isApprovedPublisher(p, core['actor_id'], core['actor_login']) ||
+          !BOT_PHASES.includes(phase))))
   )
     throw new FactoryFailure('Receipt actor/event/epoch authority mismatch');
   for (const entry of arrayField(p, 'control_manifest').map(record)) {

@@ -1,0 +1,26 @@
+{
+  "night_scan": {
+    "scan_model": "glm-5.3",
+    "verifier_model": "kimi-k3",
+    "analyst_model": "kimi-k3",
+    "llm_url": "https://opencode.ai/inference/go/v1",
+    "ocr_token_budget": 3000000,
+    "verifier_token_budget": 200000,
+    "analyst_token_budget": 100000,
+    "verify_cap": 5,
+    "concurrency": 4,
+    "exclude": ["**/package-lock.json"],
+    "ocr_version": "1.13.0",
+    "ocr_git_head": "1672852136fc87748249d22bce0819f33419ea79",
+    "ocr_lock_integrity": "sha512-H35yl2HwU7rAIcsnSa/CaDUAUJ3yZKLBpQU5XXwtBEeB8RVAXYrzqDVb+7QQmKTLMuzBO9N3v9dSibGv5NIo9w==",
+    "ocr_native_integrity": {
+      "darwin-arm64": "sha512-L4BCZxodrBqWU6v6BylFC7BO0DTETb//BsHEQw/zSk0R2Wn5b5ayyKSReT4Ydbd1iqypQjHkmfX8DpT2Yilipw==",
+      "darwin-x64": "sha512-bxC9wdu4A58AFe6hl2nEXkduaLH2ealsm/vH6gqqX3zOEBm+I3XrlX9lPExO1SCqW7qAHiuPpWnTrre2VeUoAA==",
+      "linux-arm64": "sha512-a6QM+azc6IhmiuS4BQkVoB56TbQLfb43OC+dLJe/fFsKIlDWSRGwlcjvN45Rgi/ncAE3tRDcOIWkBuJtrPSNkA==",
+      "linux-x64": "sha512-LKXWi/QbVuShUTF3DfrtpBLVlTGMX7Rq2xG9PyR5Y1herS7EP9twvkALNSfRZ7dtpjcqkeoiNgnl1dNiWfoxMA==",
+      "win32-arm64": "sha512-aRjRib4IR/4gTUxb5eWMp6+Agp+V1ZkS5AqwXvGc2wHrtMV5y6rY3vxOjFT6aWMuSmberPtv4KO6p7jlVksrWA==",
+      "win32-x64": "sha512-m1mNdtfjnjpZUNh24rwRqnUlmpotjsSbI0nJzjlFNpSjcMPveVcbooKDJYywD4waLNedvQh5ZMlvH7DybnoUGg=="
+    },
+    "fingerprint_policy_revision": "v1"
+  }
+}

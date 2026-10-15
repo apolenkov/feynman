@@ -30,6 +30,23 @@ updates:
       prefix: chore
       include: scope
 
+  # Pinned night-scan tool, installed outside the checkout; a bump fails the
+  # tool check until policy and lock are reviewed together, so nothing merges itself.
+  - package-ecosystem: npm
+    directory: /tools/ocr
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+    cooldown:
+      default-days: 3
+    labels:
+      - dependencies
+    open-pull-requests-limit: 1
+    commit-message:
+      prefix: chore
+      include: scope
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

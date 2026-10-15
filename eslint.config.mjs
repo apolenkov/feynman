@@ -12,6 +12,7 @@ export default [
       'eval/**',
       'evals/**',
       'commitlint.config.ts',
+      '.worktrees/**',
     ],
   },
 

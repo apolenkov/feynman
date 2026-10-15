@@ -1,0 +1,17 @@
+{
+  "files": [
+    {
+      "path": "docs/notes.md",
+      "status": "scan",
+      "insertions": 2,
+      "deletions": 0,
+      "will_review": false,
+      "exclude_reason": "unsupported_ext"
+    }
+  ],
+  "total_insertions": 2,
+  "total_deletions": 0,
+  "total_files": 1,
+  "reviewable_count": 0,
+  "excluded_count": 1
+}

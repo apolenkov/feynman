@@ -1,0 +1,53 @@
+{
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "scan",
+      "insertions": 1,
+      "deletions": 0,
+      "will_review": true
+    },
+    {
+      "path": "docs/notes.md",
+      "status": "scan",
+      "insertions": 2,
+      "deletions": 0,
+      "will_review": false,
+      "exclude_reason": "unsupported_ext"
+    },
+    {
+      "path": "src/auth.ts",
+      "status": "scan",
+      "insertions": 9,
+      "deletions": 0,
+      "will_review": true
+    },
+    {
+      "path": "src/db.ts",
+      "status": "scan",
+      "insertions": 3,
+      "deletions": 0,
+      "will_review": true
+    },
+    {
+      "path": "src/util.ts",
+      "status": "scan",
+      "insertions": 1,
+      "deletions": 0,
+      "will_review": true
+    },
+    {
+      "path": "test/auth.test.ts",
+      "status": "scan",
+      "insertions": 2,
+      "deletions": 0,
+      "will_review": false,
+      "exclude_reason": "default_path"
+    }
+  ],
+  "total_insertions": 14,
+  "total_deletions": 0,
+  "total_files": 6,
+  "reviewable_count": 4,
+  "excluded_count": 2
+}

@@ -173,7 +173,10 @@ Contract, Visual linter and published package runtime. Its initial policy disabl
 activation; unknown provider, budget or deployment authority denies effects.
 
 A single native controller coordinates durable lineage accounting and authenticated
-checkpoints. Separate jobs isolate model access, secretless repro/gates and trusted
+checkpoints. The scheduled `night-review.yml` only dispatches it as `night-scan`; the
+controller then runs one key-job for the pinned OCR model pass, adapts its bundle into at
+most one finding per night, issues verifier and scan receipts, and the privileged job
+publishes the issue. Separate jobs isolate model access, secretless repro/gates and trusted
 data/Git publication. Source fault fixtures do not establish hosted or genuine-finding
 acceptance.
 
