@@ -109,6 +109,21 @@ function canonicalIssue(context: FactoryContext, issue: JsonRecord): JsonRecord 
     throw new FactoryFailure('Invalid canonical finding marker; preserve work');
   }
 }
+function labelNames(issue: JsonRecord): string[] {
+  return arrayField(issue, 'labels').map((label) =>
+    typeof label === 'string' ? label : stringField(record(label), 'name'),
+  );
+}
+function partialEffect(identity: JsonRecord, issue: JsonRecord, confidence: string): JsonRecord {
+  return {
+    ...identity,
+    issue_number: issue['number'],
+    issue_node_id: issue['node_id'],
+    confidence,
+    repair_state: 'needs-human',
+    reason: 'Partial publication; earlier effects preserved',
+  };
+}
 export async function reconcilePublication(
   inputContext: FactoryContext,
   value: unknown,
@@ -130,6 +145,9 @@ export async function reconcilePublication(
   }));
   const complete = scanCoverage(scan, identified.length === findings.length);
   const base = { presence, selected, pending, complete, issues: [], dispatch: [] };
+  const issues: JsonRecord[] = [];
+  // Issue already created or mutated for the current finding but not yet registered.
+  let inFlight: JsonRecord | null = null;
   try {
     const context = await resolveFactoryContext(inputContext);
     effectPolicy(context);
@@ -152,7 +170,6 @@ export async function reconcilePublication(
       throw new FactoryFailure('Scan source/policy provenance mismatch');
     const route = `/repos/${stringField(context.policy, 'repository_full_name')}/issues`;
     let snapshot = (await githubPages(context, `${route}?state=all`)).map(record);
-    const issues: JsonRecord[] = [];
     const dispatch: JsonRecord[] = [];
     const processed: JsonRecord[] = [];
     const deferred: JsonRecord[] = [];
@@ -258,6 +275,7 @@ export async function reconcilePublication(
             throw new FactoryFailure('Ambiguous issue publication; no blind retry');
           issue = discovered[0];
         }
+        inFlight = partialEffect(identity, issue, confidence);
         snapshot = (await githubPages(context, `${route}?state=all`)).map(record);
         created++;
       }
@@ -265,6 +283,7 @@ export async function reconcilePublication(
         throw new FactoryFailure('Issue publication author untrusted');
       const issueNumber = numberField(issue, 'number');
       if (issue['state'] === 'closed') {
+        inFlight = null;
         issues.push({
           ...identity,
           issue_number: issueNumber,
@@ -275,19 +294,18 @@ export async function reconcilePublication(
         });
         continue;
       }
-      const currentLabels = arrayField(issue, 'labels').map((label) =>
-        typeof label === 'string' ? label : stringField(record(label), 'name'),
-      );
-      const labels = [
-        ...currentLabels.filter(
-          (label) => !label.startsWith('severity:') && label !== 'source:ocr-scan',
+      const labelDelta = (labels: readonly string[]) => ({
+        add: findingLabels.filter((label) => !labels.includes(label)),
+        remove: labels.filter(
+          (label) => label.startsWith('severity:') && !findingLabels.includes(label),
         ),
-        ...findingLabels,
-      ];
+      });
+      const snapshotDelta = labelDelta(labelNames(issue));
       if (
         issue['title'] !== title ||
         issue['body'] !== body ||
-        JSON.stringify(currentLabels.toSorted()) !== JSON.stringify(labels.toSorted())
+        snapshotDelta.add.length > 0 ||
+        snapshotDelta.remove.length > 0
       ) {
         const expectedNodeId = stringField(issue, 'node_id');
         await verifyControlSource(context);
@@ -307,23 +325,29 @@ export async function reconcilePublication(
           marker['fingerprint'] !== identity.fingerprint
         )
           throw new FactoryFailure('Canonical issue changed before refresh; preserve work');
-        const freshLabels = arrayField(fresh, 'labels').map((label) =>
-          typeof label === 'string' ? label : stringField(record(label), 'name'),
-        );
-        const refreshLabels = [
-          ...freshLabels.filter(
-            (label) => !label.startsWith('severity:') && label !== 'source:ocr-scan',
-          ),
-          ...findingLabels,
-        ];
-        // shortcut: GET-to-PATCH is not atomic; serialize concurrent label writers before activation.
-        issue = record(
-          await githubRequest(context, `${route}/${issueNumber}`, 'PATCH', {
-            title,
-            body,
-            labels: refreshLabels,
-          }),
-        );
+        // PATCH never carries labels: its replacement semantics would erase concurrent owner labels.
+        // Add before remove so a failure between them leaves the new labels visible, not lost.
+        const freshDelta = labelDelta(labelNames(fresh));
+        inFlight = partialEffect(identity, fresh, confidence);
+        if (fresh['title'] !== title || fresh['body'] !== body) {
+          issue = record(
+            await githubRequest(context, `${route}/${issueNumber}`, 'PATCH', { title, body }),
+          );
+        }
+        if (freshDelta.add.length > 0) {
+          await verifyControlSource(context);
+          await githubRequest(context, `${route}/${issueNumber}/labels`, 'POST', {
+            labels: freshDelta.add,
+          });
+        }
+        for (const label of freshDelta.remove) {
+          await verifyControlSource(context);
+          await githubRequest(
+            context,
+            `${route}/${issueNumber}/labels/${encodeURIComponent(label)}`,
+            'DELETE',
+          );
+        }
       }
       const stableIdentity = { ...identity, issue_node_id: stringField(issue, 'node_id') };
       const registration = produceReceipt({
@@ -370,6 +394,7 @@ export async function reconcilePublication(
         repair_state: repairState,
         registration,
       });
+      inFlight = null;
       if (repairState === 'eligible')
         dispatch.push({ issue_number: issueNumber, receipt_sha256: sha256(proof) });
     }
@@ -390,7 +415,16 @@ export async function reconcilePublication(
       reason: 'Authenticated publication reconciled',
     };
   } catch (error: unknown) {
-    return { ...base, status: 'needs-human', reason: safeReason(error) };
+    // selected/pending stay unvalidated, but issues already published or mutated stay reported.
+    return {
+      ...base,
+      issues: (inFlight === null ? issues : [...issues, inFlight]).map((entry) => ({
+        ...entry,
+        repair_state: 'needs-human',
+      })),
+      status: 'needs-human',
+      reason: safeReason(error),
+    };
   }
 }
 

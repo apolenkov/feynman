@@ -451,9 +451,9 @@
     {
       "file": "scripts/factory-publication.ts",
       "owner": "reconcilePublication",
-      "mutationHash": "96b8492f47e184d712bd9e772cc02d4f5f19eb2846c08a801e5400551d548723",
-      "count": 16,
-      "reason": "Invocation-owned presence, creation counter and issue/pending/closure collections reconcile authenticated findings; Opus regressions prove author filtering, proof prevalidation, fresh owner-label preservation, safe failure reporting and the three-new-issue cap.",
+      "mutationHash": "ef4d05812c9af7c09988e82af15ef76877f8972fbc8edd33f2f527ce3e524991",
+      "count": 21,
+      "reason": "Invocation-owned presence, creation counter and issue/pending/closure collections reconcile authenticated findings; Opus regressions prove author filtering, proof prevalidation, label add/remove that never replaces the owner label set, safe failure reporting with preserved partial effects and the three-new-issue cap.",
       "test": "tests/night-factory-publication.test.ts"
     },
     {
@@ -482,7 +482,7 @@
     },
     {
       "file": "scripts/check-factory-workflows.ts",
-      "owner": "actionlintBinary",
+      "owner": "downloadActionlint",
       "mutationHash": "7d0cdd85226b7b919d9c45be714e4df73805d761702c02f6f78520db65cf5583",
       "count": 1,
       "reason": "Invocation-owned verified archive digest builder checks one official upstream binary before native actionlint; single/max and unrelated diagnostic controls exercise the gate.",
@@ -494,6 +494,14 @@
       "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
       "count": 1,
       "reason": "Named workflow CLI boundary owns only failure exit classification; native queue acceptance and unrelated-error controls exercise the same validation route.",
+      "test": "tests/factory-operations.test.ts"
+    },
+    {
+      "file": "scripts/check-factory-workflows.ts",
+      "owner": "validateFactoryHardening",
+      "mutationHash": "f2355e43960fd4cce425563e292f835e6143bdb7add1a11031c47bfe0b0d2305",
+      "count": 2,
+      "reason": "Invocation-owned loop flag and step cursor scan one parsed workflow for write-token environment, ignore-scripts installs and explicit actions permission; real workflow and per-rule mutation controls exercise the gate.",
       "test": "tests/factory-operations.test.ts"
     },
     {
@@ -511,6 +519,14 @@
       "count": 4,
       "reason": "Invocation-owned expected/live head slots classify immutable remote transport and canonical PR state; primary actual Git existing-head recovery and foreign head/body/repository/origin controls exercise reuse and denial without a network push.",
       "test": "tests/night-factory-publication.test.ts"
+    },
+    {
+      "file": "scripts/check-factory-workflows.ts",
+      "owner": "actionlintBinary",
+      "mutationHash": "5a8ab74193021216a545c771c2ff29a7ee25f21ee257998c9916ebd00e7f9d8f",
+      "count": 2,
+      "reason": "Invocation-owned memo slot keeps one verified actionlint download per process and clears it on failure so a bad checksum is never cached; native queue controls reuse the same verified binary.",
+      "test": "tests/factory-operations.test.ts"
     }
   ]
 }

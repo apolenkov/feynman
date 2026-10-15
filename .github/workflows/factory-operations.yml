@@ -19,6 +19,7 @@ jobs:
     # shortcut: unset flag denies; owner enables only after trusted bootstrap.
     if: vars.FACTORY_PRIVILEGED_JOBS_ENABLED == 'true' && (github.actor == github.repository_owner && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    environment: factory-privileged
     permissions:
       contents: read
       actions: write
@@ -39,7 +40,7 @@ jobs:
             sudo apt-get install --yes libarchive-tools
           fi
       - name: Install secretless development tools
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Closed policy admission before dispatch or stop effects
         env:
           GITHUB_TOKEN: ${{ github.token }}
