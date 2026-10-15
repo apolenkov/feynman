@@ -483,9 +483,9 @@
     {
       "file": "scripts/check-factory-workflows.ts",
       "owner": "downloadActionlint",
-      "mutationHash": "8a18aadf0736a7f8ed6cf43d6969d90a1c48467d89526fe675e34d4fd535860d",
-      "count": 2,
-      "reason": "Invocation-owned verified archive digest builder checks one official upstream binary before native actionlint and records its private directory in the process-owned memo that disposeActionlint clears; single/max and unrelated diagnostic controls exercise the gate.",
+      "mutationHash": "b224a4475944e85995e70ec9a04ab71fdbfe56418dc2dc16bbcde4a59b86763a",
+      "count": 8,
+      "reason": "Invocation-owned download buffer, response slot and attempt counter retry a stalled or 5xx fetch up to three times, then the verified archive digest builder checks one official upstream binary before native actionlint and records its private directory in the process-owned memo that disposeActionlint clears; retry, 5xx, checksum-mismatch, single/max and unrelated diagnostic controls exercise the gate.",
       "test": "tests/factory-operations.test.ts"
     },
     {
