@@ -32,6 +32,7 @@ import {
   validateInertWorkflow,
   validateKeyJob,
   validateNativeWorkflow,
+  validateNightParentWindow,
   validateSecretIsolation,
   validateWorkflowSchema,
 } from '../scripts/check-factory-workflows.ts';
@@ -577,6 +578,22 @@ it('factory hardening requires actions: read wherever a job authenticates with t
     }, /explicit actions permission/);
   validateFactoryHardening(authenticated('    permissions:\n      actions: read\n'), 'h.yml');
   // Real token access (runs, jobs, logs, artifacts) is a hosted condition: no local fixture proves it.
+});
+
+it('ties the bot parent window to the night-review job timeout plus five minutes', () => {
+  const review = fs.readFileSync('.github/workflows/night-review.yml', 'utf8');
+  const window = record(loadFactoryPolicy()['night_scan'])['parent_window_minutes'];
+  validateNightParentWindow(window, review);
+  for (const wrong of [5, 10, 16, undefined])
+    assert.throws(() => {
+      validateNightParentWindow(wrong, review);
+    }, /parent_window_minutes/);
+  assert.throws(() => {
+    validateNightParentWindow(window, review.replace('timeout-minutes: 10', 'timeout-minutes: 20'));
+  }, /parent_window_minutes/);
+  assert.throws(() => {
+    validateNightParentWindow(window, review.replace('    timeout-minutes: 10\n', ''));
+  }, /parent_window_minutes/);
 });
 
 it('PR-A enables nothing: inactive policy, no schedule, no secrets beyond the workflow token and no FACTORY_* set true', () => {

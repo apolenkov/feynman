@@ -139,6 +139,27 @@ export function validateInertPolicy(policy: unknown): void {
       `factory-policy.json: secret_names must be exactly ${INERT_POSTURE.keySecrets.join(', ')}`,
     );
 }
+// The bot-producer parent window is the night-review job timeout plus a five-minute margin, read from the workflow.
+export function validateNightParentWindow(windowMinutes: unknown, nightReview: string): void {
+  const result = parseWorkflow(
+    { name: INERT_POSTURE.scheduleWorkflow, content: nightReview },
+    new NoOperationTraceWriter(),
+  );
+  result.context.errors.check('Official workflow parser');
+  const jobs =
+    result.value !== undefined && isMapping(result.value) ? result.value.find('jobs') : undefined;
+  const timeouts = [...(jobs !== undefined && isMapping(jobs) ? jobs : [])].map(({ value }) =>
+    isMapping(value) ? Number(scalarText(value.find('timeout-minutes'))) : Number.NaN,
+  );
+  if (
+    timeouts.length === 0 ||
+    !timeouts.every((minutes) => Number.isInteger(minutes) && minutes > 0) ||
+    windowMinutes !== Math.max(...timeouts) + 5
+  )
+    throw new Error(
+      'factory-policy.json: night_scan.parent_window_minutes must be the night-review timeout-minutes plus 5',
+    );
+}
 function enablesFactoryFlag(token: TemplateToken): boolean {
   if (isMapping(token))
     return [...token].some(
@@ -536,12 +557,26 @@ export async function validateNativeWorkflow(content: string, name: string): Pro
       `Upstream actionlint rejected ${name}: status=${String(result.status)} signal=${String(result.signal)} error=${result.error?.name ?? 'none'} ${result.stdout}${result.stderr}`,
     );
 }
+function nightWindow(policy: unknown): unknown {
+  const block =
+    typeof policy === 'object' && policy !== null && 'night_scan' in policy
+      ? policy.night_scan
+      : null;
+  return typeof block === 'object' && block !== null && 'parent_window_minutes' in block
+    ? block.parent_window_minutes
+    : undefined;
+}
 async function workflowMain(): Promise<void> {
   try {
-    validateInertPolicy(
-      JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, 'factory-policy.json'), 'utf8')),
+    const policy: unknown = JSON.parse(
+      fs.readFileSync(path.resolve(import.meta.dirname, 'factory-policy.json'), 'utf8'),
     );
+    validateInertPolicy(policy);
     const directory = path.resolve(import.meta.dirname, '..', '.github', 'workflows');
+    validateNightParentWindow(
+      nightWindow(policy),
+      fs.readFileSync(path.join(directory, 'night-review.yml'), 'utf8'),
+    );
     const listed = fs.readdirSync(directory);
     validateFactoryWorkflowSet(listed, (file) =>
       fs.readFileSync(path.join(directory, file), 'utf8'),

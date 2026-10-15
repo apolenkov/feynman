@@ -182,7 +182,9 @@ it('publishes confirmed and disputed findings from detached non-lineage proofs, 
       run_id: runId,
       producer_phase: phase,
       request_key: sha256({ phase, runId, document }),
-      actor_decision: 'approved-publisher',
+      actor_decision: ['scan', 'verifier', 'publication'].includes(phase)
+        ? 'approved-publisher'
+        : 'owner',
       operation: {
         initial_claimed: true,
         retry_claimed: false,
@@ -432,7 +434,9 @@ it('complete fixture gate', () => {
       run_id: runId,
       producer_phase: phase,
       request_key: sha256({ phase, runId, payload, head }),
-      actor_decision: 'approved-publisher',
+      actor_decision: ['scan', 'verifier', 'publication'].includes(phase)
+        ? 'approved-publisher'
+        : 'owner',
       operation: {
         initial_claimed: true,
         retry_claimed: false,

@@ -168,7 +168,9 @@ function findingReceipt(
     event: 'workflow_dispatch',
     actor_id: '23296915',
     actor_login: 'apolenkov',
-    actor_decision: 'approved-publisher',
+    actor_decision: ['scan', 'verifier', 'publication'].includes(phase)
+      ? 'approved-publisher'
+      : 'owner',
     producer_phase: phase,
     request_key: sha256({ phase, runId }),
     lineage_id: sha256(identity),
@@ -1500,15 +1502,16 @@ function setRun(platform: FactoryPlatform, runId: string, patch: JsonRecord): vo
   platform.facts.set(`${RUNS}/${runId}`, run);
   platform.facts.set(`${RUNS}/${runId}/attempts/1`, run);
 }
-function parentRun(platform: FactoryPlatform, patch: JsonRecord = {}): void {
-  platform.facts.set(`${RUNS}/8800`, {
-    id: 8800,
+function parentRun(platform: FactoryPlatform, patch: JsonRecord = {}, id = '8800'): void {
+  platform.facts.set(`${RUNS}/${id}`, {
+    id: Number(id),
     ...NIGHT_REVIEW,
     event: 'schedule',
     head_branch: 'main',
     repository: { id: 1230959148 },
     head_repository: { id: 1230959148 },
     created_at: '2026-10-12T00:02:00Z',
+    updated_at: '2026-10-12T00:06:00Z',
     ...patch,
   });
 }
@@ -1521,7 +1524,7 @@ async function botContext(test: TestContext, actor: JsonRecord = BOT) {
 
 it('authenticates the producer actor as the owner or a bot parented by the scheduled review run', async (test) => {
   const { platform, context } = await botContext(test, { id: 23296915, login: 'apolenkov' });
-  assert.deepEqual(await producerActor(context, {}), {
+  assert.deepEqual(await producerActor(context, {}, true), {
     actor_id: '23296915',
     actor_login: 'apolenkov',
     actor_decision: 'owner',
@@ -1533,9 +1536,9 @@ it('authenticates the producer actor as the owner or a bot parented by the sched
     actor_login: 'github-actions[bot]',
     actor_decision: 'approved-publisher',
   };
-  assert.deepEqual(await producerActor(context, { parent_run_id: '8800' }), approved);
+  assert.deepEqual(await producerActor(context, { parent_run_id: '8800' }, true), approved);
   parentRun(platform, { event: 'workflow_dispatch' });
-  assert.deepEqual(await producerActor(context, { parent_run_id: '8800' }), approved);
+  assert.deepEqual(await producerActor(context, { parent_run_id: '8800' }, true), approved);
 });
 
 it('refuses a bot or third actor without a valid scheduled night-review parent on main', async (test) => {
@@ -1551,41 +1554,139 @@ it('refuses a bot or third actor without a valid scheduled night-review parent o
     [{ parent_run_id: '8800' }, { repository: { id: 1 } }],
     [{ parent_run_id: '8800' }, { head_repository: { id: 1 } }],
     [{ parent_run_id: '8800' }, { created_at: '2026-10-12T00:04:00Z' }],
+    [{ parent_run_id: '8800' }, { created_at: '2026-10-12T00:03:00Z' }],
+    [{ parent_run_id: '8800' }, { updated_at: '2026-10-12T00:02:30Z' }],
+    [{ parent_run_id: '8800' }, { created_at: '2026-10-11T23:47:00Z' }],
+    [{ parent_run_id: '8800' }, { created_at: '2026-10-11T00:00:00Z' }],
+    [{ parent_run_id: '8404' }, {}],
   ] as const) {
     parentRun(platform, parent);
-    await assert.rejects(producerActor(context, request), /actor|parent/i);
+    await assert.rejects(producerActor(context, request, true), /actor|parent|404/i);
   }
   parentRun(platform);
   setRun(platform, '906', { actor: { id: 777, login: 'mallory' } });
-  await assert.rejects(producerActor(context, { parent_run_id: '8800' }), /actor/i);
+  await assert.rejects(producerActor(context, { parent_run_id: '8800' }, true), /actor/i);
 });
 
-it('accepts approved-publisher receipts only from the owner or the Actions bot', async (test) => {
-  for (const [actor, ok] of [
-    [{ id: 23296915, login: 'apolenkov' }, true],
-    [BOT, true],
-    [{ id: 777, login: 'mallory' }, false],
-    [{ id: 41898282, login: 'impostor' }, false],
+it('accepts approved-publisher receipts only from the owner or the Actions bot in scan, verifier and publication', async (test) => {
+  const bad = { id: 23296915, login: 'impostor' };
+  for (const [actor, phase, decision, ok] of [
+    [{ id: 23296915, login: 'apolenkov' }, 'scan', 'approved-publisher', true],
+    [{ id: 23296915, login: 'apolenkov' }, 'reserve', 'owner', true],
+    [{ id: 23296915, login: 'apolenkov' }, 'reserve', 'approved-publisher', false],
+    [{ id: 23296915, login: 'impostor' }, 'reserve', 'owner', false],
+    [BOT, 'reserve', 'owner', false],
+    [BOT, 'scan', 'approved-publisher', true],
+    [BOT, 'verifier', 'approved-publisher', true],
+    [BOT, 'publication', 'approved-publisher', true],
+    [BOT, 'reserve', 'approved-publisher', false],
+    [BOT, 'outcome', 'approved-publisher', false],
+    [BOT, 'register', 'approved-publisher', false],
+    [{ id: 777, login: 'mallory' }, 'scan', 'approved-publisher', false],
+    [{ id: 41898282, login: 'impostor' }, 'scan', 'approved-publisher', false],
+    [bad, 'scan', 'approved-publisher', false],
   ] as const) {
-    await test.test(`actor ${actor.login}`, async (subtest) => {
+    await test.test(`actor ${actor.login} signs ${phase}`, async (subtest) => {
       const { platform, activation, genesis, context } = await botContext(subtest, actor);
-      const core = findingReceipt(platform, activation, genesis, '906', 'reserve', {
+      const core = findingReceipt(platform, activation, genesis, '906', phase, {
+        actor_decision: decision,
         actor_id: String(actor.id),
         actor_login: actor.login,
         reservation_number: 1,
         expected_transition: 'reserved',
         outcome: 'consumed',
       });
-      const envelope = platform.upload(
-        core,
-        'receipt',
-        stringField(core, 'transition_id'),
-        'reserve',
-      );
+      const envelope = platform.upload(core, 'receipt', stringField(core, 'transition_id'), phase);
       if (ok) assert.deepEqual(await verifyAuthority(context, envelope), core);
       else await assert.rejects(verifyAuthority(context, envelope), /actor/i);
     });
   }
+});
+
+it('lets the owner but never the Actions bot reserve or settle a repair', async (test) => {
+  const { platform, activation, genesis } = await bootstrapped(test);
+  const identity = {
+    repository_id: '1230959148',
+    fingerprint_policy_revision: 'reviewed-v1',
+    fingerprint: 'd'.repeat(64),
+  };
+  const issue = {
+    number: 42,
+    node_id: 'I_CANONICAL',
+    user: { id: 23296915, login: 'apolenkov' },
+    state: 'open',
+    labels: [{ name: 'factory-fix' }],
+    body: `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->`,
+    created_at: '2026-10-12T00:00:00Z',
+  };
+  platform.issues.push(issue);
+  platform.facts.set('/repos/apolenkov/feynman/issues/42', issue);
+  platform.facts.set('/repos/apolenkov/feynman/issues/42/events', [
+    {
+      id: 12,
+      event: 'labeled',
+      label: { name: 'factory-fix' },
+      actor: { id: 23296915, login: 'apolenkov' },
+    },
+  ]);
+  const owner = laterContext(platform, activation, '902');
+  const publication = findingReceipt(platform, activation, genesis, '902', 'publication');
+  const registration = await runController(owner, {
+    command: 'register',
+    publication_authority: platform.upload(
+      publication,
+      'receipt',
+      stringField(publication, 'transition_id'),
+      'publication',
+    ),
+  });
+  assert.equal(registration.status, 'accepted', registration.reason);
+  const registerCore = record(registration.record);
+  const append = await runController(owner, {
+    command: 'append',
+    envelope: platform.upload(
+      registerCore,
+      'receipt',
+      stringField(registerCore, 'transition_id'),
+      'register',
+    ),
+  });
+  assert.equal(append.status, 'accepted', append.reason);
+  const head = platform.git(['rev-parse', 'refs/heads/factory-state']);
+  const checkpointOf = async (runId: string) => {
+    const current = laterContext(platform, activation, runId);
+    const checkpoint = await runController(current, { command: 'checkpoint' });
+    assert.equal(checkpoint.status, 'accepted', checkpoint.reason);
+    const file = JSON.parse(platform.git(['show', `${head}:checkpoint.json`])) as unknown;
+    platform.upload(
+      record(checkpoint.record),
+      'checkpoint',
+      stringField(record(file), 'last_transition_id'),
+      'checkpoint',
+    );
+    return current;
+  };
+  const request = { issue_number: 42, event_id: '12', evidence: { scan: null, verifier: null } };
+  parentRun(platform);
+  for (const command of ['reserve', 'outcome'] as const) {
+    const runId = command === 'reserve' ? '903' : '904';
+    const current = await checkpointOf(runId);
+    setRun(platform, runId, { actor: BOT, created_at: '2026-10-12T00:03:00Z' });
+    const refused = await runController(current, {
+      ...request,
+      command,
+      outcome: 'patch-ready',
+      parent_run_id: '8800',
+    });
+    assert.equal(refused.status, 'denied');
+    assert.match(refused.reason, /owner/i);
+    assert.equal(platform.git(['rev-parse', 'refs/heads/factory-state']), head);
+  }
+  // The same context still serves the owner after the refusals.
+  const current = await checkpointOf('905');
+  const reserved = await runController(current, { ...request, command: 'reserve' });
+  assert.equal(reserved.status, 'accepted', reserved.reason);
+  assert.equal(record(reserved.record)['actor_decision'], 'owner');
 });
 
 // Night evidence producers: detached verifier/scan receipts and the scheduled night-scan dispatch.
@@ -1593,6 +1694,7 @@ import { nightScan } from '../scripts/factory-control.ts';
 import { reconcilePublication } from '../scripts/factory-publication.ts';
 
 const NIGHT_PRINT = 'e'.repeat(64);
+const NIGHT_REVISION = 'night-scan-fp-v1';
 function nightFinding(overrides: JsonRecord = {}): JsonRecord {
   return {
     fingerprint: NIGHT_PRINT,
@@ -1621,7 +1723,7 @@ function nightDraft(
     canonicalBytes({
       repository_id: '1230959148',
       source_sha: platform.release,
-      fingerprint_policy_revision: 'reviewed-v1',
+      fingerprint_policy_revision: NIGHT_REVISION,
       inventory,
       inventory_sha256: sha256(inventory),
       covered: inventory,
@@ -1658,6 +1760,7 @@ it('refuses a night draft with two findings, a foreign source_sha or a verdict o
     [[], {}, /one finding/],
     [[nightFinding({ authority: {} })], {}, /authority/],
     [[nightFinding()], { token_budget: 1 }, /token_budget/],
+    [[nightFinding()], { fingerprint_policy_revision: 'other-v9' }, /fingerprint policy revision/],
   ] as const) {
     const draft = nightDraft(platform, findings, overrides);
     const output = path.join(platform.root, 'receipt.json');
@@ -1701,6 +1804,20 @@ it('requires the scheduled night-review parent for a bot producer and refuses a 
   assert.equal(accepted.status, 'accepted', accepted.reason);
   assert.equal(record(accepted.record)['actor_decision'], 'approved-publisher');
   assert.equal(record(accepted.record)['actor_id'], '41898282');
+
+  // Single use: the parent's first night receipt wins, a replay from a later run is refused.
+  const acceptedCore = record(accepted.record);
+  platform.upload(acceptedCore, 'receipt', stringField(acceptedCore, 'transition_id'), 'verifier');
+  const replayContext = laterContext(platform, activation, '914');
+  setRun(platform, '914', { actor: BOT, created_at: '2026-10-12T00:04:00Z' });
+  const replay = await runController(replayContext, { ...request, parent_run_id: '8800' });
+  assert.equal(replay.status, 'denied');
+  assert.match(replay.reason, /already used/);
+  // A fresh parent in the same context still succeeds, and the same run keeps its own receipt.
+  parentRun(platform, { created_at: '2026-10-12T00:02:10Z' }, '8801');
+  const fresh = await runController(replayContext, { ...request, parent_run_id: '8801' });
+  assert.equal(fresh.status, 'accepted', fresh.reason);
+  assert.notEqual(record(fresh.record)['request_key'], acceptedCore['request_key']);
 
   const withoutBudget = platform.context({ ...activation, token_budget: null }, '912');
   const noBudget = await runController(withoutBudget, {
@@ -1773,7 +1890,7 @@ it('issues verifier then scan receipts that verifyAuthority and publication acce
   assert.equal(scanRecord['authority'], undefined);
   assert.deepEqual(record(arrayField(scanRecord, 'findings')[0])['authority'], verifierEnvelope);
   assert.equal(record(scanCore['operation'])['payload_sha256'], sha256(scanRecord));
-  assert.equal(record(scanCore['operation'])['target_id'], 'reviewed-v1');
+  assert.equal(record(scanCore['operation'])['target_id'], NIGHT_REVISION);
   const scanEnvelope = platform.upload(
     scanCore,
     'receipt',
@@ -1837,7 +1954,7 @@ it('publishes exactly one issue from a recorded night run and leaks no key canar
   const { platform, activation } = await bootstrapped(test);
   const context = laterContext(platform, activation, '930');
   const model = await modelScenario(test, 'ok1', agreeable, {
-    revision: 'reviewed-v1',
+    revision: NIGHT_REVISION,
     keys: canaries,
   });
   const modelRun = await model.exec();
@@ -1869,7 +1986,7 @@ it('publishes exactly one issue from a recorded night run and leaks no key canar
       '--out',
       draft,
       '--revision',
-      'reviewed-v1',
+      NIGHT_REVISION,
     ],
     { encoding: 'utf8' },
   );

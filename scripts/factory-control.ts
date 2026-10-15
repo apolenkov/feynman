@@ -502,6 +502,7 @@ async function prepareRegistration(
   const lineage = await publicationIdentity(context, state, publication);
   const fields = {
     ...publication,
+    ...(await producerActor(context, request, false)),
     producer_phase: 'register',
     run_id: context.job['run_id'],
     run_attempt: 1,
@@ -649,8 +650,12 @@ function nightDraft(context: FactoryContext, request: JsonRecord): JsonRecord {
     draft['repository_id'] !== context.policy['repository_id']
   )
     throw new FactoryFailure('Night draft source_sha differs from the checked-out workflow sha');
-  if (stringField(draft, 'fingerprint_policy_revision') === '')
-    throw new FactoryFailure('Night draft lacks fingerprint policy revision');
+  if (
+    stringField(draft, 'fingerprint_policy_revision') === '' ||
+    draft['fingerprint_policy_revision'] !==
+      record(context.staticPolicy['night_scan'] ?? {})['fingerprint_policy_revision']
+  )
+    throw new FactoryFailure('Night draft fingerprint policy revision differs from the policy');
   for (const finding of findings) {
     if (!/^[0-9a-f]{64}$/.test(stringField(finding, 'fingerprint')))
       throw new FactoryFailure('Night finding fingerprint invalid');
@@ -658,6 +663,33 @@ function nightDraft(context: FactoryContext, request: JsonRecord): JsonRecord {
       throw new FactoryFailure('Night finding verdict must be confirmed or disputed');
   }
   return draft;
+}
+// Single use: a parent's first night receipt wins; a later run finds an earlier run's receipt with its request key.
+async function assertParentUnused(
+  context: FactoryContext,
+  parentId: string,
+  requestKey: string,
+): Promise<void> {
+  const parent = record(await githubRequest(context, `${base(context)}/actions/runs/${parentId}`));
+  const since = Date.parse(stringField(parent, 'created_at'));
+  const earlier = (await githubPages(context, `${base(context)}/actions/artifacts`, 'artifacts'))
+    .map(record)
+    .filter(
+      (artifact) =>
+        typeof artifact['name'] === 'string' &&
+        artifact['name'].startsWith('factory-v1-receipt-') &&
+        artifact['expired'] === false &&
+        String(record(artifact['workflow_run'])['id']) !== context.job['run_id'] &&
+        Date.parse(stringField(artifact, 'created_at')) >= since,
+    );
+  for (const artifact of earlier) {
+    const digest = stringField(artifact, 'digest').replace(/^sha256:/, '');
+    const prior = parseFactoryJson(
+      await readAuthorityArchive(context, String(artifact['id']), digest, 'receipt'),
+    );
+    if (prior['request_key'] === requestKey)
+      throw new FactoryFailure('Night parent_run_id already used by an earlier run');
+  }
 }
 async function prepareNightEvidence(
   context: FactoryContext,
@@ -718,6 +750,16 @@ async function prepareNightEvidence(
     'sha',
   );
   const payloadSha = sha256(payload);
+  const actor = await producerActor(context, request, true);
+  // A bot run is keyed by its parent, not its own run id, so a replayed parent yields the same request key.
+  const parentId = actor.actor_decision === 'owner' ? null : stringField(request, 'parent_run_id');
+  const requestKey = sha256({
+    phase,
+    run_id: parentId === null ? context.job['run_id'] : null,
+    parent_run_id: parentId,
+    payload_sha256: payloadSha,
+  });
+  if (parentId !== null) await assertParentUnused(context, parentId, requestKey);
   const receipt = produceReceipt({
     epoch_id: context.policy['epoch_id'],
     sequence: numberField(state.checkpoint, 'sequence') + 1,
@@ -735,9 +777,9 @@ async function prepareNightEvidence(
     run_id: context.job['run_id'],
     run_attempt: 1,
     event: 'workflow_dispatch',
-    ...(await producerActor(context, request)),
+    ...actor,
     producer_phase: phase,
-    request_key: sha256({ phase, run_id: context.job['run_id'], payload_sha256: payloadSha }),
+    request_key: requestKey,
     lineage_id: null,
     issue_node_id: null,
     issue_number: null,
@@ -942,7 +984,7 @@ export async function runController(
       run_id: context.job['run_id'],
       run_attempt: 1,
       event: 'workflow_dispatch',
-      ...(await producerActor(context, request)),
+      ...(await producerActor(context, request, false)),
       producer_phase: command,
       request_key: requestKey,
       lineage_id: lineage['lineage_id'],
