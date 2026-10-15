@@ -9,6 +9,7 @@ import type { TestContext } from 'node:test';
 import { FactoryPlatform } from './helpers/night-factory-transport.ts';
 import {
   arrayField,
+  CONTROL_FILES,
   record,
   resolveFactoryContext,
   verifyControlSource,
@@ -26,6 +27,7 @@ import {
   UNWIRED_CONTROL_COMMANDS,
   validateDispatchReachability,
   validateFactoryHardening,
+  validateFactoryWorkflowSet,
   validateInertPolicy,
   validateInertWorkflow,
   validateNativeWorkflow,
@@ -587,7 +589,7 @@ it('PR-A enables nothing: inactive policy, no schedule, no secrets beyond the wo
       'provider secret',
       'FACTORY_INPUT: ${{ inputs.request }}',
       'FACTORY_INPUT: ${{ secrets.OPENCODE_GO_API_KEY }}',
-      /secret OPENCODE_GO_API_KEY/,
+      /secret use .*OPENCODE_GO_API_KEY/,
     ],
     [
       'inherited secrets',
@@ -678,6 +680,130 @@ it('factory dispatch choices reach a job, a no-filter script command, or an expl
       read,
     );
   }, /reach no job: vanish/);
+});
+
+const inertWorkflow = (stepBody: string, on = 'on: workflow_dispatch'): string =>
+  `name: t\n${on}\npermissions: {}\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n${stepBody}`;
+
+it('inert gate rejects every secret reference form except the workflow token', () => {
+  const rejected = [
+    '      - run: echo\n        env:\n          X: ${{ toJSON(secrets) }}\n',
+    '      - run: echo\n        env:\n          X: ${{ secrets }}\n',
+    '      - run: echo\n        env:\n          X: ${{ SECRETS.OPENCODE_GO_API_KEY }}\n',
+    "      - run: echo\n        env:\n          X: ${{ secrets['OPENCODE_GO_API_KEY'] }}\n",
+    "      - run: echo\n        env:\n          X: ${{ '}}' && secrets.OPENCODE_GO_API_KEY }}\n",
+    '      - run: echo\n        env:\n          X: ${{ secrets.GITHUB_TOKEN && secrets.OTHER }}\n',
+    '      - run: echo\n        env:\n          X: ${{ secrets.GITHUB_TOKEN_OTHER }}\n',
+    '      - run: |\n          # ${{ secrets.OPENCODE_GO_API_KEY }}\n          echo\n',
+    "      - if: secrets.OPENCODE_GO_API_KEY != ''\n        run: echo\n",
+    '      - uses: ./.github/actions/x\n        with:\n          key: ${{ secrets.OPENCODE_GO_API_KEY }}\n',
+  ];
+  for (const step of rejected)
+    assert.throws(
+      () => {
+        validateInertWorkflow(inertWorkflow(step), 'i.yml');
+      },
+      /secret/,
+      step,
+    );
+  for (const step of [
+    '      - run: echo\n        env:\n          X: ${{ secrets.GITHUB_TOKEN }}\n',
+    '      - run: echo\n        env:\n          X: ${{ SECRETS.github_token }}\n',
+    '      - run: |\n          # secrets are never used here\n          echo ${{ github.run_id }}\n',
+    "      - run: echo\n        env:\n          X: ${{ format('secrets {0}', github.run_id) }}\n",
+  ])
+    validateInertWorkflow(inertWorkflow(step), 'i.yml');
+});
+
+it('inert gate allows only the workflow_dispatch trigger and no stray factory workflow file', () => {
+  const step = '      - run: echo\n';
+  for (const on of [
+    'on: push',
+    'on: [workflow_dispatch, push]',
+    'on:\n  workflow_dispatch:\n  pull_request_target:',
+    'on:\n  workflow_dispatch:\n  workflow_run:\n    workflows: [x]',
+    'on:\n  workflow_dispatch:\n  issues:\n    types: [opened]',
+    "on:\n  workflow_dispatch:\n  schedule:\n    - cron: '0 3 * * *'",
+  ])
+    assert.throws(
+      () => {
+        validateInertWorkflow(inertWorkflow(step, on), 'i.yml');
+      },
+      /trigger is not enabled/,
+      on,
+    );
+  validateInertWorkflow(inertWorkflow(step, 'on:\n  workflow_dispatch:'), 'i.yml');
+  validateFactoryWorkflowSet(fs.readdirSync('.github/workflows'));
+  assert.throws(() => {
+    validateFactoryWorkflowSet([...FACTORY_WORKFLOWS, 'factory-extra.yml']);
+  }, /factory-extra\.yml/);
+  validateFactoryWorkflowSet(['ci.yml', 'release.yml', ...FACTORY_WORKFLOWS]);
+});
+
+it('dispatch reachability needs a handler branch for the command, not just the string', () => {
+  const workflow = `name: t\non:\n  workflow_dispatch:\n    inputs:\n      command:\n        type: choice\n        options: [preflight, stop]\n        default: preflight\npermissions: {}\njobs:\n  preflight:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node scripts/x.ts "$FACTORY_COMMAND"\n`;
+  const check = (source: string): void => {
+    validateDispatchReachability(workflow, 'w.yml', () => source);
+  };
+  for (const source of [
+    "if (role !== 'stop') throw new Error('no');",
+    "const label = 'stop';",
+    "if (command !== 'stop') return;",
+    "if (command === 'preflight') return;",
+  ])
+    assert.throws(
+      () => {
+        check(source);
+      },
+      /reach no job: stop/,
+      source,
+    );
+  check("switch (command) { case 'stop': break; case 'preflight': break; }");
+  check("if (command === 'stop' || command === 'preflight') return;");
+});
+
+it('factory hardening treats the token in job env, workflow env, action inputs and any casing as authentication', () => {
+  const actionsRead = '    permissions:\n      actions: read\n';
+  const readOnly = '    permissions:\n      contents: read\n';
+  const run = '    steps:\n      - run: node tools/other.js\n';
+  const cases: [string, string][] = [
+    ['job env', `${readOnly}    env:\n      T: \${{ github.token }}\n${run}`],
+    ['job env secret', `${readOnly}    env:\n      T: \${{ secrets.GITHUB_TOKEN }}\n${run}`],
+    ['mixed case', `${readOnly}${run}        env:\n          T: \${{ GITHUB.TOKEN }}\n`],
+    [
+      'mixed case secret',
+      `${readOnly}${run}        env:\n          T: \${{ SECRETS.GITHUB_TOKEN }}\n`,
+    ],
+    [
+      'with github-token',
+      `${readOnly}    steps:\n      - uses: x/y@v1\n        with:\n          github-token: literal\n`,
+    ],
+    [
+      'with token',
+      `${readOnly}    steps:\n      - uses: x/y@v1\n        with:\n          token: literal\n`,
+    ],
+    [
+      'with token expression',
+      `${readOnly}    steps:\n      - uses: x/y@v1\n        with:\n          other: \${{ github.token }}\n`,
+    ],
+    ['inline run', `${readOnly}    steps:\n      - run: echo \${{ github.token }}\n`],
+  ];
+  for (const [label, job] of cases)
+    assert.throws(
+      () => {
+        validateFactoryHardening(hardeningWorkflow(job), 'h.yml');
+      },
+      /explicit actions permission/,
+      label,
+    );
+  assert.throws(() => {
+    validateFactoryHardening(
+      hardeningWorkflow(`${readOnly}${run}`, 'permissions: {}\nenv:\n  T: ${{ github.token }}\n'),
+      'h.yml',
+    );
+  }, /explicit actions permission/);
+  for (const [, job] of cases)
+    validateFactoryHardening(hardeningWorkflow(job.replace(readOnly, actionsRead)), 'h.yml');
 });
 
 // AC20–22/25–26 primary owner; no window start or additional target is synthesized.
@@ -850,6 +976,31 @@ it('F7 owner stop completes under control-file drift while ordinary effects stay
     platform.requests.some((request) => request.path.includes('contents/stop.json')),
     false,
   );
+});
+
+it('F7 the relaxed stop verification is refused to every role but stop', async (test) => {
+  const { context } = stopPlatform(test);
+  const stop = await resolveFactoryContext(context);
+  await verifyControlSource(stop, true);
+  for (const role of ['repair', 'bootstrap'] as const)
+    await assert.rejects(
+      verifyControlSource({ ...stop, role }, true),
+      /requires the stop role/,
+      role,
+    );
+});
+
+it('every local import between factory scripts is a controlled manifest file', () => {
+  const scripts = fs
+    .readdirSync('scripts')
+    .filter((file) => /^(?:factory-.*|check-factory-workflows)\.ts$/.test(file));
+  assert.ok(scripts.length >= 8);
+  for (const file of scripts) {
+    assert.ok(CONTROL_FILES.includes(`scripts/${file}`), `${file} itself`);
+    const source = fs.readFileSync(path.join('scripts', file), 'utf8');
+    for (const [, imported = ''] of source.matchAll(/from '\.\/(factory-[\w-]+\.ts)'/g))
+      assert.ok(CONTROL_FILES.includes(`scripts/${imported}`), `${file} imports ${imported}`);
+  }
 });
 
 it('F7 stop switches ordinary effects off and a missing or non-false stop.json never opens them', async (test) => {

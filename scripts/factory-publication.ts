@@ -17,7 +17,7 @@ import {
   verifyControlSource,
 } from './factory-protocol.ts';
 import type { FactoryContext, FactoryDecision, JsonRecord } from './factory-protocol.ts';
-import { isProtectedPath } from './factory-paths.ts';
+import { isProtectedPath, isSafeRepoPath } from './factory-paths.ts';
 
 export interface PublicationResult {
   readonly presence: readonly string[];
@@ -262,15 +262,32 @@ export async function reconcilePublication(
         continue;
       }
       processed.push(finding);
-      const protectedPath = isProtectedPath(context.policy, stringField(finding, 'path'));
-      const repairState = confidence === 'disputed' || protectedPath ? 'needs-human' : 'eligible';
-      const origin = {
-        scope: stringField(finding, 'path'),
-        inventory_sha256: scan['inventory_sha256'],
-        tool_revision: scan['tool_revision'],
-        config_revision: scan['config_revision'],
+      const findingPath = stringField(finding, 'path');
+      // An unsafe path cannot be judged against the patterns, so it never becomes eligible.
+      const blockedPath =
+        !isSafeRepoPath(findingPath) || isProtectedPath(context.policy, findingPath);
+      const repairState = confidence === 'disputed' || blockedPath ? 'needs-human' : 'eligible';
+      const bodyFor = (inventory: unknown): string => {
+        const origin = {
+          scope: stringField(finding, 'path'),
+          inventory_sha256: inventory,
+          tool_revision: scan['tool_revision'],
+          config_revision: scan['config_revision'],
+        };
+        return `<!-- factory-finding-v1 ${JSON.stringify({ ...identity, origin })} -->\nConfidence: ${confidence}\nRepair: ${repairState}\nAuthenticated receipt: ${sha256(proof)}`;
       };
-      const body = `<!-- factory-finding-v1 ${JSON.stringify({ ...identity, origin })} -->\nConfidence: ${confidence}\nRepair: ${repairState}\nAuthenticated receipt: ${sha256(proof)}`;
+      const body = bodyFor(scan['inventory_sha256']);
+      // The stored inventory digest is bookkeeping: an inventory-only change must not rewrite every issue.
+      const sameBody = (current: JsonRecord): boolean => {
+        const stored = canonicalIssue(context, current)?.['origin'];
+        return (
+          current['body'] === body ||
+          (typeof stored === 'object' &&
+            stored !== null &&
+            !Array.isArray(stored) &&
+            current['body'] === bodyFor(record(stored)['inventory_sha256']))
+        );
+      };
       const title = `[factory:${confidence}] ${fingerprint.slice(0, 16)}`;
       const findingLabels = [`severity:${stringField(finding, 'severity')}`, 'source:ocr-scan'];
       if (issue === undefined) {
@@ -326,7 +343,7 @@ export async function reconcilePublication(
       const snapshotDelta = labelDelta(labelNames(issue));
       if (
         issue['title'] !== title ||
-        issue['body'] !== body ||
+        !sameBody(issue) ||
         snapshotDelta.add.length > 0 ||
         snapshotDelta.remove.length > 0
       ) {
@@ -352,7 +369,7 @@ export async function reconcilePublication(
         // Add before remove so a failure between them leaves the new labels visible, not lost.
         const freshDelta = labelDelta(labelNames(fresh));
         inFlight = partialEffect(identity, fresh, confidence);
-        if (fresh['title'] !== title || fresh['body'] !== body) {
+        if (fresh['title'] !== title || !sameBody(fresh)) {
           issue = record(
             await githubRequest(context, `${route}/${issueNumber}`, 'PATCH', { title, body }),
           );

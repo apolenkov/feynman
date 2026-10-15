@@ -59,6 +59,12 @@ export const FACTORY_WORKFLOWS: readonly string[] = [
   'night-review.yml',
 ];
 export const FACTORY_ENVIRONMENT = 'factory-privileged';
+// A factory-* workflow outside the list would skip every gate below.
+export function validateFactoryWorkflowSet(files: readonly string[]): void {
+  for (const file of files)
+    if (/^factory-.*\.ya?ml$/.test(file) && !FACTORY_WORKFLOWS.includes(file))
+      throw new Error(`${file}: factory workflow is not listed in FACTORY_WORKFLOWS`);
+}
 // shortcut: npm subcommand is the first non-option word, so `npm --prefix dir ci` and `echo npm i` misjudge; use a shell parser if that matters.
 const NPM_INSTALL =
   /(?:^|[\s'"(])npm((?:\s+-\S+)*)\s+(ci|cit|ic|clean-install|clean-install-test|install-ci-test|install-clean|install-test|it|add|i|in|ins|inst|insta|instal|install|isnt|isnta|isntal|isntall)(?=[\s'")]|$)/;
@@ -82,9 +88,9 @@ function installsWithScripts(run: string): boolean {
 // in the same reviewed diff instead of bypassing the gate.
 export const INERT_POSTURE: {
   readonly activation: boolean;
-  readonly scheduleAllowed: boolean;
+  readonly triggers: readonly string[];
   readonly secretNames: readonly string[];
-} = { activation: false, scheduleAllowed: false, secretNames: ['GITHUB_TOKEN'] };
+} = { activation: false, triggers: ['workflow_dispatch'], secretNames: ['GITHUB_TOKEN'] };
 // Text of a scalar workflow token (expressions keep their `${{ }}` form); structures are not text.
 const scalarText = (token: TemplateToken | undefined): string =>
   token !== undefined && isScalar(token) ? token.toString() : '';
@@ -106,8 +112,35 @@ function enablesFactoryFlag(token: TemplateToken): boolean {
     );
   return isSequence(token) && [...token].some(enablesFactoryFlag);
 }
-// shortcut: comment stripping is per line (`#` after whitespace) and secrets are matched textually;
-// use the expression parser if a legitimate `#` inside a string ever hides a reference.
+// Bodies of the `${{ }}` expressions in a text, without their string literals: a quoted `}}` cannot end one
+// early and a quoted word is not a reference. An unterminated expression runs to the end.
+function expressionBodies(text: string): string[] {
+  const bodies: string[] = [];
+  for (let at = text.indexOf('${{'); at !== -1; at = text.indexOf('${{', at)) {
+    let body = '';
+    at += 3;
+    while (at < text.length && !text.startsWith('}}', at)) {
+      if (text[at] === "'") {
+        for (at++; at < text.length && (text[at] !== "'" || text[at + 1] === "'"); at++)
+          if (text[at] === "'") at++;
+        at++;
+        body += "''";
+      } else body += text.charAt(at++);
+    }
+    bodies.push(body);
+    at += 2;
+  }
+  return bodies;
+}
+const SECRET_ALLOWED = new RegExp(
+  `\\bsecrets\\s*\\.\\s*(?:${INERT_POSTURE.secretNames.join('|')})\\b`,
+  'gi',
+);
+// The workflow token in any casing or bracket form: `github.token`, `secrets.GITHUB_TOKEN`, `github['token']`.
+const TOKEN_REFERENCE =
+  /\bgithub\s*(?:\.\s*token\b|\[\s*'token'\s*\])|\bsecrets\s*\.\s*github_token\b/i;
+// shortcut: the FACTORY_* flag is matched textually on comment-stripped lines; use the expression parser
+// if a legitimate `#` inside a string ever hides a flag.
 export function validateInertWorkflow(content: string, name: string): void {
   const result = parseWorkflow({ name, content }, new NoOperationTraceWriter());
   result.context.errors.check('Official workflow parser');
@@ -120,17 +153,34 @@ export function validateInertWorkflow(content: string, name: string): void {
       : trigger !== undefined && isSequence(trigger)
         ? [...trigger].map(scalarText)
         : [scalarText(trigger)];
-  if (!INERT_POSTURE.scheduleAllowed && triggers.includes('schedule'))
-    throw new Error(`${name}: schedule trigger is not enabled in this delivery`);
+  for (const entry of triggers)
+    if (!INERT_POSTURE.triggers.includes(entry))
+      throw new Error(`${name}: ${entry} trigger is not enabled in this delivery`);
+  // Secrets are judged on the expressions Actions substitutes before any shell, so comments are not cut.
+  const inspectText = (text: string, key: string): void => {
+    for (const body of expressionBodies(
+      !text.includes('${{') && key === 'if' ? `\${{ ${text} }}` : text,
+    ))
+      if (/\bsecrets\b/i.test(body.replaceAll(SECRET_ALLOWED, '')))
+        throw new Error(`${name}: secret use in "${body.trim()}" is not enabled in this delivery`);
+  };
+  const inspect = (token: TemplateToken, key: string): void => {
+    if (isMapping(token))
+      for (const entry of token) {
+        const entryKey = scalarText(entry.key);
+        inspectText(entryKey, '');
+        if (entryKey.toLowerCase() === 'secrets' && isScalar(entry.value))
+          throw new Error(`${name}: dynamic or inherited secrets are not enabled in this delivery`);
+        inspect(entry.value, entryKey);
+      }
+    else if (isSequence(token)) for (const item of token) inspect(item, key);
+    else inspectText(scalarText(token), key);
+  };
+  inspect(result.value, '');
   const text = content
     .split('\n')
     .map((line) => line.replace(/(^|\s)#.*/, ''))
     .join('\n');
-  if (/\bsecrets\s*:\s*inherit\b/.test(text) || /\bsecrets\s*\[/.test(text))
-    throw new Error(`${name}: dynamic or inherited secrets are not enabled in this delivery`);
-  for (const [, secret] of text.matchAll(/\bsecrets\.([A-Za-z_]\w*)/g))
-    if (secret === undefined || !INERT_POSTURE.secretNames.includes(secret))
-      throw new Error(`${name}: secret ${secret ?? ''} is not enabled in this delivery`);
   if (
     enablesFactoryFlag(result.value) ||
     /FACTORY_\w+\s*(?<![=!<>])=(?!=)\s*["']?true\b/i.test(text)
@@ -177,21 +227,33 @@ export function validateFactoryHardening(content: string, name: string): void {
     )
       throw new Error(`${id}: write-token job requires environment ${FACTORY_ENVIRONMENT}`);
     const steps = job.value.find('steps');
-    let authenticates = false;
+    const holdsToken = (token: TemplateToken | undefined): boolean =>
+      token !== undefined &&
+      isMapping(token) &&
+      [...token].some(
+        ({ key, value }) =>
+          TOKEN_REFERENCE.test(scalarText(value)) || /^(?:github-)?token$/i.test(scalarText(key)),
+      );
+    // Workflow and job env reach every step, so they authenticate the whole job.
+    let authenticates = [result.value.find('env'), job.value.find('env')].some(
+      (env) =>
+        env !== undefined &&
+        isMapping(env) &&
+        [...env].some(({ value }) => TOKEN_REFERENCE.test(scalarText(value))),
+    );
     for (const step of steps !== undefined && isSequence(steps) ? steps : []) {
       if (!isMapping(step)) continue;
       const env = step.find('env');
       const tokenEnv =
-        env !== undefined &&
-        isMapping(env) &&
-        [...env].some(({ value }) =>
-          /\b(?:github\.token|secrets\.GITHUB_TOKEN)\b/.test(scalarText(value)),
-        );
+        (env !== undefined &&
+          isMapping(env) &&
+          [...env].some(({ value }) => TOKEN_REFERENCE.test(scalarText(value)))) ||
+        holdsToken(step.find('with'));
       const token = step.find('run');
       // An expression run is not a string token; its text form keeps the literal command.
       const run = token !== undefined && isScalar(token) ? token.toString() : '';
       if (installsWithScripts(run)) throw new Error(`${id}: npm ci must use --ignore-scripts`);
-      authenticates ||= tokenEnv || run.includes('scripts/factory-');
+      authenticates ||= tokenEnv || TOKEN_REFERENCE.test(run) || run.includes('scripts/factory-');
       const pin =
         env !== undefined && isMapping(env) ? env.find('FACTORY_ACTIVATION_POLICY_PIN') : undefined;
       if (CONTROLLER_SCRIPT.test(run) && scalarText(pin) !== PIN_EXPRESSION)
@@ -257,7 +319,17 @@ export function validateDispatchReachability(
           : /node (scripts\/[\w.-]+\.ts) "\$FACTORY_COMMAND"/.exec(run)?.[1];
       if (script === undefined) continue;
       const source = readScript(script);
-      for (const option of options) if (source.includes(`'${option}'`)) reached.add(option);
+      // A handler branch (`case 'x'`, `command === 'x'`, `input['command'] === 'x'`) counts; a bare string such as
+      // `role !== 'x'` does not.
+      for (const option of options) {
+        const quoted = `'${option.replaceAll(/\W/g, String.raw`\$&`)}'`;
+        if (
+          new RegExp(String.raw`\bcase\s+${quoted}|\bcommand(?:'\])?\s*===?\s*${quoted}`).test(
+            source,
+          )
+        )
+          reached.add(option);
+      }
     }
   }
   const dead = options.filter((option) => !reached.has(option));
@@ -329,10 +401,9 @@ async function workflowMain(): Promise<void> {
       JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, 'factory-policy.json'), 'utf8')),
     );
     const directory = path.resolve(import.meta.dirname, '..', '.github', 'workflows');
-    for (const file of fs
-      .readdirSync(directory)
-      .filter((file) => file.endsWith('.yml'))
-      .toSorted()) {
+    const listed = fs.readdirSync(directory);
+    validateFactoryWorkflowSet(listed);
+    for (const file of listed.filter((file) => file.endsWith('.yml')).toSorted()) {
       const content = fs.readFileSync(path.join(directory, file), 'utf8');
       await validateNativeWorkflow(content, file);
       if (FACTORY_WORKFLOWS.includes(file)) {
