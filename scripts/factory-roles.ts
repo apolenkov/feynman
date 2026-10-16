@@ -12,6 +12,7 @@ export const ROLE_CONTROL_FILES: readonly string[] = Object.freeze([
   'scripts/factory-roles.ts',
   'scripts/factory-role-authority.ts',
   'scripts/factory-role-validate.ts',
+  'scripts/factory-repair.ts',
   'scripts/factory-role-config.json',
 ]);
 const ROLES = [

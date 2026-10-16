@@ -8,6 +8,7 @@ import {
 } from '../scripts/factory-protocol.ts';
 import { runController, submitIngress } from '../scripts/factory-control.ts';
 import { authenticateRoleReservation } from '../scripts/factory-role-authority.ts';
+import { runRepair } from '../scripts/factory-repair.ts';
 
 // AC06–13 primary owner. NEW CONTRACT absence is not behavioral baseline RED.
 it('implements RFC8785 finite-number ordering without normalizing Unicode and rejects lone surrogates', () => {
@@ -839,6 +840,28 @@ it('v2 authenticates the same-run reserve artifact AND immutable recovered journ
   assert.equal(appended.status, 'accepted', appended.reason);
   const readOnlyStart = platform.requests.length;
   const result = await authenticateRoleReservation(context, pin, request);
+  const previousPin = process.env['FACTORY_ROLE_CONTROL_PIN'];
+  process.env['FACTORY_ROLE_CONTROL_PIN'] = pin;
+  test.after(() => {
+    if (previousPin === undefined) delete process.env['FACTORY_ROLE_CONTROL_PIN'];
+    else process.env['FACTORY_ROLE_CONTROL_PIN'] = previousPin;
+  });
+  const preparation = await runRepair(context, { command: 'prepare', ...request });
+  assert.equal(preparation.status, 'prepared', preparation.reason);
+  assert.deepEqual(preparation.record, {
+    ...result,
+    effects: 'HOLD',
+    provider_allowed: false,
+    writer_allowed: false,
+  });
+  // Authentic evidence never grants permission to execute, including a repeated request.
+  const beforeEffects = platform.requests.length;
+  for (const command of ['research', 'candidate', 'publish', 'release']) {
+    const effect = await runRepair(context, { command, ...request });
+    assert.equal(effect.status, 'denied');
+    assert.equal(record(effect.record)['effects'], 'HOLD');
+  }
+  assert.equal(platform.requests.length, beforeEffects);
   assert.equal(result.state_head, record(appended.record)['state_head']);
   assert.deepEqual(result.reservation, receipt);
   assert.equal(result.context['run_id'], '904');
@@ -874,6 +897,9 @@ it('v2 authenticates the same-run reserve artifact AND immutable recovered journ
   const receiptPath = `/repos/apolenkov/feynman/contents/receipts/904-1-${String(receipt['transition_id'])}.json`;
   platform.failures.set(`GET ${receiptPath}`, 404);
   await assert.rejects(authenticateRoleReservation(context, pin, request), /404|journal/);
+  const stalePreparation = await runRepair(context, { command: 'prepare', ...request });
+  assert.equal(stalePreparation.status, 'denied', 'prepare must reauthenticate on every call');
+  assert.equal(record(stalePreparation.record)['provider_allowed'], false);
   platform.failures.delete(`GET ${receiptPath}`);
   platform.overrides.set(receiptPath, {
     type: 'file',
