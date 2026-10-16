@@ -1445,6 +1445,7 @@ const absenceOperation = (head: string, target: string, payload: string): JsonRe
 it('AC04–05 requires complete actual scan coverage and independently bound absence proof before closing a missing canonical finding', async (test) => {
   for (const control of [
     'complete-absence',
+    'known-presence',
     'incomplete-coverage',
     'wrong-issue-proof',
     'narrowed-scan',
@@ -1501,6 +1502,7 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
         ...document,
         source_sha: repaired,
         findings: [],
+        ...(control === 'known-presence' ? { known_present: [fixture.fingerprint] } : {}),
         covered: control === 'incomplete-coverage' ? [] : ['bin/application.mjs'],
         failed: control === 'incomplete-coverage' ? ['bin/application.mjs'] : [],
         ...(control === 'narrowed-scan'
@@ -1566,6 +1568,12 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
         authority: scanAuthority,
         disappearance_authority: control === 'missing-proof' ? {} : { [issue.node_id]: proof },
       });
+      if (control === 'known-presence') {
+        assert.equal(result.complete, true);
+        assert.deepEqual(result.presence, [fixture.fingerprint]);
+        assert.deepEqual(result.issues, []);
+        assert.deepEqual(result.pending, []);
+      }
       assert.equal(
         result.status,
         [
@@ -1589,6 +1597,122 @@ it('AC04–05 requires complete actual scan coverage and independently bound abs
         control === 'complete-absence' ? 1 : 0,
       );
     });
+});
+
+it('binds known presence to the signed scan and publishes a shared fingerprint only once', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const { authority: _authority, ...document } = fixture.scan;
+  const scan = { ...document, known_present: [fixture.fingerprint] };
+  const authority = fixture.authority(
+    'scan',
+    'complete',
+    fixture.baseline,
+    sha256(scan),
+    'reviewed-v1',
+  );
+  const before = fixture.platform.requests.length;
+  const tampered = await reconcilePublication(fixture.context, {
+    ...scan,
+    known_present: ['f'.repeat(64)],
+    authority,
+  });
+  assert.equal(tampered.status, 'needs-human');
+  assert.match(tampered.reason, /Scan source\/policy provenance mismatch/);
+  assert.deepEqual(
+    fixture.platform.requests.slice(before).filter((r) => r.method !== 'GET'),
+    [],
+  );
+  assert.equal(fixture.platform.issues.length, 0);
+  const accepted = await reconcilePublication(fixture.context, { ...scan, authority });
+  assert.equal(accepted.status, 'accepted', accepted.reason);
+  assert.deepEqual(accepted.presence, [fixture.fingerprint]);
+  assert.equal(accepted.issues.length, 1);
+  assert.equal(fixture.platform.issues.length, 1);
+});
+
+it('rejects malformed known presence before any publication writes', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const { authority: _authority, ...document } = fixture.scan;
+  for (const known_present of [
+    null,
+    {},
+    'fingerprint',
+    [null],
+    ['bad'],
+    ['A'.repeat(64)],
+    [fixture.fingerprint, fixture.fingerprint],
+  ]) {
+    const scan = { ...document, known_present };
+    const before = fixture.platform.requests.length;
+    const result = await reconcilePublication(fixture.context, {
+      ...scan,
+      authority: fixture.authority(
+        'scan',
+        'complete',
+        fixture.baseline,
+        sha256(scan),
+        'reviewed-v1',
+      ),
+    });
+    assert.equal(result.status, 'needs-human');
+    assert.equal(result.complete, false);
+    assert.match(result.reason, /known.presen/i);
+    assert.deepEqual(
+      fixture.platform.requests.slice(before).filter((r) => r.method !== 'GET'),
+      [],
+    );
+  }
+});
+
+it('known presence alone never creates, refreshes or reopens an issue', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const issue = {
+    number: 42,
+    node_id: 'I_KNOWN',
+    user: { id: 23296915, login: 'apolenkov' },
+    state: 'closed',
+    title: 'preserve owner title',
+    body: `<!-- factory-finding-v1 ${JSON.stringify({
+      repository_id: '1230959148',
+      fingerprint_policy_revision: 'reviewed-v1',
+      fingerprint: fixture.fingerprint,
+      origin: absenceOrigin,
+    })} -->`,
+  };
+  fixture.platform.issues.push(issue);
+  fixture.platform.facts.set('/repos/apolenkov/feynman/issues/42', issue);
+  const { authority: _authority, ...document } = fixture.scan;
+  for (const state of ['closed', 'open']) {
+    const current = { ...issue, state };
+    fixture.platform.issues.splice(0, 1, current);
+    fixture.platform.facts.set('/repos/apolenkov/feynman/issues/42', current);
+    const scan = {
+      ...document,
+      findings: [],
+      known_present: [fixture.fingerprint, 'f'.repeat(64)].toSorted(),
+    };
+    const before = fixture.platform.requests.length;
+    const result = await reconcilePublication(fixture.context, {
+      ...scan,
+      authority: fixture.authority(
+        'scan',
+        'complete',
+        fixture.baseline,
+        sha256(scan),
+        'reviewed-v1',
+      ),
+    });
+    assert.equal(result.status, 'accepted', result.reason);
+    assert.equal(result.complete, true);
+    assert.deepEqual(result.presence, [fixture.fingerprint, 'f'.repeat(64)].toSorted());
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.pending, []);
+    assert.deepEqual(
+      fixture.platform.requests.slice(before).filter((r) => r.method !== 'GET'),
+      [],
+    );
+    assert.deepEqual(fixture.platform.facts.get('/repos/apolenkov/feynman/issues/42'), current);
+  }
 });
 
 function refreshedScan(

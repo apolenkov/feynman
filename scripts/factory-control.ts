@@ -642,6 +642,16 @@ function nightDraft(context: FactoryContext, request: JsonRecord): JsonRecord {
   const draft = parseFactoryJson(fs.readFileSync(file));
   const findings = arrayField(draft, 'findings').map(record);
   if (findings.length > 1) throw new FactoryFailure('Night draft may carry at most one finding');
+  const known = draft['known_present'];
+  if (
+    known !== undefined &&
+    (!Array.isArray(known) ||
+      known.some(
+        (fingerprint) => typeof fingerprint !== 'string' || !/^[0-9a-f]{64}$/.test(fingerprint),
+      ) ||
+      new Set(known).size !== known.length)
+  )
+    throw new FactoryFailure('Night draft known presence invalid');
   if (
     ['token_budget', 'authority', 'disappearance_authority', 'reopen_authority'].some(
       (key) => draft[key] !== undefined,

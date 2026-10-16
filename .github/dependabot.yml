@@ -4,12 +4,12 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
-    # TypeScript majors change the compiler contract this repo pins in
-    # tsconfig and typed ESLint; take a new major by hand.
+    # TypeScript 7.0.2 fails strict peer resolution (2026-10-16):
+    # typescript-eslint 8.71.2 requires TypeScript <6.1.0; keep compatible 6.0.3.
     ignore:
       - dependency-name: typescript
-        update-types:
-          - version-update:semver-major
+        versions:
+          - '>=7.0.0'
     schedule:
       interval: weekly
       day: monday

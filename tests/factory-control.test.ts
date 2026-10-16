@@ -1827,6 +1827,40 @@ it('refuses a night draft with two findings, a foreign source_sha or a verdict o
   assert.equal(platform.git(['rev-parse', 'refs/heads/factory-state']), head);
 });
 
+it('rejects malformed known presence before issuing any night receipt', async (test) => {
+  const { platform, activation } = await bootstrapped(test);
+  const context = laterContext(platform, activation, '910');
+  const head = platform.git(['rev-parse', 'refs/heads/factory-state']);
+  const writes = nonGetCount(platform);
+  for (const command of ['verifier', 'scan']) {
+    for (const known_present of [
+      null,
+      {},
+      'fingerprint',
+      [null],
+      ['bad'],
+      ['A'.repeat(64)],
+      [NIGHT_PRINT, NIGHT_PRINT],
+    ]) {
+      const result = await runController(context, {
+        command,
+        draft_file: nightDraft(platform, [nightFinding()], { known_present }),
+      });
+      assert.equal(result.status, 'denied');
+      assert.match(result.reason, /known.presen/i);
+      assert.equal(result.record, undefined);
+    }
+  }
+  assert.equal(nonGetCount(platform), writes);
+  assert.equal(platform.git(['rev-parse', 'refs/heads/factory-state']), head);
+  const valid = await runController(context, {
+    command: 'verifier',
+    draft_file: nightDraft(platform, [nightFinding()], { known_present: [NIGHT_PRINT] }),
+  });
+  assert.equal(valid.status, 'accepted', valid.reason);
+  assert.ok(valid.record);
+});
+
 it('requires the scheduled night-review parent for a bot producer and refuses a null token budget', async (test) => {
   const { platform, activation } = await bootstrapped(test);
   const context = laterContext(platform, activation, '911');
