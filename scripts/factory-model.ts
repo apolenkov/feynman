@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import {
@@ -285,13 +286,18 @@ async function chat(
   url: string,
   key: string,
   payload: JsonRecord,
+  clientHeaders: Readonly<Record<string, string>>,
   timeoutMs = CALL_TIMEOUT_MS,
 ): Promise<ChatResult> {
   const request = JSON.stringify(payload);
   try {
     const response = await fetch(`${url}/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${key}`,
+        ...clientHeaders,
+      },
       body: request,
       signal: AbortSignal.timeout(Math.max(1, timeoutMs)),
     });
@@ -612,17 +618,27 @@ export async function runModel(options: RunOptions): Promise<void> {
     value === undefined || value === '' ? [] : [{ value, fallback }],
   );
   if (keys.length === 0) throw new FactoryFailure('Model key is not configured');
+  // The provider routes all calls in a run by a stable session ID, including OCR's requests.
+  const clientHeaders = {
+    'x-opencode-session': randomUUID(),
+    'user-agent': 'feynman-night-factory/1.0',
+  };
   // The primary key is tried first; the fallback is used only when the provider answers 401 to the primary.
   let key: string | null = null;
   let authFallbackUsed = false;
   let probeStatus = 0;
   let probeError: unknown = null;
   for (const candidate of keys) {
-    const probe = await chat(policy.llm_url, candidate.value, {
-      model: policy.scan_model,
-      messages: [{ role: 'user', content: 'ping' }],
-      max_tokens: 1,
-    });
+    const probe = await chat(
+      policy.llm_url,
+      candidate.value,
+      {
+        model: policy.scan_model,
+        messages: [{ role: 'user', content: 'ping' }],
+        max_tokens: 1,
+      },
+      clientHeaders,
+    );
     probeStatus = probe.status;
     probeError = tryRecord(probe.body)?.['error'];
     if (probe.status === 401) continue;
@@ -643,6 +659,7 @@ export async function runModel(options: RunOptions): Promise<void> {
       OCR_LLM_TOKEN: activeKey,
       OCR_LLM_MODEL: policy.scan_model,
       OCR_LLM_PROTOCOL: PROTOCOL,
+      OCR_LLM_EXTRA_HEADERS: `x-opencode-session=${clientHeaders['x-opencode-session']}`,
     };
     const exclude = policy.exclude.length > 0 ? ['--exclude', policy.exclude.join(',')] : [];
 
@@ -747,6 +764,7 @@ export async function runModel(options: RunOptions): Promise<void> {
         policy.llm_url,
         activeKey,
         llmRequest(policy.verifier_model, VERIFIER_INSTRUCTION, findingData(source, first)),
+        clientHeaders,
         callMs,
       );
       verifierTokens += result.tokens;
@@ -775,6 +793,7 @@ export async function runModel(options: RunOptions): Promise<void> {
           ...findingData(source, first),
           verifier_reason: reason,
         }),
+        clientHeaders,
         callMs,
       );
       analystTokens += result.tokens;

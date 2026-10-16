@@ -74,6 +74,7 @@ describe('factory-model run: environment and secrets', () => {
         .toSorted(),
       [
         'HOME',
+        'OCR_LLM_EXTRA_HEADERS',
         'OCR_LLM_MODEL',
         'OCR_LLM_PROTOCOL',
         'OCR_LLM_TOKEN',
@@ -120,7 +121,7 @@ describe('factory-model run: environment and secrets', () => {
     });
   }
 
-  it('falls back to the second key only on 401 and records it', async (t) => {
+  it('keeps one Go session across auth fallback, OCR and roles, with a fresh session next run', async (t) => {
     const s = await scenario(t, 'ok1', (request) =>
       request.authorization === `Bearer ${PRIMARY}`
         ? { status: 401, raw: '{}' }
@@ -133,6 +134,20 @@ describe('factory-model run: environment and secrets', () => {
     assert.equal(scan?.env['OCR_LLM_TOKEN'], FALLBACK);
     assert.equal(s.llm.requests[0]?.authorization, `Bearer ${PRIMARY}`);
     assert.ok(s.llm.requests.slice(1).every((r) => r.authorization === `Bearer ${FALLBACK}`));
+    const session = s.llm.requests[0].headers['x-opencode-session'];
+    assert.equal(typeof session, 'string');
+    assert.ok(typeof session === 'string' && session.length > 0);
+    assert.deepEqual(new Set(s.llm.requests.map(kindOf)), new Set(['probe', 'verify', 'analyst']));
+    for (const request of s.llm.requests) {
+      assert.equal(request.headers['x-opencode-session'], session);
+      assert.equal(request.headers['user-agent'], 'feynman-night-factory/1.0');
+    }
+    assert.equal(scan.env['OCR_LLM_EXTRA_HEADERS'], `x-opencode-session=${session}`);
+    const nextRun = s.llm.requests.length;
+    assert.equal((await s.exec()).code, 0);
+    const nextSession = s.llm.requests[nextRun]?.headers['x-opencode-session'];
+    assert.ok(typeof nextSession === 'string' && nextSession.length > 0);
+    assert.notEqual(nextSession, session);
   });
 
   it('keeps the primary key when it works', async (t) => {
