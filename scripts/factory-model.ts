@@ -169,6 +169,16 @@ const STDERR_PHRASES = [
   'no such host',
   'certificate',
   'model not found',
+  'MissingSessionID',
+  'invalid_request_error',
+  'unsupported_parameter',
+  'unsupported_value',
+  'context_length_exceeded',
+  'content_filter',
+  'max_completion_tokens',
+  'tool_call_id',
+  'tool_calls',
+  'reasoning_content',
 ] as const;
 export function stderrSignals(text: string): { http_statuses: number[]; messages: string[] } {
   const statuses = [
