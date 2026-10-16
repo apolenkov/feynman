@@ -745,10 +745,15 @@ export async function githubPages(
     if (context.policy['api_origin'] !== 'https://api.github.com' || !context.token)
       throw new FactoryFailure('Unknown authenticated fixed pagination origin');
     const endpoint = new URL(next, 'https://api.github.com');
-    const decoded = decodeURIComponent(endpoint.pathname);
+    // GitHub Link headers may identify the same repository by its immutable numeric ID.
+    const route = endpoint.pathname.replace(
+      /^\/repositories\/1230959148\//,
+      '/repos/apolenkov/feynman/',
+    );
+    const decoded = decodeURIComponent(route);
     if (
       endpoint.origin !== 'https://api.github.com' ||
-      endpoint.pathname !== initial.pathname ||
+      route !== initial.pathname ||
       !decoded.startsWith('/repos/apolenkov/feynman/') ||
       decoded.includes('\\') ||
       context.policy['repository_id'] !== '1230959148'

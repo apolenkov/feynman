@@ -469,6 +469,42 @@ it('uses complete Link pagination and rejects terminal count mismatch', async (t
     githubPages(context, '/repos/apolenkov/feynman/example', 'records'),
     /Incomplete pagination count/,
   );
+
+  // GitHub's artifacts endpoint uses the immutable repository ID in its next Link.
+  for (const [next, allowed] of [
+    ['https://api.github.com/repositories/1230959148/actions/artifacts?page=2', true],
+    ['https://api.github.com/repos/apolenkov/feynman/actions/artifacts?page=2', true],
+    ['https://foreign.invalid/repositories/1230959148/actions/artifacts?page=2', false],
+    ['https://api.github.com/repositories/999/actions/artifacts?page=2', false],
+    ['https://api.github.com/repositories/1230959148/actions/runs?page=2', false],
+    ['https://api.github.com/repos/other/feynman/actions/artifacts?page=2', false],
+  ] as const) {
+    const fetched: string[] = [];
+    const mock = test.mock.method(globalThis, 'fetch', (input: string | URL | Request) => {
+      fetched.push(input instanceof Request ? input.url : String(input));
+      return Promise.resolve(
+        new Response(JSON.stringify({ total_count: 2, artifacts: [{ id: fetched.length }] }), {
+          headers: fetched.length === 1 ? { link: `<${next}>; rel="next"` } : {},
+        }),
+      );
+    });
+    try {
+      const pages = githubPages(context, '/repos/apolenkov/feynman/actions/artifacts', 'artifacts');
+      if (allowed) {
+        assert.deepEqual(await pages, [{ id: 1 }, { id: 2 }]);
+        assert.equal(fetched[1], next);
+      } else {
+        await assert.rejects(pages, /Foreign pagination origin\/route/);
+        assert.equal(
+          fetched.length,
+          1,
+          'must reject the foreign Link before forwarding credentials',
+        );
+      }
+    } finally {
+      mock.mock.restore();
+    }
+  }
 });
 
 import fs from 'node:fs';
