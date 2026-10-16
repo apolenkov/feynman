@@ -1,5 +1,13 @@
 # Tasks
 
+## 2026-10-16 continuation (TASK-282.06)
+
+- [x] Preserve observed known fingerprints independently of new-finding selection; prove complete known-only scans and no false absence closure, with invalid inputs failing before writes.
+- [x] Prepare read-only readiness contracts for the three targets assigned by 008: customdev, customdev-learning and harness. Keep exact private identities in the local delivery packet; unknown deployment facts remain blockers.
+- [x] Resolve the PR-C/v1 scope with coordinator 008: roles and the end-to-end fixer are assigned to separate TASK-559 (v2); AC2 here covers v1 API contracts only; TASK-282.06 remains within v1. See design.md for the diagnosed boundaries and C1/C2 recommendation.
+- [ ] Run native install/CI and independent review on the local branch; deliver READY with exact SHA and explicit unverified scope. Main remains frozen and runtime state is untouched.
+- [ ] AC5: use a genuine finding after the scheduled 05:17 night scan for the live scan-to-closure acceptance; never substitute fixtures.
+
 ## 1. Publication and presence
 
 - [ ] 1.1 Implement `scripts/factory-publication.ts` and `.github/workflows/night-review.yml` with complete presence, confidence separation and bounded paginated issue reconciliation; verify AC01–05 in `tests/night-factory-publication.test.ts` with real production decisions and failure transport.

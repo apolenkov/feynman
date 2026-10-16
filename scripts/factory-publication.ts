@@ -200,8 +200,23 @@ export async function reconcilePublication(
     (finding) =>
       typeof finding['fingerprint'] === 'string' && /^[0-9a-f]{64}$/.test(finding['fingerprint']),
   );
+  const knownInput = scan['known_present'];
+  const knownPresent = Array.isArray(knownInput)
+    ? knownInput.filter(
+        (fingerprint): fingerprint is string =>
+          typeof fingerprint === 'string' && /^[0-9a-f]{64}$/.test(fingerprint),
+      )
+    : [];
+  const validKnownPresence =
+    knownInput === undefined ||
+    (Array.isArray(knownInput) &&
+      knownPresent.length === knownInput.length &&
+      new Set(knownPresent).size === knownPresent.length);
   const presence = [
-    ...new Set(identified.map((finding) => stringField(finding, 'fingerprint'))),
+    ...new Set([
+      ...identified.map((finding) => stringField(finding, 'fingerprint')),
+      ...knownPresent,
+    ]),
   ].toSorted();
   const selected: readonly JsonRecord[] = [];
   const pending = identified.map((finding) => ({
@@ -209,12 +224,13 @@ export async function reconcilePublication(
     path: finding['path'],
     adjudication: 'unvalidated-pending',
   }));
-  const complete = scanCoverage(scan, identified.length === findings.length);
+  const complete = scanCoverage(scan, validKnownPresence && identified.length === findings.length);
   const base = { presence, selected, pending, complete, issues: [], dispatch: [] };
   const issues: JsonRecord[] = [];
   // Issue already created or mutated for the current finding but not yet registered.
   let inFlight: JsonRecord | null = null;
   try {
+    if (!validKnownPresence) throw new FactoryFailure('Invalid known presence');
     const context = await resolveFactoryContext(inputContext);
     effectPolicy(context);
     await verifyControlSource(context);
