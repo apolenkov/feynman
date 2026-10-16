@@ -183,7 +183,7 @@ describe('factory-model run: environment and secrets', () => {
     assert.ok(!result.stdout.includes(FALLBACK) && !result.stderr.includes(FALLBACK));
   });
 
-  for (const [label, error, expected] of [
+  for (const [label, error, expected, rawBody] of [
     [
       'known error',
       { code: 'model_not_found', type: 'invalid_request_error', message: PRIMARY },
@@ -206,11 +206,18 @@ describe('factory-model run: environment and secrets', () => {
       { code: null, type: null, message_signals: ['content_filter'], message_length: 14 },
     ],
     ['missing error', null, { code: null, type: null }],
+    ['string error', `model ${PRIMARY} ${FALLBACK}`, { code: null, type: null }],
+    [
+      'non-JSON HTML 400',
+      null,
+      { code: null, type: null },
+      `<html><body>max_tokens ${PRIMARY} ${FALLBACK}</body></html>`,
+    ],
   ] as const) {
     it(`records only allowlisted probe diagnostics: ${label}`, async (t) => {
       const s = await scenario(t, 'nofiles', () => ({
         status: 400,
-        raw: JSON.stringify({ error }),
+        raw: rawBody ?? JSON.stringify({ error }),
       }));
       const result = await s.exec();
       assert.equal(result.code, 0, result.stderr);
@@ -226,6 +233,8 @@ describe('factory-model run: environment and secrets', () => {
       assert.equal(s.llm.requests.length, 1);
       const text = fs.readFileSync(path.join(s.out, 'scan-raw.json'), 'utf8');
       assert.ok(!text.includes(PRIMARY) && !text.includes(FALLBACK));
+      assert.ok(!result.stdout.includes(PRIMARY) && !result.stdout.includes(FALLBACK));
+      assert.ok(!result.stderr.includes(PRIMARY) && !result.stderr.includes(FALLBACK));
       assert.doesNotThrow(() =>
         buildScanDraft(
           raw,
