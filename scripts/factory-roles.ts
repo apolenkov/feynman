@@ -187,7 +187,8 @@ export function validateRoleChain(input: unknown): JsonRecord {
     if (receipt['predecessor_sha256'] !== predecessor) fail('predecessor');
     const finalHead =
       index < 5 ? null : text(record(envelopes[5]?.['receipt'])['final_sha'], 'final head', SHA);
-    if (receipt['final_sha'] !== finalHead) fail('final head drift');
+    if (receipt['final_sha'] !== finalHead || finalHead === reservation['baseline_sha'])
+      fail('final head drift');
     const slot = slots[index];
     if (
       slot === undefined ||

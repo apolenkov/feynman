@@ -229,6 +229,10 @@ describe('additive v2 role contract (structural validation, not authority)', () 
       reseal(input);
       assert.throws(() => validate(input), /final head/);
     }
+    const unchanged = fixture();
+    for (const envelope of unchanged.roles.slice(5)) envelope.receipt['final_sha'] = SHA;
+    reseal(unchanged);
+    assert.throws(() => validate(unchanged), /final head/);
   });
   it('bounds the total allocation and refuses unused-budget transfer between roles', () => {
     for (const key of ['token_budget', 'timeout_seconds'] as const) {
