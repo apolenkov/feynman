@@ -994,3 +994,38 @@ jobs:
           fs.writeFileSync('factory-input.json', JSON.stringify(parseFactoryJson(process.env.FACTORY_INPUT || '{}')));
           NODE
           node scripts/factory-writer.ts "$FACTORY_COMMAND" factory-input.json
+  role-prepare:
+    needs: append-reserve
+    # Read-only evidence only. Provider, sandbox, writer and release executors remain HOLD (PR3).
+    if: needs.append-reserve.result == 'success' && inputs.command == 'reserve' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '23296915' && github.actor == 'apolenkov' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - name: Ensure standard archive tooling
+        run: |
+          if ! command -v bsdtar >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes libarchive-tools
+          fi
+      - name: Install secretless development tools
+        run: npm ci --ignore-scripts
+      - name: Authenticate reserve artifact and durable journal; effects HOLD
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FACTORY_ACTIVATION_POLICY_PIN: ${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}
+          FACTORY_ROLE_CONTROL_PIN: ${{ vars.FACTORY_ROLE_CONTROL_PIN }}
+          FACTORY_INPUT: ${{ inputs.request }}
+        run: |
+          printf '%s' "$FACTORY_INPUT" > role-input.json
+          node scripts/factory-repair.ts prepare role-input.json

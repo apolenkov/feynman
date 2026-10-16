@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { produceReceipt, sha256 } from '../scripts/factory-protocol.ts';
 
-import { validateRoleChain as validate } from '../scripts/factory-roles.ts';
+import { ROLE_CONTROL_FILES, validateRoleChain as validate } from '../scripts/factory-roles.ts';
 
 const SHA = 'a'.repeat(40);
 const FINAL = 'b'.repeat(40);
@@ -68,7 +68,7 @@ function fixture(length = 10) {
     outcome: 'consumed',
     evidence: { scan: null, verifier: null },
   });
-  const manifest = [{ path: 'scripts/factory-roles.ts', blob_sha: SHA }];
+  const manifest = ROLE_CONTROL_FILES.map((path) => ({ path, blob_sha: SHA }));
   const allocations = ORDER.map((role) => ({ role, token_budget: 100, timeout_seconds: 10 }));
   const context = {
     owner_id: '23296915',

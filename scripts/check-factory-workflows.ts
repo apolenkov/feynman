@@ -106,6 +106,7 @@ export const INERT_POSTURE: {
   readonly keyStep: string;
   readonly keyEnvironment: string;
   readonly keyJobSha256: string;
+  readonly rolePrepareJobSha256: string;
 } = {
   activation: false,
   triggers: ['workflow_dispatch'],
@@ -119,6 +120,8 @@ export const INERT_POSTURE: {
   // The parsed structure of the key job (earlier steps, $GITHUB_ENV writes, env values) is pinned; it changes only in a
   // reviewed diff. Comments, quoting and scalar types are not part of it.
   keyJobSha256: 'b2b4677e30fdf126f48c3aab7625019ddd518283e9b6bc145532a22123ae696b',
+  // Only read-only preparation is wired; role executors require a separate reviewed delivery.
+  rolePrepareJobSha256: 'dd3d9b9db2e9798db5da1d566509dea46a195d368d4c9807b2c0ffa303e7583c',
 };
 // Text of a scalar workflow token (expressions keep their `${{ }}` form); structures are not text.
 const scalarText = (token: TemplateToken | undefined): string =>
@@ -227,6 +230,7 @@ export function validateInertWorkflow(content: string, name: string): void {
   result.context.errors.check('Official workflow parser');
   if (result.value === undefined || !isMapping(result.value))
     throw new Error('Workflow mapping absent');
+  validateRolePreparation(result.value, name);
   const trigger = result.value.find('on');
   const triggers =
     trigger !== undefined && isMapping(trigger)
@@ -288,7 +292,7 @@ export function validateInertWorkflow(content: string, name: string): void {
     throw new Error(`${name}: FACTORY_* may only be read from vars, never set to true`);
 }
 // Controller entry points; `scripts/factory-protocol.ts emit` only echoes an authority marker.
-const CONTROLLER_SCRIPT = /scripts\/factory-(?:control|publication|writer|operations)\.ts/;
+const CONTROLLER_SCRIPT = /scripts\/factory-(?:control|publication|writer|operations|repair)\.ts/;
 const PIN_EXPRESSION = '${{ vars.FACTORY_ACTIVATION_POLICY_PIN }}';
 // Static floor only: a token-holding job needs a protected environment, no lifecycle scripts at install,
 // an explicit actions grant wherever it authenticates runs/jobs/logs/artifacts, and every controller
@@ -391,6 +395,26 @@ function tokenText(token: TemplateToken): string {
   if (isMapping(token))
     return [...token].map(({ key, value }) => `${scalarText(key)}\n${tokenText(value)}`).join('\n');
   return isSequence(token) ? [...token].map(tokenText).join('\n') : scalarText(token);
+}
+function validateRolePreparation(workflow: TemplateToken, name: string): void {
+  const jobs = isMapping(workflow) ? workflow.find('jobs') : undefined;
+  if (jobs === undefined || !isMapping(jobs)) return;
+  const preparation = name === INERT_POSTURE.keyWorkflow ? jobs.find('role-prepare') : undefined;
+  if (
+    name === INERT_POSTURE.keyWorkflow &&
+    (preparation === undefined ||
+      crypto.hash('sha256', JSON.stringify(tokenTree(preparation))) !==
+        INERT_POSTURE.rolePrepareJobSha256)
+  )
+    throw new Error(`${name}: role-prepare must match the reviewed read-only job`);
+  for (const job of jobs) {
+    if (job.value === preparation) continue;
+    if (
+      job.key.toString().startsWith('role-') ||
+      /scripts\/factory-(?:repair|role-)/.test(tokenText(job.value))
+    )
+      throw new Error(`${name}: role executors remain HOLD; only role-prepare is wired`);
+  }
 }
 const KEY_SECRET_NAME = new RegExp(`\\b(?:${INERT_POSTURE.keySecrets.join('|')})\\b`, 'i');
 const RUNNER_DEBUG = /ACTIONS_(?:STEP|RUNNER)_DEBUG/i;

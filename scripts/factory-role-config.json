@@ -1,0 +1,55 @@
+{
+  "schema": "factory-role-config/v2",
+  "slots": [
+    {
+      "role": "research",
+      "token_share_bps": 1000,
+      "time_share_bps": 1000
+    },
+    {
+      "role": "architecture",
+      "token_share_bps": 1000,
+      "time_share_bps": 1000
+    },
+    {
+      "role": "test",
+      "token_share_bps": 1000,
+      "time_share_bps": 1000
+    },
+    {
+      "role": "baseline",
+      "token_share_bps": 1000,
+      "time_share_bps": 1000
+    },
+    {
+      "role": "developer",
+      "token_share_bps": 1000,
+      "time_share_bps": 1000
+    },
+    {
+      "role": "candidate",
+      "token_share_bps": 1000,
+      "time_share_bps": 1000
+    },
+    {
+      "role": "publish",
+      "token_share_bps": 1000,
+      "time_share_bps": 1000
+    },
+    {
+      "role": "review-ocr",
+      "token_share_bps": 1000,
+      "time_share_bps": 1000
+    },
+    {
+      "role": "review-independent",
+      "token_share_bps": 1000,
+      "time_share_bps": 1000
+    },
+    {
+      "role": "release",
+      "token_share_bps": 1000,
+      "time_share_bps": 1000
+    }
+  ]
+}
