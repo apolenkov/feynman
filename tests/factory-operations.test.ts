@@ -37,6 +37,7 @@ import {
   validateWorkflowSchema,
 } from '../scripts/check-factory-workflows.ts';
 import { loadNightPolicy } from '../scripts/factory-model.ts';
+import { ROLE_CONTROL_FILES } from '../scripts/factory-roles.ts';
 it('native factory workflow JSON boundaries reject malformed input without exposing bytes or writing outputs', async (test) => {
   const root = process.cwd();
   fs.mkdirSync(path.join(root, '.worktrees'), { recursive: true });
@@ -1609,10 +1610,14 @@ it('every local import between factory scripts is a controlled manifest file', (
     .filter((file) => /^(?:factory-.*|check-factory-workflows)\.ts$/.test(file));
   assert.ok(scripts.length >= 8);
   for (const file of scripts) {
-    assert.ok(CONTROL_FILES.includes(`scripts/${file}`), `${file} itself`);
+    const filePath = `scripts/${file}`;
+    const v1 = CONTROL_FILES.includes(filePath);
+    const v2 = ROLE_CONTROL_FILES.includes(filePath);
+    assert.notEqual(v1, v2, `${file} belongs to exactly one control manifest`);
+    const allowed = v1 ? CONTROL_FILES : [...CONTROL_FILES, ...ROLE_CONTROL_FILES];
     const source = fs.readFileSync(path.join('scripts', file), 'utf8');
     for (const [, imported = ''] of source.matchAll(/from '\.\/([^']+)'/g))
-      assert.ok(CONTROL_FILES.includes(`scripts/${imported}`), `${file} imports ${imported}`);
+      assert.ok(allowed.includes(`scripts/${imported}`), `${file} imports ${imported}`);
   }
 });
 
