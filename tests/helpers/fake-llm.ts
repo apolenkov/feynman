@@ -1,7 +1,9 @@
 import { createServer } from 'node:http';
+import type { IncomingHttpHeaders } from 'node:http';
 import { once } from 'node:events';
 
 export interface LlmRequest {
+  readonly headers: IncomingHttpHeaders;
   readonly authorization: string;
   readonly body: Readonly<Record<string, unknown>>;
 }
@@ -36,7 +38,11 @@ export async function startFakeLlm(
         typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
           ? Object.fromEntries(Object.entries(parsed))
           : {};
-      const request = { authorization: incoming.headers.authorization ?? '', body };
+      const request = {
+        headers: incoming.headers,
+        authorization: incoming.headers.authorization ?? '',
+        body,
+      };
       requests.push(request);
       const reply = handler(request, requests.length);
       if (reply.drop === true) {
