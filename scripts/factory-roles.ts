@@ -8,7 +8,11 @@ import {
 import type { JsonRecord } from './factory-protocol.ts';
 
 // Kept separate from CONTROL_FILES: v2 must not change the v1 activation manifest.
-export const ROLE_CONTROL_FILES: readonly string[] = Object.freeze(['scripts/factory-roles.ts']);
+export const ROLE_CONTROL_FILES: readonly string[] = Object.freeze([
+  'scripts/factory-roles.ts',
+  'scripts/factory-role-authority.ts',
+  'scripts/factory-role-config.json',
+]);
 const ROLES = [
   'research',
   'architecture',

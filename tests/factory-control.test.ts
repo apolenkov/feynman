@@ -7,6 +7,7 @@ import {
   createFactoryContext,
 } from '../scripts/factory-protocol.ts';
 import { runController, submitIngress } from '../scripts/factory-control.ts';
+import { authenticateRoleReservation } from '../scripts/factory-role-authority.ts';
 
 // AC06–13 primary owner. NEW CONTRACT absence is not behavioral baseline RED.
 it('implements RFC8785 finite-number ordering without normalizing Unicode and rejects lone surrogates', () => {
@@ -788,6 +789,121 @@ async function registeredFactory(test: TestContext, additionalIssues: readonly J
     head: stringField(record(registered.record), 'state_head'),
   };
 }
+
+it('v2 authenticates the same-run reserve artifact AND immutable recovered journal before preparing context', async (test) => {
+  const { platform, activation } = await registeredFactory(test);
+  const { ROLE_CONTROL_FILES } = await import('../scripts/factory-roles.ts');
+  const source = new Map(
+    [...platform.manifest.map((entry) => stringField(entry, 'path')), ...ROLE_CONTROL_FILES].map(
+      (file) => [file, fs.readFileSync(file)] as const,
+    ),
+  );
+  const sourceHead = platform.commitFiles(source, [platform.release]);
+  platform.git(['update-ref', 'refs/heads/main', sourceHead]);
+  const oldContext = laterContext(platform, activation, '904');
+  const context = { ...oldContext, job: { ...oldContext.job, workflow_source_sha: sourceHead } };
+  const runPath = '/repos/apolenkov/feynman/actions/runs/904';
+  const run = { ...record(platform.facts.get(runPath)), head_sha: sourceHead };
+  platform.facts.set(runPath, run);
+  platform.facts.set(`${runPath}/attempts/1`, run);
+  const manifest = ROLE_CONTROL_FILES.map((file) => ({
+    path: file,
+    blob_sha: platform.git(['rev-parse', `${sourceHead}:${file}`]),
+  }));
+  const release = {
+    schema: 'factory-role-release/v2',
+    repository_id: activation['repository_id'],
+    source_sha: sourceHead,
+    manifest,
+  };
+  const releaseHead = platform.commitFiles(
+    new Map([['role-control-manifest.json', canonicalBytes(release)]]),
+    [],
+  );
+  const pin = `${releaseHead}:${platform.git(['rev-parse', `${releaseHead}:role-control-manifest.json`])}`;
+  const request = { issue_number: 42, event_id: '12' };
+  const prepared = await runController(context, { command: 'reserve', ...request });
+  assert.equal(prepared.status, 'accepted', prepared.reason);
+  const receipt = record(prepared.record);
+  const envelope = platform.upload(
+    receipt,
+    'receipt',
+    stringField(receipt, 'transition_id'),
+    'reserve',
+  );
+  await assert.rejects(
+    authenticateRoleReservation(context, pin, request),
+    /orphan|journal|recovery/i,
+  );
+  const appended = await runController(context, { command: 'append', envelope });
+  assert.equal(appended.status, 'accepted', appended.reason);
+  const readOnlyStart = platform.requests.length;
+  const result = await authenticateRoleReservation(context, pin, request);
+  assert.equal(result.state_head, record(appended.record)['state_head']);
+  assert.deepEqual(result.reservation, receipt);
+  assert.equal(result.context['run_id'], '904');
+  assert.equal(result.context['run_attempt'], 1);
+  assert.equal(result.context['token_budget'], activation['token_budget']);
+  assert.deepEqual(result.context['role_manifest'], manifest);
+  assert.equal(result.context['role_config_sha256'], sha256(result.allocations));
+  assert.ok(
+    result.allocations.reduce(
+      (sum: number, slot: JsonRecord) => sum + Number(slot['token_budget']),
+      0,
+    ) <= Number(activation['token_budget']),
+  );
+  await assert.rejects(authenticateRoleReservation(context, 'bad-pin', request), /pin/);
+  await assert.rejects(
+    authenticateRoleReservation(
+      { ...context, job: { ...context.job, run_attempt: 2 } },
+      pin,
+      request,
+    ),
+    /attempt|Rerun/,
+  );
+  await assert.rejects(
+    authenticateRoleReservation(context, pin, { ...request, event_id: '99' }),
+    /opt-in|request/,
+  );
+  platform.facts.set(`${runPath}/attempts/1`, {
+    ...run,
+    actor: { id: 41898282, login: 'github-actions[bot]' },
+  });
+  await assert.rejects(authenticateRoleReservation(context, pin, request), /owner|actor/);
+  platform.facts.set(`${runPath}/attempts/1`, run);
+  const receiptPath = `/repos/apolenkov/feynman/contents/receipts/904-1-${String(receipt['transition_id'])}.json`;
+  platform.failures.set(`GET ${receiptPath}`, 404);
+  await assert.rejects(authenticateRoleReservation(context, pin, request), /404|journal/);
+  platform.failures.delete(`GET ${receiptPath}`);
+  platform.overrides.set(receiptPath, {
+    type: 'file',
+    encoding: 'base64',
+    size: 2,
+    content: 'e30=',
+    sha: 'a'.repeat(40),
+  });
+  await assert.rejects(authenticateRoleReservation(context, pin, request), /blob bytes/);
+  platform.overrides.delete(receiptPath);
+  for (const changed of [
+    { ...release, source_sha: 'a'.repeat(40) },
+    { ...release, manifest: manifest.slice(1) },
+  ]) {
+    const head = platform.commitFiles(
+      new Map([['role-control-manifest.json', canonicalBytes(changed)]]),
+      [],
+    );
+    const invalidPin = `${head}:${platform.git(['rev-parse', `${head}:role-control-manifest.json`])}`;
+    await assert.rejects(
+      authenticateRoleReservation(context, invalidPin, request),
+      /source|manifest/,
+    );
+  }
+  const archive = stringField(record(envelope['transport']), 'artifact_id');
+  platform.failures.set(`GET /repos/apolenkov/feynman/actions/artifacts/${archive}/zip`, 404);
+  await assert.rejects(authenticateRoleReservation(context, pin, request), /404|archive/);
+  platform.failures.delete(`GET /repos/apolenkov/feynman/actions/artifacts/${archive}/zip`);
+  assert.ok(platform.requests.slice(readOnlyStart).every(({ method }) => method === 'GET'));
+});
 
 it('AC09 preserves both native Git siblings when an external writer wins between append preflight and ordinary fast-forward publication', async (test) => {
   const fixture = await registeredFactory(test);
