@@ -386,17 +386,24 @@ describe('factory-model run: recorded ocr outputs', () => {
   it('keeps only HTTP codes and known phrases from a failing ocr stderr, never its text', async (t) => {
     const s = await scenario(t, 'ok1', agreeable, {
       fixture: { ...readRecord(path.join(FIXTURES, 'ok1.json')), stdout: '', exit_code: 1 },
-      stderr: `scan failed: all 2 file scan(s) failed: POST /chat/completions: 404 Not Found {"error":"model not found: glm-x","key":"${PRIMARY}"} status code: 404\n`,
+      stderr: `scan failed: all 2 file scan(s) failed: POST /chat/completions: 404 Not Found {"error":"model not found: glm-x","key":"${PRIMARY}"} status code: 404\nPOST /chat/completions: 400 Bad Request {"type":"invalid_request_error","message":"reasoning_content absent for tool_call_id=private-call-42","key":"${FALLBACK}"}\n`,
     });
     assert.equal((await s.exec()).code, 0);
     const raw = bundle(s.out, 'scan-raw.json');
     assert.equal(raw['probe_status'], 200);
     assert.deepEqual(raw['stderr_signals'], {
-      http_statuses: [404],
-      messages: ['scan failed', 'model not found'],
+      http_statuses: [400, 404],
+      messages: [
+        'scan failed',
+        'model not found',
+        'invalid_request_error',
+        'tool_call_id',
+        'reasoning_content',
+      ],
     });
     const text = fs.readFileSync(path.join(s.out, 'scan-raw.json'), 'utf8');
-    assert.ok(!text.includes(PRIMARY) && !text.includes('glm-x'));
+    for (const secret of [PRIMARY, FALLBACK, 'glm-x', 'private-call-42'])
+      assert.equal(text.includes(secret), false);
   });
 
   it('reads the status of an openai-go error line and keeps the newest stderr when it is huge', async (t) => {
