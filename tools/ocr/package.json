@@ -4,6 +4,6 @@
   "private": true,
   "description": "Pinned model-scan tool for the night factory; installed with --ignore-scripts outside the checkout",
   "dependencies": {
-    "@alibaba-group/open-code-review": "1.13.0"
+    "@alibaba-group/open-code-review": "1.13.3"
   }
 }
