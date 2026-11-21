@@ -1,5 +1,6 @@
-# Weekly version updates; a new release waits 3 days before Dependabot
-# proposes it (cooldown), so a pulled or compromised version is skipped.
+# Monthly version updates with at most one open version PR per ecosystem/directory.
+# A 3-day cooldown delays new releases; it does not guarantee their safety.
+# Dependabot security updates are separate from this schedule and PR limit.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -11,8 +12,7 @@ updates:
         versions:
           - '>=7.0.0'
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
       time: '09:00'
     cooldown:
       default-days: 3
@@ -25,7 +25,7 @@ updates:
           - patch
     labels:
       - dependencies
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 1
     commit-message:
       prefix: chore
       include: scope
@@ -35,8 +35,7 @@ updates:
   - package-ecosystem: npm
     directory: /tools/ocr
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
       time: '09:00'
     cooldown:
       default-days: 3
@@ -50,8 +49,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
       time: '09:00'
     cooldown:
       default-days: 3
@@ -61,7 +59,7 @@ updates:
           - '*'
     labels:
       - github-actions
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 1
     commit-message:
       prefix: chore
       include: scope
