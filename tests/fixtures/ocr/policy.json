@@ -10,16 +10,16 @@
     "verify_cap": 5,
     "concurrency": 4,
     "exclude": ["**/package-lock.json"],
-    "ocr_version": "1.13.0",
-    "ocr_git_head": "1672852136fc87748249d22bce0819f33419ea79",
-    "ocr_lock_integrity": "sha512-H35yl2HwU7rAIcsnSa/CaDUAUJ3yZKLBpQU5XXwtBEeB8RVAXYrzqDVb+7QQmKTLMuzBO9N3v9dSibGv5NIo9w==",
+    "ocr_version": "1.13.12",
+    "ocr_git_head": "f921d6a0de3b71befce15d8edf589cd3609968fa",
+    "ocr_lock_integrity": "sha512-INAEZXpxGuAd4XhMLLLxMo4jYoh0cdbp52sDNl/VfLJ7PT7kFkHFsmPiD63kt0PnGkr3w+zEsKoCNGz9JJZfzA==",
     "ocr_native_integrity": {
-      "darwin-arm64": "sha512-L4BCZxodrBqWU6v6BylFC7BO0DTETb//BsHEQw/zSk0R2Wn5b5ayyKSReT4Ydbd1iqypQjHkmfX8DpT2Yilipw==",
-      "darwin-x64": "sha512-bxC9wdu4A58AFe6hl2nEXkduaLH2ealsm/vH6gqqX3zOEBm+I3XrlX9lPExO1SCqW7qAHiuPpWnTrre2VeUoAA==",
-      "linux-arm64": "sha512-a6QM+azc6IhmiuS4BQkVoB56TbQLfb43OC+dLJe/fFsKIlDWSRGwlcjvN45Rgi/ncAE3tRDcOIWkBuJtrPSNkA==",
-      "linux-x64": "sha512-LKXWi/QbVuShUTF3DfrtpBLVlTGMX7Rq2xG9PyR5Y1herS7EP9twvkALNSfRZ7dtpjcqkeoiNgnl1dNiWfoxMA==",
-      "win32-arm64": "sha512-aRjRib4IR/4gTUxb5eWMp6+Agp+V1ZkS5AqwXvGc2wHrtMV5y6rY3vxOjFT6aWMuSmberPtv4KO6p7jlVksrWA==",
-      "win32-x64": "sha512-m1mNdtfjnjpZUNh24rwRqnUlmpotjsSbI0nJzjlFNpSjcMPveVcbooKDJYywD4waLNedvQh5ZMlvH7DybnoUGg=="
+      "darwin-arm64": "sha512-gC2zKWVSW1utzNruERHXbvRPbtcT9bmECu6CMa43yUOm8ZuiY7+iPF8Fd6emKouNn9K4KdE4uwpYSwEzwkvBnA==",
+      "darwin-x64": "sha512-9G2M6VPpQJ2cvGtuRC5vSXGLgi5Mq4vUF1U+gni9EflvlnhJAEmpHkcilH4rXhd1Rk+giF/yV2xInXufx29xGA==",
+      "linux-arm64": "sha512-YDIrHfCzv0AKFG0v6sho0/TdzrFCkY5+CjuHRfjwmiTOzgb/rM8GzZai6WFBFIzvJVzCTSprLdv/sATsMeAOdg==",
+      "linux-x64": "sha512-4/XmL1YqzjtHrKM3C9sYiMGpWLCwBfSv70jrdKq2WmQMtl/YipBQPNDBtjQ61oBvbxU67Yrcx+G/Gu76P4ayAQ==",
+      "win32-arm64": "sha512-/goYqCN5/gyEjrPKizINMSiOnWuQucLqhbmsX+kpi+3jFaTyCHAZ+DK1ypy2nuI25zpFR53TRoLEFueKHbFxnA==",
+      "win32-x64": "sha512-+jITW9giD8kc305cO78ZtiHxrGrmgV665aVueBAQLEqjOuz9D1OFdHUrNhS+jDVJRmdr3B4JfalEYzujdyI5xw=="
     },
     "fingerprint_policy_revision": "v1"
   }
