@@ -1,13 +1,21 @@
-# Feynman reference-quality audit · 23 November 2026
+# Feynman reference-quality audit · 23–24 November 2026
 
-**Disposition: limited audit and implementation plan.** All 299 tracked blobs are accounted for. The main engineering risks at this revision are the unfinished bounded-work guarantee in two diagram rules, failure/coverage gaps in repository tooling, and mixed responsibilities in the lint, evaluation and factory modules. A transient state read fault also reactivated a disabled hook in an isolated test. An interrupted bootstrap replacement also lost the previous usable export. There are 15 findings: 3 high, 9 medium, 3 low. Seven already have an implementation owner. Independent challenge: **pending independent review**.
+All **109/109 first-party source files** have a direct semantic review at the snapshot below. The initial pass reviewed 30. The completion pass read the remaining 79 in full and found eight additional issues. The highest-priority new finding is a handoff failure: the controller rejects the issue marker that the publisher writes (F18).
+
+| Findings | High | Medium | Low | Total |
+|---|---:|---:|---:|---:|
+| Initial pass, F01–F15 | 3 | 9 | 3 | 15 |
+| Completion pass, F16–F23 | 1 | 6 | 1 | 8 |
+| Total | 4 | 15 | 4 | 23 |
+
+F01–F07 have an implementation owner on the scanning branch. F08–F23 are proposed. **Independent challenge pass: pending.** DoD items 1–7 and 9 pass. Item 8 awaits the owner-authorized public issue backlink. The [criteria and DoD table](criteria.md) also records the failed isolated full CI invocation (C4), outstanding challenge (G2), issue update (G5) and the reason for the inapplicable tracker criterion (F5).
 
 ## Passport
 
 | Field | Value |
 |---|---|
 | Repository and request | apolenkov/feynman, issue #1, AUDIT_AND_PLAN. The issue's earlier main revision describes preparation only. |
-| Checkout | docs/audit-issue-1, forked from fix/code-scanning-audit. Clean index and tracked worktree at start; no prior audit commit on the remote branch. |
+| Checkout | docs/audit-issue-1, forked from fix/code-scanning-audit. The initial audit began with a clean index and worktree. The source-reading pass resumed from pushed audit commit 7ed64f7. |
 | Commit | a7dac0d0feb681b2b91da19856e901436d6fbec8 |
 | Tree | de24352b5ade769cbdb6f51a82fb92fca7258151 |
 | Environment | Darwin 27.2.0 arm64; Node 26.13.1, npm 11.20.0, TypeScript 6.0.3, OpenSpec 2.1.1. The package supports Node 22.18+. |
@@ -26,11 +34,19 @@
 
 | Inspection unit | Count | Evidence |
 |---|---:|---|
-| Source with full structural inspection and flow analysis | 109 | 106 TS files, one MJS config, two shell entrypoints. TS/MJS body traversal includes nested callbacks, direct imported calls, selected I/O calls, throws, catches and assertions. |
+| Direct semantic source review | 109 | 106 TS files, one MJS config and two shell entrypoints. Read module initialization, functions, methods, nested callbacks and shell execution in their containing files. |
 | Other structural inspection | 182 | Documents and fixtures, project metadata, manifests, YAML workflows and changes. JSON/YAML decoded, Markdown heading structure indexed. |
 | Media | 5 | Three binary format headers and two XML-parsed SVGs; no pixel-level visual quality claim. |
 | External/lock artifacts | 3 | Resolved dependency maps in the root, Codex and OCR lockfiles parsed as lockfile v3. Dependency implementation source is external to the tree. |
-| **Total** | **299** | 109 + 182 + 5 + 3. All 299 reviewed in the recorded mode; excluded 0, blocked 0, pending 0, in progress 0 for inventory inspection. Semantic review depth is a separate criterion. |
+| **Total** | **299** | 109 + 182 + 5 + 3. All 299 reviewed in the recorded mode; excluded 0, blocked 0, pending 0, in progress 0 for inventory inspection. |
+
+The two registers join on path and blob. In the file inventory, `range` covers the whole source and `reviewNote` records the behavior inspected. In the function register, `lines` gives the inclusive reviewed range for each executable unit. Source entries in both registers carry `status: REVIEWED` and a `reviewPass`. Workflow records describe structural inspection.
+
+| Direct read | Files | Physical lines | Source execution records |
+|---|---:|---:|---:|
+| Initial | 30 | 2,413 | 214 |
+| Completion | 79 | 36,208 | 2,892 |
+| Total | 109 | 38,621 | 3,106 |
 
 The isolated CI invocation exited 1 during an upstream download. Separate stages measured 16,827/17,566 covered lines (95.79%) across 55/55 expected sources. One of 981 tests failed fetching the same tool and passed on focused retry. Full CI was invoked once.
 
@@ -44,6 +60,6 @@ Each inventory row binds its range to the complete blob, with Git mode, size, ca
 | Documented product contract | CONTEXT.md, AGENTS.md, CONTRIBUTING.md, docs/architecture.md, docs/adr/0001 through 0007, docs/release.md and openspec/specs/ | Codex only, two delivery paths, pure core, owned state gateway, reproducible compiled package. Preserve Q01–Q15 and S01–S09 evidence boundaries. |
 | Current implementation | Snapshot tree, named source locations, effective configurations, tests and package smoke | New findings refer to this revision. Closed scanning work refers to commits. The September retrospective and historical evaluation reports provide comparison, not current acceptance. |
 | Proposed requirement | Q07 review thresholds, per-identity exceptions, preservation on preference-read failure and reporting of incomplete drift inspections | Adopt only after review. Other fixes preserve existing contracts except for the explicit gate/error corrections in the plan. |
-| Unknown / external | Hosted results, independent challenge, live explanation quality and full per-body semantic signoff | No account changes, model evaluations, deployment, live factory activation or hosted security scan in this run. Read source evidence and conditional claims separately. |
+| Unknown / external | Hosted results, independent challenge and live explanation quality | No account changes, model evaluations, deployment, live factory activation or hosted security scan in this run. Read source evidence and conditional claims separately. |
 
 Start with R00's preference-preservation regression. Continue R01/R02 in their existing owner branch and R03's paired docs-read test. Obtain the independent challenge before treating the audit as accepted.

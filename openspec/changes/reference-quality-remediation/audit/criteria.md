@@ -19,7 +19,7 @@ Rows follow issue order. PASS applies only to the named audit deliverable or obs
 | C4 full CI invocation | FAIL | Clean install passed. The single isolated npm run ci exited 1 during the upstream checker download. See the independent component outcomes in evidence. |
 | C5 exclusions and discovery | PASS | No nested test entry in the snapshot. Nested helpers join typechecking and run through import. evals are scoring protocols/fixtures and their TS runners under scripts are included. |
 | C6 proposed gates and controls | PASS | Disposable worktree tested exact ceiling and one line above for both ESLint rules. Identity matching remains a design with required pre/post controls. |
-| D1 complete source reading | NOT VERIFIED | Whole-file AST and type-assisted inspection covers all tracked TS/MJS, including closure bodies. Shell entrypoints and workflow definitions were also inspected. Individual semantic judgment on every callback body is not independently evidenced by enumerating it. |
+| D1 complete source reading | PASS | Direct readings cover 30 initial and 79 completion files. The inventory records the full blob range and file-specific review note. The function register binds each of 3,106 source execution records to its reviewed range, blob and pass. Workflow job and step inspection remains structural. |
 | D2 dependency and runtime paths | PASS | Module import/export edges, direct imported calls, workflow job dependencies and principal runtime traces. Computed process/file relationships require the accompanying narrative. |
 | D3 all tracked areas | PASS | Source and non-source surfaces have separate per-file dispositions. |
 | D4 ownership, duplication and simplicity | PASS | Target table identifies reasons for change and a smaller alternative for each large implementation file. |
@@ -33,10 +33,10 @@ Rows follow issue order. PASS applies only to the named audit deliverable or obs
 | E4 migration and verification | PASS | Stable facades, signature lookup, target groups, static clients, test fixtures, package and authenticated file inventories specified. |
 | E5 alternatives | PASS | Retention and in-file decomposition considered for parser, dispatcher and factory owners. |
 | E6 tools and validation | PASS | Existing ESLint rules validated only in sandbox; coordinated baseline remains PROJECTED. |
-| F1 order | PASS | R00–R03 correct/characterize failures, R04–R06 are required readability deliverables, R07–R09 close docs, gates and review. |
+| F1 order | PASS | R00–R03 and R11–R17 correct or characterize failures. R04–R06 depend on the relevant corrections before extraction. R09 integrates the results for review. |
 | F2 executable steps | PASS | Tasks specify findings, dependencies, locations, success tests, scope and rollback. |
 | F3 behavior vs contract change | PASS | R03 explicitly tightens docs exit behavior; moves retain public signatures and effects. |
-| F4 finding-to-task map | PASS | R01 covers F01/F04/F05; R02 F02/F03/F06; R03 F08; R04–06 F10; R07 F07/F09; R08 F11; R10 F12; R00 F13; R07 F14; R11 F15. |
+| F4 finding-to-task map | PASS | R01 covers F01/F04/F05; R02 F02/F03/F06; R03 F08; R04–06 F10; R07 F07/F09; R08 F11; R10 F12; R00 F13; R07 F14; R11 F15; R12 F16; R13 F17/F21; R14 F18/F23; R15 F19; R16 F20; R17 F22. |
 | F5 additional tracker issues | NOT APPLICABLE | #1 and the scanning change already own this work. This run authorizes no issue writes. |
 | F6 legacy baseline | PASS | Candidate identities and acceptance cases include deletion, stale permissions and a count-preserving substitution. No candidate is automatically approved. |
 | G1 self-check | PASS | Refer to the recorded inventory, path, range, gate and dependency checks. |
@@ -50,8 +50,8 @@ Rows follow issue order. PASS applies only to the named audit deliverable or obs
 | # | Status | Disposition |
 |---|---|---|
 | 1 | PASS | Snapshot identified and every tracked element accounted for. |
-| 2 | NOT VERIFIED | Full structural reads and flow analysis are reproducible. A complete line-by-line semantic verdict for every first-party body is not evidenced. Inventory rows distinguish 30 directly reviewed source files from 79 with full body traversal and selected contract tracing. The exact paths and ranges are in the two registers. |
-| 3 | PASS | CI interruption, semantic depth, platform, hosted and live-eval limits are recorded. |
+| 2 | PASS | 109/109 first-party files read in full (30 initial + 79 completion), with blob-bound source and execution ranges. The other 190 entries received structural (182), media (5) or external-lock (3) inspection. |
+| 3 | PASS | CI interruption, platform, hosted and live-eval limits are recorded. |
 | 4 | PASS | Every oversized implementation module has a split or an explicit exception. |
 | 5 | PASS | Effective gate scope checked, including measured exclusions and paired canaries. CI invocation outcome is recorded independently under C4. |
 | 6 | PASS | Findings cite the revision and locations; already implemented and in-progress work have distinct dispositions. |
@@ -71,16 +71,16 @@ These are dispositions against the canonical repository-quality contract, separa
 | Q06 | PASS | Static imports resolve inside the allowed core boundary; restriction and frozen-input tests passed in the component run. Mutation permissions have named owners and protecting tests. |
 | Q07 | FAIL | Large mixed-responsibility units and 85 unadjudicated size candidates need specific review (F10/F11). The numeric standard is proposed; the mixed changes of responsibility are visible at the snapshot. |
 | Q08 | FAIL | F13 changed a disabled preference on a transient read error in the state gateway; valid control preserved it. |
-| Q09 | FAIL | Dedicated tests exist across the public paths, but F05/F06 identify concrete unprotected boundaries. |
-| Q10 | NOT VERIFIED | Numerator, denominator and actual scope are recorded with the component results. A line-coverage floor alone does not establish coverage of the critical negative branches in F05. |
+| Q09 | FAIL | Dedicated tests exist across the public paths, but F05/F06 identify unprotected boundaries. F18 shows a missing publisher-to-controller round trip and F22 a named warning-rule oracle that can pass on a false positive. |
+| Q10 | FAIL | The measured 55-source report covers 95.79%. F16 shows that another report with the same path set can pass the floor through duplicate weighting. F05 also identifies gaps in critical negative branches. |
 | Q11 | PASS | Exact tarball bytes agreed on repeated builds; subsequent isolated smoke consumed the retained artifact. |
 | Q12 | NOT VERIFIED | The local command and hosted matrix are defined. The one local invocation exited 1; other supported matrix combinations were not executed here. |
 | Q13 | NOT VERIFIED | Root audit returned zero vulnerabilities, Codex installation is locked and there are no runtime npm dependencies. Hosted scanning closure and all external policy settings were outside this run. |
-| Q14 | FAIL | F07, F09 and F14 identify reader-facing ambiguity and an outdated current denominator. |
+| Q14 | FAIL | F07, F09, F14 and F19 identify install ambiguity, an outdated current denominator and misleading CLI guidance. |
 | Q15 | NOT VERIFIED | Local smoke and release design were checked. No publication, registry rehearsal or hosted recovery exercise was performed in this run. |
 | S03 | PASS | The lint argument parser has immutable accumulator/terminal results; CLI behavior and argument tests cover invalid and conflicting modes. |
 | S04, S05 | NOT VERIFIED | Policy checks, strict types and a per-function assertions inventory support review; they cannot establish the intent of every mutation or assertion. |
 | S06 | FAIL | Silent omission of a tracked read error yields exit 0 in the docs gate (F08). |
 | S07 | NOT VERIFIED | Golden pairs and property tests exercise content preservation; F06 limits the generated cases. |
-| S08 | PASS | The coverage checker compares enumerated source paths and LCOV paths in both directions; the component scope result gives the observed counts. |
+| S08 | PASS | The coverage checker compares enumerated source paths and LCOV paths in both directions; the measured report contains all 55 expected files. F16 concerns repeated in-scope records and is assessed under Q10. |
 | S09 | NOT VERIFIED | Pending independent review. |

@@ -5,6 +5,7 @@ Issue #1 asks how much of Feynman a green build actually checks and where a main
 ## What Changes
 
 - Record the fixed-revision audit in [the audit index](audit/README.md). Keep evidence with this change so it remains available when archived and stays outside the shipped docs tree.
+- Complete the source-reading requirement at the pinned commit. Bind each full-file read and its executable ranges to the Git blob, record new findings and acceptance checks, and leave the independent challenge to the next reviewer.
 - Propose a review threshold and a per-symbol exception policy for Q07. Internal extractions preserve existing entry points and behavior.
 - Specify fail-safe handling for an unreadable preference file and an incomplete documentation drift sweep. Disposable controls confirmed both behaviors at the audited revision.
 - Reconcile the already-owned scanning work before starting the dependent extractions. [Tasks](tasks.md) describe future implementation and acceptance.
