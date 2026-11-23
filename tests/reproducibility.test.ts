@@ -118,6 +118,39 @@ describe('reproducibility check', () => {
     }
   });
 
+  it('hashes missing, dangling and ENOTDIR entries as the same deletion', (test) => {
+    const fx = fixture();
+    test.after(fx.dispose);
+    // git still lists scripts/build-package.ts through all three snapshots.
+    const parent = path.join(fx.root, 'scripts');
+    const child = path.join(parent, 'build-package.ts');
+    fs.unlinkSync(child);
+    checkReproducibility({
+      root: fx.root,
+      runCommand: runner((attempt) => {
+        if (attempt === 1) fs.symlinkSync('missing', child);
+        else {
+          fs.rmSync(parent, { recursive: true });
+          fs.writeFileSync(parent, 'file');
+        }
+        retain(fx.root, 'same');
+        return result();
+      }),
+    });
+  });
+
+  it('rejects a tracked symlink to an existing file with the source diagnostic', (test) => {
+    const fx = fixture();
+    test.after(fx.dispose);
+    const source = path.join(fx.root, 'source.txt');
+    fs.unlinkSync(source);
+    fs.symlinkSync('scripts/build-package.ts', source);
+    assert.throws(
+      () => checkReproducibility({ root: fx.root, runCommand: runner(() => result()) }),
+      /unsupported source entry: source\.txt/,
+    );
+  });
+
   it('detects source drift after the first build', () => {
     const fx = fixture();
     try {

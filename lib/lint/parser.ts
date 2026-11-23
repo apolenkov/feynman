@@ -5,19 +5,7 @@
 // Zero deps. ESM only.
 
 import { hasFlowArrow } from './arrows.ts';
-
-// Keep the first opening bracket, including nested openings in the label.
-// Each delimiter search resumes after the previous closing bracket.
-function* boxes(text: string): Generator<{ start: number; end: number }> {
-  for (let cursor = 0; cursor < text.length;) {
-    const start = text.indexOf('[', cursor);
-    if (start < 0) return;
-    const close = text.indexOf(']', start + 1);
-    if (close < 0) return;
-    if (close > start + 1) yield { start, end: close + 1 };
-    cursor = close + 1;
-  }
-}
+import { boxes } from './boxes.ts';
 
 // Characters that indicate ASCII diagram content
 // Box-drawing: ┌┐└┘─│├┤┬┴┼ Tree: ├── └── Arrows: →←↑↓▲▼
@@ -256,8 +244,7 @@ export function parse(markdown: string): readonly DiagramNode[] {
       // Check for structural diagram indicators (order matters — strongest first)
       const text = blockLines.join('\n');
       const { hasBoxDrawing } = countDiagramChars(text);
-      const hasBoxToken =
-        (hasFlowArrow(text) || text.includes('─>')) && boxes(text).next().done !== true;
+      const hasBoxToken = hasFlowArrow(text) && boxes(text).next().done !== true;
       // Multiple [Box] tokens on one line without natural language between them
       // (even without arrows — L05 will catch missing arrows)
       // "Natural language between" means: word chars NOT in brackets between the boxes

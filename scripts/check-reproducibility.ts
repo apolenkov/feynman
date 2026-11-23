@@ -56,6 +56,33 @@ export function runReproducibilityCommand(
   };
 }
 
+function missingEntry(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+  );
+}
+
+function openSource(absolute: string, relative: string): number | undefined {
+  try {
+    return fs.openSync(
+      absolute,
+      fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK,
+    );
+  } catch (error) {
+    if (missingEntry(error)) return undefined;
+    if (!(error instanceof Error && 'code' in error && error.code === 'ELOOP')) throw error;
+    // Distinguish a dangling link from an unsupported entry without reading its contents.
+    try {
+      fs.statSync(absolute);
+    } catch (targetError) {
+      if (missingEntry(targetError)) return undefined;
+    }
+    throw new Error(`unsupported source entry: ${relative}`);
+  }
+}
+
 function sourceSnapshot(root: string, runner: ReproducibilityRunner): string {
   const result = runner('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
     cwd: root,
@@ -80,23 +107,19 @@ function sourceSnapshot(root: string, runner: ReproducibilityRunner): string {
   ].toSorted();
   for (const relative of relativeFiles) {
     const absolute = path.join(root, relative);
-    try {
-      const fd = fs.openSync(
-        absolute,
-        fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK,
-      );
-      try {
-        const stat = fs.fstatSync(fd);
-        if (!stat.isFile()) throw new Error(`unsupported source entry: ${relative}`);
-        sourceHash.update(`file\0${relative}\0${stat.mode}\0`);
-        sourceHash.update(fs.readFileSync(fd));
-        sourceHash.update('\0');
-      } finally {
-        fs.closeSync(fd);
-      }
-    } catch (error) {
-      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+    const fd = openSource(absolute, relative);
+    if (fd === undefined) {
       sourceHash.update(`deleted\0${relative}\0`);
+      continue;
+    }
+    try {
+      const stat = fs.fstatSync(fd);
+      if (!stat.isFile()) throw new Error(`unsupported source entry: ${relative}`);
+      sourceHash.update(`file\0${relative}\0${stat.mode}\0`);
+      sourceHash.update(fs.readFileSync(fd));
+      sourceHash.update('\0');
+    } finally {
+      fs.closeSync(fd);
     }
   }
   return sourceHash.digest('hex');

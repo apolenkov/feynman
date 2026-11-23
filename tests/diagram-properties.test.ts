@@ -1,3 +1,5 @@
+import { boxes } from '../lib/lint/boxes.ts';
+import { flowArrowIndex, hasExactlyOneArrow } from '../lib/lint/arrows.ts';
 import fc from 'fast-check';
 import { parse } from '../lib/lint/parser.ts';
 import { it } from 'node:test';
@@ -73,16 +75,21 @@ it('aligns a narrow compact title once and satisfies frame rules', () => {
   assert.deepEqual(lint(fixed, { rules: ['L01', 'L08', 'L09'] }).issues, []);
 });
 
+const propertyOptions = { seed: 20261123, numRuns: 100 };
+
 it('parses generated arrow rows and aligns them idempotently without changing labels', () => {
   const row = fc.record({
-    padding: fc.integer({ min: 0, max: 3 }),
+    left: fc.constantFrom('x', '漢', '🧭'),
+    padding: fc.integer({ min: 0, max: 2 }),
     token: fc.constantFrom('-->', '→', '──>', '─→'),
     label: fc.constantFrom('alpha', 'β', '漢字', '🧭'),
   });
   fc.assert(
     fc.property(fc.array(row, { minLength: 2, maxLength: 24 }), (rows) => {
       const input = rows
-        .map(({ padding, token, label }) => `[x]${' '.repeat(padding)}${token} [${label}]`)
+        .map(
+          ({ left, padding, token, label }) => `[${left}]${' '.repeat(padding)}${token} [${label}]`,
+        )
         .join('\n');
       const fixed = autofix(input);
       assert.equal(autofix(fixed), fixed);
@@ -90,17 +97,82 @@ it('parses generated arrow rows and aligns them idempotently without changing la
         parse(fixed).map((node) => node.content),
         [fixed],
       );
+      const widest = Math.max(...rows.map(({ left }) => visualWidth(left)));
       assert.deepEqual(
         fixed.split('\n'),
-        rows.map(({ token, label }) => `[x] ${token} [${label}]`),
+        rows.map(
+          ({ left, token, label }) =>
+            `[${left}]${' '.repeat(1 + widest - visualWidth(left))}${token} [${label}]`,
+        ),
       );
     }),
+    propertyOptions,
   );
 });
 
-it('scans a long unfinished box label in a generic fence within the time budget', () => {
+it('matches nonempty boxes and complete arrow tokens in generated rows', () => {
+  const token = fc.constantFrom('->', '─>', '─→', '──>', '-->', '→');
+  const piece = fc.oneof(
+    token,
+    token.map((arrow) => `[漢${arrow}]`),
+    fc.constantFrom('[]', '[', ']', '[[x]', '[unclosed', '🧭'),
+  );
+  fc.assert(
+    fc.property(fc.array(piece, { minLength: 1, maxLength: 16 }), (pieces) => {
+      const line = pieces.join('');
+      const arrows = [...line.matchAll(/─→|→|──>|-->/g)];
+      assert.equal(flowArrowIndex(line), arrows[0]?.index ?? -1);
+      assert.equal(hasExactlyOneArrow(line), arrows.length === 1);
+      const labels = [...line.matchAll(/\[[^\]]+\]/g)];
+      assert.deepEqual(
+        [...boxes(line)],
+        labels.map((m) => ({ start: m.index, end: m.index + m[0].length })),
+      );
+    }),
+    propertyOptions,
+  );
+});
+
+it('requires two nonempty boxes to classify an arrowless box row', () => {
+  for (const line of ['[single]', '[] [single]', '[[nested]', '[unfinished']) {
+    assert.deepEqual(parse(line), []);
+    assert.deepEqual(
+      parse(`\`\`\`
+${line}
+\`\`\``),
+      [],
+    );
+  }
+});
+
+it('preserves multiline labels and same-line arrow gaps in mermaid mix detection', () => {
+  for (const [row, mixed] of [
+    ['[a\nb] --> [c\nd]', true],
+    ['[a] [nested --> [b]', true],
+    ['[a]\n--> [b]', false],
+    ['[a] -->\u2028[b]', false],
+    ['[] --> [b]', false],
+    ['[a] --> []', false],
+  ] as const) {
+    const input = `\`\`\`mermaid
+\`\`\`
+${row}`;
+    assert.equal(lint(input, { rules: ['L07'] }).issues.length, Number(mixed), row);
+  }
+});
+
+it('scans long unfinished labels within the time budget', () => {
   const label = '['.repeat(100_000);
-  const start = performance.now();
-  assert.deepEqual(parse(`\`\`\`\n${label}\n\`\`\``), []);
-  assert.ok(performance.now() - start < 2000);
+  for (const [fence, content, nodeCount] of [
+    ['', label, 0],
+    ['', `[a] --> [b]\n${label}`, 1],
+    ['mermaid', label, 0],
+  ] as const) {
+    const input = `\`\`\`${fence}\n${content}\n\`\`\``;
+    const start = performance.now();
+    assert.equal(parse(input).length, nodeCount);
+    assert.deepEqual(lint(input).issues, []);
+    assert.equal(autofix(input, { processFenced: true }), input);
+    assert.ok(performance.now() - start < 2000);
+  }
 });

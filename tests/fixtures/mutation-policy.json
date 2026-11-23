@@ -89,7 +89,23 @@
       "test": "tests/autofix.test.ts"
     },
     {
-      "file": "lib/lint/parser.ts",
+      "file": "lib/lint/rules.ts",
+      "owner": "hasAsciiFlow",
+      "mutationHash": "1f74e5f5969d5a44c7dc17c1af5a5d3977a9380c3e17be653aa6c733f3ebfada",
+      "count": 10,
+      "reason": "A local label iterator and same-line match state advance once through the input, including multiline labels.",
+      "test": "tests/diagram-properties.test.ts"
+    },
+    {
+      "file": "lib/lint/arrows.ts",
+      "owner": "firstArrow",
+      "mutationHash": "848a8e051f36bf836ca13e123ed41e6dc200a3dc53eefc13919007ce549f0621",
+      "count": 2,
+      "reason": "Retain the earliest complete token while scanning the fixed arrow list.",
+      "test": "tests/diagram-properties.test.ts"
+    },
+    {
+      "file": "lib/lint/boxes.ts",
       "owner": "boxes",
       "mutationHash": "04977f03a00416f26a01afac0d05b3ed644cce705783643f78f8afb77ad47a6d",
       "count": 2,
@@ -211,7 +227,7 @@
     {
       "file": "scripts/check-reproducibility.ts",
       "owner": "sourceSnapshot",
-      "mutationHash": "f21e00a6c408d84c7990a2214b32887d879b19c297b7aeccb4164ea78c5737a1",
+      "mutationHash": "8ae2566bae7c36d3bc92eda5dd2d5642131484ee4f08cfc1b3ff5b6480a71bad",
       "count": 4,
       "reason": "Invocation-owned cryptographic builder streams sorted source metadata and bytes without concatenating the entire repository in memory.",
       "test": "tests/reproducibility.test.ts"
