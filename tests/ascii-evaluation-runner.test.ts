@@ -741,8 +741,13 @@ describe('ASCII evaluation runner', () => {
     try {
       await run(fx, transport, { taskIds: ['A01'], arms: ['native'] });
       const frozenTarball = path.join(fx.output, 'candidate-package.tgz');
-      assert.equal(fs.readFileSync(frozenTarball).equals(builtBytes), true);
-      assert.equal(fs.statSync(frozenTarball).mode & 0o777, 0o400);
+      const fd = fs.openSync(frozenTarball, 'r');
+      try {
+        assert.equal(fs.readFileSync(fd).equals(builtBytes), true);
+        assert.equal(fs.fstatSync(fd).mode & 0o777, 0o400);
+      } finally {
+        fs.closeSync(fd);
+      }
       assert.deepEqual(transport.extractedTarballs, [frozenTarball]);
       const manifest: unknown = JSON.parse(
         fs.readFileSync(path.join(fx.output, 'manifest.json'), 'utf8'),

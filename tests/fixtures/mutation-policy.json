@@ -90,6 +90,14 @@
     },
     {
       "file": "lib/lint/parser.ts",
+      "owner": "boxes",
+      "mutationHash": "04977f03a00416f26a01afac0d05b3ed644cce705783643f78f8afb77ad47a6d",
+      "count": 2,
+      "reason": "A local cursor advances past each closing bracket to scan labels in one forward pass.",
+      "test": "tests/diagram-properties.test.ts"
+    },
+    {
+      "file": "lib/lint/parser.ts",
       "owner": "parse",
       "mutationHash": "d0bfe535959addfa79c7d368c8cde817f50c30c041bcdcd4dff6434bd6dbc2c3",
       "count": 15,
@@ -203,7 +211,7 @@
     {
       "file": "scripts/check-reproducibility.ts",
       "owner": "sourceSnapshot",
-      "mutationHash": "2587e3157b0a7bcbc9f11f101e57e2957fda0685a605051254def78b2e23dc62",
+      "mutationHash": "f21e00a6c408d84c7990a2214b32887d879b19c297b7aeccb4164ea78c5737a1",
       "count": 4,
       "reason": "Invocation-owned cryptographic builder streams sorted source metadata and bytes without concatenating the entire repository in memory.",
       "test": "tests/reproducibility.test.ts"
@@ -679,6 +687,14 @@
       "count": 1,
       "reason": "Invocation-owned hash builder digests the canonical structure of one key job to compare it with the reviewed pin; earlier-step GITHUB_ENV, substituted env value and working-directory controls exercise the pin.",
       "test": "tests/factory-operations.test.ts"
+    },
+    {
+      "file": "scripts/factory-protocol.ts",
+      "owner": "readLimitedFile",
+      "mutationHash": "b267413b8d1dbc73d2d5d2405b9d063c5a9323b0fef964e2826dbce851f6d95f",
+      "count": 2,
+      "reason": "An offset tracks short reads into a size-capped local buffer on the same descriptor.",
+      "test": "tests/factory-control.test.ts"
     }
   ]
 }

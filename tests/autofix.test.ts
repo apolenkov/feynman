@@ -863,75 +863,73 @@ describe('idempotency — double-pass is a no-op for all patterns', () => {
 // feynman-lint --fix CLI for L11 dot-leader conversion (smoke)
 // ---------------------------------------------------------------------------
 describe('feynman-lint --fix CLI for L11 dot-leader conversion', () => {
-  it('--fix converts L11-eligible frame in file in place', () => {
-    const tmp = path.join(os.tmpdir(), `feynman-l11-${process.pid}.md`);
+  it('--fix converts L11-eligible frame in file in place', (t) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-l11-'));
+    t.after(() => {
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+    const tmp = path.join(dir, 'input.md');
     const input =
       '# title\n\n```\n┌────────────┐\n│ a ... ok   │\n│ b ... wait │\n└────────────┘\n```\n';
     fs.writeFileSync(tmp, input);
-    try {
-      const result = spawnSync(
-        process.execPath,
-        [path.resolve(import.meta.dirname, '..', 'bin', 'feynman-lint.ts'), '--fix', tmp],
-        { encoding: 'utf8' },
-      );
-      assert.equal(
-        result.status,
-        0,
-        `expected exit 0, got ${String(result.status)}; stderr: ${result.stderr}`,
-      );
-      const after = fs.readFileSync(tmp, 'utf8');
-      assert.notEqual(after, input, 'file must have been modified');
-      assert.ok(!after.includes('┌'), 'frame must be removed by L11 dot-leader autofix');
-    } finally {
-      try {
-        fs.unlinkSync(tmp);
-      } catch (_) {}
-    }
+    const result = spawnSync(
+      process.execPath,
+      [path.resolve(import.meta.dirname, '..', 'bin', 'feynman-lint.ts'), '--fix', tmp],
+      { encoding: 'utf8' },
+    );
+    assert.equal(
+      result.status,
+      0,
+      `expected exit 0, got ${String(result.status)}; stderr: ${result.stderr}`,
+    );
+    const after = fs.readFileSync(tmp, 'utf8');
+    assert.notEqual(after, input, 'file must have been modified');
+    assert.ok(!after.includes('┌'), 'frame must be removed by L11 dot-leader autofix');
   });
 
-  it('--fix preserves a titled status frame in place', () => {
-    const tmp = path.join(os.tmpdir(), `feynman-l11-title-${process.pid}.md`);
+  it('--fix preserves a titled status frame in place', (t) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-l11-'));
+    t.after(() => {
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+    const tmp = path.join(dir, 'input.md');
     const input =
       '# Report\n\n```\n┌─ Production ─┐\n│ API ... ok   │\n│ Web ... fail │\n└──────────────┘\n```\n';
     fs.writeFileSync(tmp, input);
-    try {
-      const result = spawnSync(
-        process.execPath,
-        [path.resolve(import.meta.dirname, '..', 'bin', 'feynman-lint.ts'), '--fix', tmp],
-        { encoding: 'utf8' },
-      );
-      assert.equal(result.status, 0, result.stderr);
-      const after = fs.readFileSync(tmp, 'utf8');
-      for (const content of ['Production', 'API', 'ok', 'Web', 'fail'])
-        assert.ok(after.includes(content), `lost ${content}: ${after}`);
-      assert.doesNotMatch(after, /┌─ Production/);
-    } finally {
-      fs.rmSync(tmp, { force: true });
-    }
+    const result = spawnSync(
+      process.execPath,
+      [path.resolve(import.meta.dirname, '..', 'bin', 'feynman-lint.ts'), '--fix', tmp],
+      { encoding: 'utf8' },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const after = fs.readFileSync(tmp, 'utf8');
+    for (const content of ['Production', 'API', 'ok', 'Web', 'fail'])
+      assert.ok(after.includes(content), `lost ${content}: ${after}`);
+    assert.doesNotMatch(after, /┌─ Production/);
   });
 
-  it('--fix preserves compact title and complete multiword status payloads', () => {
-    const tmp = path.join(os.tmpdir(), `feynman-l11-payload-${process.pid}.md`);
+  it('--fix preserves compact title and complete multiword status payloads', (t) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-l11-'));
+    t.after(() => {
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+    const tmp = path.join(dir, 'input.md');
     const input =
       '# Report\n\n```\n┌─Deploy┐\n│ api ✓ built successfully │\n│ web ← готов к запуску │\n└────────┘\n```\n';
     fs.writeFileSync(tmp, input);
-    try {
-      const result = spawnSync(
-        process.execPath,
-        [path.resolve(import.meta.dirname, '..', 'bin', 'feynman-lint.ts'), '--fix', tmp],
-        { encoding: 'utf8' },
-      );
-      assert.equal(result.status, 0, result.stderr);
-      const after = fs.readFileSync(tmp, 'utf8');
-      for (const content of ['Deploy', 'api', '✓ built successfully', 'web', '← готов к запуску'])
-        assert.ok(after.includes(content), `lost ${content}: ${after}`);
-      assert.equal(
-        autofix(after, { processFenced: true, convertL11: true, convertL15: true }),
-        after,
-      );
-    } finally {
-      fs.rmSync(tmp, { force: true });
-    }
+    const result = spawnSync(
+      process.execPath,
+      [path.resolve(import.meta.dirname, '..', 'bin', 'feynman-lint.ts'), '--fix', tmp],
+      { encoding: 'utf8' },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const after = fs.readFileSync(tmp, 'utf8');
+    for (const content of ['Deploy', 'api', '✓ built successfully', 'web', '← готов к запуску'])
+      assert.ok(after.includes(content), `lost ${content}: ${after}`);
+    assert.equal(
+      autofix(after, { processFenced: true, convertL11: true, convertL15: true }),
+      after,
+    );
   });
 });
 

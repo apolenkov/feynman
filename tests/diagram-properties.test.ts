@@ -1,3 +1,5 @@
+import fc from 'fast-check';
+import { parse } from '../lib/lint/parser.ts';
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
 import { autofix } from '../lib/lint/autofix.ts';
@@ -69,4 +71,36 @@ it('aligns a narrow compact title once and satisfies frame rules', () => {
   assert.ok(fixed.includes('Deploy'));
   assert.equal(autofix(fixed), fixed);
   assert.deepEqual(lint(fixed, { rules: ['L01', 'L08', 'L09'] }).issues, []);
+});
+
+it('parses generated arrow rows and aligns them idempotently without changing labels', () => {
+  const row = fc.record({
+    padding: fc.integer({ min: 0, max: 3 }),
+    token: fc.constantFrom('-->', '→', '──>', '─→'),
+    label: fc.constantFrom('alpha', 'β', '漢字', '🧭'),
+  });
+  fc.assert(
+    fc.property(fc.array(row, { minLength: 2, maxLength: 24 }), (rows) => {
+      const input = rows
+        .map(({ padding, token, label }) => `[x]${' '.repeat(padding)}${token} [${label}]`)
+        .join('\n');
+      const fixed = autofix(input);
+      assert.equal(autofix(fixed), fixed);
+      assert.deepEqual(
+        parse(fixed).map((node) => node.content),
+        [fixed],
+      );
+      assert.deepEqual(
+        fixed.split('\n'),
+        rows.map(({ token, label }) => `[x] ${token} [${label}]`),
+      );
+    }),
+  );
+});
+
+it('scans a long unfinished box label in a generic fence within the time budget', () => {
+  const label = '['.repeat(100_000);
+  const start = performance.now();
+  assert.deepEqual(parse(`\`\`\`\n${label}\n\`\`\``), []);
+  assert.ok(performance.now() - start < 2000);
 });

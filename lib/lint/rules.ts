@@ -1,3 +1,4 @@
+import { hasFlowArrow } from './arrows.ts';
 // lib/lint/rules.ts — lint rules for ASCII diagrams
 // Each rule: (ast: ASTNode, fullText: string) => Issue[]
 // Issue: {rule, severity, line, column, message, suggestion?}
@@ -914,7 +915,7 @@ export function L13_double_wrap(ast: ASTNode): Issue[] {
 // ---------------------------------------------------------------------------
 
 // Regex: at least one box-drawing, arrow, or tree char in the content.
-const DIAGRAM_CHAR_RE = /[┌┐└┘│─├┤┬┴┼]|-->|→|[├└]──/;
+const DIAGRAM_CHAR_RE = /[┌┐└┘│─├┤┬┴┼]/;
 
 // ---------------------------------------------------------------------------
 // L15 — Homogeneous frame → plain format
@@ -959,7 +960,7 @@ export function L15_homogeneous_frame(ast: ASTNode): Issue[] {
     if (stripped.some((l) => (l.match(/│/g) ?? []).length >= 2)) {
       return [];
     }
-    if (stripped.some((l) => /─→|→|──>|-->/.test(l))) {
+    if (stripped.some(hasFlowArrow)) {
       return [];
     }
     // Status frames — let L11 handle.
@@ -1005,7 +1006,7 @@ export function L14_blank_line_separation(ast: ASTNode, fullText: string): Issue
   if (ast.content.length === 0) return [];
 
   // Only fire on diagram blocks with actual diagram chars.
-  if (!DIAGRAM_CHAR_RE.test(ast.content)) return [];
+  if (!DIAGRAM_CHAR_RE.test(ast.content) && !hasFlowArrow(ast.content)) return [];
 
   // Indented / list-adjacent blocks: be lenient.
   if (ast.indent > 0) return [];

@@ -10,15 +10,29 @@ it('atomically replaces contents while preserving mode and symlink destinations'
   try {
     const target = path.join(root, 'target.json');
     atomicWrite(target, 'original');
-    assert.equal(fs.statSync(target).mode & 0o777, 0o600);
-    fs.chmodSync(target, 0o640);
+    {
+      const fd = fs.openSync(target, 'r');
+      try {
+        assert.equal(fs.fstatSync(fd).mode & 0o777, 0o600);
+        fs.fchmodSync(fd, 0o640);
+      } finally {
+        fs.closeSync(fd);
+      }
+    }
     const link = path.join(root, 'linked.json');
     fs.symlinkSync(target, link);
     atomicWrite(link, 'replacement');
-    assert.equal(fs.readFileSync(target, 'utf8'), 'replacement');
-    assert.equal(fs.statSync(target).mode & 0o777, 0o640);
+    {
+      const fd = fs.openSync(target, 'r');
+      try {
+        assert.equal(fs.readFileSync(fd, 'utf8'), 'replacement');
+        assert.equal(fs.fstatSync(fd).mode & 0o777, 0o640);
+        fs.fchmodSync(fd, 0o666);
+      } finally {
+        fs.closeSync(fd);
+      }
+    }
     assert.ok(fs.lstatSync(link).isSymbolicLink());
-    fs.chmodSync(target, 0o666);
     atomicWrite(link, 'preserve explicitly granted permissions');
     assert.equal(fs.statSync(target).mode & 0o777, 0o666);
     assert.deepEqual(fs.readdirSync(root).sort(), ['linked.json', 'target.json']);

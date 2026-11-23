@@ -80,15 +80,24 @@ function sourceSnapshot(root: string, runner: ReproducibilityRunner): string {
   ].toSorted();
   for (const relative of relativeFiles) {
     const absolute = path.join(root, relative);
-    if (!fs.existsSync(absolute)) {
+    try {
+      const fd = fs.openSync(
+        absolute,
+        fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK,
+      );
+      try {
+        const stat = fs.fstatSync(fd);
+        if (!stat.isFile()) throw new Error(`unsupported source entry: ${relative}`);
+        sourceHash.update(`file\0${relative}\0${stat.mode}\0`);
+        sourceHash.update(fs.readFileSync(fd));
+        sourceHash.update('\0');
+      } finally {
+        fs.closeSync(fd);
+      }
+    } catch (error) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
       sourceHash.update(`deleted\0${relative}\0`);
-      continue;
     }
-    const stat = fs.lstatSync(absolute);
-    if (!stat.isFile()) throw new Error(`unsupported source entry: ${relative}`);
-    sourceHash.update(`file\0${relative}\0${stat.mode}\0`);
-    sourceHash.update(fs.readFileSync(absolute));
-    sourceHash.update('\0');
   }
   return sourceHash.digest('hex');
 }

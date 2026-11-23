@@ -1,0 +1,4 @@
+- [x] Preserve diagram recognition while replacing duplicated arrow patterns and repeated bracket searches. Cover parsing and alignment with regression and property tests.
+- [ ] Remove path races and isolate temporary test files.
+- [ ] Lock workflow tools and verify their executable versions.
+- [ ] Move the native installation commands up and document outstanding factory acceptance.
