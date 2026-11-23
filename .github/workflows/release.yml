@@ -31,13 +31,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: 24.22.3
           cache: npm
-      - name: Use pinned npm for release rehearsal
-        run: |
-          npm ci --prefix tools/npm --ignore-scripts
-          echo "$GITHUB_WORKSPACE/tools/npm/node_modules/.bin" >> "$GITHUB_PATH"
-          tools/npm/node_modules/.bin/npm --version
       - name: Install dependencies
         run: npm ci
       - name: Install pinned Codex CLI for native tests
@@ -69,7 +64,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: 24.22.3
           cache: npm
           registry-url: https://registry.npmjs.org
 
@@ -105,12 +100,6 @@ jobs:
           fi
 
           echo "Release source validated: ${PACKAGE_TAG} at $(git rev-parse HEAD)"
-
-      - name: Upgrade npm for Trusted Publishing
-        run: |
-          npm ci --prefix tools/npm --ignore-scripts
-          echo "$GITHUB_WORKSPACE/tools/npm/node_modules/.bin" >> "$GITHUB_PATH"
-          tools/npm/node_modules/.bin/npm --version
 
       - name: Install dependencies
         run: npm ci

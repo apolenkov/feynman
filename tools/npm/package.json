@@ -1,7 +1,0 @@
-{
-  "name": "feynman-npm-tool",
-  "private": true,
-  "dependencies": {
-    "npm": "12.0.2"
-  }
-}
