@@ -36,7 +36,10 @@ jobs:
         run: npm ci
 
       - name: Install pinned Codex CLI for native tests
-        run: npm install --global --ignore-scripts @openai/codex@0.153.3
+        run: |
+          npm ci --prefix tools/codex --ignore-scripts
+          echo "$GITHUB_WORKSPACE/tools/codex/node_modules/.bin" >> "$GITHUB_PATH"
+          tools/codex/node_modules/.bin/codex --version
 
       - name: Ensure native archive tools
         if: runner.os == 'Linux'

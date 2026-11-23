@@ -96,7 +96,18 @@ describe('Codex-only package contract', () => {
     const releaseWorkflow = read('.github/workflows/release.yml');
     assert.match(releaseWorkflow, /id-token:\s*write/);
     assert.match(releaseWorkflow, /name: Publish to npm via OIDC/);
-    assert.match(releaseWorkflow, /npm install --global npm@\d+\.\d+\.\d+/);
+    assert.ok(releaseWorkflow.includes('npm ci --prefix tools/npm --ignore-scripts'));
+    assert.ok(
+      releaseWorkflow.includes(
+        'echo "$GITHUB_WORKSPACE/tools/npm/node_modules/.bin" >> "$GITHUB_PATH"',
+      ),
+    );
+    const packages = parseJsonObject(read('tools/npm/package-lock.json'))['packages'];
+    assertRecord(packages);
+    const npm = packages['node_modules/npm'];
+    assertRecord(npm);
+    assertString(npm['integrity']);
+    assert.match(npm['integrity'], /^sha512-/);
     assert.doesNotMatch(releaseWorkflow, /npm@latest/);
     assert.doesNotMatch(releaseWorkflow, /NPM_TOKEN|NODE_AUTH_TOKEN|npm_token/);
   });
