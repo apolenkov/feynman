@@ -2,13 +2,16 @@
 
 All **109/109 first-party source files** have a direct semantic review at the snapshot below. The initial pass reviewed 30. The completion pass read the remaining 79 in full and found eight additional issues. The highest-priority new finding is a handoff failure: the controller rejects the issue marker that the publisher writes (F18).
 
-| Findings | High | Medium | Low | Total |
-|---|---:|---:|---:|---:|
-| Initial pass, F01–F15 | 3 | 9 | 3 | 15 |
-| Completion pass, F16–F23 | 1 | 6 | 1 | 8 |
-| Total | 4 | 15 | 4 | 23 |
+The independent review of `777491d` is complete. It confirmed the four original High findings, revised six priorities and added eight findings. The highest-priority additions concern truncated CLI output and two bounded-work failures.
 
-F01–F07 have an implementation owner on the scanning branch. F08–F23 are proposed. **Independent challenge pass: pending.** DoD items 1–7 and 9 pass. Item 8 awaits the owner-authorized public issue backlink. The [criteria and DoD table](criteria.md) also records the failed isolated full CI invocation (C4), outstanding challenge (G2), issue update (G5) and the reason for the inapplicable tracker criterion (F5).
+| Pass (revised severity) | High | Medium | Low | Total |
+|---|---:|---:|---:|---:|
+| Initial, F01–F15 | 2 | 8 | 5 | 15 |
+| Completion, F16–F23 | 1 | 4 | 3 | 8 |
+| Independent challenge, F24–F31 | 3 | 1 | 4 | 8 |
+| Total | 6 | 13 | 12 | 31 |
+
+F01–F07 have landed source fixes. F08–F31 remain open. The [criteria and DoD](criteria.md) record the original isolated CI failure (C4), completed challenge (G2), and outstanding public issue backlink (G5 and DoD 8).
 
 ## Passport
 
@@ -19,15 +22,15 @@ F01–F07 have an implementation owner on the scanning branch. F08–F23 are pro
 | Commit | a7dac0d0feb681b2b91da19856e901436d6fbec8 |
 | Tree | de24352b5ade769cbdb6f51a82fb92fca7258151 |
 | Environment | Darwin 27.2.0 arm64; Node 26.13.1, npm 11.20.0, TypeScript 6.0.3, OpenSpec 2.1.1. The package supports Node 22.18+. |
-| Comparison boundary | The four commits after 6bb6c18 are included. Later work on the scanning branch is outside this revision. Documentation-only audit additions are outside the denominator. |
+| Comparison boundary | The four commits after 6bb6c18 are included. The combined PR will carry both scanning fixes and the audit via merge `631aa3d`. Later source dispositions at `2f72cee` are recorded separately. Documentation-only audit additions are outside the denominator. |
 | Single home | The existing quality standard, retrospective and research describe product acceptance and earlier revisions. This change owns the dated evidence and future implementation tasks. Keeping the registers here avoids shipping them through scripts/build-package.ts, which copies docs recursively. Proposal, tasks and audit retain their relative links when archived together. |
 
 ## Read the results
 
 1. [Acceptance criteria and Definition of Done](criteria.md) and [gate evidence](evidence/gates.md).
-2. [Findings with snapshot locations](findings.md), including the four implemented commits and the seven open scanning items.
+2. [Findings with snapshot locations](findings.md), including the integrated status refresh and local challenge checks.
 3. [Project standard](standard.md) and [target architecture and migration table](target-architecture.md).
-4. [Change proposal](../proposal.md), [quality](../specs/repository-quality/spec.md), [state](../specs/plugin-install/spec.md) and [docs-check](../specs/doc-drift-guard/spec.md) deltas and [ordered implementation tasks](../tasks.md).
+4. [Change proposal](../proposal.md), [quality](../specs/repository-quality/spec.md), [state](../specs/rules-injection/spec.md) and [docs-check](../specs/doc-drift-guard/spec.md) deltas and [ordered implementation tasks](../tasks.md).
 5. [File inventory](inventory.jsonl), [function and execution register](functions.jsonl), [module graph](evidence/modules.jsonl), [workflow graph](evidence/workflows.jsonl), and [size-rule candidates](evidence/size-candidates.jsonl).
 
 ## What the counts mean
@@ -40,7 +43,7 @@ F01–F07 have an implementation owner on the scanning branch. F08–F23 are pro
 | External/lock artifacts | 3 | Resolved dependency maps in the root, Codex and OCR lockfiles parsed as lockfile v3. Dependency implementation source is external to the tree. |
 | **Total** | **299** | 109 + 182 + 5 + 3. All 299 reviewed in the recorded mode; excluded 0, blocked 0, pending 0, in progress 0 for inventory inspection. |
 
-The two registers join on path and blob. In the file inventory, `range` covers the whole source and `reviewNote` records the behavior inspected. In the function register, `lines` gives the inclusive reviewed range for each executable unit. Source entries in both registers carry `status: REVIEWED` and a `reviewPass`. Workflow records describe structural inspection.
+The two registers join on path and blob. In the file inventory, `range` covers the whole source and `reviewNote` records the behavior inspected. The function register is AST-generated for TypeScript/MJS, with additional shell and workflow records. Semantic evidence is the per-file review note. In the function register, `lines` gives the inclusive reviewed range for each executable unit. Source entries in both registers carry `status: REVIEWED` and a `reviewPass`. Workflow records describe structural inspection.
 
 | Direct read | Files | Physical lines | Source execution records |
 |---|---:|---:|---:|
@@ -60,6 +63,6 @@ Each inventory row binds its range to the complete blob, with Git mode, size, ca
 | Documented product contract | CONTEXT.md, AGENTS.md, CONTRIBUTING.md, docs/architecture.md, docs/adr/0001 through 0007, docs/release.md and openspec/specs/ | Codex only, two delivery paths, pure core, owned state gateway, reproducible compiled package. Preserve Q01–Q15 and S01–S09 evidence boundaries. |
 | Current implementation | Snapshot tree, named source locations, effective configurations, tests and package smoke | New findings refer to this revision. Closed scanning work refers to commits. The September retrospective and historical evaluation reports provide comparison, not current acceptance. |
 | Proposed requirement | Q07 review thresholds, per-identity exceptions, preservation on preference-read failure and reporting of incomplete drift inspections | Adopt only after review. Other fixes preserve existing contracts except for the explicit gate/error corrections in the plan. |
-| Unknown / external | Hosted results, independent challenge and live explanation quality | No account changes, model evaluations, deployment, live factory activation or hosted security scan in this run. Read source evidence and conditional claims separately. |
+| Unknown / external | Hosted results and live explanation quality | No account changes, model evaluations, deployment, live factory activation or hosted security scan in this run. Read source evidence and conditional claims separately. |
 
-Start with R00's preference-preservation regression. Continue R01/R02 in their existing owner branch and R03's paired docs-read test. Obtain the independent challenge before treating the audit as accepted.
+Start with R00's preference-preservation regression. R02 owns the newly identified bounded-work sites and R18 owns piped lint output. The [task list](../tasks.md) gives the remaining dependencies and acceptance criteria.

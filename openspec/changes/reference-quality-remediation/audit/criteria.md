@@ -36,11 +36,11 @@ Rows follow issue order. PASS applies only to the named audit deliverable or obs
 | F1 order | PASS | R00–R03 and R11–R17 correct or characterize failures. R04–R06 depend on the relevant corrections before extraction. R09 integrates the results for review. |
 | F2 executable steps | PASS | Tasks specify findings, dependencies, locations, success tests, scope and rollback. |
 | F3 behavior vs contract change | PASS | R03 explicitly tightens docs exit behavior; moves retain public signatures and effects. |
-| F4 finding-to-task map | PASS | R01 covers F01/F04/F05; R02 F02/F03/F06; R03 F08; R04–06 F10; R07 F07/F09; R08 F11; R10 F12; R00 F13; R07 F14; R11 F15; R12 F16; R13 F17/F21; R14 F18/F23; R15 F19; R16 F20; R17 F22. |
+| F4 finding-to-task map | PASS | R01 records F01/F04/F05; R02 records F02/F03/F06 and owns F25/F26/F27; R03 F08; R04–06 F10; R07 F07/F09; R08 F11; R10 F12; R00 F13; R07 F14; R11 F15; R12 F16; R13 F17/F21; R14 F18/F23; R15 F19; R16 F20; R17 F22; R18 F24; R19 F28/F30/F31; R20 F29. |
 | F5 additional tracker issues | NOT APPLICABLE | #1 and the scanning change already own this work. This run authorizes no issue writes. |
 | F6 legacy baseline | PASS | Candidate identities and acceptance cases include deletion, stale permissions and a count-preserving substitution. No candidate is automatically approved. |
 | G1 self-check | PASS | Refer to the recorded inventory, path, range, gate and dependency checks. |
-| G2 independent challenge | NOT VERIFIED | Pending independent review. This run used one reviewer and performed a self-check. |
+| G2 independent challenge | PASS | DONE. An independent reviewer challenged the audit at `777491d`. The [verdicts and observations](findings.md) record four confirmed original High findings, six severity changes and eight additions. |
 | G3 statuses | PASS | Criteria and Definition of Done each carry an explicit disposition. |
 | G4 deliverables | PASS | Index links report, registers, evidence, findings, standard, architecture and tasks. |
 | G5 update public issue | NOT VERIFIED | Owner reserved issue/PR communication. The PR-ready summary is handed off separately. |
@@ -49,15 +49,15 @@ Rows follow issue order. PASS applies only to the named audit deliverable or obs
 
 | # | Status | Disposition |
 |---|---|---|
-| 1 | PASS | Snapshot identified and every tracked element accounted for. |
-| 2 | PASS | 109/109 first-party files read in full (30 initial + 79 completion), with blob-bound source and execution ranges. The other 190 entries received structural (182), media (5) or external-lock (3) inspection. |
+| 1 | PASS | Every tracked element accounted for at scanning-branch snapshot `a7dac0d`. The combined PR includes both scanning fixes and the audit, joined in `631aa3d`. Main has a different baseline. |
+| 2 | PASS | 109/109 first-party files read in full (30 initial + 79 completion), with blob-bound ranges. functions.jsonl is the AST-generated execution index (plus shell/workflow records). The per-file review notes in inventory.jsonl are the semantic evidence. The independent challenge found eight omissions, F24–F31. The other 190 entries received structural (182), media (5) or external-lock (3) inspection. |
 | 3 | PASS | CI interruption, platform, hosted and live-eval limits are recorded. |
 | 4 | PASS | Every oversized implementation module has a split or an explicit exception. |
 | 5 | PASS | Effective gate scope checked, including measured exclusions and paired canaries. CI invocation outcome is recorded independently under C4. |
-| 6 | PASS | Findings cite the revision and locations; already implemented and in-progress work have distinct dispositions. |
+| 6 | PASS | Findings cite the baseline, locations and integrated code status. Offline checks reproduced F16–F18, the parser aspect of F19, primary-probe ordering for F20, split-stream decoding for F21, the F22 oracle gap and the F23 renderer boundary. F24 was also reproduced. Performance findings have source evidence and future thresholds. |
 | 7 | PASS | Each mandatory fix maps to a numbered task and acceptance check. |
 | 8 | NOT VERIFIED | Single repository index and local handoff exist. The public issue backlink awaits the owner's publication. |
-| 9 | PASS | The requested audit branch adds only the audit/change files. Test homes, worktrees and temporary package installation are isolated from owner settings. |
+| 9 | PASS | The audit commits add only change artifacts. The combined branch also contains the separately identified scanning fixes. Test homes, worktrees and temporary package installation are isolated from owner settings. |
 
 ## Existing product promises at this revision
 
@@ -83,4 +83,4 @@ These are dispositions against the canonical repository-quality contract, separa
 | S06 | FAIL | Silent omission of a tracked read error yields exit 0 in the docs gate (F08). |
 | S07 | NOT VERIFIED | Golden pairs and property tests exercise content preservation; F06 limits the generated cases. |
 | S08 | PASS | The coverage checker compares enumerated source paths and LCOV paths in both directions; the measured report contains all 55 expected files. F16 concerns repeated in-scope records and is assessed under Q10. |
-| S09 | NOT VERIFIED | Pending independent review. |
+| S09 | NOT VERIFIED | The independent audit challenge at `777491d` satisfies G2. S09 also requires independent implementation review and final acceptance on one revision; R09 owns that later check. |

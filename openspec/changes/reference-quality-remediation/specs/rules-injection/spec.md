@@ -13,3 +13,8 @@ State reconciliation SHALL distinguish an unavailable preference file from succe
 
 - **WHEN** the preference file is readable but contains invalid JSON
 - **THEN** the existing backup-before-recovery contract applies
+
+#### Scenario: Inspecting the preference path fails
+
+- **WHEN** a filesystem error prevents SessionStart from determining whether the preference file exists
+- **THEN** it leaves the preference, backup and active flag intact and emits no instruction block
