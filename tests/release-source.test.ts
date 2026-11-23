@@ -148,3 +148,37 @@ describe('release source gate', () => {
     assert.match(result.output, /missing its tag name/);
   });
 });
+
+it('checks the bundled npm version before release', async (t) => {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-release-npm-'));
+  t.after(() => {
+    fs.rmSync(bin, { recursive: true, force: true });
+  });
+  fs.writeFileSync(
+    path.join(bin, 'npm'),
+    '#!/bin/sh\n[ "$#" = 1 ] && [ "$1" = --version ] || exit 2\nprintf "%s\\n" "$STUB_NPM_VERSION"\n',
+    { mode: 0o700 },
+  );
+
+  for (const [status, versions] of [
+    [1, ['11.5.0', '11.4.99', '10.9.4', '11.6.0-pre.1', '', 'v11.19.1', '11.5']],
+    [0, ['11.5.1', '11.10.0', '11.19.1', '12.0.0']],
+  ] as const) {
+    for (const version of versions) {
+      await t.test(`${status === 0 ? 'accepts' : 'rejects'} ${JSON.stringify(version)}`, () => {
+        const result = spawnSync(
+          'bash',
+          [path.join(ROOT, '.github/scripts/check-release-npm.sh')],
+          {
+            env: {
+              PATH: [bin, '/usr/bin', '/bin'].join(path.delimiter),
+              STUB_NPM_VERSION: version,
+            },
+            encoding: 'utf8',
+          },
+        );
+        assert.equal(result.status, status, result.stderr);
+      });
+    }
+  }
+});

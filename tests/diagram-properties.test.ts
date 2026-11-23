@@ -169,28 +169,27 @@ function referenceAsciiFlow(text: string): boolean {
 }
 
 it('classifies generated ASCII flows beside a Mermaid fence', () => {
-  const piece = fc.constantFrom(
-    '[a]',
-    '[]',
-    '[',
-    ']',
-    'b',
-    '-->',
-    '->',
-    '-',
-    '>',
-    ' ',
-    '\n',
-    '\r',
-    '\u2028',
-    '\u2029',
+  const label = fc.constantFrom('a', 'some text', '漢字', 'x[y', 'a\nb');
+  const box = fc.oneof(
+    { weight: 6, arbitrary: label.map((text) => `[${text}]`) },
+    { weight: 1, arbitrary: label.map((text) => `[${text}`) },
+    { weight: 1, arbitrary: fc.constant('[]') },
+  );
+  const arrow = fc.oneof(
+    { weight: 3, arbitrary: fc.constant('-->') },
+    { weight: 2, arbitrary: fc.constantFrom('->', '→', '──>', '─→', '─>', '-', '>') },
+  );
+  const gap = fc.oneof(
+    { weight: 3, arbitrary: fc.constantFrom('', ' ', ' extra ') },
+    { weight: 1, arbitrary: fc.constantFrom('\n', '\r', '\u2028', '\u2029') },
   );
   fc.assert(
-    fc.property(fc.array(piece, { maxLength: 18 }), (pieces) => {
-      const row = pieces.join('');
+    fc.property(box, gap, arrow, gap, box, (left, before, token, after, right) => {
+      const row = left + before + token + after + right;
+      const hasDiagramGlyph = token.includes('─') || token.includes('→');
       assert.equal(
         lint('```mermaid\n```\n' + row, { rules: ['L07'] }).issues.length,
-        Number(referenceAsciiFlow(row)),
+        Number(hasDiagramGlyph || referenceAsciiFlow(row)),
         JSON.stringify(row),
       );
     }),

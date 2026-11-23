@@ -40,7 +40,7 @@ Rows follow issue order. PASS applies only to the named audit deliverable or obs
 | F5 additional tracker issues | NOT APPLICABLE | #1 and the scanning change already own this work. This run authorizes no issue writes. |
 | F6 legacy baseline | PASS | Candidate identities and acceptance cases include deletion, stale permissions and a count-preserving substitution. No candidate is automatically approved. |
 | G1 self-check | PASS | Refer to the recorded inventory, path, range, gate and dependency checks. |
-| G2 independent challenge | PASS | DONE. An independent reviewer challenged the audit at `777491d`. The [verdicts and observations](findings.md) record four confirmed original High findings, six severity changes and eight additions. |
+| G2 independent challenge | PASS | DONE. An independent reviewer challenged the audit at `777491d`. The [verdicts and observations](findings.md) record four confirmed original High findings, five severity changes (F01, F03, F15, F16, F20) and seven reviewer additions (F24–F26, F28–F31). The author added F27. Revised totals are 7 High, 12 Medium and 12 Low. |
 | G3 statuses | PASS | Criteria and Definition of Done each carry an explicit disposition. |
 | G4 deliverables | PASS | Index links report, registers, evidence, findings, standard, architecture and tasks. |
 | G5 update public issue | NOT VERIFIED | Owner reserved issue/PR communication. The PR-ready summary is handed off separately. |
@@ -50,11 +50,11 @@ Rows follow issue order. PASS applies only to the named audit deliverable or obs
 | # | Status | Disposition |
 |---|---|---|
 | 1 | PASS | Every tracked element accounted for at scanning-branch snapshot `a7dac0d`. The combined PR includes both scanning fixes and the audit, joined in `631aa3d`. Main has a different baseline. |
-| 2 | PASS | 109/109 first-party files read in full (30 initial + 79 completion), with blob-bound ranges. functions.jsonl is the AST-generated execution index (plus shell/workflow records). The per-file review notes in inventory.jsonl are the semantic evidence. The independent challenge found eight omissions, F24–F31. The other 190 entries received structural (182), media (5) or external-lock (3) inspection. |
+| 2 | PASS | 109/109 first-party files read in full (30 initial + 79 completion), with blob-bound ranges. functions.jsonl is the AST-generated execution index (plus shell/workflow records). The per-file review notes in inventory.jsonl are the semantic evidence. The reviewer reported seven omissions and the author identified F27. The other 190 entries received structural (182), media (5) or external-lock (3) inspection. |
 | 3 | PASS | CI interruption, platform, hosted and live-eval limits are recorded. |
 | 4 | PASS | Every oversized implementation module has a split or an explicit exception. |
 | 5 | PASS | Effective gate scope checked, including measured exclusions and paired canaries. CI invocation outcome is recorded independently under C4. |
-| 6 | PASS | Findings cite the baseline, locations and integrated code status. Offline checks reproduced F16–F18, the parser aspect of F19, primary-probe ordering for F20, split-stream decoding for F21, the F22 oracle gap and the F23 renderer boundary. F24 was also reproduced. Performance findings have source evidence and future thresholds. |
+| 6 | PASS | Findings cite the baseline, locations and integrated code status. Offline checks reproduced F16–F18, the parser aspect of F19, primary-probe ordering for F20, split-stream decoding for F21, the F22 oracle gap and the F23 renderer boundary. F24 also reproduced. The reviewer analyzed growth for F25–F26 and measured quadratic growth for F27 on continuous prose without blank lines. F28–F31 are code-reading findings without runtime reproductions. |
 | 7 | PASS | Each mandatory fix maps to a numbered task and acceptance check. |
 | 8 | NOT VERIFIED | Single repository index and local handoff exist. The public issue backlink awaits the owner's publication. |
 | 9 | PASS | The audit commits add only change artifacts. The combined branch also contains the separately identified scanning fixes. Test homes, worktrees and temporary package installation are isolated from owner settings. |

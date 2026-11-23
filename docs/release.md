@@ -14,7 +14,8 @@ npm run ci
 Use Node.js 22.18 or newer. The working tree must be clean before the version
 bump.
 
-Native integration checks also need Codex CLI 0.171.0 on `PATH`. CI, release rehearsal
+Native integration checks also need the Codex CLI version pinned in
+[tools/codex/package.json](../tools/codex/package.json) on `PATH`. CI, release rehearsal
 and publishing install the same version from the lockfile in `tools/codex`.
 Validate native compatibility when updating that lockfile.
 With `CI=true`, a missing or unresponsive app-server fails the native tests.
@@ -78,6 +79,7 @@ smoke test. The workflow has the required `id-token: write` permission and
 does not receive an npm publish token. Both jobs read their exact Node.js version from
 [.node-version](../.node-version) and check that its bundled npm meets the Trusted
 Publishing minimum of 11.5.1 before proceeding.
+When adopting a Node.js security or maintenance release, update `.node-version` manually in a PR and run the release dry run with the new pin.
 
 Before any publishing write, the workflow derives `v<version>` from the checked
 out `package.json`. A release event must name that exact tag, and any fetched tag

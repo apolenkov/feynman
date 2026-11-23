@@ -35,14 +35,16 @@ All eight findings below are proposed. The commit in the heading applies to ever
 | F22 | Medium | The golden pass branch at `tests/lint.test.ts:61–69` checks only error-severity issues. The rule coverage check at lines 111–116 counts named pass fixtures. A warning rule can emit its own diagnostic on a named pass fixture and both checks still succeed. `tests/lint-cases.json:115` is an ordinary L06 pass case and produces no L06 warning. An injected warning demonstrates the gap. This gap concerns the golden oracle, even where separate unit assertions exist. | For a named pass fixture assert that its rule emitted no diagnostic at either severity. Preserve the overall no-errors check and allow unrelated advisory rules. Demonstrate that an unexpected target warning fails the golden check (R17). |
 | F23 | Medium | `scripts/factory-publication.ts:135–142` budgets the detail text after computing the surrounding markup. When that markup alone exceeds the allowance, it is still returned. At lines 354–358 the header and details are assembled without a final byte-length check. This contradicts the 2 KB issue-body expectation tested at `tests/night-factory-publication.test.ts:2556` and can produce oversized output. | Budget the complete UTF-8 body, including the header and required formatting. Shorten or omit optional details when needed. Verify the final bound and intact canonical metadata, including when the required header itself cannot fit (R14). |
 
-## Findings added by the independent challenge
+## Findings added during the challenge
+
+The reviewer reported F24–F26 and F28–F31. The author identified F27. F28–F31 are based on code reading and have no runtime reproductions.
 
 | ID | Severity | Snapshot evidence and consequence | Minimum change / planned acceptance |
 |---|---|---|---|
 | F24 | High (Major) | `bin/feynman-lint.ts:253–255`, `:269–273`, `:285–286`. Immediate process exit can discard buffered JSON, GCC diagnostics and explanations when stdout is piped. A file received complete JSON while a pipe received an invalid prefix for the same mode and input. Both processes returned the expected lint status. | R18. Set the exit code and return, or wait for writes to drain. Compare bytes and exit status for stdout pipes and files. |
 | F25 | High (Major) | `lib/lint/rules.ts:373`, `:379`. The reviewer identified worst-case cubic growth in labeled connection matching on the L05 path. | R02. Recognize connector boundaries with bounded forward work and preserve accepted labels. |
 | F26 | High (Major) | `lib/lint/frames.ts:62–92`. Frame enumeration can repeatedly inspect the same suffix on unclosed frames, with quadratic total work. | R02. Reuse closer/row information across frames. Preserve frame order, indices and inner rows at each consumer. |
-| F27 | Medium | `lib/lint/parser.ts:302` (integrated `lib/lint/parser.ts:289`). A rejected standalone block without blank lines is classified again from each following line. The pre-existing path can take quadratic work in line count. | R02. Reuse classification work while retaining any valid diagram suffix and its original source range. |
+| F27 | High | `lib/lint/parser.ts:302` (integrated `lib/lint/parser.ts:289`). A rejected standalone block without blank lines is classified again from each following line. The reviewer later measured quadratic growth in line count on ordinary continuous prose. This puts F27 at High alongside F26. | R02. Reuse classification work while retaining any valid diagram suffix and its original source range. |
 | F28 | Low (Minor) | `bin/commands/install.ts:51–55`, `bin/adapters/codex-config.ts:229–240`. The existing-hook check accepts a matching basename. An ordinary reinstall leaves a stale script path in place. | R19. Compare the installed hook with the intended command and repair a stale owned entry. Preserve foreign hooks. |
 | F29 | Low (Minor) | `scripts/feynman-highlight.ts:43–48`, `:90`. A typo in the dry-run flag selects a real write. The pre-edit budget also blocks reverting an oversized file. | R20. Reject unknown options before writes and permit a size-reducing revert that restores an in-budget file. |
 | F30 | Low (Nit) | `bin/adapters/codex-config.ts:253`, `:261`. Cleanup drops pre-existing foreign empty groups or events when removing owned hooks. | R19. Preserve previously empty foreign entries and test structural equality of unrelated configuration. |
@@ -63,7 +65,7 @@ Rechecked at `2f72cee` following merge `631aa3d`. The [scanning change](../../co
 
 ## Local checks of the challenge
 
-Disposable checks used the integrated branch at `2f72cee` with synthetic data and the existing offline fixtures. Numerical growth orders for F25–F27 are the reviewer's analysis; R02 specifies prospective acceptance measurements.
+Disposable checks used the integrated branch at `2f72cee` with synthetic data and the existing offline fixtures. The reviewer analyzed growth orders for F25–F26 and later confirmed the author’s F27 by measurement on continuous prose without blank lines. R02 specifies the acceptance measurements for fixes.
 
 | Finding | Observation and scope |
 |---|---|

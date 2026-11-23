@@ -2,14 +2,15 @@
 
 All **109/109 first-party source files** have a direct semantic review at the snapshot below. The initial pass reviewed 30. The completion pass read the remaining 79 in full and found eight additional issues. The highest-priority new finding is a handoff failure: the controller rejects the issue marker that the publisher writes (F18).
 
-The independent review of `777491d` is complete. It confirmed the four original High findings, revised six priorities and added eight findings. The highest-priority additions concern truncated CLI output and two bounded-work failures.
+The independent review of `777491d` is complete. The reviewer confirmed the four original High findings, revised five priorities (F01, F03, F15, F16, F20) and reported seven findings (F24–F26, F28–F31). The author added F27. The reviewer later measured quadratic parser work on continuous prose without blank lines. The four new High findings cover truncated CLI output and three performance defects.
 
 | Pass (revised severity) | High | Medium | Low | Total |
 |---|---:|---:|---:|---:|
 | Initial, F01–F15 | 2 | 8 | 5 | 15 |
 | Completion, F16–F23 | 1 | 4 | 3 | 8 |
-| Independent challenge, F24–F31 | 3 | 1 | 4 | 8 |
-| Total | 6 | 13 | 12 | 31 |
+| Reviewer, F24–F26 and F28–F31 | 3 | 0 | 4 | 7 |
+| Author, F27 | 1 | 0 | 0 | 1 |
+| Total | 7 | 12 | 12 | 31 |
 
 F01–F07 have landed source fixes. F08–F31 remain open. The [criteria and DoD](criteria.md) record the original isolated CI failure (C4), completed challenge (G2), and outstanding public issue backlink (G5 and DoD 8).
 
