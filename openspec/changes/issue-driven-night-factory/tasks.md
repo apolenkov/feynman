@@ -1,6 +1,6 @@
 # Tasks
 
-Branch acceptance and the live scan-to-closure check remain open and are tracked separately. Live acceptance requires a genuine finding from a scheduled scan.
+The maintainer’s tracker records progress on the open acceptance tasks below.
 
 ## 2026-10-16 continuation (TASK-282.06)
 
