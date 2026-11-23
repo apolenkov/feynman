@@ -136,7 +136,7 @@ function isCurrentRelease(title: string, version: string): boolean {
 
 function isUntouchedGeneratedSection(text: string): boolean {
   const section = text.trimEnd();
-  const marker = /\n<!-- feynman-generated: ([a-f0-9]{64}) -->$/.exec(section);
+  const marker = /\n<!-- feynman-generated: ([a-f0-9]{64}) -{2}>$/.exec(section);
   return marker !== null && marker[1] === sectionHash(section.slice(0, marker.index));
 }
 

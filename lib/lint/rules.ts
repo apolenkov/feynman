@@ -244,13 +244,13 @@ export function L02_tree_chars(ast: ASTNode): Issue[] {
 // ---------------------------------------------------------------------------
 const ARROW_PATTERNS: { name: string; re: RegExp }[] = [
   // seq-msg family: -->> first (return), then ->> (sync call, not tail of -->>)
-  { name: 'seq-msg', re: /-->>/ },
+  { name: 'seq-msg', re: /-{2}>>/ },
   { name: 'seq-msg', re: /(?<!-)->>/ }, // ->> not preceded by - (so it isn't the tail of -->>)
   // flow arrows — --> must exclude --> that is the head of -->> (handled by seq-msg above),
   // but since seq-msg is checked first and found.set() guards duplicates, we only need to
   // avoid counting -->> as --> which the seq-msg pattern already captures.
   // The (?!>) lookahead ensures --> inside -->> isn't double-counted as a flow arrow.
-  { name: '-->', re: /-->(?!>)/ },
+  { name: '-->', re: /-{2}>(?!>)/ },
   { name: '→', re: /(?<![─-])→/ },
   { name: '─→', re: /─→/ },
   { name: '──>', re: /──>/ },
@@ -372,7 +372,7 @@ const BARE_CONNECTION_RE = /^\s*(?:(?:<-+>|<-+|-+>{1,2})|(?:←|↔|→|─+(?:�
 // boundary arrowheads carry direction; arrow tokens inside the label are invalid.
 const LABELED_CONNECTION_RE = /^\s*<?-{2,}\s*(.+?)\s*-{2,}>?\s*$/;
 const ARROW_TOKEN_RE = /<-|->|←|↔|→|─+(?:→|>)/;
-const PARALLEL_BRANCH_COLUMN_RE = /^\s{3,}\+-->\s*$/;
+const PARALLEL_BRANCH_COLUMN_RE = /^\s{3,}\+-{2}>\s*$/;
 
 function isCompleteConnection(value: string): boolean {
   if (BARE_CONNECTION_RE.test(value)) return true;
@@ -496,7 +496,7 @@ function hasAsciiFlow(text: string): boolean {
     if (ch === '\n' || ch === '\r' || ch === '\u2028' || ch === '\u2029') {
       left = false;
       arrow = false;
-    } else if (left && (ch === '→' || text.startsWith('-->', i))) {
+    } else if (left && text.startsWith('-->', i)) {
       arrow = true;
     }
   }

@@ -7,7 +7,7 @@ CI and release workflows SHALL install their npm-distributed tools from integrit
 #### Scenario: Release rehearsal and publication
 
 - **WHEN** the release workflow installs dependencies and builds or publishes a package
-- **THEN** it uses the locked npm version and runs native tests with the locked Codex CLI
+- **THEN** both jobs use the same exact Node version and its bundled npm, check the executing npm meets the Trusted Publishing minimum before release writes, and run native tests with the locked Codex CLI
 
 ### Requirement: Preserve diagram behavior with linear token matching
 

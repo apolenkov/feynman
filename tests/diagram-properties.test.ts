@@ -110,6 +110,16 @@ it('parses generated arrow rows and aligns them idempotently without changing la
   );
 });
 
+function referenceArrowOffsets(line: string): number[] {
+  const offsets: number[] = [];
+  for (let i = 0; i < line.length;) {
+    const token = ['─→', '→', '──>', '-->'].find((value) => line.startsWith(value, i));
+    if (token !== undefined) offsets.push(i);
+    i += token?.length ?? 1;
+  }
+  return offsets;
+}
+
 it('matches nonempty boxes and complete arrow tokens in generated rows', () => {
   const token = fc.constantFrom('->', '─>', '─→', '──>', '-->', '→');
   const piece = fc.oneof(
@@ -120,8 +130,8 @@ it('matches nonempty boxes and complete arrow tokens in generated rows', () => {
   fc.assert(
     fc.property(fc.array(piece, { minLength: 1, maxLength: 16 }), (pieces) => {
       const line = pieces.join('');
-      const arrows = [...line.matchAll(/─→|→|──>|-->/g)];
-      assert.equal(flowArrowIndex(line), arrows[0]?.index ?? -1);
+      const arrows = referenceArrowOffsets(line);
+      assert.equal(flowArrowIndex(line), arrows[0] ?? -1);
       assert.equal(hasExactlyOneArrow(line), arrows.length === 1);
       const labels = [...line.matchAll(/\[[^\]]+\]/g)];
       assert.deepEqual(
@@ -145,12 +155,60 @@ ${line}
   }
 });
 
+// Enumerate all pairs of nonempty labels (including nested openings) and
+// inspect only the intervening substring. Generated inputs are deliberately short.
+function referenceAsciiFlow(text: string): boolean {
+  const labels = [...text.matchAll(/(?=(\[[^\]]+\]))/g)];
+  return labels.some((left) => {
+    const end = left.index + (left[1]?.length ?? 0);
+    return labels.some((right) => {
+      const gap = text.slice(end, right.index);
+      return gap.includes('-->') && !/[\n\r\u2028\u2029]/.test(gap);
+    });
+  });
+}
+
+it('classifies generated ASCII flows beside a Mermaid fence', () => {
+  const piece = fc.constantFrom(
+    '[a]',
+    '[]',
+    '[',
+    ']',
+    'b',
+    '-->',
+    '->',
+    '-',
+    '>',
+    ' ',
+    '\n',
+    '\r',
+    '\u2028',
+    '\u2029',
+  );
+  fc.assert(
+    fc.property(fc.array(piece, { maxLength: 18 }), (pieces) => {
+      const row = pieces.join('');
+      assert.equal(
+        lint('```mermaid\n```\n' + row, { rules: ['L07'] }).issues.length,
+        Number(referenceAsciiFlow(row)),
+        JSON.stringify(row),
+      );
+    }),
+    { ...propertyOptions, numRuns: 1000 },
+  );
+});
+
 it('preserves multiline labels and same-line arrow gaps in mermaid mix detection', () => {
   for (const [row, mixed] of [
     ['[a\nb] --> [c\nd]', true],
     ['[a] [nested --> [b]', true],
     ['[a]\n--> [b]', false],
     ['[a] -->\u2028[b]', false],
+    ['[a]\r--> [b]', false],
+    ['[a] -->\u2029[b]', false],
+    ['[a] --> [b', false],
+    ['[a] -> [b]', false],
+    ['[a] → [b]', true],
     ['[] --> [b]', false],
     ['[a] --> []', false],
   ] as const) {

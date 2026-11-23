@@ -1256,7 +1256,7 @@ async function bootstrapGenesis(
   for (const issue of issues) {
     if (typeof issue['body'] !== 'string' || !issue['body'].includes('<!-- factory-finding-v1 '))
       continue;
-    const marker = /<!-- factory-finding-v1 (\{[^\n]*\}) -->/.exec(issue['body'])?.[1];
+    const marker = /<!-- factory-finding-v1 (\{[^\n]*\}) -{2}>/.exec(issue['body'])?.[1];
     if (marker === undefined)
       throw new FactoryFailure('Unidentifiable legacy canonical issue; inventory unknown');
     const markerValue: unknown = JSON.parse(marker);

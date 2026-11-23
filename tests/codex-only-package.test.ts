@@ -97,7 +97,14 @@ describe('Codex-only package contract', () => {
     assert.match(releaseWorkflow, /id-token:\s*write/);
     assert.match(releaseWorkflow, /name: Publish to npm via OIDC/);
     // Both release jobs use the npm bundled with this Node distribution.
-    assert.equal(releaseWorkflow.match(/node-version: 24\.22\.3$/gm)?.length, 2);
+    assert.match(read('.node-version').trim(), /^\d+\.\d+\.\d+$/);
+    const jobs = releaseWorkflow.split(/^  (?:rehearsal|publish):$/m).slice(1);
+    assert.equal(jobs.length, 2);
+    for (const job of jobs) {
+      const setup = job.indexOf('node-version-file: .node-version');
+      const guard = job.indexOf('run: bash .github/scripts/check-release-npm.sh');
+      assert.ok(setup >= 0 && guard > setup && guard < job.indexOf('run: npm ci'));
+    }
     assert.doesNotMatch(releaseWorkflow, /npm@latest/);
     assert.doesNotMatch(releaseWorkflow, /NPM_TOKEN|NODE_AUTH_TOKEN|npm_token/);
   });

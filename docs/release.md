@@ -75,9 +75,9 @@ The release workflow checks out the tag, runs the full CI/build gate, uploads
 the package artifact, and publishes it through npm Trusted Publishing (GitHub
 OIDC). It then verifies registry propagation and runs the published-package
 smoke test. The workflow has the required `id-token: write` permission and
-does not receive an npm publish token. Both publication and rehearsal use Node.js 24.22.3
-with its bundled npm 11.19.1. When updating Node.js, verify that its bundled
-npm meets the Trusted Publishing minimum of 11.5.1.
+does not receive an npm publish token. Both jobs read their exact Node.js version from
+[.node-version](../.node-version) and check that its bundled npm meets the Trusted
+Publishing minimum of 11.5.1 before proceeding.
 
 Before any publishing write, the workflow derives `v<version>` from the checked
 out `package.json`. A release event must name that exact tag, and any fetched tag

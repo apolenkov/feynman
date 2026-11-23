@@ -2,3 +2,5 @@
 - [x] Remove path races and isolate temporary test files.
 - [x] Lock workflow tools and verify their executable versions.
 - [x] Move the native installation commands up and document outstanding factory acceptance.
+- [x] Verify complete arrow tokens against an independent literal scanner and L07 flow classification against a separate grammar oracle. Cover all four reviewed boundary mutations and remove the unreachable Unicode-arrow check. Check all tracked regex literals for the ASCII arrow spelling.
+- [x] Use one exact release Node pin, track the Codex tool lock with Dependabot and check the running npm against the Trusted Publishing minimum in both release jobs before release writes.
