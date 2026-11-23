@@ -16,6 +16,15 @@
 
 **feynman adds visual-explanation instructions to Codex: a skill that turns relationships into diagrams, an optional session hook, and an ASCII diagram linter.**
 
+## Install
+
+Install the native Codex plugin from your terminal.
+
+```bash
+codex plugin marketplace add apolenkov/feynman --ref main
+codex plugin add feynman@feynman
+```
+
 ![feynman lint catching a broken box and passing a clean flow](.github/assets/demo.gif)
 
 ## Why
@@ -46,14 +55,9 @@ establish explanation quality.
 - **Local only.** The CLI has zero third-party runtime dependencies, and the
   hook writes no telemetry.
 
-## Install
+## Installation options
 
 ### Native Codex plugin
-
-```bash
-codex plugin marketplace add apolenkov/feynman --ref main
-codex plugin add feynman@feynman
-```
 
 Open `/plugins` in Codex to search for **Feynman**, install it, then start a
 new session. The skill is discoverable for visual architecture, ASCII diagrams,
