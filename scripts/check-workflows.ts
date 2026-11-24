@@ -99,11 +99,14 @@ async function downloadActionlint(): Promise<string> {
   fs.writeFileSync(binary, executable, { flag: 'wx', mode: 0o700 });
   return binary;
 }
-export async function validateNativeWorkflow(content: string, name: string): Promise<void> {
+export async function validateNativeWorkflow(
+  content: string,
+  name: string,
+  binary?: string,
+): Promise<void> {
   validateWorkflowSchema(content, name);
-  const binary = await actionlintBinary();
   const result = spawnSync(
-    binary,
+    binary ?? (await actionlintBinary()),
     ['-no-color', '-oneline', '-ignore', QUEUE_DIAGNOSTIC, '-stdin-filename', name, '-'],
     { input: content, encoding: 'utf8' },
   );

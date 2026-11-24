@@ -4,9 +4,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { it } from 'node:test';
-import { checkWorkflows, validateWorkflowSchema } from '../scripts/check-workflows.ts';
+import {
+  checkWorkflows,
+  validateNativeWorkflow,
+  validateWorkflowSchema,
+} from '../scripts/check-workflows.ts';
 
 const directory = path.resolve(import.meta.dirname, '..', '.github', 'workflows');
+const workflow = `on: push
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok
+`;
 
 it('checks the official schema for every repository workflow', async () => {
   const checked = new Set<string>();
@@ -14,9 +25,11 @@ it('checks the official schema for every repository workflow', async () => {
     validateWorkflowSchema(content, name);
     checked.add(name);
   });
-  for (const name of ['ci.yml', 'codeql.yml', 'release.yml', 'scorecard.yml']) {
-    assert.ok(checked.has(name), `missing workflow: ${name}`);
-  }
+  const workflows = fs
+    .readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && ['.yml', '.yaml'].includes(path.extname(entry.name)))
+    .map((entry) => entry.name);
+  assert.deepEqual(checked, new Set(workflows));
 });
 
 for (const [description, before, after, diagnostic] of [
@@ -39,11 +52,36 @@ for (const [description, before, after, diagnostic] of [
     t.after(() => {
       fs.rmSync(fixture, { recursive: true, force: true });
     });
-    const original = fs.readFileSync(path.join(directory, 'codeql.yml'), 'utf8');
-    fs.writeFileSync(path.join(fixture, 'additional.yml'), original.replace(before, after));
+    fs.writeFileSync(path.join(fixture, 'additional.yml'), workflow.replace(before, after));
     await assert.rejects(checkWorkflows(fixture, validateWorkflowSchema), diagnostic);
   });
 }
+
+it('accepts the queue diagnostic and rejects an unknown runner label', async (t) => {
+  const version = spawnSync('actionlint', ['-version'], { encoding: 'utf8' });
+  if (version.error && 'code' in version.error && version.error.code === 'ENOENT') {
+    t.skip('Offline test requires actionlint 1.7.12 on PATH');
+    return;
+  }
+  assert.ifError(version.error);
+  assert.equal(version.status, 0, version.stderr);
+  const [installed = 'unknown'] = version.stdout.trim().split('\n');
+  if (installed !== '1.7.12') {
+    t.skip(`Offline test requires actionlint 1.7.12 on PATH (found ${installed})`);
+    return;
+  }
+
+  const name = 'queued.yml';
+  const queued = workflow.replace('jobs:', 'concurrency:\n  group: test\n  queue: max\njobs:');
+  await validateNativeWorkflow(queued, name, 'actionlint');
+
+  const unknownRunner = queued.replace('ubuntu-latest', 'feynman-unknown-runner');
+  validateWorkflowSchema(unknownRunner, name);
+  await assert.rejects(
+    validateNativeWorkflow(unknownRunner, name, 'actionlint'),
+    /label "feynman-unknown-runner" is unknown\..*\[runner-label\]/,
+  );
+});
 
 it('exits unsuccessfully when the downloaded actionlint archive fails its checksum', () => {
   const fetchStub = "globalThis.fetch = async () => new Response('invalid archive')";
