@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 
-import { lint, format, RULE_IDS } from '../lib/lint/index.ts';
+import { lint, format, RULE_IDS, type Issue } from '../lib/lint/index.ts';
 import { parse } from '../lib/lint/parser.ts';
 import { estimateFrameCost, L10_mixed_script } from '../lib/lint/rules.ts';
 import { lastVisualColumnOf, firstVisualColumnOf } from '../lib/lint/width.ts';
@@ -50,54 +50,76 @@ const loadedCases: unknown = require(path.resolve(import.meta.dirname, 'lint-cas
 if (!isLintCaseArray(loadedCases)) throw new TypeError('invalid lint-cases.json');
 const cases = loadedCases;
 
+function assertGoldenPass(rule: string, issues: readonly Issue[]): void {
+  const errors = issues.filter((issue) => issue.severity === 'error');
+  assert.equal(
+    errors.length,
+    0,
+    `Expected pass but got ${errors.length} errors: ${errors.map((e) => `${e.rule} ${e.message}`).join('; ')}`,
+  );
+  if (rule === 'none' || rule === 'all') return;
+  const namedIssues = issues.filter((issue) => issue.rule === rule);
+  assert.deepEqual(namedIssues, [], `Expected pass without diagnostics from ${rule}`);
+}
+
+function goldenCase(tc: LintCase): () => void {
+  return () => {
+    const { issues } = lint(tc.input);
+    if (tc.expected === 'pass') {
+      assertGoldenPass(tc.rule, issues);
+      return;
+    }
+    if (tc.expected !== 'fail') return;
+
+    const matchingIssues = issues.filter(
+      ({ rule }) => tc.rule === 'none' || tc.rule === 'all' || rule === tc.rule,
+    );
+    assert.ok(
+      matchingIssues.length >= 1,
+      `Expected fail with rule '${tc.rule}' but got no matching issues. All issues: ${JSON.stringify(issues)}`,
+    );
+
+    for (const exp of tc.expected_issues ?? []) {
+      if (exp.rule !== undefined) {
+        const found = issues.some((i) => i.rule === exp.rule);
+        assert.ok(found, `Expected issue with rule '${exp.rule}' not found`);
+      }
+      if (exp.line !== undefined) {
+        const found = issues.some((i) => i.rule === exp.rule && i.line === exp.line);
+        assert.ok(
+          found,
+          `Expected issue at line ${exp.line} for rule ${String(exp.rule)} not found`,
+        );
+      }
+    }
+  };
+}
+
+describe('Golden pass assertion', () => {
+  const clean = required(cases.filter(({ name }) => name === 'L06 pass — both ▲ and ▼ present'));
+  const withWarning = { ...clean, input: clean.input.replace('▼ low', 'low') };
+
+  it('accepts a clean named pass', goldenCase(clean));
+
+  it('allows warnings unrelated to the named rule and in aggregate passes', () => {
+    assert.deepEqual(
+      lint(withWarning.input).issues.map(({ rule, severity }) => [rule, severity]),
+      [['L06', 'warn']],
+    );
+    for (const rule of ['L05', 'all', 'none']) goldenCase({ ...withWarning, rule })();
+  });
+
+  it('rejects an unexpected warning from the named rule', () => {
+    assert.throws(goldenCase(withWarning), /Expected pass.*L06/);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Golden cases from lint-cases.json
 // ---------------------------------------------------------------------------
 describe('Golden cases (lint-cases.json)', () => {
   for (const tc of cases) {
-    it(tc.name, () => {
-      const result = lint(tc.input);
-
-      if (tc.expected === 'pass') {
-        // No error-severity issues allowed
-        const errors = result.issues.filter((i) => i.severity === 'error');
-        assert.equal(
-          errors.length,
-          0,
-          `Expected pass but got ${errors.length} errors: ${errors.map((e) => `${e.rule} ${e.message}`).join('; ')}`,
-        );
-      } else {
-        // Must have at least one issue matching the expected rule
-        // (L06 uses severity='warn', so check all issues not just errors)
-        const matchingIssues = result.issues.filter((i) => {
-          if (tc.rule === 'none' || tc.rule === 'all') return true;
-          return i.rule === tc.rule;
-        });
-
-        if (tc.expected === 'fail') {
-          assert.ok(
-            matchingIssues.length >= 1,
-            `Expected fail with rule '${tc.rule}' but got no matching issues. All issues: ${JSON.stringify(result.issues)}`,
-          );
-
-          if (tc.expected_issues !== undefined) {
-            for (const exp of tc.expected_issues) {
-              if (exp.rule !== undefined) {
-                const found = result.issues.some((i) => i.rule === exp.rule);
-                assert.ok(found, `Expected issue with rule '${exp.rule}' not found`);
-              }
-              if (exp.line !== undefined) {
-                const found = result.issues.some((i) => i.rule === exp.rule && i.line === exp.line);
-                assert.ok(
-                  found,
-                  `Expected issue at line ${exp.line} for rule ${String(exp.rule)} not found`,
-                );
-              }
-            }
-          }
-        }
-      }
-    });
+    it(tc.name, goldenCase(tc));
   }
 });
 

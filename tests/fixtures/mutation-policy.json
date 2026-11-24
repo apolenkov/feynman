@@ -17,6 +17,14 @@
       "test": "tests/commands-coverage.test.ts"
     },
     {
+      "file": "bin/feynman-lint.ts",
+      "owner": "main",
+      "mutationHash": "b4c09245f9ac719c557fa5778c0c85591228f2817e958cffeec564ee5c3ebf4b",
+      "count": 2,
+      "reason": "The CLI boundary records the lint status for stdin and files, letting stdout and stderr drain before process exit.",
+      "test": "tests/lint-execution.test.ts"
+    },
+    {
       "file": "hooks/feynman-session-start.ts",
       "owner": "readStdin",
       "mutationHash": "b62963af8f86fb80daea7a195227913f15361580ec732830a10f1bf9f70682ed",
@@ -27,10 +35,10 @@
     {
       "file": "lib/lint/autofix.ts",
       "owner": "autofix",
-      "mutationHash": "d71d88b29d521869b264c6fb3dbb91a9d027106a54bd0059ef470ab53ecb22a0",
-      "count": 22,
-      "reason": "Source cursor skips complete handled frames while an owned output buffer retains untouched lines and full converted payloads; avoids recursive document traversal and growing-array copies.",
-      "test": "tests/diagram-properties.test.ts"
+      "mutationHash": "d34a10ce5b46ea091d997e93f59b0cf6f37101aacbad726ef68e9db55dade37b",
+      "count": 27,
+      "reason": "A cursor and one frame iterator per fence-free segment advance in source order; an owned output buffer retains untouched lines and converted payloads.",
+      "test": "tests/lint-bounded-work.test.ts"
     },
     {
       "file": "lib/lint/autofix.ts",
@@ -75,18 +83,26 @@
     {
       "file": "lib/lint/frames.ts",
       "owner": "iterateFrames",
-      "mutationHash": "8e244e9bd8f609e9fba316d745adecbfb637868efa1a14898fc1d8f1fd167a25",
+      "mutationHash": "1debc96aa774a9f871a2cf0827af5a6dfe90e556a9787f2c6811bbc0b6e7b009",
+      "count": 8,
+      "reason": "Owned lookup and row buffers index each line once; the generator cursor skips enclosed openers while preserving source order.",
+      "test": "tests/lint-bounded-work.test.ts"
+    },
+    {
+      "file": "lib/lint/frames.ts",
+      "owner": "inner",
+      "mutationHash": "9cc36260a67a3fb62194cb5126cbee11f03ef957e2d611f09e3a55be9a7b64d1",
       "count": 2,
-      "reason": "Generator cursor skips closed frames and advances after unclosed openers without recursive traversal.",
-      "test": "tests/autofix.test.ts"
+      "reason": "The accessor reverses a private row slice and memoizes it so unclosed frames only allocate overlapping row arrays on request.",
+      "test": "tests/lint-bounded-work.test.ts"
     },
     {
       "file": "lib/lint/frames.ts",
       "owner": "nextFrame",
       "mutationHash": "12026a607781ebb37ea4c366eff957d49304f9174c6bce7c8c0a3b20b2ee7027",
       "count": 7,
-      "reason": "Lookahead cursor and owned inner-row buffer detect the canonical closer within caller-supplied lines without copying each scanned suffix; autofix bounds those lines at fences.",
-      "test": "tests/autofix.test.ts"
+      "reason": "Lookahead cursor and owned inner-row buffer detect the canonical closer for a single frame query without copying the scanned suffix.",
+      "test": "tests/lint-bounded-work.test.ts"
     },
     {
       "file": "lib/lint/rules.ts",
@@ -114,11 +130,27 @@
     },
     {
       "file": "lib/lint/parser.ts",
+      "owner": "countDiagramChars",
+      "mutationHash": "7d012cc0b0a154f15501d1282ead49013248a364c9f8ae49838219d34f684d36",
+      "count": 4,
+      "reason": "Local counters collect non-whitespace and drawing-character totals in a single pass.",
+      "test": "tests/lint-bounded-work.test.ts"
+    },
+    {
+      "file": "lib/lint/parser.ts",
+      "owner": "diagramSuffixStart",
+      "mutationHash": "d0388a5393cb56486e44e3058992d75a2f743e2ed27f2937fccec448cbabff54",
+      "count": 10,
+      "reason": "A backward cursor accumulates suffix density and prose state once per line and records the earliest eligible diagram start.",
+      "test": "tests/lint-bounded-work.test.ts"
+    },
+    {
+      "file": "lib/lint/parser.ts",
       "owner": "parse",
-      "mutationHash": "d0bfe535959addfa79c7d368c8cde817f50c30c041bcdcd4dff6434bd6dbc2c3",
-      "count": 15,
-      "reason": "Source cursors and owned node/block buffers preserve coordinates while consuming variable-length fenced and unfenced blocks.",
-      "test": "tests/lint.test.ts"
+      "mutationHash": "322e8de83c2c800500d014f5a4047b16d13f9c6909d1ff18efde148bf4e1f834",
+      "count": 16,
+      "reason": "Source cursors and owned buffers retain coordinates when emitting fenced blocks, standalone blocks and accepted suffixes.",
+      "test": "tests/lint-bounded-work.test.ts"
     },
     {
       "file": "lib/lint/rules.ts",
@@ -147,10 +179,10 @@
     {
       "file": "lib/lint/rules.ts",
       "owner": "L09_right_edge_alignment",
-      "mutationHash": "9a0732acbcd776d3aa4b44ee64b3c6b4d4ce1dd846543a2da4aa35185a9798d5",
-      "count": 12,
-      "reason": "Indexed closer search and skip cursor retain canonical visual-left matching and coordinates; an owned diagnostic buffer avoids repeated output copies.",
-      "test": "tests/lint.test.ts"
+      "mutationHash": "f877d2f7b487c0c81d2ba975524f29dd0bef12822ddf01316d8d3372f101902a",
+      "count": 11,
+      "reason": "Local maps index the nearest later closer at each visual left column. The forward cursor and diagnostic buffer retain frame order and coordinates.",
+      "test": "tests/lint-bounded-work.test.ts"
     },
     {
       "file": "lib/lint/width.ts",
