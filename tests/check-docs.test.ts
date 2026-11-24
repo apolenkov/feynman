@@ -36,6 +36,7 @@ function docsFixture(): string {
     ['CHANGELOG.md', '# Changelog\n'],
     ['docs/guide.md', '# Guide\n'],
     ['examples/sample.md', '# Sample\n'],
+    ['SUPPORT.md', '# Support\nPrivate support fixture text\n'],
     ['bin/feynman.ts', '#!/usr/bin/env node\n'],
     [
       'bin/feynman-lint.ts',
@@ -150,6 +151,7 @@ describe('docs CLI boundary', { concurrency: false }, () => {
           lintFailures: [],
           hasInvalidPublicInstallExample: false,
           driftFindings: [],
+          driftReadFailures: [],
         });
         const stdout: string[] = [];
         const stderr: string[] = [];
@@ -195,6 +197,63 @@ describe('docs CLI boundary', { concurrency: false }, () => {
         assert.match(message, /public install examples/);
         assert.match(message, /superseded toolchain contract/);
         assert.match(message, /README\.md/);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+  });
+
+  for (const [description, rel, replacement] of [
+    ['tracked support file became a directory', 'SUPPORT.md', 'directory'],
+    ['tracked support file is a dangling link', 'SUPPORT.md', 'symlink'],
+    ['required public CLI became a directory', 'bin/feynman.ts', 'directory'],
+    ['required public CLI was removed', 'bin/feynman.ts', 'absent'],
+  ] as const) {
+    it(`reports the relative path when a ${description}`, () => {
+      withGitFixtureEnvironment(() => {
+        const root = docsFixture();
+        try {
+          const file = path.join(root, rel);
+          fs.rmSync(file);
+          if (replacement === 'directory') fs.mkdirSync(file);
+          if (replacement === 'symlink') fs.symlinkSync('missing.md', file);
+          const stdout: string[] = [];
+          const stderr: string[] = [];
+          assert.equal(
+            runDocsCheck(root, {
+              stdout: (text) => stdout.push(text),
+              stderr: (text) => stderr.push(text),
+            }),
+            1,
+          );
+          assert.deepEqual(stdout, []);
+          const message = stderr.join('');
+          assert.deepEqual(message.trim().split('\n'), [`doc-drift guard: cannot read ${rel}`]);
+          assert.ok(!message.includes(root));
+          assert.doesNotMatch(message, /Private support fixture text/);
+        } finally {
+          fs.rmSync(root, { recursive: true, force: true });
+        }
+      });
+    });
+  }
+
+  it('still passes when a tracked drift-only file was removed from the working tree', () => {
+    withGitFixtureEnvironment(() => {
+      const root = docsFixture();
+      try {
+        fs.rmSync(path.join(root, 'SUPPORT.md'));
+        const stdout: string[] = [];
+        const stderr: string[] = [];
+        assert.equal(
+          runDocsCheck(root, {
+            stdout: (text) => stdout.push(text),
+            stderr: (text) => stderr.push(text),
+          }),
+          0,
+        );
+        assert.deepEqual(stdout, ['docs lint OK (5 files)\n']);
+        assert.deepEqual(stderr, []);
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }

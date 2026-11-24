@@ -1,59 +1,69 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
 import {
   readSettings,
   writeSettings,
-  hasFeynmanHook,
+  hasCurrentFeynmanHook,
   hasAnyFeynmanHook,
+  isSessionStartHookCommand,
   removeFeynmanHooks,
   bootstrapState,
   codexConfig,
   type ValidatedCodexConfig,
 } from '../adapters/codex-config.ts';
-import { sessionStartHookCommand } from '../adapters/codex-hook.ts';
+import { SESSION_HOOK_PATH, sessionStartHookCommand } from '../adapters/codex-hook.ts';
 import { removeActiveFlag } from '../adapters/state-store.ts';
 
 const HOME = os.homedir();
-const _hookExt = fs.existsSync(
-  path.resolve(import.meta.dirname, '..', '..', 'hooks', 'feynman-session-start.ts'),
-)
-  ? '.ts'
-  : '.js';
-const SESSION_HOOK_PATH = path.resolve(
-  import.meta.dirname,
-  '..',
-  '..',
-  'hooks',
-  `feynman-session-start${_hookExt}`,
-);
 
-function withSessionHook(settings: ValidatedCodexConfig): ValidatedCodexConfig {
-  const withoutFeynman = removeFeynmanHooks(settings);
-  const hooks = withoutFeynman.hooks ?? {};
+function withSessionHook(settings: ValidatedCodexConfig, command: string): ValidatedCodexConfig {
+  const hooks = settings.hooks ?? {};
   return {
-    ...withoutFeynman,
+    ...settings,
     hooks: {
       ...hooks,
       SessionStart: [
         ...(hooks['SessionStart'] ?? []),
         {
           matcher: 'startup|resume|compact|clear',
-          hooks: [{ type: 'command', command: sessionStartHookCommand(), timeout: 5 }],
+          hooks: [{ type: 'command', command, timeout: 5 }],
         },
       ],
     },
   };
 }
 
+function repairSessionHooks(config: ValidatedCodexConfig, command: string): ValidatedCodexConfig {
+  const groups = config.hooks?.['SessionStart'] ?? [];
+  if (
+    !groups.some((group) => group.hooks.some((hook) => isSessionStartHookCommand(hook['command'])))
+  ) {
+    return withSessionHook(config, command);
+  }
+  const sessionStart = groups.map((group) => ({
+    ...group,
+    hooks: group.hooks.map((hook) =>
+      hook['command'] !== command && isSessionStartHookCommand(hook['command'])
+        ? { ...hook, command }
+        : hook,
+    ),
+  }));
+  return { ...config, hooks: { ...config.hooks, SessionStart: sessionStart } };
+}
+
 function installCodex(opts: Readonly<{ force: boolean }>): { readonly already: boolean } {
   const cfg = readSettings();
-  const already = hasFeynmanHook(cfg);
+  const command = sessionStartHookCommand();
+  const already = hasCurrentFeynmanHook(cfg, command);
   if (already && !opts.force) {
     bootstrapState();
     return { already: true };
   }
-  writeSettings(withSessionHook(cfg));
+  writeSettings(
+    opts.force
+      ? withSessionHook(removeFeynmanHooks(cfg), command)
+      : repairSessionHooks(cfg, command),
+  );
   bootstrapState();
   return { already: false };
 }

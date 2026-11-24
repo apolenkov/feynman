@@ -14,8 +14,9 @@ unmeasured production-file exceptions.
 
 The configuration file was already included in the historical percentage and
 remains included. Its explicit inventory entry preserves that denominator instead
-of dropping fully covered configuration lines to hide a mismatch. The current
-inventory contains 37 TypeScript files plus configuration, 38 sources total.
+of dropping fully covered configuration lines to hide a mismatch. To list the
+current executable sources and compare them with the measured LCOV records, run
+`npm run coverage` followed by `npm run check:coverage`.
 
 ## Historical baseline and expanded scope
 
