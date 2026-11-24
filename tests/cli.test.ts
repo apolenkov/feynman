@@ -62,6 +62,11 @@ function cleanup(home: string): void {
   fs.rmSync(home, { recursive: true, force: true });
 }
 
+function expectedSessionCommand(home: string, hook: string): string {
+  const quote = (value: string) => "'" + value.split("'").join("'\\''") + "'";
+  return `FEYNMAN_HOME=${quote(path.join(home, '.codex'))} node ${quote(hook)}`;
+}
+
 describe('feynman CLI', () => {
   it('installs and executes hooks literally from paths containing quotes and dollar signs', () => {
     const temporary = tempHome();
@@ -192,10 +197,69 @@ describe('feynman CLI', () => {
   it('installs one Codex SessionStart hook and is idempotent', () => {
     const home = tempHome();
     try {
-      assert.equal(run(home, ['install']).status, 0);
+      const first = run(home, ['install']);
+      assert.equal(first.status, 0, first.stderr);
       assert.equal(sessionStartGroups(home).length, 1);
-      assert.equal(run(home, ['install']).status, 0);
+      const hook = path.join(ROOT, 'hooks', 'feynman-session-start.ts');
+      assert.ok(first.stdout.split('\n').includes(`│ hook:     ${hook}`));
+      assert.deepEqual(commandsInSessionStart(home), [expectedSessionCommand(home, hook)]);
+      const priorConfig = fs.readFileSync(configPath(home), 'utf8');
+      const repeat = run(home, ['install']);
+      assert.equal(repeat.status, 0, repeat.stderr);
+      assert.match(repeat.stdout, /already installed/);
+      assert.equal(fs.readFileSync(configPath(home), 'utf8'), priorConfig);
       assert.equal(sessionStartGroups(home).length, 1);
+    } finally {
+      cleanup(home);
+    }
+  });
+
+  it('repairs a stale owned hook on ordinary reinstall while retaining foreign settings', () => {
+    const home = tempHome();
+    const hook = path.join(ROOT, 'hooks', 'feynman-session-start.ts');
+    const command = expectedSessionCommand(home, hook);
+    const current = {
+      matcher: 'resume',
+      hooks: [{ type: 'command', command, timeout: 17 }],
+    };
+    const foreign = {
+      matcher: 'startup',
+      hooks: [{ command: 'node /tmp/not-feynman-session-start.js', timeout: 11 }],
+    };
+    const empty = { matcher: 'resume', hooks: [] };
+    const stale = {
+      type: 'command',
+      command: "node '/tmp/old-install/feynman-session-start.js'",
+      timeout: 13,
+    };
+    const mixed = { ...foreign, hooks: [...foreign.hooks, stale] };
+    const config = {
+      profile: { name: 'work' },
+      hooks: {
+        SessionStart: [empty, mixed, current],
+        Stop: [{ hooks: [{ command: 'node /tmp/old-install/feynman-lint.js' }] }],
+        UserPromptSubmit: [],
+        CustomEvent: [],
+      },
+    };
+    try {
+      fs.mkdirSync(path.dirname(configPath(home)), { recursive: true });
+      fs.writeFileSync(configPath(home), JSON.stringify(config));
+
+      const repaired = run(home, ['install']);
+      assert.equal(repaired.status, 0, repaired.stderr);
+      assert.ok(repaired.stdout.split('\n').includes(`│ hook:     ${hook}`));
+      assert.deepEqual(readConfig(home), {
+        ...config,
+        hooks: {
+          ...config.hooks,
+          SessionStart: [
+            empty,
+            { ...mixed, hooks: [...foreign.hooks, { ...stale, command }] },
+            current,
+          ],
+        },
+      });
     } finally {
       cleanup(home);
     }
@@ -312,6 +376,53 @@ describe('feynman CLI', () => {
       assert.equal(fs.existsSync(path.join(out, 'skills')), false);
     } finally {
       process.chdir(cwd);
+      cleanup(home);
+    }
+  });
+
+  it('keeps a working export after a failed forced copy and replaces it on retry', () => {
+    const home = tempHome();
+    try {
+      const out = path.join(home, 'export');
+      const args = ['bootstrap', '--out', out];
+      const initial = run(home, args);
+      assert.equal(initial.status, 0, initial.stderr);
+      const marker = path.join(out, 'feynman-bootstrap.json');
+      const priorMarker = fs.readFileSync(marker, 'utf8');
+      assert.equal(parseJsonObject(priorMarker)['outputDir'], out);
+      const priorFile = path.join(out, 'prior-export.txt');
+      fs.writeFileSync(priorFile, 'prior bytes');
+
+      const preload = path.join(home, 'fail-copy.mjs');
+      fs.writeFileSync(
+        preload,
+        `import fs from 'node:fs';
+const copy = fs.copyFileSync;
+fs.copyFileSync = (source, ...args) => {
+  if (source.endsWith('/feynman-contract.md')) throw new Error('injected copy failure');
+  return copy(source, ...args);
+};
+`,
+      );
+      const failed = spawnSync(process.execPath, ['--import', preload, CLI, ...args, '--force'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: { ...process.env, HOME: home, NO_COLOR: '1' },
+      });
+      assert.equal(failed.status, 1, failed.stderr);
+      assert.match(failed.stderr, /injected copy failure/);
+      assert.equal(fs.readFileSync(marker, 'utf8'), priorMarker);
+      assert.equal(fs.readFileSync(priorFile, 'utf8'), 'prior bytes');
+      const exportedCli = path.join(out, 'bin', 'feynman.ts');
+      assert.equal(run(home, ['version'], exportedCli).status, 0);
+
+      const retry = run(home, [...args, '--force']);
+      assert.equal(retry.status, 0, retry.stderr);
+      assert.equal(parseJsonObject(fs.readFileSync(marker, 'utf8'))['outputDir'], out);
+      assert.equal(fs.existsSync(priorFile), false);
+      assert.equal(run(home, ['version'], exportedCli).status, 0);
+      assert.deepEqual(fs.readdirSync(home).sort(), ['export', 'fail-copy.mjs']);
+    } finally {
       cleanup(home);
     }
   });

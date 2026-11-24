@@ -71,7 +71,10 @@ describe('Codex-only package contract', () => {
       const source = read(file).toLowerCase();
       assert.doesNotMatch(source, /claude|opencode|--target ['"]both/);
       assert.doesNotMatch(source, /--target/);
-      assert.match(source, /\['install', '--force'\]/);
+      const install = file.endsWith('/release-smoke.ts')
+        ? /\['install'\]/
+        : /\['install', '--force'\]/;
+      assert.match(source, install);
     }
   });
 

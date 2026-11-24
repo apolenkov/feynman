@@ -16,6 +16,7 @@ const EXAMPLES_DIR = path.resolve(import.meta.dirname, '..', '..', 'examples');
 const CODEX_MARKETPLACE = path.resolve(ROOT_DIR, '.agents', 'plugins', 'marketplace.json');
 const CODEX_PLUGIN_DIR = path.resolve(ROOT_DIR, 'plugins', 'feynman');
 const DEFAULT_BOOTSTRAP_DIR = 'feynman-package';
+const OWNERSHIP_MARKER = 'feynman-bootstrap.json';
 const PACKAGE_JSON = path.resolve(ROOT_DIR, 'package.json');
 
 export type BootstrapArguments =
@@ -85,55 +86,212 @@ export function cmdBootstrap(args: readonly string[]): void {
   }
   const { out, force } = parsed;
 
-  if (fs.existsSync(out) && !force) {
+  reportDestinationConflict(checkDestination(out, force).kind, out);
+  const result = stageBootstrap(out, force);
+  if (result.kind !== 'exported') reportDestinationConflict(result.kind, out);
+  else printBootstrapResult(out, result.counts);
+  process.exit(0);
+}
+
+type Destination =
+  | { readonly kind: 'new' | 'skip' | 'refuse' }
+  | { readonly kind: 'replace'; readonly identity: fs.BigIntStats };
+
+function checkDestination(out: string, force: boolean): Destination {
+  const info = fs.lstatSync(out, { bigint: true, throwIfNoEntry: false });
+  if (info === undefined) return { kind: 'new' };
+  if (!force) return { kind: 'skip' };
+  if (!info.isDirectory()) return { kind: 'refuse' };
+
+  const canonical = fs.realpathSync(out);
+  const protectedPaths = [process.cwd(), os.homedir(), ROOT_DIR].map((directory) =>
+    fs.realpathSync(directory),
+  );
+  const containsProtectedPath = protectedPaths.some((directory) => {
+    const relative = path.relative(canonical, directory);
+    return (
+      relative === '' ||
+      (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative))
+    );
+  });
+  return containsProtectedPath || !ownsBootstrapDirectory(out, out)
+    ? { kind: 'refuse' }
+    : { kind: 'replace', identity: info };
+}
+
+function reportDestinationConflict(status: Destination['kind'], out: string): void {
+  if (status === 'skip') {
     console.log(`feynman bootstrap: output already exists at ${out}`);
     console.log('Use `--force` to recreate it.');
     process.exit(0);
   }
-
-  if (fs.existsSync(out)) {
-    const canonical = fs.realpathSync(out);
-    const protectedPaths = [process.cwd(), os.homedir(), ROOT_DIR].map((directory) =>
-      fs.realpathSync(directory),
+  if (status === 'refuse') {
+    console.error(
+      'feynman bootstrap: refusing to replace an unowned, symlinked, or protected directory',
     );
-    const containsProtectedPath = protectedPaths.some((directory) => {
-      const relative = path.relative(canonical, directory);
-      return (
-        relative === '' ||
-        (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative))
-      );
-    });
-    const owned = ownsBootstrapDirectory(out);
-    if (fs.lstatSync(out).isSymbolicLink() || containsProtectedPath || !owned) {
-      console.error(
-        'feynman bootstrap: refusing to replace an unowned, symlinked, or protected directory',
-      );
-      process.exit(2);
-    }
-    fs.rmSync(out, { recursive: true, force: true });
+    process.exit(2);
   }
+}
 
+function stageBootstrap(out: string, force: boolean) {
+  const parent = path.dirname(out);
+  ensureDir(parent);
+  const staging = fs.mkdtempSync(path.join(parent, '.feynman-bootstrap-'));
+  const bundle = path.join(staging, 'bundle');
+  const previous = path.join(staging, 'previous');
+  const result = exportBootstrap(bundle, out, previous, force);
+  try {
+    fs.rmSync(bundle, { recursive: true, force: true });
+    // Leave displaced directories in staging when recovery could not finish.
+    if (fs.readdirSync(staging).length === 0) fs.rmdirSync(staging);
+  } catch (cleanupError) {
+    if (result.kind !== 'error') throw cleanupError;
+    throw new AggregateError([result.error, cleanupError], 'Bootstrap cleanup also failed', {
+      cause: result.error,
+    });
+  }
+  if (result.kind === 'error') throw result.error;
+  return result;
+}
+
+function exportBootstrap(bundle: string, out: string, previous: string, force: boolean) {
+  try {
+    const counts = writeBootstrapBundle(bundle, out);
+    const destination = checkDestination(out, force);
+    if (destination.kind === 'skip' || destination.kind === 'refuse') {
+      return { kind: destination.kind } as const;
+    }
+    promoteBootstrap(bundle, out, previous, destination);
+    return { kind: 'exported', counts } as const;
+  } catch (error) {
+    return { kind: 'error', error } as const;
+  }
+}
+
+function sameDirectory(file: string, identity: fs.BigIntStats): boolean {
+  const current = fs.lstatSync(file, { bigint: true, throwIfNoEntry: false });
+  return (
+    current?.isDirectory() === true && current.dev === identity.dev && current.ino === identity.ino
+  );
+}
+
+// Node's directory rename can replace an empty directory. Claim each name
+// exclusively and keep the source tree intact until the whole transfer succeeds.
+function linkDirectoryContents(source: string, destination: string, root = false): void {
+  const entries = fs.readdirSync(source, { withFileTypes: true });
+  for (const entry of entries) {
+    if (root && entry.name === OWNERSHIP_MARKER) continue;
+    const from = path.join(source, entry.name);
+    const to = path.join(destination, entry.name);
+    if (entry.isDirectory()) {
+      fs.mkdirSync(to, { mode: 0o700 });
+      linkDirectoryContents(from, to);
+    } else {
+      fs.linkSync(from, to);
+    }
+  }
+  // Publish the ownership marker only once every runtime file is available.
+  if (root) {
+    fs.linkSync(path.join(source, OWNERSHIP_MARKER), path.join(destination, OWNERSHIP_MARKER));
+  }
+  fs.chmodSync(destination, fs.statSync(source).mode & 0o777);
+}
+
+function publishDirectory(source: string, out: string, staging: string): void {
+  fs.mkdirSync(out, { mode: 0o700 });
+  const identity = fs.lstatSync(out, { bigint: true });
+  try {
+    linkDirectoryContents(source, out, true);
+  } catch (error) {
+    const partial = path.join(staging, 'partial');
+    try {
+      if (!sameDirectory(out, identity)) throw new Error(`Bootstrap destination changed at ${out}`);
+      fs.renameSync(out, partial);
+      if (!sameDirectory(partial, identity)) {
+        throw new Error(`Bootstrap destination changed. Displaced entry preserved at ${partial}`);
+      }
+      fs.rmSync(partial, { recursive: true });
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], 'Bootstrap transfer and cleanup failed', {
+        cause: error,
+      });
+    }
+    throw error;
+  }
+}
+
+function promoteBootstrap(
+  bundle: string,
+  out: string,
+  previous: string,
+  destination: Destination,
+): void {
+  const replacing = destination.kind === 'replace';
+  const staging = path.dirname(previous);
+  if (replacing) {
+    fs.renameSync(out, previous);
+    if (!sameDirectory(previous, destination.identity) || !ownsBootstrapDirectory(previous, out)) {
+      throw new Error(`Bootstrap destination changed. Displaced entry preserved at ${previous}`);
+    }
+  }
+  try {
+    publishDirectory(bundle, out, staging);
+  } catch (error) {
+    if (replacing) {
+      try {
+        publishDirectory(previous, out, staging);
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          `Bootstrap promotion and restoration failed. Prior export remains at ${previous}`,
+          { cause: error },
+        );
+      }
+      fs.rmSync(previous, { recursive: true });
+    }
+    throw error;
+  }
+  if (replacing) fs.rmSync(previous, { recursive: true });
+}
+
+function requireStagedRuntime(bundle: string): void {
+  const extension = path.extname(import.meta.filename);
+  for (const entry of [
+    'bin/feynman',
+    'bin/feynman-lint',
+    'hooks/feynman-session-start',
+    'lib/lint/index',
+    'lib/state/index',
+  ]) {
+    const file = entry + extension;
+    if (fs.lstatSync(path.join(bundle, file), { throwIfNoEntry: false })?.isFile() !== true) {
+      throw new Error(`Bootstrap runtime file missing: ${file}`);
+    }
+  }
+}
+
+function writeBootstrapBundle(bundle: string, out: string) {
   const codexMarketplace = copyFileIfExists(
     CODEX_MARKETPLACE,
-    path.join(out, '.agents', 'plugins', 'marketplace.json'),
+    path.join(bundle, '.agents', 'plugins', 'marketplace.json'),
   )
     ? 1
     : 0;
-  const codexPlugin = copyDirectory(CODEX_PLUGIN_DIR, path.join(out, 'plugins', 'feynman'));
+  const codexPlugin = copyDirectory(CODEX_PLUGIN_DIR, path.join(bundle, 'plugins', 'feynman'));
 
   const counts = {
-    examples: copyMarkdownDir(EXAMPLES_DIR, path.join(out, 'examples')),
-    rules: copyFileIfExists(RULES_PATH, path.join(out, 'rules', 'feynman-contract.md')) ? 1 : 0,
-    hookRuntime: copyDirectory(path.join(ROOT_DIR, 'hooks'), path.join(out, 'hooks')),
-    cliRuntime: copyDirectory(path.join(ROOT_DIR, 'bin'), path.join(out, 'bin')),
-    coreRuntime: copyDirectory(path.join(ROOT_DIR, 'lib'), path.join(out, 'lib')),
-    packageManifest: copyFileIfExists(PACKAGE_JSON, path.join(out, 'package.json')) ? 1 : 0,
+    examples: copyMarkdownDir(EXAMPLES_DIR, path.join(bundle, 'examples')),
+    rules: copyRequiredFile(RULES_PATH, path.join(bundle, 'rules', 'feynman-contract.md')),
+    hookRuntime: copyDirectory(path.join(ROOT_DIR, 'hooks'), path.join(bundle, 'hooks')),
+    cliRuntime: copyDirectory(path.join(ROOT_DIR, 'bin'), path.join(bundle, 'bin')),
+    coreRuntime: copyDirectory(path.join(ROOT_DIR, 'lib'), path.join(bundle, 'lib')),
+    packageManifest: copyRequiredFile(PACKAGE_JSON, path.join(bundle, 'package.json')),
     plugins: codexMarketplace + codexPlugin,
   };
 
-  ensureDir(out);
+  requireStagedRuntime(bundle);
   fs.writeFileSync(
-    path.join(out, 'feynman-bootstrap.json'),
+    path.join(bundle, OWNERSHIP_MARKER),
     JSON.stringify(
       {
         version: VERSION,
@@ -145,7 +303,16 @@ export function cmdBootstrap(args: readonly string[]): void {
       2,
     ) + '\n',
   );
+  return counts;
+}
 
+function copyRequiredFile(source: string, destination: string): number {
+  ensureDir(path.dirname(destination));
+  fs.copyFileSync(source, destination);
+  return 1;
+}
+
+function printBootstrapResult(out: string, counts: ReturnType<typeof writeBootstrapBundle>): void {
   const total = Object.values(counts).reduce((sum, count) => sum + count, 1);
   console.log('');
   console.log('┌─ feynman bootstrap ────────────────────────────────────────┐');
@@ -158,21 +325,32 @@ export function cmdBootstrap(args: readonly string[]): void {
   console.log(`│ plugins:  ${counts.plugins}`);
   console.log(`│ files:    ${total}`);
   console.log('└───────────────────────────────────────────────────────────┘');
-  process.exit(0);
 }
 
-function ownsBootstrapDirectory(out: string): boolean {
+function ownsBootstrapDirectory(directory: string, out: string): boolean {
   try {
-    const marker: unknown = JSON.parse(
-      fs.readFileSync(path.join(out, 'feynman-bootstrap.json'), 'utf8'),
-    );
-    return (
-      typeof marker === 'object' &&
-      marker !== null &&
-      'outputDir' in marker &&
-      typeof marker.outputDir === 'string' &&
-      path.resolve(marker.outputDir) === out
-    );
+    const markerPath = path.join(directory, OWNERSHIP_MARKER);
+    const { O_RDONLY, O_NOFOLLOW, O_NONBLOCK } = fs.constants;
+    const fd = fs.openSync(markerPath, O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
+    try {
+      const info = fs.fstatSync(fd, { bigint: true });
+      if (!info.isFile()) return false;
+      // Where O_NOFOLLOW is unavailable, verify that the entry names the open file.
+      if (!O_NOFOLLOW) {
+        const entry = fs.lstatSync(markerPath, { bigint: true });
+        if (!entry.isFile() || entry.dev !== info.dev || entry.ino !== info.ino) return false;
+      }
+      const marker: unknown = JSON.parse(fs.readFileSync(fd, 'utf8'));
+      return (
+        typeof marker === 'object' &&
+        marker !== null &&
+        'outputDir' in marker &&
+        typeof marker.outputDir === 'string' &&
+        path.resolve(marker.outputDir) === out
+      );
+    } finally {
+      fs.closeSync(fd);
+    }
   } catch {
     return false;
   }

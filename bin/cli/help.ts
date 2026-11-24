@@ -42,12 +42,12 @@ export const EXAMPLES_HELP = `${c.bold('feynman examples')} — print built-in d
 
 ${c.bold('Usage:')}
   feynman examples                     # list available examples
-  feynman examples --name <fileBase>   # print a specific example
-  feynman examples --random            # print a random example
+  feynman examples --name <fileBase>   # print the full example
+  feynman examples --random            # preview a random example
 
 ${c.bold('Options:')}
   --name    Example filename without .md extension (examples/feature-planning)
-  --random  Show one random example in full
+  --random  Preview one random example (first 26 lines)
   --help    Show this help
 
 Example filenames:

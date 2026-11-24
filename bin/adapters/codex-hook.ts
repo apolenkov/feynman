@@ -10,7 +10,7 @@ const _hookExt = fs.existsSync(
 )
   ? '.ts'
   : '.js';
-const HOOK_PATH = path.resolve(
+export const SESSION_HOOK_PATH = path.resolve(
   import.meta.dirname,
   '..',
   '..',
@@ -20,5 +20,5 @@ const HOOK_PATH = path.resolve(
 
 export function sessionStartHookCommand(): string {
   const quote = (value: string): string => "'" + value.replace(/'/g, "'\\''") + "'";
-  return `FEYNMAN_HOME=${quote(codexConfig().rootDir)} node ${quote(HOOK_PATH)}`;
+  return `FEYNMAN_HOME=${quote(codexConfig().rootDir)} node ${quote(SESSION_HOOK_PATH)}`;
 }

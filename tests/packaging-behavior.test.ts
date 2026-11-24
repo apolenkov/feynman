@@ -239,6 +239,8 @@ type ReleaseFailure =
   | 'install'
   | 'version'
   | 'doctor'
+  | 'displayed-hook'
+  | 'stale-hook'
   | 'home'
   | 'hook-command'
   | 'hook'
@@ -283,26 +285,29 @@ function releaseRunner(failure: ReleaseFailure = 'none'): ReleaseCommandRunner {
       return failure === 'install' ? { ...OK, status: 2, stderr: 'install failed' } : OK;
     if (args[0] === 'version') return result(failure === 'version' ? '1.0.0\n' : '2.0.0\n');
     if (args[0] === 'install') {
+      assert.deepEqual(args, ['install']);
       const home = options.env['HOME'];
       if (home === undefined) throw new Error('HOME missing in install command');
-      fs.mkdirSync(path.join(home, '.codex'), { recursive: true });
+      const settings = path.join(home, '.codex', 'hooks.json');
+      assert.match(fs.readFileSync(settings, 'utf8'), /feynman-session-start\.ts/);
+      const script = path.join(path.dirname(home), 'packed', 'hooks', 'feynman-session-start.js');
+      const codexHome = failure === 'home' ? '/wrong/home' : path.join(home, '.codex');
+      const command = `FEYNMAN_HOME='${codexHome}' node '${script}'`;
+      if (failure === 'stale-hook') return result(`│ hook:     ${script}\n`);
       fs.writeFileSync(
-        path.join(home, '.codex', 'hooks.json'),
+        settings,
         JSON.stringify({
           hooks: {
             SessionStart: [
               {
-                hooks: [
-                  {
-                    command: `${failure === 'home' ? '/wrong/home' : path.join(home, '.codex')} feynman-session-start.js`,
-                  },
-                ],
+                matcher: 'resume',
+                hooks: [{ type: 'command', command, timeout: 17 }],
               },
             ],
           },
         }),
       );
-      return OK;
+      return result(`│ hook:     ${failure === 'displayed-hook' ? '/wrong/hook.js' : script}\n`);
     }
     if (args[0] === 'doctor') return result(failure === 'doctor' ? 'Status: BAD' : 'Status: OK');
     if (args[0] === '--json')
@@ -343,6 +348,8 @@ describe('release smoke behavior', () => {
     ['install', /install failed/],
     ['version', /version mismatch/],
     ['doctor', /doctor smoke failed/],
+    ['displayed-hook', /displayed hook path differs/],
+    ['stale-hook', /feynman-session-start\.js command missing/],
     ['home', /missing expected FEYNMAN_HOME/],
     ['hook-command', /hook failed/],
     ['hook', /did not emit/],

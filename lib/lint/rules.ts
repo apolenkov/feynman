@@ -368,16 +368,28 @@ export function L04_column_widths(ast: ASTNode): Issue[] {
 // Connections may be directed or intentionally undirected.
 // ---------------------------------------------------------------------------
 const BARE_CONNECTION_RE = /^\s*(?:(?:<-+>|<-+|-+>{1,2})|(?:←|↔|→|─+(?:→|>))|-{2,})\s*$/;
-// Labels may be compact (`--request-->`) or spaced (`-- load > 8 -->`). The
-// boundary arrowheads carry direction; arrow tokens inside the label are invalid.
-const LABELED_CONNECTION_RE = /^\s*<?-{2,}\s*(.+?)\s*-{2,}>?\s*$/;
-const ARROW_TOKEN_RE = /<-|->|←|↔|→|─+(?:→|>)/;
+const CONNECTION_PREFIX_RE = /^<?-{2,}/;
+// Try each dash run once, including in malformed connections with many runs.
+const CONNECTION_SUFFIX_RE = /(?<!-)-{2,}>?$/;
+const INVALID_CONNECTION_LABEL_RE = /[\r\n\u2028\u2029]|<-|->|←|↔|→|─>/;
 const PARALLEL_BRANCH_COLUMN_RE = /^\s{3,}\+-{2}>\s*$/;
 
 function isCompleteConnection(value: string): boolean {
   if (BARE_CONNECTION_RE.test(value)) return true;
-  const label = LABELED_CONNECTION_RE.exec(value)?.[1]?.trim();
-  return label !== undefined && label.length > 0 && !ARROW_TOKEN_RE.test(label);
+  const connection = value.trim();
+  const prefix = CONNECTION_PREFIX_RE.exec(connection)?.[0];
+  const suffix = CONNECTION_SUFFIX_RE.exec(connection);
+  if (prefix === undefined || suffix === null) return false;
+
+  const gap = connection.slice(prefix.length, suffix.index);
+  const label = gap.trim();
+  if (label.length > 0) return !INVALID_CONNECTION_LABEL_RE.test(label);
+
+  // Preserve dash-only captures when the boundary has a spare dash. The old
+  // match preferred whitespace to a leading dash unless dot could not match it.
+  return (
+    suffix[0].startsWith('---') || (prefix.endsWith('---') && !/[^\r\n\u2028\u2029]/.test(gap))
+  );
 }
 
 export function L05_flow_integrity(ast: ASTNode): Issue[] {
@@ -618,75 +630,65 @@ export function L09_right_edge_alignment(ast: ASTNode): Issue[] {
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
   const issues: Issue[] = [];
+  const nearestCloserByColumn = new Map<number, number>();
+  const closerByOpener = new Map<number, number>();
 
-  let li = 0;
-  while (li < lines.length) {
+  // In reverse order each opener can look up its first later closer at the
+  // same visual left column. Record a row's opener before indexing its closer.
+  for (let li = lines.length - 1; li >= 0; li--) {
+    const line = lines[li] ?? '';
+    if (line.includes('┌') && line.includes('┐')) {
+      const closer = nearestCloserByColumn.get(firstVisualColumnOf(line, '┌'));
+      if (closer !== undefined) closerByOpener.set(li, closer);
+    }
+    if (line.includes('└') && line.includes('┘')) {
+      nearestCloserByColumn.set(firstVisualColumnOf(line, '└'), li);
+    }
+  }
+
+  for (let li = 0; li < lines.length; li++) {
+    const closeLi = closerByOpener.get(li);
+    if (closeLi === undefined) continue; // L01 reports unclosed frames.
     const topLine = lines[li] ?? '';
-    // A frame opens on a line that contains both ┌ and ┐
-    if (topLine.includes('┌') && topLine.includes('┐')) {
-      const anchorTopCol = firstVisualColumnOf(topLine, '┌');
-      const anchorCol = lastVisualColumnOf(topLine, '┐');
-      const topAbsLine = baseLineNum + li;
+    const anchorCol = lastVisualColumnOf(topLine, '┐');
+    const topAbsLine = baseLineNum + li;
 
-      // Find the matching close: first subsequent line where └ is at the same
-      // visual column as ┌ AND the line contains ┘.
-      let closeLi = -1;
-      for (let lj = li + 1; lj < lines.length; lj++) {
-        const candidate = lines[lj] ?? '';
-        if (!candidate.includes('└') || !candidate.includes('┘')) continue;
-        const candidateLeftCol = firstVisualColumnOf(candidate, '└');
-        if (candidateLeftCol === anchorTopCol) {
-          closeLi = lj;
-          break;
-        }
-      }
-
-      if (closeLi === -1) {
-        // Frame never closes — skip silently (L01 already flags this).
-        li++;
-        continue;
-      }
-
-      // Inner rows: strictly between top and close
-      for (let lj = li + 1; lj < closeLi; lj++) {
-        const innerLine = lines[lj] ?? '';
-        if (!innerLine.includes('│')) continue; // skip decorative gap lines
-        const actualCol = lastVisualColumnOf(innerLine, '│');
-        if (actualCol !== anchorCol) {
-          issues.push(
-            issue(
-              'L09',
-              'error',
-              baseLineNum + lj,
-              anchorCol,
-              `Frame inner row '│' at col ${actualCol} does not align with top '┐' at col ${anchorCol} (line ${topAbsLine})`,
-              `Pad or trim the row so the closing │/┘ lands at column ${anchorCol}`,
-            ),
-          );
-        }
-      }
-
-      // Bottom corner: ┘ column must match anchorCol
-      const closeLine = lines[closeLi] ?? '';
-      const actualBotCol = lastVisualColumnOf(closeLine, '┘');
-      if (actualBotCol !== anchorCol) {
+    // Inner rows: strictly between top and close
+    for (let lj = li + 1; lj < closeLi; lj++) {
+      const innerLine = lines[lj] ?? '';
+      if (!innerLine.includes('│')) continue; // skip decorative gap lines
+      const actualCol = lastVisualColumnOf(innerLine, '│');
+      if (actualCol !== anchorCol) {
         issues.push(
           issue(
             'L09',
             'error',
-            baseLineNum + closeLi,
+            baseLineNum + lj,
             anchorCol,
-            `Frame bottom '┘' at col ${actualBotCol} does not align with top '┐' at col ${anchorCol} (line ${topAbsLine})`,
+            `Frame inner row '│' at col ${actualCol} does not align with top '┐' at col ${anchorCol} (line ${topAbsLine})`,
             `Pad or trim the row so the closing │/┘ lands at column ${anchorCol}`,
           ),
         );
       }
-
-      // Advance past the closed frame so we can detect a stacked sibling frame next.
-      li = closeLi + 1;
-      continue;
     }
-    li++;
+
+    const closeLine = lines[closeLi] ?? '';
+    const actualBotCol = lastVisualColumnOf(closeLine, '┘');
+    if (actualBotCol !== anchorCol) {
+      issues.push(
+        issue(
+          'L09',
+          'error',
+          baseLineNum + closeLi,
+          anchorCol,
+          `Frame bottom '┘' at col ${actualBotCol} does not align with top '┐' at col ${anchorCol} (line ${topAbsLine})`,
+          `Pad or trim the row so the closing │/┘ lands at column ${anchorCol}`,
+        ),
+      );
+    }
+
+    // Advance past the closed frame so we can detect a stacked sibling frame next.
+    li = closeLi;
   }
 
   return issues;
@@ -748,10 +750,9 @@ export function L11_overdecoration(ast: ASTNode): Issue[] {
   const baseLineNum = ast.startLine;
 
   return Array.from(iterateFrames(lines)).flatMap((frame) => {
+    if (frame.closeLi === -1) return [];
     const { topLi, closeLi, indent, inner } = frame;
     const top = lines[topLi] ?? '';
-
-    if (closeLi === -1) return [];
 
     const innerCount = inner.length;
     if (innerCount < 1 || innerCount > 5) return [];
@@ -865,10 +866,9 @@ export function L12_token_budget(ast: ASTNode): Issue[] {
   const baseLineNum = ast.startLine;
 
   return Array.from(iterateFrames(lines)).flatMap((frame) => {
+    if (frame.closeLi === -1) return [];
     const { topLi, closeLi, indent, inner } = frame;
     const top = lines[topLi] ?? '';
-
-    if (closeLi === -1) return [];
 
     // Whitelist: tree composition inside frame (consistent with L11)
     if (inner.some((line) => /[├└]──/.test(line))) return [];

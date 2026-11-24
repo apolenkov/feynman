@@ -329,10 +329,10 @@ export function runEvaluation(options: Readonly<EvaluationOptions>): void {
           .filter((event) => event['type'] === 'item.completed')
           .map((event) => event['item'])
           .filter(record);
-        const answer = messages
+        const texts = messages
           .filter((item) => item['type'] === 'agent_message')
-          .map((item) => String(item['text']))
-          .join('\n');
+          .map((item) => item['text']);
+        const answer = texts.every((text) => typeof text === 'string') ? texts.join('\n') : '';
         const completion = events
           .filter(record)
           .find((event) => event['type'] === 'turn.completed');
@@ -340,7 +340,7 @@ export function runEvaluation(options: Readonly<EvaluationOptions>): void {
           (item) => !['agent_message', 'reasoning'].includes(String(item['type'])),
         );
         const success =
-          result.status === 0 && completion !== undefined && answer.length > 0 && !usedTools;
+          result.status === 0 && completion !== undefined && answer.trim().length > 0 && !usedTools;
         const summary = {
           id,
           taskId: task.id,

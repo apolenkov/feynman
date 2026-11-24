@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it, type TestContext } from 'node:test';
 import { arrayField, record, stringField } from '../scripts/factory-protocol.ts';
 import type { LlmReply } from './helpers/fake-llm.ts';
 import { buildScanDraft, fingerprintFinding } from '../scripts/factory-scan-record.ts';
@@ -15,6 +15,7 @@ import {
   claimOf,
   criteriaReply,
   kindOf,
+  makeRepo,
   readRecord,
   run,
   scenario,
@@ -22,6 +23,7 @@ import {
   tmp,
   verdictReply,
   writePolicy,
+  writeKnown,
 } from './helpers/night-model-scenario.ts';
 
 const LOCK = path.join(import.meta.dirname, '..', 'tools', 'ocr', 'package-lock.json');
@@ -639,7 +641,7 @@ describe('factory-model run: verification and acceptance', () => {
 
 describe('factory-model run: shared deadline', () => {
   const direct = (
-    s: Awaited<ReturnType<typeof scenario>>,
+    s: Pick<Awaited<ReturnType<typeof scenario>>, 'dir' | 'out' | 'stub'>,
     clock: () => number,
     deadlineSeconds = 100,
   ): Promise<void> =>
@@ -649,12 +651,142 @@ describe('factory-model run: shared deadline', () => {
       knownFile: path.join(s.dir, 'known.json'),
       outDir: s.out,
       policy: loadNightPolicy(path.join(s.dir, 'policy.json')),
-      env: { PATH: process.env['PATH'] ?? '', RUNNER_TEMP: s.dir, OCR_LLM_AUTH_TOKEN: PRIMARY },
+      env: {
+        PATH: process.env['PATH'] ?? '',
+        RUNNER_TEMP: s.dir,
+        OCR_LLM_AUTH_TOKEN: PRIMARY,
+        OPENCODE_GO_API_KEY: FALLBACK,
+      },
       deadlineSeconds,
       clock,
     });
   const scanned = (s: Awaited<ReturnType<typeof scenario>>): boolean =>
     s.stub.invocations().some((call) => call.argv.includes('--max-tokens-budget'));
+  const probeFixture = (t: TestContext, reply: () => Response | Promise<Response>) => {
+    const dir = tmp(t);
+    makeRepo(dir);
+    writeKnown(dir);
+    writePolicy(dir, 'https://fixture.example/v1');
+    const provider = t.mock.method(
+      globalThis,
+      'fetch',
+      async (_input: string | URL | Request, _init?: RequestInit) => await reply(),
+    );
+    return { dir, out: path.join(dir, 'out'), stub: stubOcr(dir, 'nofiles'), provider };
+  };
+
+  it('skips the primary probe and OCR when setup spends the deadline', async (t) => {
+    const s = probeFixture(t, () => Response.json({}));
+    let clockReads = 0;
+    await assert.rejects(
+      direct(s, () => (clockReads++ === 0 ? 0 : 100_000)),
+      /Deadline spent/,
+    );
+    assert.equal(s.provider.mock.callCount(), 0);
+    assert.deepEqual(
+      s.stub.invocations().map((call) => call.argv),
+      [['--version']],
+    );
+    assert.equal(fs.existsSync(s.out), false);
+  });
+
+  it('uses whole milliseconds for a fractional deadline and stops with less than a millisecond left', async (t) => {
+    let time = 1_700_000_000_000;
+    const s = probeFixture(t, () => {
+      time += 10;
+      return Response.json({}, { status: 401 });
+    });
+    const timeout = t.mock.method(AbortSignal, 'timeout');
+    await assert.rejects(
+      direct(s, () => time, 0.010999999),
+      /Deadline spent/,
+    );
+    assert.equal(s.provider.mock.callCount(), 1);
+    assert.deepEqual(
+      timeout.mock.calls.map((call) => call.arguments),
+      [[10]],
+    );
+    assert.deepEqual(
+      s.stub.invocations().map((call) => call.argv),
+      [['--version']],
+    );
+    assert.equal(fs.existsSync(s.out), false);
+  });
+
+  it('caps a delayed primary probe to its remaining time before refusing to start OCR', async (t) => {
+    let time = 99_900;
+    const s = probeFixture(t, async () => {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      time = 100_000;
+      return Response.json({});
+    });
+    const timeout = t.mock.method(AbortSignal, 'timeout');
+    let clockReads = 0;
+    await assert.rejects(
+      direct(s, () => (clockReads++ === 0 ? 0 : time)),
+      /Deadline spent/,
+    );
+    assert.deepEqual(
+      timeout.mock.calls.map((call) => call.arguments),
+      [[100]],
+    );
+    assert.equal(s.provider.mock.callCount(), 1);
+    assert.deepEqual(
+      s.stub.invocations().map((call) => call.argv),
+      [['--version']],
+    );
+    assert.equal(fs.existsSync(s.out), false);
+  });
+
+  it('does not try the fallback when the primary returns 401 at the deadline', async (t) => {
+    let time = 0;
+    const s = probeFixture(t, () => {
+      time = 100_000;
+      return Response.json({}, { status: 401 });
+    });
+    const timeout = t.mock.method(AbortSignal, 'timeout');
+    await assert.rejects(
+      direct(s, () => time),
+      /Deadline spent/,
+    );
+    assert.deepEqual(
+      timeout.mock.calls.map((call) => call.arguments),
+      [[60_000]],
+    );
+    assert.equal(s.provider.mock.callCount(), 1);
+    assert.equal(
+      new Headers(s.provider.mock.calls[0]?.arguments[1]?.headers).get('authorization'),
+      `Bearer ${PRIMARY}`,
+    );
+    assert.deepEqual(
+      s.stub.invocations().map((call) => call.argv),
+      [['--version']],
+    );
+    assert.equal(fs.existsSync(s.out), false);
+  });
+
+  it('uses the remaining budget on an eligible fallback after a primary 401', async (t) => {
+    let time = 0;
+    const s = probeFixture(t, () => {
+      if (time > 0) return Response.json({});
+      time = 80_000;
+      return Response.json({}, { status: 401 });
+    });
+    const timeout = t.mock.method(AbortSignal, 'timeout');
+    await direct(s, () => time);
+    assert.deepEqual(
+      timeout.mock.calls.map((call) => call.arguments),
+      [[60_000], [20_000]],
+    );
+    assert.deepEqual(
+      s.provider.mock.calls.map((call) =>
+        new Headers(call.arguments[1]?.headers).get('authorization'),
+      ),
+      [`Bearer ${PRIMARY}`, `Bearer ${FALLBACK}`],
+    );
+    assert.equal(bundle(s.out, 'scan-raw.json')['auth_fallback_used'], true);
+    assert.equal(bundle(s.out, 'scan-raw.json')['probe_status'], 200);
+  });
 
   it(
     'an ocr that hangs is killed at its share of the deadline and leaves an incomplete record',

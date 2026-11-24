@@ -270,6 +270,15 @@ function prepareRelease(
   }
 }
 
+function commitRelease(environment: BumpEnvironment, message: string): string {
+  environment.log('committing…');
+  git(environment, ['add', ...RELEASE_FILES]);
+  git(environment, ['commit', '-m', message]);
+  const sha = git(environment, ['rev-parse', '--short', 'HEAD']);
+  environment.log(`  ${sha} ${message}`);
+  return sha;
+}
+
 export function executeBump(options: BumpOptions, environment: BumpEnvironment): void {
   preflight(options, environment);
   const snapshots = options.dryRun ? null : snapshotReleaseFiles(environment);
@@ -295,14 +304,8 @@ export function executeBump(options: BumpOptions, environment: BumpEnvironment):
   const plans = planReleaseWrites(snapshots, target);
   prepareRelease(plans, snapshots, environment);
 
-  if (options.commit) {
-    environment.log('committing…');
-    git(environment, ['add', ...RELEASE_FILES]);
-    const commitMessage = `chore(release): v${target}`;
-    git(environment, ['commit', '-m', commitMessage]);
-    const sha = git(environment, ['rev-parse', '--short', 'HEAD']);
-    environment.log(`  ${sha} ${commitMessage}`);
-  }
+  const commitMessage = `chore(release): v${target}`;
+  const releaseCommit = options.commit ? commitRelease(environment, commitMessage) : null;
   if (options.tag) {
     environment.log('tagging…');
     git(environment, ['tag', '-a', `v${target}`, '-m', `v${target}`]);
@@ -314,12 +317,22 @@ export function executeBump(options: BumpOptions, environment: BumpEnvironment):
   }
 
   environment.log('\ndone. next:');
-  if (!options.commit) {
-    environment.log('  review and commit the updated release files (or rerun with --commit)');
-  } else if (!options.tag) {
-    environment.log(`  create tag v${target} explicitly (or rerun with --tag --push)`);
-  } else if (!options.push) {
-    environment.log(`  push main and v${target} explicitly (or rerun with --push)`);
+  if (releaseCommit === null) {
+    environment.log(`  review the prepared v${target} release files, then run:`);
+    environment.log(`  git add ${RELEASE_FILES.join(' ')}`);
+    environment.log(`  git commit -m "${commitMessage}"`);
+  }
+  if (!options.tag) {
+    environment.log(
+      releaseCommit === null
+        ? `  once the v${target} release commit is at the tip of main, tag it:`
+        : `  once the v${target} release commit is on main, tag it explicitly:`,
+    );
+    environment.log(`  git tag -a v${target} -m v${target} ${releaseCommit ?? 'main'}`);
+  }
+  if (!options.push) {
+    environment.log('  git push origin main');
+    environment.log(`  git push origin v${target}`);
   }
   environment.log(
     '  publish only through the reviewed release workflow or an explicitly authorized npm command',

@@ -6,6 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
+import { extractHookScriptPath } from '../bin/adapters/codex-config.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 interface CommandResult {
@@ -209,12 +211,31 @@ function runHookCommand(
   return stdout;
 }
 
-function verifyInstalledHooks(runner: ReleaseCommandRunner, root: string, homeDir: string): void {
-  const cfg = readJson(runtimeConfigPath(homeDir));
+function smokeHookConfig(command: string) {
+  return {
+    hooks: {
+      SessionStart: [{ matcher: 'resume', hooks: [{ type: 'command', command, timeout: 17 }] }],
+    },
+  };
+}
 
+function verifyInstalledHooks(
+  runner: ReleaseCommandRunner,
+  root: string,
+  homeDir: string,
+  installOutput: string,
+): void {
+  const cfg = readJson(runtimeConfigPath(homeDir));
   const sessionCommand = findHookCommand(cfg, 'SessionStart', 'feynman-session-start.js');
+  const registered = extractHookScriptPath(sessionCommand, 'feynman-session-start.js');
+  if (registered === null || !installOutput.split('\n').includes(`│ hook:     ${registered}`)) {
+    throw new Error('Codex displayed hook path differs from the registered JavaScript path');
+  }
+  if (!isDeepStrictEqual(cfg, smokeHookConfig(sessionCommand))) {
+    throw new Error('Codex stale-hook repair changed settings outside the hook command');
+  }
   const expectedHome = path.join(homeDir, '.codex');
-  if (!sessionCommand.includes(expectedHome)) {
+  if (!sessionCommand.startsWith(`FEYNMAN_HOME='${expectedHome.replaceAll("'", "'\\''")}' `)) {
     throw new Error('Codex SessionStart command missing expected FEYNMAN_HOME');
   }
 
@@ -387,14 +408,20 @@ export function releaseSmoke(options: Readonly<ReleaseSmokeOptions> = {}): void 
       throw new Error(`version mismatch: expected ${pkg.version}, got ${version}`);
     }
 
-    run(runner, root, npmCache, feynman, ['install', '--force'], { env: { HOME: homeDir } });
+    const settings = runtimeConfigPath(homeDir);
+    fs.mkdirSync(path.dirname(settings));
+    fs.writeFileSync(
+      settings,
+      JSON.stringify(smokeHookConfig('node /stale/feynman-session-start.ts')),
+    );
+    const installed = run(runner, root, npmCache, feynman, ['install'], { env: { HOME: homeDir } });
 
     const codexDoctor = run(runner, root, npmCache, feynman, ['doctor'], {
       env: { HOME: homeDir },
     });
     if (!codexDoctor.includes('Status: OK'))
       throw new Error('Codex doctor smoke failed for packed install');
-    verifyInstalledHooks(runner, root, homeDir);
+    verifyInstalledHooks(runner, root, homeDir, installed);
 
     const lintOut = run(runner, root, npmCache, lint, [
       '--json',
