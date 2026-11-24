@@ -82,8 +82,8 @@ function rawScan(overrides: JsonRecord = {}, comments: JsonRecord[] = []): JsonR
     schema: 'factory-night-scan-raw/v1',
     source_sha: SHA,
     tool: {
-      version: '1.13.12',
-      git_head: 'f921d6a',
+      version: '1.14.0',
+      git_head: 'd29ca20',
       lock_integrity: 'sha512-x',
       binary_version: 'v',
     },

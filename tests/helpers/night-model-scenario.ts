@@ -113,7 +113,7 @@ export function stubOcr(
       exit_code: fixture['exit_code'],
       hang: options.hang === true,
       stderr: options.stderr ?? '',
-      version: options.version ?? 'open-code-review v1.13.12 (f921d6a) test/stub',
+      version: options.version ?? 'open-code-review v1.14.0 (d29ca204) test/stub',
     }),
   );
   const bin = path.join(dir, 'ocr-stub');

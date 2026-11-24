@@ -1974,7 +1974,7 @@ function nightDraft(
       token_usage: 100,
       truncated: false,
       successful: true,
-      tool_revision: 'open-code-review@1.13.12+test',
+      tool_revision: 'open-code-review@1.14.0+test',
       config_revision: 'c'.repeat(64),
       findings,
       deferred_findings: [],
