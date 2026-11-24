@@ -41,14 +41,6 @@ jobs:
           echo "$GITHUB_WORKSPACE/tools/codex/node_modules/.bin" >> "$GITHUB_PATH"
           tools/codex/node_modules/.bin/codex --version
 
-      - name: Ensure native archive tools
-        if: runner.os == 'Linux'
-        run: |
-          if ! command -v bsdtar >/dev/null; then
-            sudo apt-get update
-            sudo apt-get install --yes libarchive-tools
-          fi
-
       - name: Run the complete local gate
         run: npm run ci
 

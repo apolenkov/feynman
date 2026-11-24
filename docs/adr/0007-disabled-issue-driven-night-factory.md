@@ -1,6 +1,6 @@
 # ADR0007: Repository-only issue-driven factory with activation disabled
 
-Status: Removed on 2026-11-25 by owner decision (TASK-922). See the [archived change](../../openspec/changes/archive/2026-11-25-issue-driven-night-factory/proposal.md).
+Status: Removed on 2026-11-25 by owner decision (TASK-922). See the archived change at `openspec/changes/archive/2026-11-25-issue-driven-night-factory/`.
 
 ## Context
 
@@ -22,4 +22,4 @@ Night-scan rollout (PR-B): the daily `night-review.yml` only dispatches the cont
 
 Residual risk of the bot actor: `parent_run_id` is a correlation, not an authentication. The producer bounds it by freshness (the parent started before and was last updated no earlier than the producer run, and the run started within `night_scan.parent_window_minutes` of it, which `check-factory-workflows` ties to the `night-review.yml` job timeout plus five minutes) and by single use (the parent is part of the receipt request key, and a later run finds the earlier run's receipt and refuses). Neither check proves who dispatched the run. The trust boundary of `approved-publisher` is therefore push access to the repository: anyone who can run a workflow with `actions: write` on `main` can sign a scan, verifier or publication receipt inside that window. Narrowing it further needs protocol v2.
 
-See [the change](../../openspec/changes/issue-driven-night-factory/design.md), [requirements](../../openspec/changes/issue-driven-night-factory/specs/night-factory/spec.md) and [exact protocol import](../../openspec/changes/issue-driven-night-factory/factory-protocol-v1.md).
+See [the change](../../openspec/changes/archive/2026-11-25-issue-driven-night-factory/design.md), [requirements](../../openspec/changes/archive/2026-11-25-issue-driven-night-factory/specs/night-factory/spec.md) and [exact protocol import](../../openspec/changes/archive/2026-11-25-issue-driven-night-factory/factory-protocol-v1.md).

@@ -439,6 +439,38 @@
       "count": 1,
       "reason": "Outer CLI boundary reports failure after the isolated published-consumer cleanup finishes.",
       "test": "tests/packaging-behavior.test.ts"
+    },
+    {
+      "file": "scripts/check-workflows.ts",
+      "owner": "downloadActionlint",
+      "mutationHash": "b224a4475944e85995e70ec9a04ab71fdbfe56418dc2dc16bbcde4a59b86763a",
+      "count": 8,
+      "reason": "The download buffer, response and attempt counter handle up to three tries before the archive checksum is checked. Only a verified archive can populate the private tool directory.",
+      "test": "tests/check-workflows.test.ts"
+    },
+    {
+      "file": "scripts/check-workflows.ts",
+      "owner": "workflowMain",
+      "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
+      "count": 1,
+      "reason": "The CLI sets the process exit code when workflow validation or the pinned binary download fails.",
+      "test": "tests/check-workflows.test.ts"
+    },
+    {
+      "file": "scripts/check-workflows.ts",
+      "owner": "actionlintBinary",
+      "mutationHash": "5a8ab74193021216a545c771c2ff29a7ee25f21ee257998c9916ebd00e7f9d8f",
+      "count": 2,
+      "reason": "One process-owned promise shares the verified download across workflows. A failed download clears the promise so another call can retry.",
+      "test": "tests/check-workflows.test.ts"
+    },
+    {
+      "file": "scripts/check-workflows.ts",
+      "owner": "disposeActionlint",
+      "mutationHash": "80f3d5afd83b0e21888ef40fbeee08ab7616ddef1ea75ab8d0c16bc680f46127",
+      "count": 2,
+      "reason": "The checker clears its cached download and removes its private tool directory after validation or at process exit.",
+      "test": "tests/check-workflows.test.ts"
     }
   ]
 }
