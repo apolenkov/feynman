@@ -6,6 +6,7 @@ import path from 'node:path';
 import { it } from 'node:test';
 import {
   checkWorkflows,
+  disposeActionlint,
   validateNativeWorkflow,
   validateWorkflowSchema,
 } from '../scripts/check-workflows.ts';
@@ -29,6 +30,7 @@ it('checks the official schema for every repository workflow', async () => {
     .readdirSync(directory, { withFileTypes: true })
     .filter((entry) => entry.isFile() && ['.yml', '.yaml'].includes(path.extname(entry.name)))
     .map((entry) => entry.name);
+  assert.ok(workflows.length > 0, 'Expected at least one .yml or .yaml workflow file');
   assert.deepEqual(checked, new Set(workflows));
 });
 
@@ -57,30 +59,21 @@ for (const [description, before, after, diagnostic] of [
   });
 }
 
-it('accepts the queue diagnostic and rejects an unknown runner label', async (t) => {
-  const version = spawnSync('actionlint', ['-version'], { encoding: 'utf8' });
-  if (version.error && 'code' in version.error && version.error.code === 'ENOENT') {
-    t.skip('Offline test requires actionlint 1.7.12 on PATH');
-    return;
-  }
-  assert.ifError(version.error);
-  assert.equal(version.status, 0, version.stderr);
-  const [installed = 'unknown'] = version.stdout.trim().split('\n');
-  if (installed !== '1.7.12') {
-    t.skip(`Offline test requires actionlint 1.7.12 on PATH (found ${installed})`);
-    return;
-  }
-
+it('accepts the queue diagnostic and rejects unknown runner labels even when they contain queue', async (t) => {
+  t.after(disposeActionlint);
   const name = 'queued.yml';
   const queued = workflow.replace('jobs:', 'concurrency:\n  group: test\n  queue: max\njobs:');
-  await validateNativeWorkflow(queued, name, 'actionlint');
+  await validateNativeWorkflow(queued, name);
 
-  const unknownRunner = queued.replace('ubuntu-latest', 'feynman-unknown-runner');
-  validateWorkflowSchema(unknownRunner, name);
-  await assert.rejects(
-    validateNativeWorkflow(unknownRunner, name, 'actionlint'),
-    /label "feynman-unknown-runner" is unknown\..*\[runner-label\]/,
-  );
+  for (const [label, diagnostic] of [
+    ['feynman-unknown-runner', /label "feynman-unknown-runner" is unknown\..*\[runner-label\]/],
+    ['feynman-queue-runner', /label "feynman-queue-runner" is unknown\..*\[runner-label\]/],
+  ] as const) {
+    await assert.rejects(
+      validateNativeWorkflow(queued.replace('ubuntu-latest', label), name),
+      diagnostic,
+    );
+  }
 });
 
 it('exits unsuccessfully when the downloaded actionlint archive fails its checksum', () => {
