@@ -85,6 +85,7 @@
     "jiti": "2.7.0",
     "lefthook": "2.2.2",
     "prettier": "3.10.1",
+    "scslre": "0.3.0",
     "typescript": "^6.0.3"
   }
 }

@@ -5,46 +5,12 @@ import { autofix } from '../lib/lint/autofix.ts';
 import { iterateFrames, nextFrame } from '../lib/lint/frames.ts';
 import { lint } from '../lib/lint/index.ts';
 import { parse } from '../lib/lint/parser.ts';
+import { assertBoundedWork } from './helpers/scan-work.ts';
 
 const properties = { seed: 20261124, numRuns: 200 };
 const fenced = (content: string): string => `\`\`\`\n${content}\n\`\`\``;
 const locations = (input: string, rules: readonly string[]) =>
   lint(input, { rules }).issues.map(({ rule, line, column }) => [rule, line, column]);
-
-function assertBoundedWork(
-  smallest: number,
-  makeInput: (size: number) => string,
-  run: (input: string) => unknown,
-): void {
-  const sizes = [smallest, smallest * 2, smallest * 4];
-  const inputs = sizes.map(makeInput);
-  const first = inputs[0];
-  assert.ok(first !== undefined);
-  const measure = (input: string, batches: number): number => {
-    const start = process.cpuUsage();
-    for (let batch = 0; batch < batches; batch++) run(input);
-    const { user, system } = process.cpuUsage(start);
-    return user + system;
-  };
-
-  // Calibrate once to stay above timer noise, then use the same batch at every size.
-  for (const input of inputs) measure(input, 1);
-  let batches = 1;
-  while (measure(first, batches) < 15_000) batches *= 2;
-  for (const input of inputs) measure(input, batches);
-  const medians = inputs.map((input) => {
-    const samples = Array.from({ length: 7 }, () => measure(input, batches));
-    samples.sort((a, b) => a - b);
-    const median = samples[3];
-    assert.ok(median !== undefined);
-    return median;
-  });
-  for (const [index, median] of medians.entries()) {
-    const previous = medians[index - 1];
-    if (previous === undefined) continue;
-    assert.ok(median / previous <= 2.8, `${sizes.join('/')}: CPU medians ${medians.join('/')} µs`);
-  }
-}
 
 describe('F25 labeled connections', () => {
   it('preserves the accepted labels and L05 source locations', () => {
@@ -79,12 +45,17 @@ describe('F25 labeled connections', () => {
     return `--${'─'.repeat(size - 5)}-->`;
   }
 
-  for (const shape of ['valid', 'bad suffix', 'stroke label'] as const) {
+  for (const [shape, repeated] of [
+    ['valid', ['x']],
+    ['bad suffix', ['-', ' ']],
+    ['stroke label', ['─']],
+  ] as const) {
     it(`bounds lint work for ${shape} connectors`, () => {
       assertBoundedWork(
-        shape === 'stroke label' ? 1024 : 64,
+        1024,
         (n) => fenced(`[A] ${connector(n, shape)} [B]`),
         (input) => lint(input, { rules: ['L05'] }),
+        repeated,
       );
     });
   }
@@ -262,7 +233,7 @@ describe('landed L05 and L07 bracket scanning', () => {
     it(`retains bounded lint work for ${name}`, () => {
       const run = (text: string) => locations(text, ['L05', 'L07']);
       assert.deepEqual(run(input(64)), expected);
-      assertBoundedWork(2048, input, run);
+      assertBoundedWork(2048, input, run, ['[', 'x']);
     });
   }
 });
