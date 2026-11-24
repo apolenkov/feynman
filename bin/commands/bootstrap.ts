@@ -330,15 +330,27 @@ function printBootstrapResult(out: string, counts: ReturnType<typeof writeBootst
 function ownsBootstrapDirectory(directory: string, out: string): boolean {
   try {
     const markerPath = path.join(directory, OWNERSHIP_MARKER);
-    if (!fs.lstatSync(markerPath).isFile()) return false;
-    const marker: unknown = JSON.parse(fs.readFileSync(markerPath, 'utf8'));
-    return (
-      typeof marker === 'object' &&
-      marker !== null &&
-      'outputDir' in marker &&
-      typeof marker.outputDir === 'string' &&
-      path.resolve(marker.outputDir) === out
-    );
+    const { O_RDONLY, O_NOFOLLOW, O_NONBLOCK } = fs.constants;
+    const fd = fs.openSync(markerPath, O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
+    try {
+      const info = fs.fstatSync(fd, { bigint: true });
+      if (!info.isFile()) return false;
+      // Where O_NOFOLLOW is unavailable, verify that the entry names the open file.
+      if (!O_NOFOLLOW) {
+        const entry = fs.lstatSync(markerPath, { bigint: true });
+        if (!entry.isFile() || entry.dev !== info.dev || entry.ino !== info.ino) return false;
+      }
+      const marker: unknown = JSON.parse(fs.readFileSync(fd, 'utf8'));
+      return (
+        typeof marker === 'object' &&
+        marker !== null &&
+        'outputDir' in marker &&
+        typeof marker.outputDir === 'string' &&
+        path.resolve(marker.outputDir) === out
+      );
+    } finally {
+      fs.closeSync(fd);
+    }
   } catch {
     return false;
   }

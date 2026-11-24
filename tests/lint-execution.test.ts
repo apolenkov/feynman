@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { buffer } from 'node:stream/consumers';
 import { describe, it } from 'node:test';
 
 import { lint } from '../lib/lint/index.ts';
@@ -105,32 +106,32 @@ describe('feynman-lint output streams', () => {
       error: '',
     },
   ]) {
-    it(`drains complete ${name} output through a pipe`, (test) => {
+    it(`drains complete ${name} output through a pipe`, async (test) => {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-lint-streams-'));
       test.after(() => {
         fs.rmSync(dir, { recursive: true, force: true });
       });
-      const stdoutPath = path.join(dir, 'stdout');
-      const stderrPath = path.join(dir, 'stderr');
-      const stdout = fs.openSync(stdoutPath, 'w');
-      const stderr = fs.openSync(stderrPath, 'w');
+      const stdout = await fs.promises.open(path.join(dir, 'stdout'), 'wx+');
+      let stderr: fs.promises.FileHandle | undefined;
       const args = [cli, ...flags, '-'];
+      let expected: Buffer;
       try {
+        stderr = await fs.promises.open(path.join(dir, 'stderr'), 'wx+');
         const redirected = spawnSync(process.execPath, args, {
           input,
-          stdio: ['pipe', stdout, stderr],
+          stdio: ['pipe', stdout.fd, stderr.fd],
         });
         assert.ifError(redirected.error);
         assert.equal(redirected.status, status);
-      } finally {
-        fs.closeSync(stdout);
-        fs.closeSync(stderr);
-      }
 
-      const expected = fs.readFileSync(stdoutPath);
-      assert.ok(expected.length > 256 * 1024, 'output must exceed the pipe buffer');
-      assert.match(expected.toString('utf8'), outputStart);
-      assert.equal(fs.readFileSync(stderrPath, 'utf8'), error);
+        expected = await buffer(stdout.createReadStream({ start: 0, autoClose: false }));
+        assert.ok(expected.length > 256 * 1024, 'output must exceed the pipe buffer');
+        assert.match(expected.toString('utf8'), outputStart);
+        const errors = await buffer(stderr.createReadStream({ start: 0, autoClose: false }));
+        assert.equal(errors.toString('utf8'), error);
+      } finally {
+        await Promise.all([stdout.close(), stderr?.close()]);
+      }
 
       const piped = spawnSync(process.execPath, args, { input, maxBuffer: 8 * 1024 * 1024 });
       assert.ifError(piped.error);
