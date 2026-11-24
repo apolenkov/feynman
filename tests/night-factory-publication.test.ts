@@ -1264,6 +1264,194 @@ async function publicationFindingFixture(test: TestContext) {
   return { ...fixture, finding, fingerprint, scan: { ...document, authority: scan } };
 }
 
+async function registrationFromPublication(
+  fixture: Awaited<ReturnType<typeof publicationFindingFixture>>,
+  published: JsonRecord,
+) {
+  const { platform } = fixture;
+  const checkpoint = await runController(fixture.bootstrapContext, { command: 'checkpoint' });
+  assert.equal(checkpoint.status, 'accepted', checkpoint.reason);
+  platform.upload(
+    record(checkpoint.record),
+    'checkpoint',
+    stringField(fixture.genesisReceipt, 'transition_id'),
+    'checkpoint',
+  );
+  assert.equal(published['repair_state'], 'eligible');
+  const publication = record(published['registration']);
+  const context = platform.context(fixture.activation, '9590');
+  const request = {
+    command: 'register',
+    publication_authority: platform.upload(
+      publication,
+      'receipt',
+      stringField(publication, 'transition_id'),
+      'publication',
+    ),
+  };
+  return { context, request };
+}
+
+async function assertRegisteredOnce(
+  fixture: Awaited<ReturnType<typeof publicationFindingFixture>>,
+  published: JsonRecord,
+  registration: Awaited<ReturnType<typeof registrationFromPublication>>,
+): Promise<void> {
+  const { platform } = fixture;
+  const { context, request } = registration;
+  const register = await runController(context, request);
+  assert.equal(register.status, 'accepted', register.reason);
+  const receipt = record(register.record);
+  const append = await runController(context, {
+    command: 'append',
+    envelope: platform.upload(
+      receipt,
+      'receipt',
+      stringField(receipt, 'transition_id'),
+      'register',
+    ),
+  });
+  assert.equal(append.status, 'accepted', append.reason);
+  const head = stringField(record(append.record), 'state_head');
+  const lineageId = stringField(record(published['registration']), 'lineage_id');
+  assert.equal(
+    platform.git(['ls-tree', '-r', '--name-only', head, 'lineages/']),
+    `lineages/${lineageId}.json`,
+  );
+  const lineage: unknown = JSON.parse(platform.git(['show', `${head}:lineages/${lineageId}.json`]));
+  assert.partialDeepStrictEqual(lineage, {
+    identity: { issue_node_id: published['issue_node_id'], fingerprint: fixture.fingerprint },
+  });
+}
+
+for (const form of ['publisher', 'legacy'] as const) {
+  it(`registers and appends exactly one lineage from a ${form} finding marker`, async (test) => {
+    const fixture = await publicationFindingFixture(test);
+    const { platform } = fixture;
+    const result = await reconcilePublication(fixture.context, fixture.scan);
+    assert.equal(result.status, 'accepted', result.reason);
+    assert.equal(platform.issues.length, 1);
+    const published = record(result.issues[0]);
+    const issue = record(platform.issues[0]);
+    const route = `/repos/apolenkov/feynman/issues/${numberField(issue, 'number')}`;
+    assert.match(stringField(issue, 'body'), /"origin":\{/);
+    const identity = {
+      repository_id: '1230959148',
+      fingerprint_policy_revision: 'reviewed-v1',
+      fingerprint: fixture.fingerprint,
+    };
+    const legacy = `<!-- factory-finding-v1 ${JSON.stringify(identity)} -->`;
+    const body = form === 'legacy' ? legacy : stringField(issue, 'body');
+    const replaceIssue = (changes: JsonRecord): void => {
+      const updated = { ...issue, body, ...changes };
+      platform.issues[0] = updated;
+      platform.facts.set(route, updated);
+    };
+    replaceIssue({});
+    const registration = await registrationFromPublication(fixture, published);
+    const assertDenied = async (reason: RegExp): Promise<void> => {
+      const head = platform.git(['rev-parse', 'refs/heads/factory-state']);
+      const denied = await runController(registration.context, registration.request);
+      assert.equal(denied.status, 'denied', denied.reason);
+      assert.match(denied.reason, reason);
+      assert.equal(platform.git(['rev-parse', 'refs/heads/factory-state']), head);
+    };
+    if (form === 'publisher') {
+      replaceIssue({ body: body.replace(fixture.fingerprint, 'f'.repeat(64)) });
+      await assertDenied(/ambiguous finding issue/);
+      replaceIssue({ body: '<!-- factory-finding-v1 broken -->' });
+      await assertDenied(/Invalid canonical finding marker/);
+      replaceIssue({ user: { id: 999 } });
+      await assertDenied(/post-cutoff canonical issue/);
+      replaceIssue({});
+      platform.issues.push({ ...issue, number: 99, node_id: 'I_DUPLICATE', body: legacy });
+      await assertDenied(/ambiguous finding issue/);
+      platform.issues.pop();
+      platform.issues.push({
+        ...issue,
+        number: 99,
+        node_id: 'I_DUPLICATE',
+        body: `${legacy}\n<!-- factory-finding-v1 broken -->`,
+      });
+      await assertDenied(/Invalid canonical finding marker/);
+      platform.issues.pop();
+      platform.issues.push(
+        { ...issue, number: 99, node_id: 'I_FOREIGN', user: { id: 999 }, body: legacy },
+        {
+          ...issue,
+          number: 100,
+          node_id: 'I_FOREIGN_BAD',
+          user: { id: 999 },
+          body: '<!-- factory-finding-v1 broken -->',
+        },
+        {
+          ...issue,
+          number: 101,
+          node_id: 'I_UNRELATED_BAD',
+          body: '<!-- factory-finding-v1 broken -->',
+        },
+      );
+    }
+    await assertRegisteredOnce(fixture, published, registration);
+  });
+}
+
+it('bootstraps legacy inline and publisher-origin markers into quarantine', async (test) => {
+  const platform = new FactoryPlatform(test);
+  const identity = { repository_id: '1230959148', fingerprint_policy_revision: 'reviewed-v1' };
+  const markers = [
+    { ...identity, fingerprint: 'a'.repeat(64) },
+    {
+      ...identity,
+      fingerprint: 'b'.repeat(64),
+      origin: {
+        scope: 'bin/application.mjs',
+        inventory_sha256: 'c'.repeat(64),
+        tool_revision: 'scanner-v1',
+        config_revision: 'config-v1',
+      },
+    },
+  ];
+  const issues = markers.map((marker, index) => {
+    const comment = `<!-- factory-finding-v1 ${JSON.stringify(marker)} -->`;
+    return {
+      number: 42 + index,
+      node_id: `I_LEGACY_${index}`,
+      user: { id: 41898282 },
+      body:
+        index === 0
+          ? `<!-- factory-finding-v1 \nLegacy note ${comment} for review\n${comment}`
+          : comment,
+    };
+  });
+  platform.issues.push(...issues);
+  const reviewed = platform.activation({
+    activation: false,
+    bootstrap_completed: false,
+    genesis_head: null,
+    genesis_receipt_sha256: null,
+    legacy_inventory_sha256: null,
+  });
+  const context = platform.context(reviewed, '9591', 'bootstrap');
+  const request = { command: 'bootstrap', bootstrap_ticket: reviewed['bootstrap_ticket'] };
+  const prepared = await runController(context, request);
+  assert.equal(prepared.status, 'accepted', prepared.reason);
+  const lineages = arrayField(record(prepared.record), 'lineages');
+  assert.equal(lineages.length, 2);
+  for (const [index, marker] of markers.entries()) {
+    assert.partialDeepStrictEqual(lineages[index], {
+      identity: {
+        ...identity,
+        fingerprint: marker.fingerprint,
+        issue_node_id: issues[index]?.node_id,
+      },
+      history_status: 'unknown',
+      repair_state: 'needs-human',
+    });
+  }
+  assert.deepEqual(writes(platform), []);
+});
+
 it('AC03–05 discovers a real accepted issue POST after lost acknowledgement and deduplicates the same scan without blind retry', async (test) => {
   const fixture = await publicationFindingFixture(test);
   const { platform } = fixture;
@@ -1955,8 +2143,13 @@ it('Opus F6 caps only three new issues while existing first findings and refuted
   const fixture = await publicationFindingFixture(test);
   fakeLabelRoutes(test, fixture.platform);
   const findings: JsonRecord[] = [];
+  const deferredPath = `bin/${'🧪'.repeat(600)}.ts`;
   for (let index = 0; index < 8; index++) {
-    const finding = { ...fixture.finding, fingerprint: sha256(`creation-cap-${index}`) };
+    const finding = {
+      ...fixture.finding,
+      fingerprint: sha256(`creation-cap-${index}`),
+      ...(index === 7 ? { path: deferredPath } : {}),
+    };
     findings.push({
       ...finding,
       authority: fixture.authority(
@@ -1983,7 +2176,10 @@ it('Opus F6 caps only three new issues while existing first findings and refuted
     }
   }
   const before = fixture.platform.requests.length;
-  const result = await reconcilePublication(fixture.context, refreshedScan(fixture, findings));
+  const result = await reconcilePublication(
+    fixture.context,
+    refreshedScan(fixture, findings, [stringField(fixture.finding, 'path'), deferredPath]),
+  );
   assert.equal(result.status, 'accepted', result.reason);
   assert.equal(result.presence.length, 8);
   assert.equal(result.issues.length, 6);
@@ -2563,7 +2759,7 @@ it('renders model text inert: one marker, no pings, links or stray backticks, fe
   assert.equal(first.status, 'accepted', first.reason);
   const body = String(fixture.platform.issues[0]?.['body']);
   assert.equal(markerLines(body), 1);
-  assert.ok(Buffer.byteLength(body) <= 2048, String(Buffer.byteLength(body)));
+  assert.equal(Buffer.byteLength(body), 2048);
   for (const raw of ['@owner', '#12', '://', 'www.']) assert.equal(body.includes(raw), false, raw);
   assert.ok(body.split('\n').includes('`'.repeat(7)), 'fence longer than the longest backtick run');
   const before = fixture.platform.requests.length;
@@ -2573,11 +2769,85 @@ it('renders model text inert: one marker, no pings, links or stray backticks, fe
   assert.equal(fixture.platform.issues.length, 1);
 });
 
+it('uses the UTF-8 body budget for Unicode metadata and optional text', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const findingPath = 'bin/résumé-🧪.mjs';
+  const repeatedly = 'é🧪'.repeat(900);
+  const scan = refreshedScan(
+    fixture,
+    [described(fixture, repeatedly, { path: findingPath })],
+    [findingPath],
+  );
+  const result = await reconcilePublication(fixture.context, scan);
+  assert.equal(result.status, 'accepted', result.reason);
+  const body = stringField(record(fixture.platform.issues[0]), 'body');
+  assert.equal(markerLines(body), 1);
+  assert.match(body, /"scope":"bin\/résumé-🧪\.mjs"/);
+  assert.match(body, /Description: (é🧪){10}/);
+  assert.equal(body.includes('\uFFFD'), false);
+  assert.ok(Buffer.byteLength(body) > 2044 && Buffer.byteLength(body) <= 2048);
+});
+
+it('omits details whose fence cannot fit and can register the shortened body', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const scan = refreshedScan(fixture, [described(fixture, '`'.repeat(2048))]);
+  const result = await reconcilePublication(fixture.context, scan);
+  assert.equal(result.status, 'accepted', result.reason);
+  const body = stringField(record(fixture.platform.issues[0]), 'body');
+  assert.ok(Buffer.byteLength(body) <= 2048);
+  assert.equal(markerLines(body), 1);
+  assert.match(
+    body,
+    /^<!-- factory-finding-v1 .* -->\nConfidence: confirmed\nRepair: eligible\nAuthenticated receipt: [a-f0-9]{64}$/,
+  );
+  const published = record(result.issues[0]);
+  await assertRegisteredOnce(
+    fixture,
+    published,
+    await registrationFromPublication(fixture, published),
+  );
+});
+
+it('refuses publication without writing when required metadata alone exceeds the body budget', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const scan = rescan(fixture, { tool_revision: '🧪'.repeat(600) });
+  const before = fixture.platform.requests.length;
+  const result = await reconcilePublication(fixture.context, scan);
+  assert.equal(result.status, 'needs-human');
+  assert.equal(result.reason, 'Required finding issue metadata exceeds 2048 bytes');
+  assert.deepEqual(result.dispatch, []);
+  assert.deepEqual(fixture.platform.issues, []);
+  assert.deepEqual(writes(fixture.platform, before), []);
+});
+
+it('refuses all publication writes when a later eligible finding exceeds the metadata budget', async (test) => {
+  const fixture = await publicationFindingFixture(test);
+  const longPath = `bin/${'🧪'.repeat(600)}.ts`;
+  const scan = refreshedScan(
+    fixture,
+    [
+      described(fixture, 'ordinary finding'),
+      described(fixture, 'oversized finding', { path: longPath, fingerprint: 'f'.repeat(64) }),
+    ],
+    [stringField(fixture.finding, 'path'), longPath],
+  );
+  const before = fixture.platform.requests.length;
+  const result = await reconcilePublication(fixture.context, scan);
+  assert.equal(result.status, 'needs-human');
+  assert.equal(result.reason, 'Required finding issue metadata exceeds 2048 bytes');
+  assert.deepEqual(writes(fixture.platform, before), []);
+  assert.deepEqual(fixture.platform.issues, []);
+  assert.deepEqual(result.issues, []);
+  assert.deepEqual(result.dispatch, []);
+});
+
 it('renderUntrusted fences and bounds arbitrary text', () => {
   const rendered = renderUntrusted('a\u0000b ```` c', 100);
   assert.equal(rendered, '`````\na b ```` c\n`````');
   assert.ok(Buffer.byteLength(renderUntrusted('é'.repeat(500), 100)) <= 100);
   assert.equal(renderUntrusted('é'.repeat(500), 100).includes('\uFFFD'), false);
+  assert.equal(renderUntrusted('text', 7), '');
+  assert.equal(renderUntrusted('text', 8), '```\n\n```');
 });
 
 it('a reworded description of the same finding is not a reason to PATCH', async (test) => {

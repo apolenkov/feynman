@@ -297,7 +297,7 @@ async function chat(
   key: string,
   payload: JsonRecord,
   clientHeaders: Readonly<Record<string, string>>,
-  timeoutMs = CALL_TIMEOUT_MS,
+  timeoutMs: number,
 ): Promise<ChatResult> {
   const request = JSON.stringify(payload);
   try {
@@ -597,8 +597,8 @@ export async function runModel(options: RunOptions): Promise<void> {
   const { policy, source } = options;
   const clock = options.clock ?? Date.now;
   const started = clock();
-  const deadline = started + (options.deadlineSeconds ?? DEFAULT_DEADLINE_SECONDS) * 1000;
-  const remaining = (): number => deadline - clock();
+  const deadlineMs = (options.deadlineSeconds ?? DEFAULT_DEADLINE_SECONDS) * 1000;
+  const remaining = (): number => Math.floor(deadlineMs - (clock() - started));
   // A call never outlives the shared deadline; the first one that finds it spent marks the run incomplete.
   let deadlineHit = false;
   const budget = (limitMs: number): number | null => {
@@ -647,6 +647,8 @@ export async function runModel(options: RunOptions): Promise<void> {
   let probeStatus = 0;
   let probeError: unknown = null;
   for (const candidate of keys) {
+    const callMs = budget(CALL_TIMEOUT_MS);
+    if (callMs === null) throw new FactoryFailure('Deadline spent before the scan started');
     const probe = await chat(
       policy.llm_url,
       candidate.value,
@@ -656,6 +658,7 @@ export async function runModel(options: RunOptions): Promise<void> {
         max_tokens: 1,
       },
       clientHeaders,
+      callMs,
     );
     probeStatus = probe.status;
     probeError = tryRecord(probe.body)?.['error'];

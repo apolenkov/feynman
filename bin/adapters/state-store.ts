@@ -37,13 +37,11 @@ function errorCode(error: unknown): string | undefined {
     : undefined;
 }
 
-/** Read JSON without trusting it; normalize it before making a state decision. */
-export function readState(rootDir: string): Record<string, unknown> | null {
-  const { statePath, injectionsPath } = statePaths(rootDir);
+function readStateFiles({ statePath, injectionsPath }: StatePaths): Record<string, unknown> | null {
+  const preferences = fs.readFileSync(statePath, 'utf8');
   try {
-    const parsed: unknown = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-    if (!isRecord(parsed)) return null;
-    const state = parsed;
+    const state: unknown = JSON.parse(preferences);
+    if (!isRecord(state)) return null;
     try {
       const text = fs.readFileSync(injectionsPath, 'utf8').trim();
       const injections = Number(text);
@@ -52,7 +50,17 @@ export function readState(rootDir: string): Record<string, unknown> | null {
       /* Bookkeeping is optional; preferences remain readable. */
     }
     return state;
-  } catch (_) {
+  } catch (error) {
+    if (error instanceof SyntaxError) return null;
+    throw error;
+  }
+}
+
+/** Read JSON without trusting it; normalize it before making a state decision. */
+export function readState(rootDir: string): Record<string, unknown> | null {
+  try {
+    return readStateFiles(statePaths(rootDir));
+  } catch {
     return null;
   }
 }
@@ -97,12 +105,12 @@ function bootstrapDefault(
 
 /** Bootstrap, migrate, and reconcile state with the active flag. */
 export function reconcileState(rootDir: string): { state: FeynmanState; active: boolean } {
-  const { statePath, flagPath } = statePaths(rootDir);
-  const stateExists = fs.existsSync(statePath);
-  const flagPresent = fs.existsSync(flagPath);
-  if (!stateExists) return bootstrapDefault(rootDir, flagPath);
+  const paths = statePaths(rootDir);
+  const { statePath, flagPath } = paths;
+  if (fs.lstatSync(statePath, { throwIfNoEntry: false }) === undefined)
+    return bootstrapDefault(rootDir, flagPath);
 
-  const raw = readState(rootDir);
+  const raw = readStateFiles(paths);
   if (raw === null) {
     backupCorruptState(statePath);
     return bootstrapDefault(rootDir, flagPath);
@@ -114,9 +122,13 @@ export function reconcileState(rootDir: string): { state: FeynmanState; active: 
     removeActiveFlag(rootDir);
     return { state, active: false };
   }
-  if (!flagPresent || fs.readFileSync(flagPath, 'utf8') !== flagContent(state)) {
-    atomicWrite(flagPath, flagContent(state));
+  let activeFlag: string | undefined;
+  try {
+    activeFlag = fs.readFileSync(flagPath, 'utf8');
+  } catch (error) {
+    if (errorCode(error) !== 'ENOENT') throw error;
   }
+  if (activeFlag !== flagContent(state)) atomicWrite(flagPath, flagContent(state));
   return { state, active: true };
 }
 

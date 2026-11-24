@@ -9,6 +9,14 @@
       "test": "tests/hook-command.test.ts"
     },
     {
+      "file": "bin/adapters/state-store.ts",
+      "owner": "reconcileState",
+      "mutationHash": "2b974812af9e3320001a9eb85c9b08785c689236e5b2b07961c8a9013e1eaa35",
+      "count": 2,
+      "reason": "A single local flag read result distinguishes missing data from I/O failure before any flag write.",
+      "test": "tests/injection-counter.test.ts"
+    },
+    {
       "file": "bin/feynman-lint.ts",
       "owner": "readStdin",
       "mutationHash": "b62963af8f86fb80daea7a195227913f15361580ec732830a10f1bf9f70682ed",
@@ -266,6 +274,14 @@
     },
     {
       "file": "scripts/evaluate-ascii.ts",
+      "owner": "appServerStdout",
+      "mutationHash": "fcbfd49f2ed16037b5d5a1723fd1fa30d28276cd1ff5db0c90148600bccc5307",
+      "count": 3,
+      "reason": "Each reader owns its bounded stdout capture, pending JSON line, and raw byte count.",
+      "test": "tests/ascii-evaluation-runner.test.ts"
+    },
+    {
+      "file": "scripts/evaluate-ascii.ts",
       "owner": "asciiEvaluationMain",
       "mutationHash": "0beddc295c1bcd99bcd1d255c012979678f1b5884adf44f0b4c83e7ca5c1c0b6",
       "count": 1,
@@ -275,9 +291,9 @@
     {
       "file": "scripts/evaluate-ascii.ts",
       "owner": "discoverInstalledSkills",
-      "mutationHash": "cf0fb001c79d0ac52c2b673b0cd2b252bfcb26a531e13dbe0e7c4cea2d9a4de4",
-      "count": 11,
-      "reason": "Invocation-owned bounded app-server stream buffers and request state parse discovery events; no shared domain state is mutated.",
+      "mutationHash": "c088ca77cb0c17724f559aecca756a65fc71b3f4bd358c68e3eda9231f716369",
+      "count": 4,
+      "reason": "Each discovery invocation owns its stderr capture and handshake state.",
       "test": "tests/ascii-evaluation-runner.test.ts"
     },
     {
@@ -286,6 +302,22 @@
       "mutationHash": "8d32a5c046da2d54c455210b63e271e1598bd1f0b9deeaefc15586235d5bd557",
       "count": 2,
       "reason": "Each invocation marks its app-server response settled once and terminates its owned child process.",
+      "test": "tests/ascii-evaluation-runner.test.ts"
+    },
+    {
+      "file": "scripts/evaluate-ascii.ts",
+      "owner": "handleTrustLine",
+      "mutationHash": "5c36b1b3fcd9b53526ecde7d71440e3e3ff44cf36a9463c54d6fef0c4577cabc",
+      "count": 2,
+      "reason": "The trust handshake retains the two list replies in invocation-local fields for evidence.",
+      "test": "tests/ascii-evaluation-runner.test.ts"
+    },
+    {
+      "file": "scripts/evaluate-ascii.ts",
+      "owner": "pushChunk",
+      "mutationHash": "6b496c4b8a5b114c8337f1c52cd618ba1e5b3ce5181667bcebefabb3e19a4cd6",
+      "count": 6,
+      "reason": "A forward byte cursor updates the owned line and capture once per segment through the terminal reply or byte cap.",
       "test": "tests/ascii-evaluation-runner.test.ts"
     },
     {
@@ -307,9 +339,9 @@
     {
       "file": "scripts/evaluate-ascii.ts",
       "owner": "trustInstalledHooks",
-      "mutationHash": "2fbadf90190fac3c2c1de1a0562d589ecdb393f812b53437c4b0ffad65611c78",
-      "count": 14,
-      "reason": "Invocation-owned bounded app-server streams and trust handshake state record and verify the isolated installed hook hash.",
+      "mutationHash": "d7b1855b6b0ff8f1c54e5f3663da6547453c3941a78d8892709e9fe63d44a414",
+      "count": 5,
+      "reason": "Each hook trust invocation owns its stderr capture and retains the handshake result.",
       "test": "tests/ascii-evaluation-runner.test.ts"
     },
     {
@@ -507,9 +539,9 @@
     {
       "file": "scripts/factory-publication.ts",
       "owner": "reconcilePublication",
-      "mutationHash": "ef4d05812c9af7c09988e82af15ef76877f8972fbc8edd33f2f527ce3e524991",
-      "count": 21,
-      "reason": "Invocation-owned presence, creation counter and issue/pending/closure collections reconcile authenticated findings; Opus regressions prove author filtering, proof prevalidation, label add/remove that never replaces the owner label set, safe failure reporting with preserved partial effects and the three-new-issue cap.",
+      "mutationHash": "2ada386de40c1e0be77a3d4c23a4e4a9fc888ba50080531fbfcd52c950682cd4",
+      "count": 22,
+      "reason": "Invocation-owned plans and cap accounting preflight eligible issue bodies before writes. Publication tracks refreshed issue facts, label deltas and partial effects for safe reporting.",
       "test": "tests/night-factory-publication.test.ts"
     },
     {
