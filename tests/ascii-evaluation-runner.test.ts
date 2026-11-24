@@ -741,14 +741,19 @@ describe('ASCII evaluation runner', () => {
     try {
       await run(fx, transport, { taskIds: ['A01'], arms: ['native'] });
       const frozenTarball = path.join(fx.output, 'candidate-package.tgz');
+      assert.deepEqual(transport.extractedTarballs, [frozenTarball]);
       const fd = fs.openSync(frozenTarball, 'r');
       try {
-        assert.equal(fs.readFileSync(fd).equals(builtBytes), true);
+        assert.deepEqual(fs.readFileSync(fd), builtBytes);
         assert.equal(fs.fstatSync(fd).mode & 0o777, 0o400);
+        fs.writeFileSync(builtTarball, 'later build bytes\n');
+        assert.equal(fs.fstatSync(fd).size, builtBytes.length);
+        const frozenBytes = Buffer.alloc(builtBytes.length);
+        assert.equal(fs.readSync(fd, frozenBytes, { position: 0 }), frozenBytes.length);
+        assert.deepEqual(frozenBytes, builtBytes);
       } finally {
         fs.closeSync(fd);
       }
-      assert.deepEqual(transport.extractedTarballs, [frozenTarball]);
       const manifest: unknown = JSON.parse(
         fs.readFileSync(path.join(fx.output, 'manifest.json'), 'utf8'),
       );
@@ -757,8 +762,6 @@ describe('ASCII evaluation runner', () => {
         manifest['packageTarballHash'],
         createHash('sha256').update(builtBytes).digest('hex'),
       );
-      fs.writeFileSync(builtTarball, 'later build bytes\n');
-      assert.equal(fs.readFileSync(frozenTarball).equals(builtBytes), true);
     } finally {
       fx.dispose();
     }

@@ -205,8 +205,8 @@ export function parse(markdown: string): readonly DiagramNode[] {
       // Fenced blocks: also accept multiple [Box] tokens (even without arrows)
       // since those are clearly intended as flow diagrams (L05 will catch missing arrows)
       const hasFencedBoxPattern = blockLines.some((line) => {
-        const tokens = boxes(line);
-        return tokens.next().done !== true && tokens.next().done !== true;
+        const [, secondBox] = boxes(line);
+        return secondBox !== undefined;
       });
       if (blockLines.length >= 1 && (looksLikeDiagram(blockLines) || hasFencedBoxPattern)) {
         nodes.push({
