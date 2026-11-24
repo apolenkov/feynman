@@ -5,7 +5,7 @@
 import { hasExactlyOneArrow, hasFlowArrow, flowArrowIndex } from './arrows.ts';
 import { visualWidth } from './width.ts';
 import { STATE_MARKER_RE } from './markers.ts';
-import { nextFrame } from './frames.ts';
+import { iterateFrames } from './frames.ts';
 
 // Strip indent prefix and the outer │ chars from an inner line. Returns the
 // raw cell content without trailing space.
@@ -431,12 +431,15 @@ export function autofix(text: string, opts?: AutofixOptions): string {
   const out: string[] = [];
   let i = 0;
   let inFence = false;
+  let segmentStart = 0;
+  let frames: ReturnType<typeof iterateFrames> | undefined;
   while (i < lines.length) {
     const line = lines[i];
     if (line === undefined) break;
     // Fenced code block toggle — opt-out by default to preserve author intent.
     if (/^\s*```/.test(line)) {
       inFence = !inFence;
+      frames = undefined;
       out.push(line);
       i++;
       continue;
@@ -452,25 +455,24 @@ export function autofix(text: string, opts?: AutofixOptions): string {
       i++;
       continue;
     }
-    // Detect the frame with the canonical nextFrame helper so autofix and the
-    // lint rules (L08/L11/L12/L15) share ONE frame definition: the closer is the
-    // first └─…─┘ found scanning forward past any hole (blank line / stray
-    // prose), and inner is the fully-bordered │ … │ rows. The scan is bounded to
-    // the current non-fence segment (nextFenceLine) so a frame never spans a ```
-    // boundary, mirroring how the parser feeds the linter one fence-free block.
-    const segEnd = nextFenceLine(lines, i + 1);
-    const frame = nextFrame(lines.slice(i, segEnd), 0);
-    if (!frame || frame.closeLi === -1) {
+    // Index each fence-free segment once so frames cannot span a fence.
+    if (frames === undefined) {
+      segmentStart = i;
+      frames = iterateFrames(lines.slice(i, nextFenceLine(lines, i + 1)));
+    }
+    const frame = frames.next().value;
+    if (frame === undefined || frame.closeLi === -1) {
       out.push(line);
       i++;
       continue;
     }
     const { indent, inner } = frame;
-    const closeLi = i + frame.closeLi;
+    const closeLi = segmentStart + frame.closeLi;
     // Do not discard text that the canonical frame parser cannot classify.
+    const borderedRows = new Set(inner);
     const unclassifiedText = lines
       .slice(i + 1, closeLi)
-      .some((row) => row.trim() !== '' && !inner.includes(row));
+      .some((row) => row.trim() !== '' && !borderedRows.has(row));
     if (unclassifiedText) {
       out.push(...lines.slice(i, closeLi + 1));
       i = closeLi + 1;

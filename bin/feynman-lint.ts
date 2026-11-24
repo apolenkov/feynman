@@ -238,21 +238,22 @@ export function main(argv: readonly string[] = process.argv.slice(2)): void {
       }));
   }
 
-  function run(markdown: string, displayName: string): void {
+  function run(markdown: string, displayName: string): 0 | 1 {
     const result = lint(markdown);
     const { issues } = result;
     const explain = useExplain ? explainFrames(markdown) : null;
+    const failed = useStrict ? issues.length > 0 : !result.passed;
+    const status = failed ? 1 : 0;
 
     if (useJson) {
       const out = {
         file: displayName,
-        passed: useStrict ? issues.length === 0 : result.passed,
+        passed: !failed,
         issues,
         ...(explain === null ? {} : { explain }),
       };
       process.stdout.write(JSON.stringify(out, null, 2) + '\n');
-      const failed = useStrict ? issues.length > 0 : !result.passed;
-      process.exit(failed ? 1 : 0);
+      return status;
     }
 
     // gcc mode
@@ -273,8 +274,6 @@ export function main(argv: readonly string[] = process.argv.slice(2)): void {
       process.stdout.write(output + '\n');
     }
 
-    const failed = useStrict ? issues.length > 0 : !result.passed;
-
     if (failed) {
       const errCount = issues.filter((i) => i.severity === 'error').length;
       const warnCount = issues.filter((i) => i.severity === 'warn').length;
@@ -283,16 +282,14 @@ export function main(argv: readonly string[] = process.argv.slice(2)): void {
         warnCount > 0 ? `${warnCount} warning${warnCount !== 1 ? 's' : ''}` : null,
       ].filter((part): part is string => part !== null);
       process.stderr.write(`${displayName}: ${parts.join(', ')}\n`);
-      process.exit(1);
-    } else {
-      process.exit(0);
     }
+    return status;
   }
 
   // Read input
   if (input.kind === 'stdin') {
     readStdin((contents) => {
-      run(contents, '<stdin>');
+      process.exitCode = run(contents, '<stdin>');
     });
   } else {
     const filePath = input.path;
@@ -306,7 +303,7 @@ export function main(argv: readonly string[] = process.argv.slice(2)): void {
       process.stderr.write(`feynman-lint: cannot read file: ${filePath}: ${read.message}\n`);
       process.exit(2);
     }
-    run(read.text, filePath);
+    process.exitCode = run(read.text, filePath);
   }
 }
 

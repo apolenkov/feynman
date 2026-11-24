@@ -1,5 +1,5 @@
 // lib/lint/frames.ts — canonical frame-iteration helper
-// Provides shared nextFrame() detection for lint rules and autofix.
+// Provides shared frame detection for lint rules and autofix.
 // Zero deps. ESM only.
 //
 // Design:
@@ -27,19 +27,13 @@ const TOP_RE = /^(\s*)┌─[^┌\n]*┐\s*$/;
 
 // Closer: └ followed by zero or more dashes, then ┘ (with optional leading indent/trailing space).
 const BOT_RE = /^(\s*)└─*┘\s*$/;
+const INNER_RE = /^\s*│.*│\s*$/;
 
 /**
  * Find the first frame in `lines` starting from `startLi`.
  * A frame is a pair of matching opener / closer lines plus the inner content.
  *
- * Usage:
- *   let li = 0;
- *   while (li < lines.length) {
- *     const frame = nextFrame(lines, li);
- *     if (!frame) { li++; continue; }
- *     // process frame …
- *     li = frame.closeLi !== -1 ? frame.closeLi + 1 : frame.topLi + 1;
- *   }
+ * Use iterateFrames when traversing more than one frame.
  *
  * @param lines   The split lines of the content string.
  * @param startLi 0-based line index to start scanning from.
@@ -71,7 +65,7 @@ export function nextFrame(lines: readonly string[], startLi: number): FrameInfo 
       // matching the original /^\s*│.*│\s*$/ predicate used by L11, L12,
       // and explainFrames. This keeps inner-set semantics byte-identical
       // with the pre-migration code for all well-formed frames.
-      if (/^\s*│.*│\s*$/.test(next)) {
+      if (INNER_RE.test(next)) {
         inner.push(next);
       }
     }
@@ -82,12 +76,44 @@ export function nextFrame(lines: readonly string[], startLi: number): FrameInfo 
   return null;
 }
 
-/** Iterate frames in source order without materializing intermediate slices. */
+/** Iterate frames in source order using one index of closers and bordered rows. */
 export function* iterateFrames(lines: readonly string[]): Generator<FrameInfo, void, unknown> {
+  const firstMissing = lines.findIndex((line: string | undefined) => line === undefined);
+  const end = firstMissing === -1 ? lines.length : firstMissing;
+  const closers = new Map<string, { readonly line: number; readonly rowCount: number }>();
+  const rows: string[] = [];
+  const frames: FrameInfo[] = [];
+
+  // Walking backwards makes the closest later closer available for each indent.
+  for (let li = end - 1; li >= 0; li--) {
+    const line = lines[li];
+    if (line === undefined) break;
+    const bottomIndent = BOT_RE.exec(line)?.[1];
+    if (bottomIndent !== undefined) closers.set(bottomIndent, { line: li, rowCount: rows.length });
+    if (INNER_RE.test(line)) rows.push(line);
+
+    const indent = TOP_RE.exec(line)?.[1];
+    if (indent === undefined) continue;
+    const closer = closers.get(indent);
+    const firstRow = closer?.rowCount ?? 0;
+    const lastRow = rows.length;
+    let inner: readonly string[] | undefined;
+    frames.push({
+      topLi: li,
+      closeLi: closer?.line ?? -1,
+      indent,
+      // Unclosed frames can share overlapping suffixes. Copy the rows only
+      // when a caller actually requests that frame's contents.
+      get inner() {
+        inner ??= rows.slice(firstRow, lastRow).reverse();
+        return inner;
+      },
+    });
+  }
+
   let cursor = 0;
-  while (cursor < lines.length) {
-    const frame = nextFrame(lines, cursor);
-    if (frame === null) return;
+  for (const frame of frames.toReversed()) {
+    if (frame.topLi < cursor) continue;
     yield frame;
     cursor = frame.closeLi === -1 ? frame.topLi + 1 : frame.closeLi + 1;
   }

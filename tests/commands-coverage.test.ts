@@ -47,6 +47,7 @@ function invoke(
 }
 
 function invokeLint(args: string[]): { code: number; out: string; err: string } {
+  const previousExitCode = process.exitCode;
   const output: string[] = [];
   const errors: string[] = [];
   const exitMock = mock.method(process, 'exit', (code?: number) => {
@@ -62,16 +63,17 @@ function invokeLint(args: string[]): { code: number; out: string; err: string } 
   });
   try {
     lintMain(args);
+    return { code: Number(process.exitCode ?? 0), out: output.join(''), err: errors.join('') };
   } catch (error) {
     if (error instanceof ExitSignal)
       return { code: error.code, out: output.join(''), err: errors.join('') };
     throw error;
   } finally {
+    process.exitCode = previousExitCode;
     exitMock.mock.restore();
     stdoutMock.mock.restore();
     stderrMock.mock.restore();
   }
-  return { code: 0, out: output.join(''), err: errors.join('') };
 }
 
 describe('command modules', { concurrency: false }, () => {
