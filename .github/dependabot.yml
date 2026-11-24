@@ -1,4 +1,4 @@
-# Monthly version updates with at most one open version PR per ecosystem/directory.
+# Monthly version updates: members of all-dependencies share one open version PR (limit 2).
 # A 3-day cooldown delays new releases; it does not guarantee their safety.
 # Dependabot security updates are separate from this schedule and PR limit.
 version: 2
@@ -39,7 +39,6 @@ updates:
           - '*'
     labels:
       - dependencies
-    open-pull-requests-limit: 2
 
   # Pinned night-scan tool, installed outside the checkout; a bump fails the
   # tool check until policy and lock are reviewed together, so nothing merges itself.
@@ -74,7 +73,6 @@ updates:
           - '*'
     labels:
       - dependencies
-    open-pull-requests-limit: 2
 
   - package-ecosystem: github-actions
     directory: /
@@ -93,4 +91,3 @@ updates:
           - '*'
     labels:
       - github-actions
-    open-pull-requests-limit: 2
