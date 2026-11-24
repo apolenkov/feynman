@@ -135,10 +135,7 @@ describe('Codex-only package contract', () => {
   it('keeps active product surfaces free of retired integrations', () => {
     const files = ACTIVE_SURFACES.flatMap(activeTextFiles);
     for (const file of files) {
-      // The night-scan endpoint and routing header belong to its provider, not a retired integration.
-      const source = read(file)
-        .replaceAll('https://opencode.ai/inference/go/', '')
-        .replaceAll('x-opencode-session', '');
+      const source = read(file);
       assert.doesNotMatch(
         source,
         /\b(?:claude|opencode)\b/i,

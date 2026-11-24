@@ -4,7 +4,6 @@
 version: 2
 
 # One version PR per scheduled run for the members marked multi-ecosystem-group below.
-# The pinned night-scan tool (/tools/ocr) is deliberately not a member.
 multi-ecosystem-groups:
   all-dependencies:
     schedule:
@@ -39,22 +38,6 @@ updates:
           - '*'
     labels:
       - dependencies
-
-  # Pinned night-scan tool, installed outside the checkout; a bump fails the
-  # tool check until policy and lock are reviewed together, so nothing merges itself.
-  - package-ecosystem: npm
-    directory: /tools/ocr
-    schedule:
-      interval: monthly
-      time: '09:00'
-    cooldown:
-      default-days: 3
-    labels:
-      - dependencies
-    open-pull-requests-limit: 1
-    commit-message:
-      prefix: chore
-      include: scope
 
   - package-ecosystem: npm
     directory: /tools/codex

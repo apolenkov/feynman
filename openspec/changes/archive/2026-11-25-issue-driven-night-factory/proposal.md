@@ -1,3 +1,5 @@
+Status: отменено (cancelled) 2026-11-25 — factory removed by owner decision, TASK-922.
+
 # Proposal
 
 ## Why

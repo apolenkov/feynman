@@ -1,9 +1,0 @@
-{
-  "name": "feynman-night-ocr",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Pinned model-scan tool for the night factory; installed with --ignore-scripts outside the checkout",
-  "dependencies": {
-    "@alibaba-group/open-code-review": "1.14.0"
-  }
-}

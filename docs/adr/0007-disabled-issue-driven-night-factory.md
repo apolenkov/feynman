@@ -1,6 +1,6 @@
 # ADR0007: Repository-only issue-driven factory with activation disabled
 
-Status: Accepted design; source implementation pending final review.
+Status: Removed on 2026-11-25 by owner decision (TASK-922). See the [archived change](../../openspec/changes/archive/2026-11-25-issue-driven-night-factory/proposal.md).
 
 ## Context
 

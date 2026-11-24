@@ -3,6 +3,24 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// Read one byte beyond the limit so growth after opening cannot bypass the cap.
+export function readLimitedFile(file: string, limit: number, tooLarge: () => never): Buffer {
+  const fd = fs.openSync(file, 'r');
+  try {
+    if (fs.fstatSync(fd).size > limit) return tooLarge();
+    const bytes = Buffer.alloc(limit + 1);
+    let length = 0;
+    while (length <= limit) {
+      const count = fs.readSync(fd, bytes, length, bytes.length - length, null);
+      if (count === 0) return bytes.subarray(0, length);
+      length += count;
+    }
+    return tooLarge();
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 /** Replace complete file contents only after the new bytes are safely written. */
 export function atomicWrite(filePath: string, content: string): void {
   const destination = fs.existsSync(filePath) ? fs.realpathSync(filePath) : filePath;
