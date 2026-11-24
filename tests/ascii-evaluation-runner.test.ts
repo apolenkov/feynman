@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import childProcess from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it, type TestContext } from 'node:test';
 import { applyOutputStyle, readRulesForIntensity } from '../lib/state/index.ts';
 import {
   discoverInstalledSkills,
@@ -43,6 +46,19 @@ const ok = (stdout = ''): EvaluationCommandResult => ({
   stderr: '',
 });
 
+const DISCOVERY_SKILL = {
+  name: 'feynman:feynman',
+  enabled: true,
+  path: '/fixture/🧪/SKILL.md',
+};
+const UNTRUSTED_HOOK = {
+  key: 'SessionStart:🧪',
+  currentHash: 'sha256:fake',
+  command: 'fake command',
+  eventName: 'sessionStart',
+  trustStatus: 'untrusted',
+};
+
 function fakeCodexAppServer(mode: 'success' | 'malformed' = 'success'): {
   readonly home: string;
   readonly environment: Readonly<NodeJS.ProcessEnv>;
@@ -60,15 +76,17 @@ if (process.env.FAKE_CODEX_MODE === 'malformed') {
     const request = JSON.parse(line);
     let result = {};
     if (request.method === 'skills/list') {
-      result = { data: [{ skills: [{ name: 'feynman:feynman', enabled: true }] }] };
+      result = { data: [{ skills: [${JSON.stringify(DISCOVERY_SKILL)}] }] };
     }
     if (request.method === 'hooks/list') {
-      result = { data: [{ hooks: [{
-        key: 'SessionStart:fake', currentHash: 'sha256:fake', command: 'fake command',
-        eventName: 'sessionStart', trustStatus: trusted ? 'trusted' : 'untrusted'
-      }] }] };
+      const hook = ${JSON.stringify(UNTRUSTED_HOOK)};
+      if (trusted) hook.trustStatus = 'trusted';
+      result = { data: [{ hooks: [hook] }] };
     }
-    if (request.method === 'config/batchWrite') trusted = true;
+    if (request.method === 'config/batchWrite') {
+      const value = request.params.edits[0].value;
+      trusted = value[${JSON.stringify(UNTRUSTED_HOOK.key)}]?.trusted_hash === 'sha256:fake';
+    }
     process.stdout.write(JSON.stringify({ id: request.id, result }) + '\\n');
   });
 }
@@ -84,6 +102,30 @@ if (process.env.FAKE_CODEX_MODE === 'malformed') {
       fs.rmSync(home, { recursive: true, force: true });
     },
   };
+}
+
+async function readAppServerChunks<T>(
+  t: TestContext,
+  read: (environment: NodeJS.ProcessEnv, cwd: string) => Promise<T>,
+  chunks: readonly Buffer[],
+): Promise<T> {
+  const child = Object.assign(new EventEmitter(), {
+    stdin: { write: () => undefined },
+    stdout: new EventEmitter(),
+    stderr: new EventEmitter(),
+    kill: () => undefined,
+  });
+  const spawn = t.mock.method(childProcess, 'spawn', () => child);
+  syncBuiltinESMExports();
+  try {
+    const result = read({}, process.cwd());
+    for (const chunk of chunks) child.stdout.emit('data', chunk);
+    child.emit('exit', 1);
+    return await result;
+  } finally {
+    spawn.mock.restore();
+    syncBuiltinESMExports();
+  }
 }
 
 function write(file: string, contents: string): void {
@@ -709,6 +751,79 @@ describe('ASCII evaluation app-server controls', () => {
       fake.dispose();
     }
   });
+
+  const skills = { data: [{ skills: [DISCOVERY_SKILL] }] };
+  const initialHooks = { data: [{ hooks: [UNTRUSTED_HOOK] }] };
+  const trustedHooks = {
+    data: [{ hooks: [{ ...UNTRUSTED_HOOK, trustStatus: 'trusted' }] }],
+  };
+  const notification = Buffer.from('{"method":"fixture/notification"}\n');
+  const cap = 4 * 1024 * 1024;
+  const reply = (id: number, result: unknown) => Buffer.from(`${JSON.stringify({ id, result })}\n`);
+  const discoveryReplies = [reply(1, {}), reply(2, skills)];
+  const trustReplies = [reply(1, {}), reply(2, initialHooks), reply(3, {}), reply(4, trustedHooks)];
+
+  function transcript(replies: readonly Buffer[], bytes: number): Buffer {
+    const all = Buffer.concat(replies);
+    if (bytes === 0) return all;
+    return Buffer.concat([
+      all.subarray(0, -1),
+      Buffer.alloc(bytes - all.length, ' '),
+      Buffer.from('\n'),
+    ]);
+  }
+
+  function delivered(stdout: Buffer, split: number, coalesced: boolean): Buffer[] {
+    const chunks: Buffer[] = [];
+    let tail = stdout;
+    if (split > 0) {
+      // Split every multibyte field, including both the initial and verified trust keys.
+      for (let emoji = tail.indexOf('🧪'); emoji >= 0; emoji = tail.indexOf('🧪')) {
+        chunks.push(tail.subarray(0, emoji + split));
+        tail = tail.subarray(emoji + split);
+      }
+    }
+    if (coalesced) chunks.push(Buffer.concat([tail, notification]));
+    else chunks.push(tail, notification);
+    return chunks;
+  }
+
+  for (const bytes of [0, cap, cap + 1]) {
+    it(`captures the same app-server reply bytes across chunk boundaries (${bytes || 'ordinary'} bytes)`, async (t) => {
+      const discoveryStdout = transcript(discoveryReplies, bytes);
+      const trustStdout = transcript(trustReplies, bytes);
+      for (const split of [0, 1, 2, 3]) {
+        for (const coalesced of [false, true]) {
+          const discovery = await readAppServerChunks(
+            t,
+            discoverInstalledSkills,
+            delivered(discoveryStdout, split, coalesced),
+          );
+          const trust = await readAppServerChunks(
+            t,
+            trustInstalledHooks,
+            delivered(trustStdout, split, coalesced),
+          );
+          if (bytes > cap) {
+            assert.equal(discovery.status, 1);
+            assert.equal(discovery.error, 'skills/list stdout exceeded the byte limit');
+            assert.equal(trust.status, 1);
+            assert.equal(trust.error, 'hook trust stdout exceeded the byte limit');
+            assert.ok(discovery.stdout === discoveryStdout.subarray(0, cap).toString());
+            assert.ok(trust.stdout === trustStdout.subarray(0, cap).toString());
+          } else {
+            assert.equal(discovery.status, 0, discovery.error ?? 'skills/list failed');
+            assert.equal(trust.status, 0, trust.error ?? 'hook trust failed');
+            assert.deepEqual(discovery.result, skills);
+            assert.deepEqual(trust.initial, initialHooks);
+            assert.deepEqual(trust.verified, trustedHooks);
+            assert.ok(discovery.stdout === discoveryStdout.toString(), 'discovery stdout differs');
+            assert.ok(trust.stdout === trustStdout.toString(), 'hook trust stdout differs');
+          }
+        }
+      }
+    });
+  }
 });
 
 describe('ASCII evaluation runner', () => {
