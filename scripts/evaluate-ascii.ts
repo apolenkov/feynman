@@ -4,6 +4,7 @@ import { hash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { StringDecoder } from 'node:string_decoder';
 import { applyOutputStyle, assertTagPairs, readRulesForIntensity } from '../lib/state/index.ts';
 import { runEvaluationCommand } from './evaluate.ts';
 import type { EvaluationCommandResult, EvaluationCommandRunner } from './evaluate.ts';
@@ -1350,6 +1351,42 @@ function parseOptionalArguments(
   throw new Error(`Unknown argument: ${argument}`);
 }
 
+function appServerStdout(
+  handleLine: (line: string) => void,
+  settled: () => boolean,
+  exceedsLimit: () => void,
+) {
+  const decoder = new StringDecoder('utf8');
+  let stdout = '';
+  let line = '';
+  let bytes = 0;
+  return {
+    capture: (): string => stdout + decoder.end(),
+    pushChunk: (chunk: Buffer): void => {
+      let offset = 0;
+      // Count up to each newline so a terminal reply excludes subsequent bytes in its chunk.
+      while (offset < chunk.length && !settled()) {
+        const newline = chunk.indexOf(0x0a, offset);
+        const end = newline === -1 ? chunk.length : newline + 1;
+        const capturedEnd = Math.min(end, offset + MAX_BUFFER_BYTES - bytes);
+        const text = decoder.write(chunk.subarray(offset, capturedEnd));
+        stdout += text;
+        bytes += capturedEnd - offset;
+        if (capturedEnd < end) {
+          exceedsLimit();
+          return;
+        }
+        offset = end;
+        line += text;
+        if (newline !== -1) {
+          handleLine(line.slice(0, -1));
+          line = '';
+        }
+      }
+    },
+  };
+}
+
 function handleDiscoveryLine(
   line: string,
   sendSkillsRequest: () => void,
@@ -1391,9 +1428,7 @@ export async function discoverInstalledSkills(
       env: { ...environment },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    let stdout = '';
     let stderr = '';
-    let buffer = '';
     let settled = false;
     let skillsRequestSent = false;
     const finish = (status: number, result: unknown, error?: string): void => {
@@ -1401,7 +1436,13 @@ export async function discoverInstalledSkills(
       settled = true;
       clearTimeout(timer);
       child.kill('SIGTERM');
-      resolve({ status, stdout, stderr, result, ...(error === undefined ? {} : { error }) });
+      resolve({
+        status,
+        stdout: stdout.capture(),
+        stderr,
+        result,
+        ...(error === undefined ? {} : { error }),
+      });
     };
     const sendSkillsRequest = (): void => {
       if (skillsRequestSent) return;
@@ -1411,22 +1452,16 @@ export async function discoverInstalledSkills(
     const timer = setTimeout(() => {
       finish(1, null, 'skills/list timed out');
     }, 10_000);
-    child.stdout.on('data', (chunk: Buffer) => {
-      if (Buffer.byteLength(stdout) + chunk.length > MAX_BUFFER_BYTES) {
-        finish(1, null, 'skills/list stdout exceeded the byte limit');
-        return;
-      }
-      const text = chunk.toString();
-      stdout += text;
-      buffer += text;
-      let newline = buffer.indexOf('\n');
-      while (newline >= 0) {
-        const line = buffer.slice(0, newline);
-        buffer = buffer.slice(newline + 1);
+    const stdout = appServerStdout(
+      (line) => {
         handleDiscoveryLine(line, sendSkillsRequest, finish);
-        newline = buffer.indexOf('\n');
-      }
-    });
+      },
+      () => settled,
+      () => {
+        finish(1, null, 'skills/list stdout exceeded the byte limit');
+      },
+    );
+    child.stdout.on('data', stdout.pushChunk);
     child.stderr.on('data', (chunk: Buffer) => {
       if (Buffer.byteLength(stderr) + chunk.length > MAX_BUFFER_BYTES) {
         finish(1, null, 'skills/list stderr exceeded the byte limit');
@@ -1505,9 +1540,7 @@ export async function trustInstalledHooks(
       env: { ...environment },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    let stdout = '';
     let stderr = '';
-    let buffer = '';
     let initial: unknown = null;
     let verified: unknown = null;
     let settled = false;
@@ -1518,7 +1551,7 @@ export async function trustInstalledHooks(
       child.kill('SIGTERM');
       resolve({
         status,
-        stdout,
+        stdout: stdout.capture(),
         stderr,
         initial,
         verified,
@@ -1531,56 +1564,49 @@ export async function trustInstalledHooks(
     const timer = setTimeout(() => {
       finish(1, 'hook trust timed out');
     }, 10_000);
-    child.stdout.on('data', (chunk: Buffer) => {
-      if (Buffer.byteLength(stdout) + chunk.length > MAX_BUFFER_BYTES) {
-        finish(1, 'hook trust stdout exceeded the byte limit');
-        return;
-      }
-      const text = chunk.toString();
-      stdout += text;
-      buffer += text;
-      let newline = buffer.indexOf('\n');
-      while (newline >= 0 && !settled) {
-        const line = buffer.slice(0, newline);
-        buffer = buffer.slice(newline + 1);
-        if (line.trim().length > 0) {
-          try {
-            const message: unknown = JSON.parse(line);
-            if (isRecord(message) && typeof message['id'] === 'number') {
-              if (message['error'] !== undefined) {
-                finish(1, `app-server RPC failed: ${JSON.stringify(message['error'])}`);
-              } else if (message['id'] === 1) {
-                send(2, 'hooks/list', { cwd });
-              } else if (message['id'] === 2) {
-                initial = message['result'] ?? null;
-                send(3, 'config/batchWrite', {
-                  edits: [
-                    {
-                      keyPath: 'hooks.state',
-                      value: hookTrustState(initial),
-                      mergeStrategy: 'upsert',
-                    },
-                  ],
-                  reloadUserConfig: true,
-                });
-              } else if (message['id'] === 3) {
-                send(4, 'hooks/list', { cwd });
-              } else if (message['id'] === 4) {
-                verified = message['result'] ?? null;
-                if (trustedSessionStartCount(verified) < 1) {
-                  finish(1, 'SessionStart hook is still untrusted after config/batchWrite');
-                } else {
-                  finish(0);
-                }
-              }
-            }
-          } catch (error) {
-            finish(1, `Invalid hook trust app-server response: ${errorMessage(error)}`);
+    const handleTrustLine = (line: string): void => {
+      if (line.trim().length === 0) return;
+      try {
+        const message: unknown = JSON.parse(line);
+        if (!isRecord(message) || typeof message['id'] !== 'number') return;
+        if (message['error'] !== undefined) {
+          finish(1, `app-server RPC failed: ${JSON.stringify(message['error'])}`);
+        } else if (message['id'] === 1) {
+          send(2, 'hooks/list', { cwd });
+        } else if (message['id'] === 2) {
+          initial = message['result'] ?? null;
+          send(3, 'config/batchWrite', {
+            edits: [
+              {
+                keyPath: 'hooks.state',
+                value: hookTrustState(initial),
+                mergeStrategy: 'upsert',
+              },
+            ],
+            reloadUserConfig: true,
+          });
+        } else if (message['id'] === 3) {
+          send(4, 'hooks/list', { cwd });
+        } else if (message['id'] === 4) {
+          verified = message['result'] ?? null;
+          if (trustedSessionStartCount(verified) < 1) {
+            finish(1, 'SessionStart hook is still untrusted after config/batchWrite');
+          } else {
+            finish(0);
           }
         }
-        newline = buffer.indexOf('\n');
+      } catch (error) {
+        finish(1, `Invalid hook trust app-server response: ${errorMessage(error)}`);
       }
-    });
+    };
+    const stdout = appServerStdout(
+      handleTrustLine,
+      () => settled,
+      () => {
+        finish(1, 'hook trust stdout exceeded the byte limit');
+      },
+    );
+    child.stdout.on('data', stdout.pushChunk);
     child.stderr.on('data', (chunk: Buffer) => {
       if (Buffer.byteLength(stderr) + chunk.length > MAX_BUFFER_BYTES) {
         finish(1, 'hook trust stderr exceeded the byte limit');

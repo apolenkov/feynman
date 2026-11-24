@@ -158,10 +158,11 @@ export function isSessionStartHookCommand(command: unknown): boolean {
   );
 }
 
-export function hasFeynmanHook(settings: ValidatedCodexConfig): boolean {
-  return (settings.hooks?.['SessionStart'] ?? []).some((group) =>
-    group.hooks.some((hook) => isSessionStartHookCommand(hook['command'])),
-  );
+export function hasCurrentFeynmanHook(settings: ValidatedCodexConfig, command: string): boolean {
+  const installed = (settings.hooks?.['SessionStart'] ?? [])
+    .flatMap((group) => group.hooks.map((hook) => hook['command']))
+    .filter(isSessionStartHookCommand);
+  return installed.length > 0 && installed.every((entry) => entry === command);
 }
 
 export function hasAnyFeynmanHook(settings: ValidatedCodexConfig): boolean {
@@ -243,22 +244,21 @@ export function extractHookScriptPath(command: string, scriptName: string): stri
 const FEYNMAN_HOOK_EVENTS = new Set(['SessionStart', 'UserPromptSubmit', 'Stop']);
 
 function removeFeynmanGroups(groups: readonly ValidatedHookGroup[]): readonly ValidatedHookGroup[] {
-  return groups
-    .map((group) => ({
-      ...group,
-      hooks: group.hooks.filter(
-        (hook) => !(typeof hook['command'] === 'string' && isFeynmanHookCommand(hook['command'])),
-      ),
-    }))
-    .filter((group) => group.hooks.length > 0);
+  return groups.flatMap((group) => {
+    const hooks = group.hooks.filter(
+      (hook) => !(typeof hook['command'] === 'string' && isFeynmanHookCommand(hook['command'])),
+    );
+    if (hooks.length === group.hooks.length) return [group];
+    return hooks.length === 0 ? [] : [{ ...group, hooks }];
+  });
 }
 
 export function removeFeynmanHooks(settings: ValidatedCodexConfig): ValidatedCodexConfig {
-  if (!settings.hooks) return { ...settings };
+  if (!settings.hooks || Object.keys(settings.hooks).length === 0) return { ...settings };
   const hooks = Object.fromEntries(
     Object.entries(settings.hooks).flatMap(([eventName, groups]) => {
       const nextGroups = FEYNMAN_HOOK_EVENTS.has(eventName) ? removeFeynmanGroups(groups) : groups;
-      return nextGroups.length === 0 ? [] : [[eventName, nextGroups]];
+      return nextGroups.length === 0 && groups.length > 0 ? [] : [[eventName, nextGroups]];
     }),
   );
   return Object.keys(hooks).length === 0

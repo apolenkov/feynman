@@ -7,32 +7,6 @@
 import { hasFlowArrow } from './arrows.ts';
 import { boxes } from './boxes.ts';
 
-// Characters that indicate ASCII diagram content
-// Box-drawing: ┌┐└┘─│├┤┬┴┼ Tree: ├── └── Arrows: →←↑↓▲▼
-// Also count: + - | < > brackets used in ASCII art context
-const DIAGRAM_CHARS = new Set([
-  '┌',
-  '┐',
-  '└',
-  '┘',
-  '─',
-  '│',
-  '├',
-  '┤',
-  '┬',
-  '┴',
-  '┼',
-  '→',
-  '←',
-  '↑',
-  '↓',
-  '▲',
-  '▼',
-  '+',
-  '-',
-  '|',
-]);
-
 // Box-drawing Unicode specifically (high-confidence indicators)
 const BOX_DRAWING_CHARS = new Set([
   '┌',
@@ -63,28 +37,35 @@ export interface DiagramNode {
 }
 
 interface DiagramCharStats {
-  readonly diagramCount: number;
+  readonly boxDrawingCount: number;
   readonly nonSpaceCount: number;
-  readonly hasBoxDrawing: boolean;
 }
 
-/**
- * Count diagram chars in a string (non-space chars only for ratio)
- * @param {string} text
- * @returns {{diagramCount: number, nonSpaceCount: number, hasBoxDrawing: boolean}}
- */
 function countDiagramChars(text: string): DiagramCharStats {
-  return Array.from(text).reduce<DiagramCharStats>(
-    (stats, ch) =>
-      /\s/.test(ch)
-        ? stats
-        : {
-            diagramCount: stats.diagramCount + Number(DIAGRAM_CHARS.has(ch)),
-            nonSpaceCount: stats.nonSpaceCount + 1,
-            hasBoxDrawing: stats.hasBoxDrawing || BOX_DRAWING_CHARS.has(ch),
-          },
-    { diagramCount: 0, nonSpaceCount: 0, hasBoxDrawing: false },
-  );
+  let boxDrawingCount = 0;
+  let nonSpaceCount = 0;
+  for (const ch of text) {
+    if (/\s/.test(ch)) continue;
+    nonSpaceCount++;
+    if (BOX_DRAWING_CHARS.has(ch)) boxDrawingCount++;
+  }
+  return { boxDrawingCount, nonSpaceCount };
+}
+
+function isProseLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return true;
+  const wordChars = (trimmed.match(/[a-zA-Z]/g) ?? []).length;
+  const boxChars = Array.from(trimmed).filter((ch) => BOX_DRAWING_CHARS.has(ch)).length;
+  return wordChars > 5 && boxChars > 0 && wordChars > boxChars * 3;
+}
+
+function hasDiagramDensity(
+  boxDrawingCount: number,
+  nonSpaceCount: number,
+  isProse: boolean,
+): boolean {
+  return nonSpaceCount >= 3 && boxDrawingCount / nonSpaceCount >= 0.15 && !isProse;
 }
 
 /**
@@ -96,31 +77,12 @@ function countDiagramChars(text: string): DiagramCharStats {
  */
 function looksLikeDiagram(lines: readonly string[]): boolean {
   const text = lines.join('\n');
-  const { nonSpaceCount, hasBoxDrawing } = countDiagramChars(text);
+  const { nonSpaceCount, boxDrawingCount } = countDiagramChars(text);
 
   // Must have minimum content
   if (nonSpaceCount < 3) return false;
 
-  // If any line looks like natural prose (has word chars AND box chars but ratio is low)
-  // then exclude it from standalone detection.
-  // Prose check: line has alphabetic words AND box chars but < 20% diagram chars overall
-  const isProse = lines.every((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return true;
-    // If the line has natural language (multiple word chars) and any box chars
-    // but the box chars are embedded in prose (not structural)
-    const wordChars = (trimmed.match(/[a-zA-Z]/g) ?? []).length;
-    const boxChars = Array.from(trimmed).filter((ch) => BOX_DRAWING_CHARS.has(ch)).length;
-    // Prose: more letters than box chars by a significant margin
-    return wordChars > 5 && boxChars > 0 && wordChars > boxChars * 3;
-  });
-
-  // For standalone blocks (not fenced), require structural indicators
-  // Box-drawing Unicode dominant (≥40% of non-space chars are box-drawing)
-  const boxDrawingCount = Array.from(text).filter((ch) => BOX_DRAWING_CHARS.has(ch)).length;
-  const boxRatio = boxDrawingCount / nonSpaceCount;
-
-  if (hasBoxDrawing && boxRatio >= 0.15 && !isProse) return true;
+  if (hasDiagramDensity(boxDrawingCount, nonSpaceCount, lines.every(isProseLine))) return true;
 
   // Check for structural patterns (these override prose check)
   // Tree structure: lines starting with ├── or └──
@@ -137,6 +99,30 @@ function looksLikeDiagram(lines: readonly string[]): boolean {
   if (tableRows.length >= 2) return true;
 
   return false;
+}
+
+// On a rejected block, a suffix cannot introduce a structural indicator. Its
+// character density and all-prose classification can still change.
+function diagramSuffixStart(lines: readonly string[]): number {
+  let start = -1;
+  let boxDrawingCount = 0;
+  let nonSpaceCount = 0;
+  let isProse = true;
+  for (let i = lines.length - 1; i > 0; i--) {
+    const line = lines[i];
+    if (line === undefined) break;
+    const stats = countDiagramChars(line);
+    boxDrawingCount += stats.boxDrawingCount;
+    nonSpaceCount += stats.nonSpaceCount;
+    isProse = isProse && isProseLine(line);
+    if (
+      !line.trimStart().startsWith('<!--') &&
+      hasDiagramDensity(boxDrawingCount, nonSpaceCount, isProse)
+    ) {
+      start = i;
+    }
+  }
+  return start;
 }
 
 /**
@@ -243,7 +229,7 @@ export function parse(markdown: string): readonly DiagramNode[] {
 
       // Check for structural diagram indicators (order matters — strongest first)
       const text = blockLines.join('\n');
-      const { hasBoxDrawing } = countDiagramChars(text);
+      const { boxDrawingCount, nonSpaceCount } = countDiagramChars(text);
       const hasBoxToken = hasFlowArrow(text) && boxes(text).next().done !== true;
       // Multiple [Box] tokens on one line without natural language between them
       // (even without arrows — L05 will catch missing arrows)
@@ -268,12 +254,14 @@ export function parse(markdown: string): readonly DiagramNode[] {
       const hasTable = blockLines.filter((l) => /^\s*\|.*\|/.test(l)).length >= 2;
 
       const isDiagram =
-        hasBoxDrawing || hasBoxToken || hasMultiBox || hasTree || hasPriority || hasTable;
+        hasBoxToken ||
+        hasMultiBox ||
+        hasTree ||
+        hasPriority ||
+        hasTable ||
+        hasDiagramDensity(boxDrawingCount, nonSpaceCount, blockLines.every(isProseLine));
 
-      if (
-        isDiagram &&
-        (looksLikeDiagram(blockLines) || hasMultiBox || hasTree || hasPriority || hasTable)
-      ) {
+      if (isDiagram) {
         nodes.push({
           type: 'diagram',
           content: text,
@@ -281,9 +269,21 @@ export function parse(markdown: string): readonly DiagramNode[] {
           endLine: j, // 1-based (last line index + 1)
           indent,
         });
-        i = j;
-        continue;
+      } else if (boxDrawingCount > 0) {
+        const suffix = diagramSuffixStart(blockLines);
+        const first = blockLines[suffix];
+        if (first !== undefined) {
+          nodes.push({
+            type: 'diagram',
+            content: blockLines.slice(suffix).join('\n'),
+            startLine: startLine + suffix,
+            endLine: j,
+            indent: getIndent(first),
+          });
+        }
       }
+      i = j;
+      continue;
     }
 
     i++;

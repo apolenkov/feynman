@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { isCanonicalIssueAuthor } from './factory-publication.ts';
+import { canonicalIssue, isCanonicalIssueAuthor } from './factory-publication.ts';
 import {
   resolveFactoryContext,
   FactoryFailure,
@@ -462,14 +462,18 @@ async function publicationIdentity(
     )
   )
     throw new FactoryFailure('Existing or aliased identity cannot start at zero');
+  const matchesIdentity = (marker: JsonRecord): boolean =>
+    marker['repository_id'] === identity.repository_id &&
+    marker['fingerprint_policy_revision'] === identity.fingerprint_policy_revision &&
+    marker['fingerprint'] === identity.fingerprint;
+  const issueMarker = canonicalIssue(context, issue);
+  if (issueMarker === null || !matchesIdentity(issueMarker))
+    throw new FactoryFailure('Recreated or ambiguous finding issue cannot reset lineage');
+
   const issues = (await githubPages(context, `${base(context)}/issues?state=all`)).map(record);
-  const marker = `<!-- factory-finding-v1 ${JSON.stringify({ repository_id: identity.repository_id, fingerprint_policy_revision: identity.fingerprint_policy_revision, fingerprint: identity.fingerprint })} -->`;
+  // Ignore unrelated markers during the scan for competing issues.
   const matches = issues.filter(
-    (candidate) =>
-      isCanonicalIssueAuthor(context, candidate) &&
-      candidate['pull_request'] === undefined &&
-      typeof candidate['body'] === 'string' &&
-      candidate['body'].split('\n').includes(marker),
+    (candidate) => canonicalIssue(context, candidate, { matchesIdentity }) !== null,
   );
   if (matches.length !== 1 || matches[0]?.['node_id'] !== issue['node_id'])
     throw new FactoryFailure('Recreated or ambiguous finding issue cannot reset lineage');
@@ -1246,21 +1250,12 @@ async function bootstrapGenesis(
   const ticket = validateProtocol(context.policy['bootstrap_ticket'], 'ticket');
   if (sha256(request['bootstrap_ticket']) !== sha256(ticket))
     throw new FactoryFailure('Unreviewed bootstrap ticket');
-  const issues = (await githubPages(context, `${base(context)}/issues?state=all`))
-    .map(record)
-    .filter(
-      (issue) => isCanonicalIssueAuthor(context, issue) && issue['pull_request'] === undefined,
-    );
+  const issues = (await githubPages(context, `${base(context)}/issues?state=all`)).map(record);
   const prs = (await githubPages(context, `${base(context)}/pulls?state=all`)).map(record);
   const imported: Lineage[] = [];
   for (const issue of issues) {
-    if (typeof issue['body'] !== 'string' || !issue['body'].includes('<!-- factory-finding-v1 '))
-      continue;
-    const marker = /<!-- factory-finding-v1 (\{[^\n]*\}) -{2}>/.exec(issue['body'])?.[1];
-    if (marker === undefined)
-      throw new FactoryFailure('Unidentifiable legacy canonical issue; inventory unknown');
-    const markerValue: unknown = JSON.parse(marker);
-    const finding = record(markerValue);
+    const finding = canonicalIssue(context, issue, { legacyImport: true });
+    if (finding === null) continue;
     if (finding['repository_id'] !== context.policy['repository_id'])
       throw new FactoryFailure('Foreign legacy finding binding');
     const identity = {

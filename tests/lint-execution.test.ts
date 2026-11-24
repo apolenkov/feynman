@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { buffer } from 'node:stream/consumers';
 import { describe, it } from 'node:test';
 
 import { lint } from '../lib/lint/index.ts';
@@ -71,4 +76,82 @@ describe('lint rule execution failures', () => {
       Object.defineProperty(RegExp.prototype, 'test', testDescriptor);
     }
   });
+});
+
+describe('feynman-lint output streams', () => {
+  const cli = path.resolve(import.meta.dirname, '../bin/feynman-lint.ts');
+  const input = '```\n' + '┌─────┐\n│ row │\n└─────┘\n'.repeat(2048) + '```\n';
+
+  for (const { name, flags, status, outputStart, error } of [
+    { name: 'JSON success', flags: ['--json'], status: 0, outputStart: /^\{/, error: '' },
+    {
+      name: 'JSON strict failure with explanations',
+      flags: ['--json', '--strict', '--explain'],
+      status: 1,
+      outputStart: /^\{/,
+      error: '',
+    },
+    {
+      name: 'GCC strict failure',
+      flags: ['--strict'],
+      status: 1,
+      outputStart: /^<stdin>:2:1: L11 warn /,
+      error: '<stdin>: 4096 warnings\n',
+    },
+    {
+      name: 'GCC explanations on success',
+      flags: ['--explain'],
+      status: 0,
+      outputStart: /^<stdin>:2: explain: framing block:/,
+      error: '',
+    },
+  ]) {
+    it(`drains complete ${name} output through a pipe`, async (test) => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-lint-streams-'));
+      test.after(() => {
+        fs.rmSync(dir, { recursive: true, force: true });
+      });
+      const stdout = await fs.promises.open(path.join(dir, 'stdout'), 'wx+');
+      let stderr: fs.promises.FileHandle | undefined;
+      const args = [cli, ...flags, '-'];
+      let expected: Buffer;
+      try {
+        stderr = await fs.promises.open(path.join(dir, 'stderr'), 'wx+');
+        const redirected = spawnSync(process.execPath, args, {
+          input,
+          stdio: ['pipe', stdout.fd, stderr.fd],
+        });
+        assert.ifError(redirected.error);
+        assert.equal(redirected.status, status);
+
+        expected = await buffer(stdout.createReadStream({ start: 0, autoClose: false }));
+        assert.ok(expected.length > 256 * 1024, 'output must exceed the pipe buffer');
+        assert.match(expected.toString('utf8'), outputStart);
+        const errors = await buffer(stderr.createReadStream({ start: 0, autoClose: false }));
+        assert.equal(errors.toString('utf8'), error);
+      } finally {
+        await Promise.all([stdout.close(), stderr?.close()]);
+      }
+
+      const piped = spawnSync(process.execPath, args, { input, maxBuffer: 8 * 1024 * 1024 });
+      assert.ifError(piped.error);
+      assert.equal(piped.status, status);
+      assert.equal(piped.stderr.toString('utf8'), error);
+      assert.ok(
+        piped.stdout.equals(expected),
+        `pipe captured ${piped.stdout.length} bytes, file captured ${expected.length}`,
+      );
+      if (flags.includes('--json')) {
+        const report: unknown = JSON.parse(piped.stdout.toString('utf8'));
+        assert.ok(report !== null && typeof report === 'object' && 'passed' in report);
+        assert.equal(report.passed, status === 0);
+        assert.ok('issues' in report && Array.isArray(report.issues));
+        assert.equal(report.issues.length, 4096);
+        if (flags.includes('--explain')) {
+          assert.ok('explain' in report && Array.isArray(report.explain));
+          assert.equal(report.explain.length, 2048);
+        }
+      }
+    });
+  }
 });

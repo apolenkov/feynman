@@ -330,6 +330,52 @@ describe('evaluation runner', () => {
     }
   });
 
+  for (const [label, text, valid] of [
+    ['missing', undefined, false],
+    ['non-string', { answer: 'looks like text' }, false],
+    ['blank', ' \t\n ', false],
+    ['multiline', '  ┌─é─┐\n  └───┘\r\n', true],
+  ] as const) {
+    it(`records a ${label} agent message in a completed tool-free turn`, () => {
+      const fx = fixture();
+      const stdout = [
+        JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text } }),
+        JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } }),
+      ].join('\n');
+      try {
+        const evaluate = (): void => {
+          run(
+            fx,
+            runnerForExec(() => ok(stdout)),
+          );
+        };
+        if (valid) evaluate();
+        else assert.throws(evaluate, /Evaluation stopped after failed attempt/);
+        const attempts = fs.readdirSync(fx.output).filter((name) => /^1-1-.+\.json$/.test(name));
+        assert.equal(attempts.length, valid ? 3 : 1);
+        for (const attempt of attempts) {
+          const summary: unknown = JSON.parse(
+            fs.readFileSync(path.join(fx.output, attempt), 'utf8'),
+          );
+          assert.partialDeepStrictEqual(summary, {
+            success: valid,
+            usedTools: false,
+            ...(valid ? { answer: text } : {}),
+          });
+          assert.equal(
+            fs.readFileSync(
+              path.join(fx.output, attempt.replace(/\.json$/, '.events.jsonl')),
+              'utf8',
+            ),
+            stdout,
+          );
+        }
+      } finally {
+        fx.dispose();
+      }
+    });
+  }
+
   it('reports both a failed attempt and temporary-home cleanup failure', () => {
     const fx = fixture();
     const failure: EvaluationCommandResult = {

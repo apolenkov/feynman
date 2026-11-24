@@ -93,7 +93,29 @@ export function isCanonicalIssueAuthor(context: FactoryContext, issue: JsonRecor
     (String(id) === context.policy['owner_id'] || id === 41898282)
   );
 }
-function canonicalIssue(context: FactoryContext, issue: JsonRecord): JsonRecord | null {
+function parseFindingMarker(payload: string): JsonRecord | null {
+  try {
+    const parsed: unknown = JSON.parse(payload);
+    const value = record(parsed);
+    stringField(value, 'repository_id');
+    stringField(value, 'fingerprint_policy_revision');
+    return /^[a-f0-9]{64}$/.test(stringField(value, 'fingerprint')) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function canonicalIssue(
+  context: FactoryContext,
+  issue: JsonRecord,
+  {
+    legacyImport = false,
+    matchesIdentity,
+  }: {
+    readonly legacyImport?: boolean;
+    readonly matchesIdentity?: (marker: JsonRecord) => boolean;
+  } = {},
+): JsonRecord | null {
   if (
     !isCanonicalIssueAuthor(context, issue) ||
     issue['pull_request'] !== undefined ||
@@ -101,21 +123,27 @@ function canonicalIssue(context: FactoryContext, issue: JsonRecord): JsonRecord 
   )
     return null;
   const prefix = '<!-- factory-finding-v1 ';
-  const marker = issue['body'].split('\n').filter((line) => line.startsWith(prefix));
-  if (marker.length === 0) return null;
-  if (marker.length !== 1 || marker[0]?.endsWith(' -->') !== true)
-    throw new FactoryFailure('Invalid canonical finding marker; preserve work');
-  try {
-    const parsed: unknown = JSON.parse(marker[0].slice(prefix.length, -4));
-    const value = record(parsed);
-    stringField(value, 'repository_id');
-    stringField(value, 'fingerprint_policy_revision');
-    if (!/^[a-f0-9]{64}$/.test(stringField(value, 'fingerprint')))
-      throw new FactoryFailure('Invalid canonical fingerprint');
-    return value;
-  } catch {
-    throw new FactoryFailure('Invalid canonical finding marker; preserve work');
+  const suffix = ' -->';
+  if (legacyImport) {
+    if (!issue['body'].includes(prefix)) return null;
+    // Legacy notes may wrap the comment in prose or contain a prefix-only placeholder.
+    const payload = /<!-- factory-finding-v1 (\{[^\n]*\}) -->/.exec(issue['body'])?.[1];
+    const marker = payload === undefined ? null : parseFindingMarker(payload);
+    if (marker === null)
+      throw new FactoryFailure('Unidentifiable legacy canonical issue; inventory unknown');
+    return marker;
   }
+  const lines = issue['body'].split('\n').filter((line) => line.startsWith(prefix));
+  for (const line of lines) {
+    const marker = line.endsWith(suffix)
+      ? parseFindingMarker(line.slice(prefix.length, -suffix.length))
+      : null;
+    if (matchesIdentity !== undefined && (marker === null || !matchesIdentity(marker))) continue;
+    if (marker === null || lines.length !== 1)
+      throw new FactoryFailure('Invalid canonical finding marker; preserve work');
+    return marker;
+  }
+  return null;
 }
 const SEVERITIES = ['critical', 'high', 'medium', 'low'];
 const MAX_BODY_BYTES = 2048;
@@ -131,8 +159,10 @@ export function renderUntrusted(text: string, maxBytes: number): string {
     .replaceAll('://', ':\u200b//')
     .replace(/www\./gi, (match) => `${match.slice(0, 3)}\u200b.`);
   const longestRun = Math.max(0, ...(neutral.match(/`+/g) ?? []).map((run) => run.length));
-  const fence = '`'.repeat(Math.max(3, longestRun + 1));
-  const room = Math.max(0, maxBytes - 2 * fence.length - 2);
+  const fenceLength = Math.max(3, longestRun + 1);
+  const room = maxBytes - 2 * fenceLength - 2;
+  if (room < 0) return '';
+  const fence = '`'.repeat(fenceLength);
   const bounded = Buffer.from(neutral, 'utf8')
     .subarray(0, room)
     .toString('utf8')
@@ -255,10 +285,18 @@ export async function reconcilePublication(
       throw new FactoryFailure('Unknown finding severity');
     const route = `/repos/${stringField(context.policy, 'repository_full_name')}/issues`;
     let snapshot = (await githubPages(context, `${route}?state=all`)).map(record);
+    const matchingIssues = (fingerprint: string): JsonRecord[] =>
+      snapshot.filter((issue) => {
+        const marker = canonicalIssue(context, issue);
+        return (
+          marker !== null &&
+          marker['repository_id'] === context.policy['repository_id'] &&
+          marker['fingerprint_policy_revision'] === scan['fingerprint_policy_revision'] &&
+          marker['fingerprint'] === fingerprint
+        );
+      });
     const dispatch: JsonRecord[] = [];
-    const processed: JsonRecord[] = [];
-    const deferred: JsonRecord[] = [];
-    let created = 0;
+    const deferred = new Map<JsonRecord, JsonRecord>();
     const closing: JsonRecord[] = [];
     // Absence closes an issue only with independent disappearance proof; without it nothing is closed.
     if (complete && scan['disappearance_authority'] !== undefined) {
@@ -291,6 +329,11 @@ export async function reconcilePublication(
         closing.push(issue);
       }
     }
+    // Preflight the bodies for this batch before the first write. Existing issues and
+    // repeated fingerprints do not consume another creation slot.
+    const plans = [];
+    const plannedCreations = new Set<string>();
+    const issueCap = numberField(context.policy, 'issue_cap');
     for (const finding of identified) {
       const proof = await verifyAuthority(context, record(finding['authority']));
       const verifierOperation = record(proof['operation']);
@@ -303,10 +346,7 @@ export async function reconcilePublication(
       )
         throw new FactoryFailure('Finding adjudication provenance mismatch');
       const confidence = stringField(proof, 'outcome');
-      if (confidence === 'refuted') {
-        processed.push(finding);
-        continue;
-      }
+      if (confidence === 'refuted') continue;
       if (confidence !== 'confirmed' && confidence !== 'disputed')
         throw new FactoryFailure('Verifier infrastructure/no-verdict failure');
       const fingerprint = stringField(finding, 'fingerprint');
@@ -315,22 +355,15 @@ export async function reconcilePublication(
         fingerprint_policy_revision: scan['fingerprint_policy_revision'],
         fingerprint,
       };
-      const matches = snapshot.filter((issue) => {
-        const marker = canonicalIssue(context, issue);
-        return (
-          marker !== null &&
-          marker['repository_id'] === identity.repository_id &&
-          marker['fingerprint_policy_revision'] === identity.fingerprint_policy_revision &&
-          marker['fingerprint'] === fingerprint
-        );
-      });
+      const matches = matchingIssues(fingerprint);
       if (matches.length > 1) throw new FactoryFailure('Canonical issue conflict');
-      let issue = matches[0];
-      if (issue === undefined && created >= numberField(context.policy, 'issue_cap')) {
-        deferred.push({ fingerprint, path: finding['path'], adjudication: confidence });
-        continue;
+      if (matches.length === 0 && !plannedCreations.has(fingerprint)) {
+        if (plannedCreations.size >= issueCap) {
+          deferred.set(finding, { fingerprint, path: finding['path'], adjudication: confidence });
+          continue;
+        }
+        plannedCreations.add(fingerprint);
       }
-      processed.push(finding);
       const findingPath = stringField(finding, 'path');
       // An unsafe path cannot be judged against the patterns, so it never becomes eligible.
       const blockedPath =
@@ -353,9 +386,14 @@ export async function reconcilePublication(
           .join('\n');
       const header = headerFor(scan['inventory_sha256']);
       const text = findingText(finding);
-      const room = MAX_BODY_BYTES - Buffer.byteLength(header) - DETAILS_LABEL.length - 3;
-      const body =
-        text === null ? header : `${header}\n\n${DETAILS_LABEL}\n${renderUntrusted(text, room)}`;
+      const detailsPrefix = `${header}\n\n${DETAILS_LABEL}\n`;
+      const details =
+        text === null
+          ? ''
+          : renderUntrusted(text, MAX_BODY_BYTES - Buffer.byteLength(detailsPrefix));
+      const body = details === '' ? header : detailsPrefix + details;
+      if (Buffer.byteLength(body) > MAX_BODY_BYTES)
+        throw new FactoryFailure(`Required finding issue metadata exceeds ${MAX_BODY_BYTES} bytes`);
       // Only the structural header is compared: a reworded description of the same finding is no change,
       // and the stored inventory digest is bookkeeping that must not rewrite every issue.
       const sameBody = (current: JsonRecord): boolean => {
@@ -373,7 +411,39 @@ export async function reconcilePublication(
       };
       const title = `[factory:${confidence}] ${fingerprint.slice(0, 16)}`;
       const findingLabels = [`severity:${stringField(finding, 'severity')}`, 'source:ocr-scan'];
+      plans.push({
+        finding,
+        proof,
+        confidence,
+        identity,
+        repairState,
+        body,
+        sameBody,
+        title,
+        findingLabels,
+      });
+    }
+    let created = 0;
+    for (const {
+      finding,
+      proof,
+      confidence,
+      identity,
+      repairState,
+      body,
+      sameBody,
+      title,
+      findingLabels,
+    } of plans) {
+      const { fingerprint } = identity;
+      const matches = matchingIssues(fingerprint);
+      if (matches.length > 1) throw new FactoryFailure('Canonical issue conflict');
+      let issue = matches[0];
       if (issue === undefined) {
+        if (created >= issueCap) {
+          deferred.set(finding, { fingerprint, path: finding['path'], adjudication: confidence });
+          continue;
+        }
         await verifyControlSource(context);
         try {
           issue = record(
@@ -385,15 +455,7 @@ export async function reconcilePublication(
           );
         } catch {
           snapshot = (await githubPages(context, `${route}?state=all`)).map(record);
-          const discovered = snapshot.filter((candidate) => {
-            const marker = canonicalIssue(context, candidate);
-            return (
-              marker !== null &&
-              marker['repository_id'] === identity.repository_id &&
-              marker['fingerprint_policy_revision'] === identity.fingerprint_policy_revision &&
-              marker['fingerprint'] === identity.fingerprint
-            );
-          });
+          const discovered = matchingIssues(fingerprint);
           if (discovered.length !== 1 || discovered[0] === undefined)
             throw new FactoryFailure('Ambiguous issue publication; no blind retry');
           issue = discovered[0];
@@ -534,8 +596,11 @@ export async function reconcilePublication(
     }
     return {
       ...base,
-      selected: processed,
-      pending: deferred,
+      selected: identified.filter((finding) => !deferred.has(finding)),
+      pending: identified.flatMap((finding) => {
+        const entry = deferred.get(finding);
+        return entry === undefined ? [] : [entry];
+      }),
       issues,
       dispatch,
       status: 'accepted',

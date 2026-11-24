@@ -190,10 +190,10 @@ function repositoryRelativePath(source: string, root: string): string {
  */
 export function coverageScope(lcov: string, root = ROOT): CoverageScope {
   const records = lcovRecords(lcov);
+  const lcovFiles = records.map(({ source }) => repositoryRelativePath(source, root)).toSorted();
+  const duplicate = lcovFiles.find((file, index) => file === lcovFiles[index - 1]);
+  if (duplicate !== undefined) throw malformedLcov(`duplicate source record for ${duplicate}`);
   const coverageFiles = coverageSourceFiles(root);
-  const lcovFiles = [
-    ...new Set(records.map((record) => repositoryRelativePath(record.source, root))),
-  ].toSorted();
   const lcovFileSet = new Set(lcovFiles);
   const coverageFileSet = new Set(coverageFiles);
 

@@ -1,5 +1,6 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,6 +31,7 @@ import {
   type BumpOptions,
   type CommandResult,
 } from '../scripts/feynman-bump.ts';
+import { gitFixtureEnvironment } from './helpers/git-environment.ts';
 
 const MARKER = '**bold** keys; ▲▼ priority; ✓✗ status.';
 
@@ -60,6 +62,112 @@ describe('feynman-highlight', () => {
       note: 'removed 2 marker lines',
     });
     assert.equal(applyHighlight(applied.text).text, applied.text);
+  });
+
+  it('rejects an unknown highlight option before reading or writing the contract', () => {
+    const root = tempRoot();
+    const rulesPath = path.join(root, 'rules', 'feynman-contract.md');
+    const original = '<contract>\ntext\n</contract>\n';
+    const errorMock = mock.method(console, 'error', () => undefined);
+    try {
+      fs.mkdirSync(path.dirname(rulesPath), { recursive: true });
+      fs.writeFileSync(rulesPath, original);
+      const reads: string[] = [];
+      const base = createHighlightEnvironment(root, () => commandResult());
+      const environment: HighlightEnvironment = {
+        ...base,
+        readFile: (filePath) => {
+          reads.push(filePath);
+          return base.readFile(filePath);
+        },
+        log: noOpLog,
+      };
+      for (const option of ['--dryrun', '-n']) {
+        assert.equal(highlightExitCode([option], environment), 1);
+        assert.deepEqual(errorMock.mock.calls.at(-1)?.arguments, [
+          'error:',
+          `unknown option: ${option}`,
+        ]);
+        assert.equal(fs.readFileSync(rulesPath, 'utf8'), original);
+      }
+      assert.deepEqual(reads, []);
+    } finally {
+      errorMock.mock.restore();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('writes valid highlight changes once and keeps dry-runs and repeats write-free', () => {
+    let text = '<contract>\ntext\n</contract>\n';
+    const writes: string[] = [];
+    let testRuns = 0;
+    const environment: HighlightEnvironment = {
+      root: '/tmp/highlight-test',
+      readFile: () => text,
+      writeFile: (_filePath, contents) => {
+        text = contents;
+        writes.push(contents);
+      },
+      runTests: () => {
+        testRuns++;
+      },
+      log: noOpLog,
+    };
+    const original = text;
+    const highlighted = `<contract>\ntext\n${MARKER}\n</contract>\n`;
+    assert.equal(highlightExitCode(['--dry-run'], environment), 0);
+    assert.equal(text, original);
+    assert.equal(highlightExitCode([], environment), 0);
+    assert.equal(highlightExitCode([], environment), 0);
+    assert.equal(text, highlighted);
+    assert.equal(highlightExitCode(['--revert', '--dry-run'], environment), 0);
+    assert.equal(text, highlighted);
+    assert.equal(highlightExitCode(['--revert'], environment), 0);
+    assert.equal(highlightExitCode(['--revert'], environment), 0);
+    assert.equal(text, original);
+    assert.deepEqual(writes, [highlighted, original]);
+    assert.equal(testRuns, 2);
+  });
+
+  it('permits reverting oversized input only when the resulting contract fits the budget', () => {
+    const root = tempRoot();
+    const rulesPath = path.join(root, 'rules', 'feynman-contract.md');
+    const fitting = `<contract>\n${'x'.repeat(4456)}\n</contract>\n`;
+    const highlighted = `<contract>\n${'x'.repeat(4456)}\n${MARKER}\n</contract>\n`;
+    let testRuns = 0;
+    const environment = {
+      ...createHighlightEnvironment(root, () => {
+        testRuns++;
+        return commandResult();
+      }),
+      log: noOpLog,
+    };
+    try {
+      fs.mkdirSync(path.dirname(rulesPath), { recursive: true });
+      assert.equal(Buffer.byteLength(fitting), 4480);
+      fs.writeFileSync(rulesPath, fitting);
+      assert.throws(() => {
+        executeHighlight({ dryRun: false, operation: 'apply' }, environment);
+      }, /exceeds budget 4480/);
+      assert.equal(fs.readFileSync(rulesPath, 'utf8'), fitting);
+
+      fs.writeFileSync(rulesPath, `x${highlighted}`);
+      assert.throws(() => {
+        executeHighlight({ dryRun: false, operation: 'revert' }, environment);
+      }, /size 4481 exceeds budget 4480/);
+      assert.equal(fs.readFileSync(rulesPath, 'utf8'), `x${highlighted}`);
+
+      fs.writeFileSync(rulesPath, highlighted);
+      assert.equal(highlightExitCode(['--revert', '--dry-run'], environment), 0);
+      assert.equal(fs.readFileSync(rulesPath, 'utf8'), highlighted);
+      assert.equal(testRuns, 0);
+      assert.equal(highlightExitCode(['--revert'], environment), 0);
+      assert.equal(highlightExitCode(['--revert'], environment), 0);
+      assert.equal(fs.readFileSync(rulesPath, 'utf8'), fitting);
+      assert.equal(testRuns, 1);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('restores the exact original bytes when post-write tests fail', () => {
@@ -299,6 +407,7 @@ describe('feynman-bump', () => {
     });
     assert.deepEqual(argv, ['patch', 'ignored', '--commit', '--commit']);
     assert.equal(parseBumpArguments(['patch', '--tag']).kind, 'error');
+    assert.equal(parseBumpArguments(['patch', '--commit', '--push']).kind, 'error');
     assert.equal(parseBumpArguments(['patch', '--dry-run', '--commit']).kind, 'error');
     assert.equal(parseBumpArguments(['patch', '--unknown']).kind, 'error');
     assert.equal(bumpExitCode(['--push']), 2);
@@ -337,35 +446,149 @@ describe('feynman-bump', () => {
     assert.throws(() => readManifestVersion('{}', 'x.json'), /Invalid version manifest/);
   });
 
-  it('runs only explicitly requested release actions through the injected runner', () => {
-    const root = tempRoot();
-    const commands: string[] = [];
-    try {
-      writeBumpFixtures(root);
-      executeBump(RELEASE_OPTIONS, bumpEnvironment(root, commands));
-      assert.equal(
-        readManifestVersion(
-          fs.readFileSync(path.join(root, 'package.json'), 'utf8'),
-          'package.json',
-        ),
-        '1.3.0',
-      );
-      assert.deepEqual(commands, [
-        'git status --porcelain',
-        'git rev-parse --abbrev-ref HEAD',
-        'npm run --silent changelog',
-        'npm run --silent ci',
-        'git add package.json plugins/feynman/.codex-plugin/plugin.json package-lock.json CHANGELOG.md',
-        'git commit -m chore(release): v1.3.0',
-        'git rev-parse --short HEAD',
-        'git tag -a v1.3.0 -m v1.3.0',
-        'git push origin main',
-        'git push origin v1.3.0',
-      ]);
-    } finally {
-      fs.rmSync(root, { recursive: true, force: true });
-    }
-  });
+  for (const { mode, commit, tag, push, gitActionCount } of [
+    {
+      mode: 'preparation only',
+      commit: false,
+      tag: false,
+      push: false,
+      gitActionCount: 0,
+    },
+    {
+      mode: 'commit only',
+      commit: true,
+      tag: false,
+      push: false,
+      gitActionCount: 3,
+    },
+    {
+      mode: 'commit and tag',
+      commit: true,
+      tag: true,
+      push: false,
+      gitActionCount: 4,
+    },
+    {
+      mode: 'full push',
+      commit: true,
+      tag: true,
+      push: true,
+      gitActionCount: 6,
+    },
+  ]) {
+    it(`finishes the same release using the printed commands after ${mode}`, () => {
+      const scratch = tempRoot();
+      const root = path.join(scratch, 'checkout');
+      const remote = path.join(scratch, 'origin.git');
+      const env = gitFixtureEnvironment();
+      const git = (args: readonly string[], cwd = root): Buffer =>
+        execFileSync('git', args, { cwd, env, stdio: 'pipe' });
+      const ref = (name: string, cwd = root): string =>
+        git(['rev-parse', name], cwd).toString().trim();
+      const commands: string[] = [];
+      const logs: string[] = [];
+      const writes: string[] = [];
+      const base = createBumpEnvironment(root);
+      const changelog = '# Changelog\n\n## [1.3.0]\n';
+      try {
+        fs.mkdirSync(root);
+        writeBumpFixtures(root);
+        git(['init', '--initial-branch=main']);
+        git(['config', 'user.name', 'Feynman Test']);
+        git(['config', 'user.email', 'feynman-test@example.invalid']);
+        git(['add', '.']);
+        git(['commit', '-m', 'Initial release fixtures']);
+        git(['init', '--bare', remote]);
+        git(['remote', 'add', 'origin', remote]);
+        git(['push', 'origin', 'main']);
+        const initialCommit = ref('HEAD');
+        let prepared = releaseBytes(root);
+        executeBump(
+          { ...RELEASE_OPTIONS, commit, tag, push },
+          {
+            ...base,
+            log: (message) => {
+              logs.push(message);
+            },
+            writeFile: (relativePath, contents) => {
+              writes.push(relativePath);
+              base.writeFile(relativePath, contents);
+            },
+            run: (command, args) => {
+              commands.push([command, ...args].join(' '));
+              if (command === 'git') return commandResult(git(args).toString());
+              assert.equal(command, 'npm');
+              if (args.at(-1) === 'changelog') {
+                fs.writeFileSync(path.join(root, 'CHANGELOG.md'), changelog);
+              } else {
+                assert.equal(args.at(-1), 'ci');
+                prepared = releaseBytes(root);
+              }
+              return commandResult();
+            },
+          },
+        );
+        assert.deepEqual(writes, RELEASE_PATHS.slice(0, 3));
+        assert.deepEqual(commands, [
+          'git status --porcelain',
+          ...(tag ? ['git rev-parse --abbrev-ref HEAD'] : []),
+          'npm run --silent changelog',
+          'npm run --silent ci',
+          ...[
+            'git add package.json plugins/feynman/.codex-plugin/plugin.json package-lock.json CHANGELOG.md',
+            'git commit -m chore(release): v1.3.0',
+            'git rev-parse --short HEAD',
+            'git tag -a v1.3.0 -m v1.3.0',
+            'git push origin main',
+            'git push origin v1.3.0',
+          ].slice(0, gitActionCount),
+        ]);
+        for (const manifest of RELEASE_PATHS.slice(0, 3)) {
+          assert.equal(
+            readManifestVersion(fs.readFileSync(path.join(root, manifest), 'utf8'), manifest),
+            '1.3.0',
+          );
+        }
+        assert.equal(prepared.get('CHANGELOG.md')?.toString(), changelog);
+        assertReleaseBytes(root, prepared);
+        const releaseTag = 'refs/tags/v1.3.0';
+        const main = 'refs/heads/main';
+        const commitBeforeContinuation = ref('HEAD');
+        assert.equal(commitBeforeContinuation !== initialCommit, commit);
+        assert.equal(git(['tag', '--list']).toString().trim(), tag ? 'v1.3.0' : '');
+        const tagBeforeContinuation = tag ? ref(releaseTag) : null;
+        assert.equal(ref(main, remote), push ? commitBeforeContinuation : initialCommit);
+        assert.equal(git(['tag', '--list'], remote).toString().trim(), push ? 'v1.3.0' : '');
+
+        const next = logs.indexOf('\ndone. next:');
+        assert.ok(next >= 0, 'release reports the remaining steps');
+        for (const line of logs.slice(next + 1).map((message) => message.trim())) {
+          if (line.startsWith('git ')) {
+            execFileSync('/bin/sh', ['-ec', line], { cwd: root, env, stdio: 'pipe' });
+          }
+        }
+
+        const releaseCommit = ref('HEAD');
+        assert.equal(ref('HEAD^'), initialCommit, 'exactly one release commit');
+        if (commit) assert.equal(releaseCommit, commitBeforeContinuation);
+        for (const releasePath of RELEASE_PATHS) {
+          assert.deepEqual(
+            git(['show', `${releaseCommit}:${releasePath}`]),
+            prepared.get(releasePath),
+          );
+        }
+        assertReleaseBytes(root, prepared);
+        assert.equal(git(['status', '--porcelain']).toString(), '');
+        assert.equal(git(['cat-file', '-t', releaseTag]).toString().trim(), 'tag');
+        assert.equal(ref(`${releaseTag}^{commit}`), releaseCommit);
+        if (tagBeforeContinuation !== null) assert.equal(ref(releaseTag), tagBeforeContinuation);
+        assert.equal(ref(main, remote), releaseCommit);
+        assert.equal(ref(releaseTag, remote), ref(releaseTag));
+      } finally {
+        fs.rmSync(scratch, { recursive: true, force: true });
+      }
+    });
+  }
 
   it('stops on preflight failure before reading or writing manifests', () => {
     const environment: BumpEnvironment = {

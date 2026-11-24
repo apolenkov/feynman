@@ -1,0 +1,143 @@
+--- a/openspec/specs/repository-quality/spec.md
++++ b/openspec/specs/repository-quality/spec.md
+@@ -1,4 +1,6 @@
+ # Repository quality and product usefulness
++
++## Purpose
+ 
+ This acceptance contract was established before the quality refactor, against
+ baseline `3d470161b5709da6cad764b23f9e10ae734b14df`. It includes the user's
+@@ -14,7 +16,9 @@
+ comparison below is retained as a historical failed acceptance contract; it is
+ not retroactively passed or rerun merely to beat its score ceiling.
+ 
+-## Requirement: Bounded, evidence-based acceptance
++## Requirements
++
++### Requirement: Bounded, evidence-based acceptance
+ 
+ The system SHALL satisfy each applicable requirement below on the same final
+ source revision. Evidence SHALL identify commands, runtime versions, artifacts,
+@@ -22,12 +26,59 @@
+ failures SHALL remain unproven. Existing coverage scope and public behavior
+ SHALL NOT be weakened to obtain a pass.
+ 
+-### Scenario: Final acceptance
++#### Scenario: Final acceptance
+ 
+-- WHEN the quality work is assessed
+-- THEN every ID has direct evidence or a source-backed non-applicability reason
+-- AND no mandatory defect remains open
+-- AND publishing or account changes are separately authorized.
++- **WHEN** the quality work is assessed
++- **THEN** every ID has direct evidence or a source-backed non-applicability reason
++- **AND** no mandatory defect remains open
++- **AND** publishing or account changes are separately authorized.
++
++### Requirement: Accurate ASCII explanations
++
++For whole-text transformations, every supplied fact within the requested scope
++SHALL survive in the rendered result, with zero invented or changed facts.
++Relationships SHALL retain identities, type, direction or its uncertainty,
++conditions, negation, and conjunctive or alternative prerequisites. A graph
++SHALL NOT become an apparent tree by losing shared nodes or return edges.
++Width SHALL be checked in display columns against the supplied budget.
++
++#### Scenario: Independent output reconstruction
++
++- **GIVEN** source texts, atomic facts and reader questions frozen before generation
++- **WHEN** the native skill and actual installed hook produce the diagrams
++- **THEN** an independent reviewer reconstructs each diagram without the source
++- **AND** the reconstructed facts are compared with the complete frozen fact set
++- **AND** ambiguous connectors and unsupported prose are treated as defects
++- **AND** corrupted control diagrams demonstrate the review can detect semantic errors.
++
++#### Scenario: User intent and settings
++
++- **WHEN** the user explicitly requests an ASCII diagram
++- **THEN** intensity and output style do not suppress that requested diagram
++- **AND** the requested width is respected without removing facts
++- **AND** ordinary prose-only and applicable suppression requests remain diagram-free.
++
++The complete task counts, delivery evidence, negative controls and reporting
++rules live in the linked protocol. This measures correctness and structural
++answerability on the frozen tasks, not human reading speed or universal model
++reliability. New failures SHALL be retained and addressed with source changes;
++criteria SHALL NOT be relaxed after seeing outputs to obtain a pass.
++
++### Requirement: Proportionate implementation
++
++The system SHALL remain Codex-only and use TypeScript for first-party code,
++with no runtime npm dependencies. Immutable transformations are the default.
++Local algorithm or I/O-buffer mutation requires the named, bounded justification
++and enforcement in `strict-code.md`; this is not permission for mutable command
++mode flags or configuration assembly. Global mutable defaults, caller-owned data
++mutation and hidden state changes are not permitted.
++
++#### Scenario: Scope boundary
++
++- **WHEN** implementation would require a breaking public change, a paid resource,
++  changing real user configuration, external writes, or weaker acceptance
++- **THEN** prepare the concrete change and request the necessary user decision
++- **AND** continue independent authorized local work.
+ 
+ ## Acceptance matrix
+ 
+@@ -48,37 +99,6 @@
+ | Q13 | Supply chain is controlled | Lockfile install, dependency audit, least-privilege workflows, immutable action references, reviewed update policy, no runtime npm dependencies |
+ | Q14 | Documentation reflects behavior | Requirements, architecture, CLI help, skill, README and release instructions agree; links and examples are checked |
+ | Q15 | Release and maintenance are operable | Version consistency, artifact verification, release rehearsal, recovery instructions, security reporting and contribution workflow are verified |
+-
+-## Requirement: Accurate ASCII explanations
+-
+-For whole-text transformations, every supplied fact within the requested scope
+-SHALL survive in the rendered result, with zero invented or changed facts.
+-Relationships SHALL retain identities, type, direction or its uncertainty,
+-conditions, negation, and conjunctive or alternative prerequisites. A graph
+-SHALL NOT become an apparent tree by losing shared nodes or return edges.
+-Width SHALL be checked in display columns against the supplied budget.
+-
+-### Scenario: Independent output reconstruction
+-
+-- GIVEN source texts, atomic facts and reader questions frozen before generation
+-- WHEN the native skill and actual installed hook produce the diagrams
+-- THEN an independent reviewer reconstructs each diagram without the source
+-- AND the reconstructed facts are compared with the complete frozen fact set
+-- AND ambiguous connectors and unsupported prose are treated as defects
+-- AND corrupted control diagrams demonstrate the review can detect semantic errors.
+-
+-### Scenario: User intent and settings
+-
+-- WHEN the user explicitly requests an ASCII diagram
+-- THEN intensity and output style do not suppress that requested diagram
+-- AND the requested width is respected without removing facts
+-- AND ordinary prose-only and applicable suppression requests remain diagram-free.
+-
+-The complete task counts, delivery evidence, negative controls and reporting
+-rules live in the linked protocol. This measures correctness and structural
+-answerability on the frozen tasks, not human reading speed or universal model
+-reliability. New failures SHALL be retained and addressed with source changes;
+-criteria SHALL NOT be relaxed after seeing outputs to obtain a pass.
+ 
+ ## Historical requirement: Useful explanations
+ 
+@@ -127,19 +147,3 @@
+ - THEN retain the failure and request a product decision before any further experiment
+ - AND retain the failed run as evidence
+ - AND do not substitute unit tests or synthetic answers for live outcomes.
+-
+-## Requirement: Proportionate implementation
+-
+-The system SHALL remain Codex-only and use TypeScript for first-party code,
+-with no runtime npm dependencies. Immutable transformations are the default.
+-Local algorithm or I/O-buffer mutation requires the named, bounded justification
+-and enforcement in `strict-code.md`; this is not permission for mutable command
+-mode flags or configuration assembly. Global mutable defaults, caller-owned data
+-mutation and hidden state changes are not permitted.
+-
+-### Scenario: Scope boundary
+-
+-- WHEN implementation would require a breaking public change, a paid resource,
+-  changing real user configuration, external writes, or weaker acceptance
+-- THEN prepare the concrete change and request the necessary user decision
+-- AND continue independent authorized local work.
