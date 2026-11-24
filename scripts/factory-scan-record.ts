@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   FactoryFailure,
+  readLimitedFile,
   canonicalBytes,
   loadFactoryPolicy,
   parseFactoryJson,
@@ -67,8 +68,7 @@ function strings(value: unknown, what: string): string[] {
 }
 function readBundle(dir: string, name: string): JsonRecord {
   const file = path.join(dir, name);
-  if (fs.statSync(file).size > 2_000_000) fail(`${name} size`);
-  return parseFactoryJson(fs.readFileSync(file));
+  return parseFactoryJson(readLimitedFile(file, 2_000_000, () => fail(`${name} size`)));
 }
 
 interface Comment {

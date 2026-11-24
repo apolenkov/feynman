@@ -1,3 +1,7 @@
+import { boxes } from '../lib/lint/boxes.ts';
+import { flowArrowIndex, hasExactlyOneArrow } from '../lib/lint/arrows.ts';
+import fc from 'fast-check';
+import { parse } from '../lib/lint/parser.ts';
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
 import { autofix } from '../lib/lint/autofix.ts';
@@ -69,4 +73,163 @@ it('aligns a narrow compact title once and satisfies frame rules', () => {
   assert.ok(fixed.includes('Deploy'));
   assert.equal(autofix(fixed), fixed);
   assert.deepEqual(lint(fixed, { rules: ['L01', 'L08', 'L09'] }).issues, []);
+});
+
+const propertyOptions = { seed: 20261123, numRuns: 100 };
+
+it('parses generated arrow rows and aligns them idempotently without changing labels', () => {
+  const row = fc.record({
+    left: fc.constantFrom('x', '漢', '🧭'),
+    padding: fc.integer({ min: 0, max: 2 }),
+    token: fc.constantFrom('-->', '→', '──>', '─→'),
+    label: fc.constantFrom('alpha', 'β', '漢字', '🧭'),
+  });
+  fc.assert(
+    fc.property(fc.array(row, { minLength: 2, maxLength: 24 }), (rows) => {
+      const input = rows
+        .map(
+          ({ left, padding, token, label }) => `[${left}]${' '.repeat(padding)}${token} [${label}]`,
+        )
+        .join('\n');
+      const fixed = autofix(input);
+      assert.equal(autofix(fixed), fixed);
+      assert.deepEqual(
+        parse(fixed).map((node) => node.content),
+        [fixed],
+      );
+      const widest = Math.max(...rows.map(({ left }) => visualWidth(left)));
+      assert.deepEqual(
+        fixed.split('\n'),
+        rows.map(
+          ({ left, token, label }) =>
+            `[${left}]${' '.repeat(1 + widest - visualWidth(left))}${token} [${label}]`,
+        ),
+      );
+    }),
+    propertyOptions,
+  );
+});
+
+function referenceArrowOffsets(line: string): number[] {
+  const offsets: number[] = [];
+  for (let i = 0; i < line.length;) {
+    const token = ['─→', '→', '──>', '-->'].find((value) => line.startsWith(value, i));
+    if (token !== undefined) offsets.push(i);
+    i += token?.length ?? 1;
+  }
+  return offsets;
+}
+
+it('matches nonempty boxes and complete arrow tokens in generated rows', () => {
+  const token = fc.constantFrom('->', '─>', '─→', '──>', '-->', '→');
+  const piece = fc.oneof(
+    token,
+    token.map((arrow) => `[漢${arrow}]`),
+    fc.constantFrom('[]', '[', ']', '[[x]', '[unclosed', '🧭'),
+  );
+  fc.assert(
+    fc.property(fc.array(piece, { minLength: 1, maxLength: 16 }), (pieces) => {
+      const line = pieces.join('');
+      const arrows = referenceArrowOffsets(line);
+      assert.equal(flowArrowIndex(line), arrows[0] ?? -1);
+      assert.equal(hasExactlyOneArrow(line), arrows.length === 1);
+      const labels = [...line.matchAll(/\[[^\]]+\]/g)];
+      assert.deepEqual(
+        [...boxes(line)],
+        labels.map((m) => ({ start: m.index, end: m.index + m[0].length })),
+      );
+    }),
+    propertyOptions,
+  );
+});
+
+it('requires two nonempty boxes to classify an arrowless box row', () => {
+  for (const line of ['[single]', '[] [single]', '[[nested]', '[unfinished']) {
+    assert.deepEqual(parse(line), []);
+    assert.deepEqual(
+      parse(`\`\`\`
+${line}
+\`\`\``),
+      [],
+    );
+  }
+});
+
+// Enumerate all pairs of nonempty labels (including nested openings) and
+// inspect only the intervening substring. Generated inputs are deliberately short.
+function referenceAsciiFlow(text: string): boolean {
+  const labels = [...text.matchAll(/(?=(\[[^\]]+\]))/g)];
+  return labels.some((left) => {
+    const end = left.index + (left[1]?.length ?? 0);
+    return labels.some((right) => {
+      const gap = text.slice(end, right.index);
+      return gap.includes('-->') && !/[\n\r\u2028\u2029]/.test(gap);
+    });
+  });
+}
+
+it('classifies generated ASCII flows beside a Mermaid fence', () => {
+  const label = fc.constantFrom('a', 'some text', '漢字', 'x[y', 'a\nb');
+  const box = fc.oneof(
+    { weight: 6, arbitrary: label.map((text) => `[${text}]`) },
+    { weight: 1, arbitrary: label.map((text) => `[${text}`) },
+    { weight: 1, arbitrary: fc.constant('[]') },
+  );
+  const arrow = fc.oneof(
+    { weight: 3, arbitrary: fc.constant('-->') },
+    { weight: 2, arbitrary: fc.constantFrom('->', '→', '──>', '─→', '─>', '-', '>') },
+  );
+  const gap = fc.oneof(
+    { weight: 3, arbitrary: fc.constantFrom('', ' ', ' extra ') },
+    { weight: 1, arbitrary: fc.constantFrom('\n', '\r', '\u2028', '\u2029') },
+  );
+  fc.assert(
+    fc.property(box, gap, arrow, gap, box, (left, before, token, after, right) => {
+      const row = left + before + token + after + right;
+      const hasDiagramGlyph = token.includes('─') || token.includes('→');
+      assert.equal(
+        lint('```mermaid\n```\n' + row, { rules: ['L07'] }).issues.length,
+        Number(hasDiagramGlyph || referenceAsciiFlow(row)),
+        JSON.stringify(row),
+      );
+    }),
+    { ...propertyOptions, numRuns: 1000 },
+  );
+});
+
+it('preserves multiline labels and same-line arrow gaps in mermaid mix detection', () => {
+  for (const [row, mixed] of [
+    ['[a\nb] --> [c\nd]', true],
+    ['[a] [nested --> [b]', true],
+    ['[a]\n--> [b]', false],
+    ['[a] -->\u2028[b]', false],
+    ['[a]\r--> [b]', false],
+    ['[a] -->\u2029[b]', false],
+    ['[a] --> [b', false],
+    ['[a] -> [b]', false],
+    ['[a] → [b]', true],
+    ['[] --> [b]', false],
+    ['[a] --> []', false],
+  ] as const) {
+    const input = `\`\`\`mermaid
+\`\`\`
+${row}`;
+    assert.equal(lint(input, { rules: ['L07'] }).issues.length, Number(mixed), row);
+  }
+});
+
+it('scans long unfinished labels within the time budget', () => {
+  const label = '['.repeat(100_000);
+  for (const [fence, content, nodeCount] of [
+    ['', label, 0],
+    ['', `[a] --> [b]\n${label}`, 1],
+    ['mermaid', label, 0],
+  ] as const) {
+    const input = `\`\`\`${fence}\n${content}\n\`\`\``;
+    const start = performance.now();
+    assert.equal(parse(input).length, nodeCount);
+    assert.deepEqual(lint(input).issues, []);
+    assert.equal(autofix(input, { processFenced: true }), input);
+    assert.ok(performance.now() - start < 2000);
+  }
 });

@@ -2,6 +2,7 @@
 // Repairs misaligned │ / ┌─┐ / └─┘ borders so the right edge lines up.
 // Zero deps. ESM only. No I/O — text in, text out.
 
+import { hasExactlyOneArrow, hasFlowArrow, flowArrowIndex } from './arrows.ts';
 import { visualWidth } from './width.ts';
 import { STATE_MARKER_RE } from './markers.ts';
 import { nextFrame } from './frames.ts';
@@ -177,7 +178,7 @@ function detectFrameContentType(stripped: readonly string[]): FrameContentType {
   // Complex guards first
   if (stripped.some((l) => /[├└]──/.test(l))) return 'complex';
   if (stripped.some((l) => (l.match(/│/g) ?? []).length >= 2)) return 'complex';
-  if (stripped.some((l) => /─→|→|──>|-->/.test(l))) return 'complex';
+  if (stripped.some(hasFlowArrow)) return 'complex';
   // Status markers (let L11 handle)
   const stateRe = new RegExp(STATE_MARKER_RE.source, STATE_MARKER_RE.flags);
   if (stripped.every((l) => stateRe.test(l))) return 'status';
@@ -215,15 +216,9 @@ export function autofixFrameToPlain(node: FrameNodeFull): string {
 // pads left-side text so all arrows line up in one column.
 // ---------------------------------------------------------------------------
 
-const ARROW_RE = /─→|→|──>|-->/;
-
-function hasExactlyOneArrow(line: string): boolean {
-  return (line.match(/─→|→|──>|-->/g) ?? []).length === 1;
-}
-
 function arrowColPos(line: string): number {
-  const m = /─→|→|──>|-->/.exec(line);
-  return m?.index !== undefined ? visualWidth(line.slice(0, m.index)) : -1;
+  const index = flowArrowIndex(line);
+  return index >= 0 ? visualWidth(line.slice(0, index)) : -1;
 }
 
 // Build a set of line indices that should be skipped for new-pattern fixes:
@@ -249,7 +244,7 @@ function buildSkipSet(lines: readonly string[], processFenced: boolean): Readonl
 }
 
 function detectAndFixArrows(text: string, processFenced: boolean): string {
-  if (!ARROW_RE.test(text)) return text;
+  if (!hasFlowArrow(text)) return text;
   const lines = text.split('\n');
   const n = lines.length;
   const skip = buildSkipSet(lines, processFenced);
@@ -276,9 +271,9 @@ function detectAndFixArrows(text: string, processFenced: boolean): string {
       const maxPos = Math.max(...positions);
       if (maxPos - minPos <= 3) {
         const parts = regionLines.map((l) => {
-          const m = /─→|→|──>|-->/.exec(l);
-          if (m?.index === undefined) return { left: l, rest: '' };
-          return { left: l.slice(0, m.index).trimEnd(), rest: l.slice(m.index) };
+          const index = flowArrowIndex(l);
+          if (index < 0) return { left: l, rest: '' };
+          return { left: l.slice(0, index).trimEnd(), rest: l.slice(index) };
         });
         const maxLeft = Math.max(...parts.map((p) => visualWidth(p.left)));
         for (let k = 0; k < parts.length; k++) {
@@ -428,7 +423,7 @@ export function autofix(text: string, opts?: AutofixOptions): string {
   const convertL15 = opts?.convertL15 === true;
   if (!text) return text;
   const hasFrames = text.includes('┌');
-  const hasArrows = ARROW_RE.test(text);
+  const hasArrows = hasFlowArrow(text);
   const hasJunctions = JUNCTION_RE.test(text);
   const hasSeps = text.includes('─');
   if (!hasFrames && !hasArrows && !hasJunctions && !hasSeps) return text;

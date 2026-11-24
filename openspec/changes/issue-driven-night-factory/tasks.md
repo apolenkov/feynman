@@ -1,5 +1,7 @@
 # Tasks
 
+The maintainer’s tracker records progress on the open acceptance tasks below.
+
 ## 2026-10-16 continuation (TASK-282.06)
 
 - [x] Preserve observed known fingerprints independently of new-finding selection; prove complete known-only scans and no false absence closure, with invalid inputs failing before writes.

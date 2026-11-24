@@ -49,6 +49,24 @@ export function parseFactoryJson(bytes: string | Buffer): JsonRecord {
     throw new FactoryFailure('Invalid factory JSON; preserve work');
   }
 }
+// Read one byte beyond the limit so growth after opening cannot bypass the cap.
+export function readLimitedFile(file: string, limit: number, tooLarge: () => never): Buffer {
+  const fd = fs.openSync(file, 'r');
+  try {
+    if (fs.fstatSync(fd).size > limit) return tooLarge();
+    const bytes = Buffer.alloc(limit + 1);
+    let length = 0;
+    while (length <= limit) {
+      const count = fs.readSync(fd, bytes, length, bytes.length - length, null);
+      if (count === 0) return bytes.subarray(0, length);
+      length += count;
+    }
+    return tooLarge();
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 export function stringField(value: JsonRecord, key: string): string {
   const field = value[key];
   if (typeof field !== 'string' || !field) throw new FactoryFailure(`Invalid string ${key}`);
@@ -817,6 +835,8 @@ export const CONTROL_FILES: readonly string[] = [
   'scripts/check-factory-workflows.ts',
   'package.json',
   'package-lock.json',
+  'tools/codex/package.json',
+  'tools/codex/package-lock.json',
   'tools/ocr/package.json',
   'tools/ocr/package-lock.json',
   '.github/workflows/ci.yml',

@@ -807,7 +807,7 @@ describe('L15 homogeneous frame — unit tests', () => {
   });
 
   it('frame with arrow-bearing content NOT flagged by L15 (complex guard)', () => {
-    // Arrow content triggers the complex guard (stripped.some(/─→|→|──>|-->/)
+    // Arrow content triggers the complex-frame guard
     // so L15 skips this frame.
     const md =
       '```\n┌────────────────────┐\n│ [A] → [B]          │\n│ step → next step   │\n└────────────────────┘\n```';

@@ -4,6 +4,9 @@
 // Detection: ``` fences (generic only) OR standalone blocks ≥30% diagram chars, ≥3 lines
 // Zero deps. ESM only.
 
+import { hasFlowArrow } from './arrows.ts';
+import { boxes } from './boxes.ts';
+
 // Characters that indicate ASCII diagram content
 // Box-drawing: ┌┐└┘─│├┤┬┴┼ Tree: ├── └── Arrows: →←↑↓▲▼
 // Also count: + - | < > brackets used in ASCII art context
@@ -109,14 +112,13 @@ function looksLikeDiagram(lines: readonly string[]): boolean {
     const wordChars = (trimmed.match(/[a-zA-Z]/g) ?? []).length;
     const boxChars = Array.from(trimmed).filter((ch) => BOX_DRAWING_CHARS.has(ch)).length;
     // Prose: more letters than box chars by a significant margin
-    if (wordChars > 5 && boxChars > 0 && wordChars > boxChars * 3) return true;
-    return !trimmed; // blank lines are neutral
+    return wordChars > 5 && boxChars > 0 && wordChars > boxChars * 3;
   });
 
   // For standalone blocks (not fenced), require structural indicators
   // Box-drawing Unicode dominant (≥40% of non-space chars are box-drawing)
   const boxDrawingCount = Array.from(text).filter((ch) => BOX_DRAWING_CHARS.has(ch)).length;
-  const boxRatio = nonSpaceCount > 0 ? boxDrawingCount / nonSpaceCount : 0;
+  const boxRatio = boxDrawingCount / nonSpaceCount;
 
   if (hasBoxDrawing && boxRatio >= 0.15 && !isProse) return true;
 
@@ -125,7 +127,7 @@ function looksLikeDiagram(lines: readonly string[]): boolean {
   if (/^[\s│]*[├└]──/m.test(text)) return true;
 
   // Flow diagram: [Box] connected with arrows
-  if (/\[[^\]]+\]/.test(text) && /-->|→|─→|──>/.test(text)) return true;
+  if (hasFlowArrow(text) && boxes(text).next().done !== true) return true;
 
   // Priority scale: ▲ or ▼ on their own
   if (/^[\s]*[▲▼]/m.test(text)) return true;
@@ -203,8 +205,8 @@ export function parse(markdown: string): readonly DiagramNode[] {
       // Fenced blocks: also accept multiple [Box] tokens (even without arrows)
       // since those are clearly intended as flow diagrams (L05 will catch missing arrows)
       const hasFencedBoxPattern = blockLines.some((line) => {
-        const boxes = [...line.matchAll(/\[[^\]]+\]/g)];
-        return boxes.length >= 2;
+        const [, secondBox] = boxes(line);
+        return secondBox !== undefined;
       });
       if (blockLines.length >= 1 && (looksLikeDiagram(blockLines) || hasFencedBoxPattern)) {
         nodes.push({
@@ -242,19 +244,19 @@ export function parse(markdown: string): readonly DiagramNode[] {
       // Check for structural diagram indicators (order matters — strongest first)
       const text = blockLines.join('\n');
       const { hasBoxDrawing } = countDiagramChars(text);
-      const hasBoxToken = /\[[^\]]+\]/.test(text) && /-->|→|─>|──>/.test(text);
+      const hasBoxToken = hasFlowArrow(text) && boxes(text).next().done !== true;
       // Multiple [Box] tokens on one line without natural language between them
       // (even without arrows — L05 will catch missing arrows)
       // "Natural language between" means: word chars NOT in brackets between the boxes
       const hasMultiBox = blockLines.some((l) => {
-        const matches = [...l.matchAll(/\[[^\]]+\]/g)];
+        const matches = [...boxes(l)];
         if (matches.length < 2) return false;
         // Check what's between the first and last box
         const first = matches[0];
         const last = matches.at(-1);
         if (!first || !last) return false;
-        const firstEnd = first.index + first[0].length;
-        const lastStart = last.index;
+        const firstEnd = first.end;
+        const lastStart = last.start;
         const between = l.slice(firstEnd, lastStart);
         // If "between" contains regular English words (sequences of alpha), it's prose
         // Allow: spaces, arrows, punctuation, special chars

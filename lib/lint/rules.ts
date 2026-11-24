@@ -3,6 +3,8 @@
 // Issue: {rule, severity, line, column, message, suggestion?}
 // Zero deps. ESM only.
 
+import { hasFlowArrow } from './arrows.ts';
+import { boxes } from './boxes.ts';
 import { visualCharacters, visualWidth, firstVisualColumnOf, lastVisualColumnOf } from './width.ts';
 import { iterateFrames } from './frames.ts';
 import { STATE_MARKER_RE } from './markers.ts';
@@ -242,13 +244,13 @@ export function L02_tree_chars(ast: ASTNode): Issue[] {
 // ---------------------------------------------------------------------------
 const ARROW_PATTERNS: { name: string; re: RegExp }[] = [
   // seq-msg family: -->> first (return), then ->> (sync call, not tail of -->>)
-  { name: 'seq-msg', re: /-->>/ },
+  { name: 'seq-msg', re: /-{2}>>/ },
   { name: 'seq-msg', re: /(?<!-)->>/ }, // ->> not preceded by - (so it isn't the tail of -->>)
   // flow arrows — --> must exclude --> that is the head of -->> (handled by seq-msg above),
   // but since seq-msg is checked first and found.set() guards duplicates, we only need to
   // avoid counting -->> as --> which the seq-msg pattern already captures.
   // The (?!>) lookahead ensures --> inside -->> isn't double-counted as a flow arrow.
-  { name: '-->', re: /-->(?!>)/ },
+  { name: '-->', re: /-{2}>(?!>)/ },
   { name: '→', re: /(?<![─-])→/ },
   { name: '─→', re: /─→/ },
   { name: '──>', re: /──>/ },
@@ -365,13 +367,12 @@ export function L04_column_widths(ast: ASTNode): Issue[] {
 // Two [Box] tokens on same line require an explicit connection between them.
 // Connections may be directed or intentionally undirected.
 // ---------------------------------------------------------------------------
-const BOX_RE = /\[[^\]]+\]/g;
 const BARE_CONNECTION_RE = /^\s*(?:(?:<-+>|<-+|-+>{1,2})|(?:←|↔|→|─+(?:→|>))|-{2,})\s*$/;
 // Labels may be compact (`--request-->`) or spaced (`-- load > 8 -->`). The
 // boundary arrowheads carry direction; arrow tokens inside the label are invalid.
 const LABELED_CONNECTION_RE = /^\s*<?-{2,}\s*(.+?)\s*-{2,}>?\s*$/;
 const ARROW_TOKEN_RE = /<-|->|←|↔|→|─+(?:→|>)/;
-const PARALLEL_BRANCH_COLUMN_RE = /^\s{3,}\+-->\s*$/;
+const PARALLEL_BRANCH_COLUMN_RE = /^\s{3,}\+-{2}>\s*$/;
 
 function isCompleteConnection(value: string): boolean {
   if (BARE_CONNECTION_RE.test(value)) return true;
@@ -388,16 +389,16 @@ export function L05_flow_integrity(ast: ASTNode): Issue[] {
   const lines = content.split('\n');
   const baseLineNum = ast.startLine;
   return lines.flatMap((line, li) => {
-    const boxes = [...line.matchAll(BOX_RE)];
+    const labels = [...boxes(line)];
 
-    if (boxes.length < 2) return [];
+    if (labels.length < 2) return [];
 
     // Check between each consecutive pair of boxes
-    const hasViolation = boxes.slice(0, -1).some((currentBox, bi) => {
-      const nextBox = boxes[bi + 1];
+    const hasViolation = labels.slice(0, -1).some((currentBox, bi) => {
+      const nextBox = labels[bi + 1];
       if (nextBox === undefined) return false;
-      const curEnd = currentBox.index + currentBox[0].length;
-      const nextStart = nextBox.index;
+      const curEnd = currentBox.end;
+      const nextStart = nextBox.start;
       const between = line.slice(curEnd, nextStart);
 
       // If between region is pure whitespace (≥3 spaces), treat as parallel layout (not connected)
@@ -414,8 +415,8 @@ export function L05_flow_integrity(ast: ASTNode): Issue[] {
             'L05',
             'error',
             baseLineNum + li,
-            (boxes[0]?.index ?? 0) + 1,
-            `${boxes.length} boxes on same line with no connection between them: ${boxes.map((m) => m[0]).join(', ')}`,
+            (labels[0]?.start ?? 0) + 1,
+            `${labels.length} boxes on same line with no connection between them: ${labels.map(({ start, end }) => line.slice(start, end)).join(', ')}`,
             `Add a connection (for example --, -->, or →) between consecutive boxes`,
           ),
         ]
@@ -477,6 +478,31 @@ export function L06_priority_scale(ast: ASTNode): Issue[] {
 // If ``` mermaid ``` block exists alongside ASCII diagram, flag.
 // This rule operates on fullText, not a single AST node.
 // ---------------------------------------------------------------------------
+// Labels can span line breaks. Only the gaps on either side of the arrow
+// must be on one line. A nested opening can also start the right label.
+function hasAsciiFlow(text: string): boolean {
+  const labels = boxes(text);
+  let next = labels.next();
+  const lastClose = text.lastIndexOf(']');
+  let left = false;
+  let arrow = false;
+  for (let i = 0; i < lastClose; i++) {
+    if (next.done !== true && next.value.end === i) {
+      left = true;
+      next = labels.next();
+    }
+    const ch = text[i];
+    if (ch === '[' && arrow && text[i + 1] !== ']') return true;
+    if (ch === '\n' || ch === '\r' || ch === '\u2028' || ch === '\u2029') {
+      left = false;
+      arrow = false;
+    } else if (left && text.startsWith('-->', i)) {
+      arrow = true;
+    }
+  }
+  return false;
+}
+
 export function L07_no_mermaid_mix(fullText: string): Issue[] {
   if (!fullText) return [];
 
@@ -489,10 +515,9 @@ export function L07_no_mermaid_mix(fullText: string): Issue[] {
 
   // Check for ASCII diagram indicators
   const hasAsciiBoxDrawing = /[┌┐└┘─│├┤┬┴┼→←↑↓▲▼]/.test(fullText);
-  const hasAsciiFlow = /\[[^\]]+\].*(?:-->|→).*\[[^\]]+\]/.test(fullText);
   const hasTree = /[├└]──/.test(fullText);
 
-  if (!hasAsciiBoxDrawing && !hasAsciiFlow && !hasTree) return [];
+  if (!hasAsciiBoxDrawing && !hasTree && !hasAsciiFlow(fullText)) return [];
 
   const mermaidLine = mermaidIdx + 1;
 
@@ -914,7 +939,7 @@ export function L13_double_wrap(ast: ASTNode): Issue[] {
 // ---------------------------------------------------------------------------
 
 // Regex: at least one box-drawing, arrow, or tree char in the content.
-const DIAGRAM_CHAR_RE = /[┌┐└┘│─├┤┬┴┼]|-->|→|[├└]──/;
+const DIAGRAM_CHAR_RE = /[┌┐└┘│─├┤┬┴┼]/;
 
 // ---------------------------------------------------------------------------
 // L15 — Homogeneous frame → plain format
@@ -959,7 +984,7 @@ export function L15_homogeneous_frame(ast: ASTNode): Issue[] {
     if (stripped.some((l) => (l.match(/│/g) ?? []).length >= 2)) {
       return [];
     }
-    if (stripped.some((l) => /─→|→|──>|-->/.test(l))) {
+    if (stripped.some(hasFlowArrow)) {
       return [];
     }
     // Status frames — let L11 handle.
@@ -1005,7 +1030,7 @@ export function L14_blank_line_separation(ast: ASTNode, fullText: string): Issue
   if (ast.content.length === 0) return [];
 
   // Only fire on diagram blocks with actual diagram chars.
-  if (!DIAGRAM_CHAR_RE.test(ast.content)) return [];
+  if (!DIAGRAM_CHAR_RE.test(ast.content) && !hasFlowArrow(ast.content)) return [];
 
   // Indented / list-adjacent blocks: be lenient.
   if (ast.indent > 0) return [];

@@ -16,6 +16,18 @@
 
 **feynman adds visual-explanation instructions to Codex: a skill that turns relationships into diagrams, an optional session hook, and an ASCII diagram linter.**
 
+## Install
+
+Install the native Codex plugin from your terminal.
+
+```bash
+codex plugin marketplace add apolenkov/feynman --ref main
+codex plugin add feynman@feynman
+```
+
+Start a new Codex session to use the skill. For the in-app installer, skills.sh,
+or the local hook and CLI, see [Installation options](#installation-options).
+
 ![feynman lint catching a broken box and passing a clean flow](.github/assets/demo.gif)
 
 ## Why
@@ -46,17 +58,13 @@ establish explanation quality.
 - **Local only.** The CLI has zero third-party runtime dependencies, and the
   hook writes no telemetry.
 
-## Install
+## Installation options
 
-### Native Codex plugin
+### Native Codex plugin via the in-app installer
 
-```bash
-codex plugin marketplace add apolenkov/feynman --ref main
-codex plugin add feynman@feynman
-```
-
-Open `/plugins` in Codex to search for **Feynman**, install it, then start a
-new session. The skill is discoverable for visual architecture, ASCII diagrams,
+After adding the marketplace, you can use the Codex UI in place of
+`codex plugin add`. Open `/plugins`, search for **Feynman**, install it, and
+start a new session. The skill is discoverable for visual architecture, ASCII diagrams,
 flows, trees, comparisons, priorities, and status summaries.
 Explanation requests work directly from the packaged skill; they do not need
 the CLI, a hook, network access, or local state setup.

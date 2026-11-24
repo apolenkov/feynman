@@ -516,11 +516,19 @@ function parseSession(stdout: string): { type: 'done' | 'failed'; file_path: str
 function excerpt(source: string, comment: Comment): string {
   try {
     const file = path.join(source, comment.path);
-    if (!fs.lstatSync(file).isFile()) return '';
-    const lines = fs.readFileSync(file, 'utf8').split('\n');
-    const from = Math.max(0, comment.start_line - 16);
-    const to = comment.start_line === 0 ? 0 : Math.max(comment.end_line, comment.start_line) + 15;
-    return lines.slice(from, to).join('\n').slice(0, 3000);
+    const fd = fs.openSync(
+      file,
+      fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK,
+    );
+    try {
+      if (!fs.fstatSync(fd).isFile()) return '';
+      const lines = fs.readFileSync(fd, 'utf8').split('\n');
+      const from = Math.max(0, comment.start_line - 16);
+      const to = comment.start_line === 0 ? 0 : Math.max(comment.end_line, comment.start_line) + 15;
+      return lines.slice(from, to).join('\n').slice(0, 3000);
+    } finally {
+      fs.closeSync(fd);
+    }
   } catch {
     return '';
   }

@@ -66,6 +66,8 @@ export class FactoryPlatform {
       'scripts/check-factory-workflows.ts',
       'package.json',
       'package-lock.json',
+      'tools/codex/package.json',
+      'tools/codex/package-lock.json',
       'tools/ocr/package.json',
       'tools/ocr/package-lock.json',
     ];

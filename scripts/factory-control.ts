@@ -3,6 +3,7 @@ import { isCanonicalIssueAuthor } from './factory-publication.ts';
 import {
   resolveFactoryContext,
   FactoryFailure,
+  readLimitedFile,
   safeReason,
   arrayField,
   authorityMarker,
@@ -637,9 +638,11 @@ const NIGHT_RECORD_LIMIT = 1_000_000;
 // shortcut: one finding per night because a run carries one verifier receipt (F1); lift with protocol v2.
 function nightDraft(context: FactoryContext, request: JsonRecord): JsonRecord {
   const file = stringField(request, 'draft_file');
-  if (fs.statSync(file).size > NIGHT_RECORD_LIMIT)
-    throw new FactoryFailure('Night draft too large');
-  const draft = parseFactoryJson(fs.readFileSync(file));
+  const draft = parseFactoryJson(
+    readLimitedFile(file, NIGHT_RECORD_LIMIT, () => {
+      throw new FactoryFailure('Night draft too large');
+    }),
+  );
   const findings = arrayField(draft, 'findings').map(record);
   if (findings.length > 1) throw new FactoryFailure('Night draft may carry at most one finding');
   const known = draft['known_present'];
@@ -1253,7 +1256,7 @@ async function bootstrapGenesis(
   for (const issue of issues) {
     if (typeof issue['body'] !== 'string' || !issue['body'].includes('<!-- factory-finding-v1 '))
       continue;
-    const marker = /<!-- factory-finding-v1 (\{[^\n]*\}) -->/.exec(issue['body'])?.[1];
+    const marker = /<!-- factory-finding-v1 (\{[^\n]*\}) -{2}>/.exec(issue['body'])?.[1];
     if (marker === undefined)
       throw new FactoryFailure('Unidentifiable legacy canonical issue; inventory unknown');
     const markerValue: unknown = JSON.parse(marker);
