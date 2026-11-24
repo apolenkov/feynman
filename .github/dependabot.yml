@@ -1,10 +1,26 @@
-# Monthly version updates with at most one open version PR per ecosystem/directory.
+# Monthly version updates: members of all-dependencies share one open version PR (limit 2).
 # A 3-day cooldown delays new releases; it does not guarantee their safety.
 # Dependabot security updates are separate from this schedule and PR limit.
 version: 2
+
+# One version PR per scheduled run for the members marked multi-ecosystem-group below.
+# The pinned night-scan tool (/tools/ocr) is deliberately not a member.
+multi-ecosystem-groups:
+  all-dependencies:
+    schedule:
+      interval: monthly
+      time: '09:00'
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: chore
+      include: scope
+
 updates:
   - package-ecosystem: npm
     directory: /
+    multi-ecosystem-group: all-dependencies
+    patterns:
+      - '*'
     # TypeScript 7.0.2 fails strict peer resolution (2026-10-16):
     # typescript-eslint 8.71.2 requires TypeScript <6.1.0; keep compatible 6.0.3.
     ignore:
@@ -17,16 +33,12 @@ updates:
     cooldown:
       default-days: 3
     groups:
-      tooling:
-        applies-to: version-updates
+      security-updates:
+        applies-to: security-updates
         patterns:
           - '*'
     labels:
       - dependencies
-    open-pull-requests-limit: 1
-    commit-message:
-      prefix: chore
-      include: scope
 
   # Pinned night-scan tool, installed outside the checkout; a bump fails the
   # tool check until policy and lock are reviewed together, so nothing merges itself.
@@ -46,33 +58,36 @@ updates:
 
   - package-ecosystem: npm
     directory: /tools/codex
-    schedule:
-      interval: monthly
-      time: '09:00'
-    cooldown:
-      default-days: 3
-    labels:
-      - dependencies
-    open-pull-requests-limit: 1
-    commit-message:
-      prefix: chore
-      include: scope
-
-  - package-ecosystem: github-actions
-    directory: /
+    multi-ecosystem-group: all-dependencies
+    patterns:
+      - '*'
     schedule:
       interval: monthly
       time: '09:00'
     cooldown:
       default-days: 3
     groups:
-      actions:
-        applies-to: version-updates
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - '*'
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: /
+    multi-ecosystem-group: all-dependencies
+    patterns:
+      - '*'
+    schedule:
+      interval: monthly
+      time: '09:00'
+    cooldown:
+      default-days: 3
+    groups:
+      security-updates:
+        applies-to: security-updates
         patterns:
           - '*'
     labels:
       - github-actions
-    open-pull-requests-limit: 1
-    commit-message:
-      prefix: chore
-      include: scope
