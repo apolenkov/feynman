@@ -154,8 +154,11 @@ describe('F26 frame iteration', () => {
   }
 });
 
+const row = 'ordinary prose without chart marks '.repeat(4).trimEnd();
+const barLine = '│'.padEnd(row.length) + '\n';
+const verticalBarSuffix = (n: number) => `${row}\n`.repeat(n) + barLine.repeat(n);
+
 describe('F27 contiguous standalone blocks', () => {
-  const row = 'ordinary prose without chart marks '.repeat(4).trimEnd();
   const suffix = '  ┌─────┐\n  │ row │\n  └┘';
   const repaired = '  ┌─────┐\n  │ row │\n  └─────┘';
 
@@ -213,8 +216,7 @@ describe('F27 contiguous standalone blocks', () => {
   });
 
   it('bounds parse work for a suffix of vertical bars', () => {
-    const bar = '│'.padEnd(row.length);
-    assertBoundedWork(128, (n) => `${row}\n`.repeat(n) + `${bar}\n`.repeat(n), parse);
+    assertBoundedWork(128, verticalBarSuffix, parse, [barLine]);
   });
 });
 
@@ -236,4 +238,98 @@ describe('landed L05 and L07 bracket scanning', () => {
       assertBoundedWork(2048, input, run, ['[', 'x']);
     });
   }
+});
+
+describe('scan work counters', () => {
+  const letters = (n: number) => 'a'.repeat(n);
+  function rejects(reason: RegExp, ...args: Parameters<typeof assertBoundedWork>): void {
+    assert.throws(() => {
+      assertBoundedWork(...args);
+    }, reason);
+  }
+
+  for (const method of ['includes', 'indexOf'] as const) {
+    it(`counts the span searched by ${method}`, () => {
+      rejects(/(?:substringChecks|searchUnits) at sizes/, 64, letters, (text) => {
+        for (let i = 0; i < text.length; i++) text[method](']', i);
+      });
+      assertBoundedWork(64, letters, (text) => {
+        for (let i = 0; i < text.length; i++) text[method]('a', i);
+        text[method](']');
+      });
+    });
+  }
+
+  const rowMoves = {
+    unshift: (rows: string[]) => rows.unshift('a'),
+    shift: (rows: string[]) => rows.shift(),
+    splice: (rows: string[]) => rows.splice(1, 0, 'a'),
+    reverse: (rows: string[]) => rows.reverse(),
+    toReversed: (rows: string[]) => rows.toReversed(),
+  };
+  for (const [method, move] of Object.entries(rowMoves)) {
+    it(`counts elements moved by ${method}`, () => {
+      rejects(/copiedRows at sizes/, 64, letters, (text) => {
+        const rows = Array.from(text);
+        for (let remaining = text.length; remaining > 0; remaining--) move(rows);
+      });
+      assertBoundedWork(64, letters, (text) => {
+        const rows: string[] = [];
+        for (const ch of text) rows.push(ch);
+        move(rows);
+      });
+    });
+  }
+
+  it('counts equal-size splice replacements without shifting the tail', () => {
+    assertBoundedWork(64, letters, (text) => {
+      const rows = Array.from(text);
+      for (const ch of text) rows.splice(1, 1, ch);
+    });
+  });
+
+  it('detects a single exec scanning the vertical-bar suffix from each line', () => {
+    rejects(
+      /super-linear repetition/,
+      16,
+      verticalBarSuffix,
+      (text) => /^[\s│]*[├└]──/m.exec(text),
+      [barLine],
+    );
+    assertBoundedWork(16, verticalBarSuffix, (text) => /[├└]──/.exec(text), [barLine]);
+  });
+
+  for (const method of ['sticky exec', 'split'] as const) {
+    it(`counts the characters inspected by a rejecting ${method}`, () => {
+      const scan = (text: string, pattern: RegExp) => {
+        if (method === 'split') {
+          text.split(pattern);
+          return;
+        }
+        const sticky = new RegExp(pattern, 'y');
+        for (let i = 0; i < text.length; i++) {
+          sticky.lastIndex = i;
+          sticky.exec(text);
+        }
+      };
+      rejects(/regexUnits at sizes/, 64, letters, (text) => {
+        scan(text, /a+b/);
+      });
+      assertBoundedWork(64, letters, (text) => {
+        scan(text, /b+a/);
+      });
+    });
+  }
+
+  it('distinguishes early and late rejection of an anchored expression', () => {
+    const scan = (text: string, pattern: RegExp) => {
+      for (let remaining = text.length; remaining > 0; remaining--) pattern.exec(text);
+    };
+    rejects(/regexUnits at sizes/, 64, letters, (text) => {
+      scan(text, /^a+b/);
+    });
+    assertBoundedWork(64, letters, (text) => {
+      scan(text, /^b/);
+    });
+  });
 });
