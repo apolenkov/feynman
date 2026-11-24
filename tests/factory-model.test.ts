@@ -28,7 +28,7 @@ import {
 
 const LOCK = path.join(import.meta.dirname, '..', 'tools', 'ocr', 'package-lock.json');
 const POLICY_INTEGRITY =
-  'sha512-INAEZXpxGuAd4XhMLLLxMo4jYoh0cdbp52sDNl/VfLJ7PT7kFkHFsmPiD63kt0PnGkr3w+zEsKoCNGz9JJZfzA==';
+  'sha512-pVgkJe1MtlnTEp2SCtyoxFdY1GZv049EOJfoyjB89sWSe5mXNz7cA4ZHsVLeWjm+UvLApRZtdbQhseaHdG8MiQ==';
 const SECRET_ENV = ['OCR_LLM_AUTH_TOKEN', 'OPENCODE_GO_API_KEY', 'GITHUB_TOKEN'];
 
 const ok1 = readRecord(path.join(FIXTURES, 'ok1.json'));
@@ -369,10 +369,10 @@ describe('factory-model run: recorded ocr outputs', () => {
     assert.equal(raw['schema'], 'factory-night-scan-raw/v1');
     assert.equal(arrayField(raw, 'comments').length, 3);
     assert.deepEqual(record(raw['tool']), {
-      version: '1.13.12',
-      git_head: 'f921d6a',
+      version: '1.14.0',
+      git_head: 'd29ca20',
       lock_integrity: POLICY_INTEGRITY,
-      binary_version: 'open-code-review v1.13.12 (f921d6a) test/stub',
+      binary_version: 'open-code-review v1.14.0 (d29ca204) test/stub',
     });
     const built = buildScanDraft(
       raw,
@@ -443,7 +443,7 @@ describe('factory-model run: recorded ocr outputs', () => {
     const s = await scenario(t, 'ok1', agreeable);
     const wrongDir = tmp(t);
     const wrong = stubOcr(wrongDir, 'ok1', {
-      version: 'open-code-review v1.13.12 (deadbee) test/stub',
+      version: 'open-code-review v1.14.0 (deadbee) test/stub',
     });
     const result = await run(
       [
@@ -840,12 +840,12 @@ describe('factory-model run: shared deadline', () => {
 describe('factory-model check-tool and policy', () => {
   function prefixWithBinary(
     dir: string,
-    version = 'open-code-review v1.13.12 (f921d6a) x/y',
+    version = 'open-code-review v1.14.0 (d29ca204) x/y',
   ): string {
     const prefix = path.join(dir, 'prefix');
     const pkg = path.join(prefix, 'node_modules', '@alibaba-group');
     fs.mkdirSync(path.join(pkg, 'open-code-review'), { recursive: true });
-    fs.writeFileSync(path.join(pkg, 'open-code-review', 'package.json'), '{"version":"1.13.12"}');
+    fs.writeFileSync(path.join(pkg, 'open-code-review', 'package.json'), '{"version":"1.14.0"}');
     fs.copyFileSync(LOCK, path.join(prefix, 'package-lock.json'));
     const bin = path.join(pkg, `ocr-${process.platform}-${process.arch}`, 'bin', 'opencodereview');
     fs.mkdirSync(path.dirname(bin), { recursive: true });
@@ -866,7 +866,7 @@ describe('factory-model check-tool and policy', () => {
     const pkg = readRecord(path.join(path.dirname(LOCK), 'package.json'));
     assert.equal(pkg['private'], true);
     assert.equal(pkg['scripts'], undefined);
-    assert.deepEqual(pkg['dependencies'], { '@alibaba-group/open-code-review': '1.13.12' });
+    assert.deepEqual(pkg['dependencies'], { '@alibaba-group/open-code-review': '1.14.0' });
   });
 
   it('accepts the pinned install and prints the native binary', async (t) => {
@@ -878,7 +878,7 @@ describe('factory-model check-tool and policy', () => {
   });
 
   it('rejects a binary built from another commit', async (t) => {
-    const prefix = prefixWithBinary(tmp(t), 'open-code-review v1.13.12 (deadbee) x/y');
+    const prefix = prefixWithBinary(tmp(t), 'open-code-review v1.14.0 (deadbee) x/y');
     assert.equal(
       (await run(['check-tool', '--policy', policyFile, '--prefix', prefix], env)).code,
       1,
