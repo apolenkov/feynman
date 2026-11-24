@@ -469,13 +469,13 @@ describe('L05 flow integrity — unit tests', () => {
   });
 
   it('a separate branch connector after a wide gap starts a parallel column', () => {
-    const md = '```\n+--> [Adopt]                              +--> [Re-open path]\n```';
-    const result = lint(md);
-    assert.equal(
-      result.issues.filter((issue) => issue.rule === 'L05').length,
-      0,
-      'the second +--> belongs to its own column, not to an Adopt→Re-open edge',
-    );
+    for (const line of [
+      '[Adopt]    +--> [Re-open path]',
+      '+--> [Adopt]                              +--> [Re-open path]',
+    ]) {
+      const result = lint(`\`\`\`\n${line}\n\`\`\``);
+      assert.equal(result.issues.filter((issue) => issue.rule === 'L05').length, 0, line);
+    }
   });
 
   it('[A] ->> [B] is not flagged (seq arrow recognized by L05)', () => {

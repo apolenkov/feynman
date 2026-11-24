@@ -41,6 +41,10 @@ export interface HighlightCommandResult {
 export type HighlightTestRunner = (root: string) => HighlightCommandResult;
 
 export function parseHighlightArguments(argv: readonly string[]): HighlightOptions {
+  const unknownOption = argv.find(
+    (arg) => arg.startsWith('-') && arg !== '--dry-run' && arg !== '--revert',
+  );
+  if (unknownOption !== undefined) throw new Error(`unknown option: ${unknownOption}`);
   return {
     dryRun: argv.includes('--dry-run'),
     operation: argv.includes('--revert') ? 'revert' : 'apply',
@@ -74,11 +78,17 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function checkBudget(text: string, label: string, log: (message: string) => void): number {
+function checkBudget(
+  text: string,
+  label: string,
+  log: (message: string) => void,
+  allowOversized = false,
+): void {
   const size = Buffer.byteLength(text, 'utf8');
   log(`  ${label}: ${size} bytes (budget ≤${BUDGET}, slack ${BUDGET - size})`);
-  if (size > BUDGET) throw new Error(`size ${size} exceeds budget ${BUDGET} — refusing to write`);
-  return size;
+  if (!allowOversized && size > BUDGET) {
+    throw new Error(`size ${size} exceeds budget ${BUDGET} — refusing to write`);
+  }
 }
 
 export function executeHighlight(
@@ -87,9 +97,9 @@ export function executeHighlight(
 ): void {
   const rulesPath = path.join(environment.root, RULES_RELATIVE_PATH);
   const original = environment.readFile(rulesPath);
-  checkBudget(original, 'before', environment.log);
-  const result =
-    options.operation === 'revert' ? revertHighlight(original) : applyHighlight(original);
+  const reverted = options.operation === 'revert' ? revertHighlight(original) : null;
+  checkBudget(original, 'before', environment.log, reverted !== null && reverted.text !== original);
+  const result = reverted ?? applyHighlight(original);
   environment.log(`  ${result.note}`);
 
   if (result.text === original) {

@@ -68,6 +68,35 @@ describe('coverage gate', () => {
     );
   });
 
+  it('rejects repeated LCOV source identities before they can inflate gate coverage', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-coverage-'));
+    try {
+      fs.mkdirSync(path.join(root, 'lib'));
+      fs.writeFileSync(path.join(root, 'lib', 'a.ts'), 'export {};\n');
+      fs.writeFileSync(path.join(root, 'lib', 'b.ts'), 'export {};\n');
+      const report =
+        'SF:lib/a.ts\nLF:20\nLH:20\nend_of_record\nSF:lib/b.ts\nLF:20\nLH:17\nend_of_record\n';
+      const scope = coverageScope(report, root);
+      assertCompleteCoverageScope(scope);
+      assert.deepEqual(scope.coverage, { hit: 37, found: 40, percentage: 92.5 });
+      assert.throws(() => {
+        assertMinimumCoverage(scope.coverage);
+      }, /92\.50% is below 95%/);
+
+      for (const source of ['lib/a.ts', './lib/../lib/a.ts', path.join(root, 'lib', 'a.ts')]) {
+        for (const hit of [20, 19]) {
+          const duplicate = `SF:${source}\nLF:20\nLH:${hit}\nend_of_record\n`;
+          assert.throws(
+            () => coverageScope(report + duplicate, root),
+            /duplicate source record for lib\/a\.ts/,
+          );
+        }
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('reports every first-party TypeScript file that is absent from LCOV', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'feynman-coverage-'));
     try {
