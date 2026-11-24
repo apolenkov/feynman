@@ -1,3 +1,4 @@
+import { assertBoundedWork } from './helpers/scan-work.ts';
 import { boxes } from '../lib/lint/boxes.ts';
 import { flowArrowIndex, hasExactlyOneArrow } from '../lib/lint/arrows.ts';
 import fc from 'fast-check';
@@ -218,18 +219,18 @@ ${row}`;
   }
 });
 
-it('scans long unfinished labels within the time budget', () => {
-  const label = '['.repeat(100_000);
-  for (const [fence, content, nodeCount] of [
-    ['', label, 0],
-    ['', `[a] --> [b]\n${label}`, 1],
-    ['mermaid', label, 0],
+it('bounds scanning for long unfinished labels', () => {
+  for (const [fence, prefix, nodeCount] of [
+    ['', '', 0],
+    ['', '[a] --> [b]\n', 1],
+    ['mermaid', '', 0],
   ] as const) {
-    const input = `\`\`\`${fence}\n${content}\n\`\`\``;
-    const start = performance.now();
-    assert.equal(parse(input).length, nodeCount);
-    assert.deepEqual(lint(input).issues, []);
-    assert.equal(autofix(input, { processFenced: true }), input);
-    assert.ok(performance.now() - start < 2000);
+    const input = (n: number) => `\`\`\`${fence}\n${prefix}${'['.repeat(n)}\n\`\`\``;
+    const long = input(100_000);
+    assert.equal(parse(long).length, nodeCount);
+    assert.deepEqual(lint(long).issues, []);
+    const fix = (text: string) => autofix(text, { processFenced: true });
+    assert.equal(fix(long), long);
+    for (const run of [parse, lint, fix]) assertBoundedWork(25_000, input, run, ['[']);
   }
 });

@@ -5,46 +5,12 @@ import { autofix } from '../lib/lint/autofix.ts';
 import { iterateFrames, nextFrame } from '../lib/lint/frames.ts';
 import { lint } from '../lib/lint/index.ts';
 import { parse } from '../lib/lint/parser.ts';
+import { assertBoundedWork } from './helpers/scan-work.ts';
 
 const properties = { seed: 20261124, numRuns: 200 };
 const fenced = (content: string): string => `\`\`\`\n${content}\n\`\`\``;
 const locations = (input: string, rules: readonly string[]) =>
   lint(input, { rules }).issues.map(({ rule, line, column }) => [rule, line, column]);
-
-function assertBoundedWork(
-  smallest: number,
-  makeInput: (size: number) => string,
-  run: (input: string) => unknown,
-): void {
-  const sizes = [smallest, smallest * 2, smallest * 4];
-  const inputs = sizes.map(makeInput);
-  const first = inputs[0];
-  assert.ok(first !== undefined);
-  const measure = (input: string, batches: number): number => {
-    const start = process.cpuUsage();
-    for (let batch = 0; batch < batches; batch++) run(input);
-    const { user, system } = process.cpuUsage(start);
-    return user + system;
-  };
-
-  // Calibrate once to stay above timer noise, then use the same batch at every size.
-  for (const input of inputs) measure(input, 1);
-  let batches = 1;
-  while (measure(first, batches) < 15_000) batches *= 2;
-  for (const input of inputs) measure(input, batches);
-  const medians = inputs.map((input) => {
-    const samples = Array.from({ length: 7 }, () => measure(input, batches));
-    samples.sort((a, b) => a - b);
-    const median = samples[3];
-    assert.ok(median !== undefined);
-    return median;
-  });
-  for (const [index, median] of medians.entries()) {
-    const previous = medians[index - 1];
-    if (previous === undefined) continue;
-    assert.ok(median / previous <= 2.8, `${sizes.join('/')}: CPU medians ${medians.join('/')} µs`);
-  }
-}
 
 describe('F25 labeled connections', () => {
   it('preserves the accepted labels and L05 source locations', () => {
@@ -79,12 +45,17 @@ describe('F25 labeled connections', () => {
     return `--${'─'.repeat(size - 5)}-->`;
   }
 
-  for (const shape of ['valid', 'bad suffix', 'stroke label'] as const) {
+  for (const [shape, repeated] of [
+    ['valid', ['x']],
+    ['bad suffix', ['-', ' ']],
+    ['stroke label', ['─']],
+  ] as const) {
     it(`bounds lint work for ${shape} connectors`, () => {
       assertBoundedWork(
-        shape === 'stroke label' ? 1024 : 64,
+        1024,
         (n) => fenced(`[A] ${connector(n, shape)} [B]`),
         (input) => lint(input, { rules: ['L05'] }),
+        repeated,
       );
     });
   }
@@ -183,8 +154,11 @@ describe('F26 frame iteration', () => {
   }
 });
 
+const row = 'ordinary prose without chart marks '.repeat(4).trimEnd();
+const barLine = '│'.padEnd(row.length) + '\n';
+const verticalBarSuffix = (n: number) => `${row}\n`.repeat(n) + barLine.repeat(n);
+
 describe('F27 contiguous standalone blocks', () => {
-  const row = 'ordinary prose without chart marks '.repeat(4).trimEnd();
   const suffix = '  ┌─────┐\n  │ row │\n  └┘';
   const repaired = '  ┌─────┐\n  │ row │\n  └─────┘';
 
@@ -242,8 +216,7 @@ describe('F27 contiguous standalone blocks', () => {
   });
 
   it('bounds parse work for a suffix of vertical bars', () => {
-    const bar = '│'.padEnd(row.length);
-    assertBoundedWork(128, (n) => `${row}\n`.repeat(n) + `${bar}\n`.repeat(n), parse);
+    assertBoundedWork(128, verticalBarSuffix, parse, [barLine]);
   });
 });
 
@@ -262,7 +235,101 @@ describe('landed L05 and L07 bracket scanning', () => {
     it(`retains bounded lint work for ${name}`, () => {
       const run = (text: string) => locations(text, ['L05', 'L07']);
       assert.deepEqual(run(input(64)), expected);
-      assertBoundedWork(2048, input, run);
+      assertBoundedWork(2048, input, run, ['[', 'x']);
     });
   }
+});
+
+describe('scan work counters', () => {
+  const letters = (n: number) => 'a'.repeat(n);
+  function rejects(reason: RegExp, ...args: Parameters<typeof assertBoundedWork>): void {
+    assert.throws(() => {
+      assertBoundedWork(...args);
+    }, reason);
+  }
+
+  for (const method of ['includes', 'indexOf'] as const) {
+    it(`counts the span searched by ${method}`, () => {
+      rejects(/(?:substringChecks|searchUnits) at sizes/, 64, letters, (text) => {
+        for (let i = 0; i < text.length; i++) text[method](']', i);
+      });
+      assertBoundedWork(64, letters, (text) => {
+        for (let i = 0; i < text.length; i++) text[method]('a', i);
+        text[method](']');
+      });
+    });
+  }
+
+  const rowMoves = {
+    unshift: (rows: string[]) => rows.unshift('a'),
+    shift: (rows: string[]) => rows.shift(),
+    splice: (rows: string[]) => rows.splice(1, 0, 'a'),
+    reverse: (rows: string[]) => rows.reverse(),
+    toReversed: (rows: string[]) => rows.toReversed(),
+  };
+  for (const [method, move] of Object.entries(rowMoves)) {
+    it(`counts elements moved by ${method}`, () => {
+      rejects(/copiedRows at sizes/, 64, letters, (text) => {
+        const rows = Array.from(text);
+        for (let remaining = text.length; remaining > 0; remaining--) move(rows);
+      });
+      assertBoundedWork(64, letters, (text) => {
+        const rows: string[] = [];
+        for (const ch of text) rows.push(ch);
+        move(rows);
+      });
+    });
+  }
+
+  it('counts equal-size splice replacements without shifting the tail', () => {
+    assertBoundedWork(64, letters, (text) => {
+      const rows = Array.from(text);
+      for (const ch of text) rows.splice(1, 1, ch);
+    });
+  });
+
+  it('detects a single exec scanning the vertical-bar suffix from each line', () => {
+    rejects(
+      /super-linear repetition/,
+      16,
+      verticalBarSuffix,
+      (text) => /^[\s│]*[├└]──/m.exec(text),
+      [barLine],
+    );
+    assertBoundedWork(16, verticalBarSuffix, (text) => /[├└]──/.exec(text), [barLine]);
+  });
+
+  for (const method of ['sticky exec', 'split'] as const) {
+    it(`counts the characters inspected by a rejecting ${method}`, () => {
+      const scan = (text: string, pattern: RegExp) => {
+        if (method === 'split') {
+          text.split(pattern);
+          return;
+        }
+        const sticky = new RegExp(pattern, 'y');
+        for (let i = 0; i < text.length; i++) {
+          sticky.lastIndex = i;
+          sticky.exec(text);
+        }
+      };
+      rejects(/regexUnits at sizes/, 64, letters, (text) => {
+        scan(text, /a+b/);
+      });
+      assertBoundedWork(64, letters, (text) => {
+        scan(text, /b+a/);
+      });
+    });
+  }
+
+  it('distinguishes early and late rejection of an anchored expression', () => {
+    const scan = (text: string, pattern: RegExp) => {
+      for (let remaining = text.length; remaining > 0; remaining--) pattern.exec(text);
+    };
+    rejects(/regexUnits at sizes/, 64, letters, (text) => {
+      scan(text, /^a+b/);
+    });
+    assertBoundedWork(64, letters, (text) => {
+      scan(text, /^b/);
+    });
+  });
 });
