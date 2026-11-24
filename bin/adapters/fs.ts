@@ -31,14 +31,14 @@ export function ensureDir(dir: string): void {
 }
 
 export function copyFileIfExists(src: string, dest: string): boolean {
-  if (!fs.existsSync(src)) return false;
+  if (fs.lstatSync(src, { throwIfNoEntry: false }) === undefined) return false;
   ensureDir(path.dirname(dest));
   fs.copyFileSync(src, dest);
   return true;
 }
 
 export function copyMarkdownDir(src: string, dest: string): number {
-  if (!fs.existsSync(src)) return 0;
+  if (fs.lstatSync(src, { throwIfNoEntry: false }) === undefined) return 0;
   return fs
     .readdirSync(src, { withFileTypes: true })
     .toSorted((a, b) => a.name.localeCompare(b.name))
@@ -55,7 +55,6 @@ export function copyMarkdownDir(src: string, dest: string): number {
 
 /** Copy every regular file in a directory tree and return the copied-file count. */
 export function copyDirectory(src: string, dest: string): number {
-  if (!fs.existsSync(src)) return 0;
   return fs
     .readdirSync(src, { withFileTypes: true })
     .toSorted((a, b) => a.name.localeCompare(b.name))

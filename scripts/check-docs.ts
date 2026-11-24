@@ -60,6 +60,7 @@ export interface DocsCheckResult {
   }[];
   readonly hasInvalidPublicInstallExample: boolean;
   readonly driftFindings: readonly string[];
+  readonly driftReadFailures: readonly string[];
 }
 
 interface DocsCheckOutput {
@@ -95,6 +96,26 @@ function trackedFiles(root: string): string[] {
   return result.stdout.split('\0').filter(Boolean);
 }
 
+function absent(file: string): boolean {
+  try {
+    return fs.lstatSync(file, { throwIfNoEntry: false }) === undefined;
+  } catch {
+    return false;
+  }
+}
+
+// null indicates an intentional deletion. undefined indicates a failed read.
+function readInput(file: string, required: boolean): string | null | undefined {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    if (!required && error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      if (absent(file)) return null;
+    }
+    return undefined;
+  }
+}
+
 export function checkDocs(root = ROOT): DocsCheckResult {
   const extension = sourceExtension(root);
   const lint = path.join(root, 'bin', `feynman-lint${extension}`);
@@ -106,7 +127,20 @@ export function checkDocs(root = ROOT): DocsCheckResult {
     ...listMarkdown(root, 'examples'),
   ];
 
+  const publicFiles = ['README.md', path.join('bin', `feynman${extension}`)];
+  const tracked = trackedFiles(root).filter((rel) => !isDriftExcluded(rel));
+  const inputs = new Map(
+    [...new Set([...publicFiles, ...tracked])].map((rel) => [
+      rel,
+      readInput(path.join(root, rel), publicFiles.includes(rel)),
+    ]),
+  );
+  const driftReadFailures = [...inputs].flatMap(([rel, content]) =>
+    content === undefined ? [rel] : [],
+  );
+
   const lintFailures = files.flatMap((file) => {
+    if (driftReadFailures.includes(file)) return [];
     const result = spawnSync(process.execPath, [lint, file], {
       cwd: root,
       encoding: 'utf8',
@@ -114,22 +148,16 @@ export function checkDocs(root = ROOT): DocsCheckResult {
     });
     return result.status === 0 ? [] : [{ file, stdout: result.stdout, stderr: result.stderr }];
   });
-  const publicText: string = [
-    fs.readFileSync(path.join(root, 'README.md'), 'utf8'),
-    fs.readFileSync(path.join(root, 'bin', `feynman${extension}`), 'utf8'),
-  ].join('\n');
-
+  const publicText = publicFiles.map((file) => inputs.get(file) ?? '').join('\n');
   const hasInvalidPublicInstallExample = publicText.includes('npx feynman ');
-  const entries = trackedFiles(root).flatMap((rel) => {
-    try {
-      return [{ rel, content: fs.readFileSync(path.join(root, rel), 'utf8') }];
-    } catch {
-      return []; // unreadable or removed since `git ls-files`
-    }
-  });
-  const driftFindings = detectDrift(entries);
+  const driftFindings = detectDrift(
+    tracked.flatMap((rel) => {
+      const content = inputs.get(rel);
+      return typeof content === 'string' ? [{ rel, content }] : [];
+    }),
+  );
 
-  return { files, lintFailures, hasInvalidPublicInstallExample, driftFindings };
+  return { files, lintFailures, hasInvalidPublicInstallExample, driftFindings, driftReadFailures };
 }
 
 export function runDocsCheck(
@@ -148,6 +176,9 @@ export function runDocsCheck(
   if (result.hasInvalidPublicInstallExample) {
     output.stderr('docs lint failed: public install examples must use npx @albinocrabs/feynman\n');
   }
+  for (const file of result.driftReadFailures) {
+    output.stderr(`doc-drift guard: cannot read ${file}\n`);
+  }
   if (result.driftFindings.length > 0) {
     output.stderr(
       'docs lint failed: superseded toolchain contract on live surfaces (see ADR 0001)\n',
@@ -158,6 +189,7 @@ export function runDocsCheck(
   if (
     result.lintFailures.length > 0 ||
     result.hasInvalidPublicInstallExample ||
+    result.driftReadFailures.length > 0 ||
     result.driftFindings.length > 0
   ) {
     return 1;

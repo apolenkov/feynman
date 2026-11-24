@@ -181,4 +181,21 @@ describe('Codex hook configuration transformation', () => {
     assert.equal(settings.hooks?.['SessionStart']?.length, 2);
     assert.equal(cleaned === settings, false);
   });
+
+  it('only drops groups and events emptied by removing owned hooks', () => {
+    const emptyGroup = { matcher: 'foreign', hooks: [], extension: { owner: 'user' } };
+    const ownedGroup = { hooks: [{ command: 'node /tmp/feynman-session-start.ts' }] };
+    const settings = {
+      hooks: {
+        SessionStart: [ownedGroup, emptyGroup],
+        Stop: [ownedGroup],
+        UserPromptSubmit: [],
+        CustomEvent: [],
+      },
+    };
+    assert.deepEqual(removeFeynmanHooks(settings), {
+      hooks: { SessionStart: [emptyGroup], UserPromptSubmit: [], CustomEvent: [] },
+    });
+    assert.deepEqual(removeFeynmanHooks({ hooks: {} }), { hooks: {} });
+  });
 });
