@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { it } from 'node:test';
 import {
+  actionlintBinary,
   checkWorkflows,
   disposeActionlint,
   validateNativeWorkflow,
@@ -63,6 +64,21 @@ it('accepts the queue diagnostic and rejects unknown runner labels even when the
   t.after(disposeActionlint);
   const name = 'queued.yml';
   const queued = workflow.replace('jobs:', 'concurrency:\n  group: test\n  queue: max\njobs:');
+  try {
+    await actionlintBinary();
+  } catch (error: unknown) {
+    if (
+      process.env['CI'] !== 'true' &&
+      error instanceof TypeError &&
+      error.cause instanceof Error &&
+      'code' in error.cause &&
+      ['ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH'].includes(String(error.cause.code))
+    ) {
+      t.skip('Offline: the pinned actionlint release is unreachable');
+      return;
+    }
+    throw error;
+  }
   await validateNativeWorkflow(queued, name);
 
   for (const [label, diagnostic] of [

@@ -12,6 +12,7 @@ Affects `.github/dependabot.yml` only. No dependency versions change in this cha
 
 ## Non-goals
 
-- Changing the pinned night-scan tool entry for `/tools/ocr`. It keeps its own monthly schedule and stays outside the group, because its bumps need policy and lock review together.
 - Changing CI workflows, dependency versions or the TypeScript ignore rule.
 - Merging any open Dependabot pull request as part of this change.
+
+`/tools/ocr` — инструмент удалён вместе с ночной фабрикой, TASK-922.

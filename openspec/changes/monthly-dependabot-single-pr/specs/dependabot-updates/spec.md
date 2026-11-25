@@ -26,12 +26,3 @@ Each version update entry and the multi-ecosystem group SHALL allow at most 2 op
 
 - **WHEN** `.github/dependabot.yml` is validated
 - **THEN** every `open-pull-requests-limit` value is 2 or less
-
-### Requirement: Pinned tool outside the group
-
-The `/tools/ocr` entry SHALL NOT be a member of the shared multi-ecosystem group, so that its bumps keep their own review.
-
-#### Scenario: Pinned tool has a new version
-
-- **WHEN** Dependabot finds a new version of the pinned night-scan tool
-- **THEN** it opens its own pull request and does not add the bump to the group pull request
