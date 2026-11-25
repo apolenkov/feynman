@@ -8,6 +8,7 @@
 <p align="center">
   <a href="https://github.com/apolenkov/feynman/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/apolenkov/feynman/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://www.npmjs.com/package/@albinocrabs/feynman"><img alt="npm" src="https://img.shields.io/npm/v/@albinocrabs/feynman?color=2563EB"></a>
+  <a href="https://api.npmjs.org/downloads/point/2026-01-01:2026-11-22/@albinocrabs%2Ffeynman">npm downloads, Jan 1 to Nov 22, 2026</a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/apolenkov/feynman?color=2563EB"></a>
   <img alt="Node.js 22.18+" src="https://img.shields.io/badge/node-%E2%89%A522.18-2563EB">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-2563EB">
@@ -29,6 +30,21 @@ Start a new Codex session to use the skill. For the in-app installer, skills.sh,
 or the local hook and CLI, see [Installation options](#installation-options).
 
 ![feynman lint catching a broken box and passing a clean flow](.github/assets/demo.gif)
+
+From the repository root, run the GIF’s broken-box example with Node.js 22.18 or newer:
+
+```bash
+node bin/feynman.ts lint tests/fixtures/invalid-l01-unclosed-box.md
+```
+
+The first diagnostic points to the missing bottom-left corner:
+
+```text
+tests/fixtures/invalid-l01-unclosed-box.md:6:1: L01 error Unclosed box: '┌' at line 6, col 1 has no matching '└' at same column
+```
+
+Close the frame and align both edges as in the [valid frame](tests/fixtures/valid-frame.md).
+The GIF ends with a separate [clean flow diagram](tests/fixtures/valid-flow.md).
 
 ## Why
 
