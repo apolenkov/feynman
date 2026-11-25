@@ -1,0 +1,21 @@
+{
+  "protocol": 2,
+  "model": "exact-model",
+  "reasoning": "medium",
+  "sourceHead": "abc123",
+  "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "runnerHash": "<runnerHash>",
+  "originalTasksHash": "98c3b6333e7639ae82af05906c21b44710352a8cccbe8fb17c4173f8cf5a6e51",
+  "usefulnessTasksHash": "478c3998185369e6c8503a7b4529061f9d839be2308f38205c68ca8bf79719b8",
+  "usefulnessPromptTemplateHash": "74a84463c2b79f57f2bcc824cfc17e5d0869fdd7906aa29555a9119f092bf113",
+  "codexVersion": "codex-test 1",
+  "startedAt": "2026-09-05T00:00:00.000Z",
+  "repetitions": 1,
+  "expectedAttempts": 96,
+  "delivery": "Direct developer-instruction injection; does not establish skill discovery",
+  "instructions": {
+    "baseline": "44b67f17d34fe479982da065a0f92c589b62def26df840f31a0c945703bc7a80",
+    "skill": "c08ec155cc03511b415476988ca58f3184b91f679d5170e648248df140b2c963",
+    "hook": "6a4ac60f342ee4d810526e67a5eaa8e0940cf996b5ac03b61ff52628e759e4f4"
+  }
+}

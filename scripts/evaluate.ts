@@ -1,14 +1,19 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import os from 'node:os';
 import { createHash } from 'node:crypto';
-import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
 import { readRulesForIntensity } from '../lib/state/rules.ts';
+import {
+  parseOriginalTasks,
+  parseUsefulnessTasks,
+  USEFULNESS_PREAMBLE,
+  record,
+} from './evaluation-tasks.ts';
+import { pathToFileURL } from 'node:url';
 
 const COMMON = 'Answer the user using only the supplied facts. Do not call tools.';
-const USEFULNESS_PREAMBLE = 'These facts completely define the fictional system for this task.';
 
 export interface EvaluationCommandResult {
   readonly status: number | null;
@@ -17,6 +22,7 @@ export interface EvaluationCommandResult {
   readonly stderr: string;
   readonly error?: Error;
 }
+
 export type EvaluationCommandRunner = (
   command: string,
   args: readonly string[],
@@ -28,6 +34,7 @@ export type EvaluationCommandRunner = (
     maxBuffer?: number;
   }>,
 ) => EvaluationCommandResult;
+
 export interface EvaluationOptions {
   readonly model: string;
   readonly outputDirectory: string;
@@ -40,16 +47,7 @@ export interface EvaluationOptions {
   readonly onProgress?: (line: string) => void;
   readonly removeTemporaryHome?: (home: string) => void;
 }
-interface EvaluationTask {
-  readonly id: number;
-  readonly sourceTaskId: number | string;
-  readonly suite: 'regression' | 'usefulness';
-  readonly prompt: string;
-}
-interface UsefulnessFact {
-  readonly id: string;
-  readonly text: string;
-}
+
 interface Conditions {
   readonly baseline: string;
   readonly skill: string;
@@ -57,63 +55,6 @@ interface Conditions {
 }
 
 const hash = (text: string | Buffer): string => createHash('sha256').update(text).digest('hex');
-const record = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-function parseOriginalTasks(text: string): readonly EvaluationTask[] {
-  const parsed: unknown = JSON.parse(text);
-  if (!record(parsed) || !Array.isArray(parsed['evals']) || parsed['evals'].length !== 20)
-    throw new Error('Expected the frozen 20-task evaluation set');
-  const tasks = parsed['evals'].map((task: unknown, index): EvaluationTask => {
-    if (!record(task) || task['id'] !== index + 1 || typeof task['prompt'] !== 'string')
-      throw new Error('Invalid evaluation task');
-    return {
-      id: task['id'],
-      sourceTaskId: task['id'],
-      suite: 'regression',
-      prompt: task['prompt'],
-    };
-  });
-  return tasks;
-}
-
-function usefulnessPrompt(task: Record<string, unknown>, facts: readonly UsefulnessFact[]): string {
-  const prompt = task['prompt'];
-  const question = task['comprehensionQuestion'];
-  if (typeof prompt !== 'string' || typeof question !== 'string')
-    throw new Error('Invalid usefulness evaluation task');
-  return `${USEFULNESS_PREAMBLE}\n\n${prompt}\n\n${facts.map(({ id, text }) => `${id}: ${text}`).join('\n')}\n\nComprehension question: ${question}`;
-}
-
-function parseUsefulnessTasks(text: string): readonly EvaluationTask[] {
-  const parsed: unknown = JSON.parse(text);
-  if (!record(parsed) || !Array.isArray(parsed['tasks']) || parsed['tasks'].length !== 12)
-    throw new Error('Expected the frozen 12-task usefulness set');
-  return parsed['tasks'].map((task: unknown, index): EvaluationTask => {
-    if (!record(task) || task['id'] !== `N${String(index + 1).padStart(2, '0')}`)
-      throw new Error('Invalid usefulness evaluation task ID sequence');
-    if (!Array.isArray(task['facts']) || task['facts'].length === 0)
-      throw new Error('Invalid usefulness evaluation task facts');
-    const facts = task['facts'].map((fact: unknown): UsefulnessFact => {
-      if (!record(fact) || typeof fact['id'] !== 'string' || typeof fact['text'] !== 'string')
-        throw new Error('Invalid usefulness evaluation fact');
-      return { id: fact['id'], text: fact['text'] };
-    });
-    if (
-      !Array.isArray(task['requiredFactIds']) ||
-      !task['requiredFactIds'].every((id) => typeof id === 'string') ||
-      typeof task['answerKey'] !== 'string'
-    ) {
-      throw new Error('Invalid usefulness evaluation grading data');
-    }
-    return {
-      id: index + 21,
-      sourceTaskId: task['id'],
-      suite: 'usefulness',
-      prompt: usefulnessPrompt(task, facts),
-    };
-  });
-}
 
 function textOutput(value: string | Buffer | null): string {
   return typeof value === 'string' ? value : (value?.toString() ?? '');
@@ -272,112 +213,118 @@ export function runEvaluation(options: Readonly<EvaluationOptions>): void {
       ),
     ),
   );
+  function runAttempt(
+    task: (typeof tasks)[number],
+    repetition: number,
+    condition: keyof Conditions,
+    instructions: string,
+  ): void {
+    const id = `${task.id}-${repetition}-${condition}`;
+    const home = fs.mkdtempSync(path.join(temporaryRoot, 'feynman-eval-'));
+    const codexHome = path.join(home, '.codex');
+    fs.mkdirSync(codexHome, { mode: 0o700 });
+    const started = performance.now();
+    let primaryError: unknown;
+    try {
+      const temporaryAuth = path.join(codexHome, 'auth.json');
+      fs.copyFileSync(authSource, temporaryAuth);
+      fs.chmodSync(temporaryAuth, 0o600);
+      const result = runner(
+        'codex',
+        [
+          'exec',
+          '--ignore-user-config',
+          '--ignore-rules',
+          '--ephemeral',
+          '--skip-git-repo-check',
+          '--sandbox',
+          'read-only',
+          '--json',
+          '-m',
+          options.model,
+          '-c',
+          'model_reasoning_effort="medium"',
+          '-c',
+          `developer_instructions=${JSON.stringify(`${COMMON}\n${instructions}`)}`,
+          '-C',
+          home,
+          task.prompt,
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            PATH: environment['PATH'],
+            HOME: home,
+            CODEX_HOME: codexHome,
+            NO_COLOR: '1',
+            ...network,
+          },
+          timeout: 120_000,
+          maxBuffer: 4 * 1024 * 1024,
+        },
+      );
+      fs.writeFileSync(path.join(output, `${id}.events.jsonl`), result.stdout);
+      fs.writeFileSync(path.join(output, `${id}.stderr.txt`), result.stderr);
+      const events = parseEvents(result.stdout);
+      const messages = events
+        .filter(record)
+        .filter((event) => event['type'] === 'item.completed')
+        .map((event) => event['item'])
+        .filter(record);
+      const texts = messages
+        .filter((item) => item['type'] === 'agent_message')
+        .map((item) => item['text']);
+      const answer = texts.every((text) => typeof text === 'string') ? texts.join('\n') : '';
+      const completion = events.filter(record).find((event) => event['type'] === 'turn.completed');
+      const usedTools = messages.some(
+        (item) => !['agent_message', 'reasoning'].includes(String(item['type'])),
+      );
+      const success =
+        result.status === 0 && completion !== undefined && answer.trim().length > 0 && !usedTools;
+      const summary = {
+        id,
+        taskId: task.id,
+        sourceTaskId: task.sourceTaskId,
+        suite: task.suite,
+        repetition,
+        condition,
+        success,
+        usedTools,
+        status: result.status,
+        signal: result.signal,
+        error: result.error?.message ?? null,
+        elapsedMs: Math.round(performance.now() - started),
+        promptHash: hash(task.prompt),
+        answer,
+        answerLength: Array.from(answer).length,
+        usage: completion?.['usage'] ?? 'unavailable',
+      };
+      fs.writeFileSync(path.join(output, `${id}.json`), `${JSON.stringify(summary, null, 2)}\n`);
+      onProgress(`${id}: ${success ? 'recorded' : 'FAILED'}`);
+      if (!success)
+        throw new Error(`Evaluation stopped after failed attempt ${id}; evidence retained`);
+    } catch (error) {
+      primaryError = error;
+      throw error;
+    } finally {
+      try {
+        removeTemporaryHome(home);
+      } catch (cleanupError) {
+        if (primaryError === undefined) throw cleanupError;
+        throw new AggregateError(
+          [primaryError, cleanupError],
+          `${errorMessage(primaryError)}; temporary-home cleanup also failed: ${errorMessage(cleanupError)}`,
+          { cause: primaryError },
+        );
+      }
+    }
+  }
   for (const task of tasks) {
     const repetition = 1;
     const offset = (task.id + repetition) % entries.length;
     const ordered = [...entries.slice(offset), ...entries.slice(0, offset)];
     for (const [condition, instructions] of ordered) {
-      const id = `${task.id}-${repetition}-${condition}`;
-      const home = fs.mkdtempSync(path.join(temporaryRoot, 'feynman-eval-'));
-      const codexHome = path.join(home, '.codex');
-      fs.mkdirSync(codexHome, { mode: 0o700 });
-      const started = performance.now();
-      let primaryError: unknown;
-      try {
-        const temporaryAuth = path.join(codexHome, 'auth.json');
-        fs.copyFileSync(authSource, temporaryAuth);
-        fs.chmodSync(temporaryAuth, 0o600);
-        const result = runner(
-          'codex',
-          [
-            'exec',
-            '--ignore-user-config',
-            '--ignore-rules',
-            '--ephemeral',
-            '--skip-git-repo-check',
-            '--sandbox',
-            'read-only',
-            '--json',
-            '-m',
-            options.model,
-            '-c',
-            'model_reasoning_effort="medium"',
-            '-c',
-            `developer_instructions=${JSON.stringify(`${COMMON}\n${instructions}`)}`,
-            '-C',
-            home,
-            task.prompt,
-          ],
-          {
-            encoding: 'utf8',
-            env: {
-              PATH: environment['PATH'],
-              HOME: home,
-              CODEX_HOME: codexHome,
-              NO_COLOR: '1',
-              ...network,
-            },
-            timeout: 120_000,
-            maxBuffer: 4 * 1024 * 1024,
-          },
-        );
-        fs.writeFileSync(path.join(output, `${id}.events.jsonl`), result.stdout);
-        fs.writeFileSync(path.join(output, `${id}.stderr.txt`), result.stderr);
-        const events = parseEvents(result.stdout);
-        const messages = events
-          .filter(record)
-          .filter((event) => event['type'] === 'item.completed')
-          .map((event) => event['item'])
-          .filter(record);
-        const texts = messages
-          .filter((item) => item['type'] === 'agent_message')
-          .map((item) => item['text']);
-        const answer = texts.every((text) => typeof text === 'string') ? texts.join('\n') : '';
-        const completion = events
-          .filter(record)
-          .find((event) => event['type'] === 'turn.completed');
-        const usedTools = messages.some(
-          (item) => !['agent_message', 'reasoning'].includes(String(item['type'])),
-        );
-        const success =
-          result.status === 0 && completion !== undefined && answer.trim().length > 0 && !usedTools;
-        const summary = {
-          id,
-          taskId: task.id,
-          sourceTaskId: task.sourceTaskId,
-          suite: task.suite,
-          repetition,
-          condition,
-          success,
-          usedTools,
-          status: result.status,
-          signal: result.signal,
-          error: result.error?.message ?? null,
-          elapsedMs: Math.round(performance.now() - started),
-          promptHash: hash(task.prompt),
-          answer,
-          answerLength: Array.from(answer).length,
-          usage: completion?.['usage'] ?? 'unavailable',
-        };
-        fs.writeFileSync(path.join(output, `${id}.json`), `${JSON.stringify(summary, null, 2)}\n`);
-        onProgress(`${id}: ${success ? 'recorded' : 'FAILED'}`);
-        if (!success)
-          throw new Error(`Evaluation stopped after failed attempt ${id}; evidence retained`);
-      } catch (error) {
-        primaryError = error;
-        throw error;
-      } finally {
-        try {
-          removeTemporaryHome(home);
-        } catch (cleanupError) {
-          if (primaryError === undefined) throw cleanupError;
-          throw new AggregateError(
-            [primaryError, cleanupError],
-            `${errorMessage(primaryError)}; temporary-home cleanup also failed: ${errorMessage(cleanupError)}`,
-            { cause: primaryError },
-          );
-        }
-      }
+      runAttempt(task, repetition, condition, instructions);
     }
   }
   fs.writeFileSync(
@@ -397,6 +344,8 @@ export function evaluateMain(argv: readonly string[] = process.argv.slice(2)): v
     process.exitCode = 1;
   }
 }
+
 const invokedPath = process.argv[1];
+
 if (invokedPath !== undefined && import.meta.url === pathToFileURL(invokedPath).href)
   evaluateMain();
