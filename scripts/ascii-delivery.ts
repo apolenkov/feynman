@@ -15,7 +15,7 @@ import {
   type PackagedArtifact,
   runRecordedCommand,
 } from './ascii-evidence.ts';
-import { type EvaluationCommandRunner } from './evaluate.ts';
+import type { EvaluationCommandRunner } from './evaluate.ts';
 import {
   type SkillDiscoveryRunner,
   type HookTrustRunner,

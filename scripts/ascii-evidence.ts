@@ -13,7 +13,7 @@ import {
   AUTOMATIC_NATIVE_TASKS,
 } from './ascii-call-plan.ts';
 import { hash } from 'node:crypto';
-import { type EvaluationCommandResult, type EvaluationCommandRunner } from './evaluate.ts';
+import type { EvaluationCommandResult, EvaluationCommandRunner } from './evaluate.ts';
 
 export const MAX_BUFFER_BYTES = 4 * 1024 * 1024;
 

@@ -1,4 +1,4 @@
-import { type ReleaseCommandRunner } from './release-smoke.ts';
+import type { ReleaseCommandRunner } from './release-smoke.ts';
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
