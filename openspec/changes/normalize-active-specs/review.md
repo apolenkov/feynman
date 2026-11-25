@@ -19,3 +19,7 @@ The 17 added scenarios express existing cases in a form OpenSpec can validate.
 The repository-quality scenario count includes four active scenarios and two
 historical scenarios. Its structure patch keeps the historical comparison
 outside the active Requirements section.
+
+## Wave 2 rehearsal
+
+On local main `1d0e191`, the structure patch still applies. In an isolated copy OpenSpec 2.1.1 archived all six deltas. `openspec validate --all --strict` then passed all ten items. The owner review precedes application to the active specs.
