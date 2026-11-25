@@ -1,0 +1,147 @@
+{
+  "L01 pass — complete box with matching corners": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~31 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=8 > content=4); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    }
+  ],
+  "L01 fail — ┌ with no matching └": [
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 2,
+      "column": 1,
+      "message": "Unclosed box: '┌' at line 2, col 1 has no matching '└' at same column",
+      "suggestion": "Add a closing └ at the same column position"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 2,
+      "column": 12,
+      "message": "Unclosed box: '┐' at line 2, col 12 has no matching '┘' at same column",
+      "suggestion": "Add a closing ┘ at the same column position"
+    }
+  ],
+  "L01 fail — ┐ with no matching ┘": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~31 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=8 > content=4); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 10,
+      "column": 5,
+      "message": "Unclosed box: '┐' at line 10, col 5 has no matching '┘' at same column",
+      "suggestion": "Add a closing ┘ at the same column position"
+    }
+  ],
+  "L01 pass — multiple complete frames": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~19 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=6 > content=1); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    },
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 8,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~19 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 8,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=6 > content=1); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    }
+  ],
+  "L10 fail — within-word Cyrillic+Latin mix (zaфикшено)": [
+    {
+      "rule": "L10",
+      "line": 1,
+      "column": 11,
+      "severity": "warn",
+      "token": "zaфикшено",
+      "message": "mixed-script token: zaфикшено"
+    }
+  ],
+  "L10 pass — kebab-case identifier whitelisted": [],
+  "L10 pass — package name token whitelisted": [],
+  "L10 pass — numeric-suffixed kebab token": [],
+  "L10 pass — hyphenated worktree branch token": [],
+  "L10 fail — Latin chars at the start of Cyrillic word": [
+    {
+      "rule": "L10",
+      "line": 1,
+      "column": 6,
+      "severity": "warn",
+      "token": "Cyrвнутри",
+      "message": "mixed-script token: Cyrвнутри"
+    }
+  ],
+  "No diagram — prose only, no issues": [],
+  "Valid complex flow diagram — all rules pass": [],
+  "L14 pass — diagram with blank lines on both sides": [],
+  "L14 pass — diagram at start of file (no before line)": [],
+  "L14 pass — diagram at end of file (no after line)": [],
+  "L14 fail — prose line directly before opening fence": [
+    {
+      "rule": "L14",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "diagram block should be separated from surrounding text by a blank line",
+      "suggestion": "add a blank line before the opening ``` fence"
+    }
+  ],
+  "L14 fail — prose line directly after closing fence": [
+    {
+      "rule": "L14",
+      "severity": "warn",
+      "line": 5,
+      "column": 1,
+      "message": "diagram block should be separated from surrounding text by a blank line",
+      "suggestion": "add a blank line after the closing ``` fence"
+    }
+  ]
+}

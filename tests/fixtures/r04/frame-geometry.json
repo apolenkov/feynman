@@ -1,0 +1,504 @@
+{
+  "L08 pass — frame with consistent row widths": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 2 items; consider dot-leader list (saves ~32 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    }
+  ],
+  "L08 fail — frame close row width differs from open": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~38 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 2,
+      "column": 12,
+      "message": "Unclosed box: '┐' at line 2, col 12 has no matching '┘' at same column",
+      "suggestion": "Add a closing ┘ at the same column position"
+    },
+    {
+      "rule": "L08",
+      "severity": "error",
+      "line": 4,
+      "column": 1,
+      "message": "Frame close row width 22 differs from frame open width 12 (line 2)",
+      "suggestion": "Make all frame rows the same display width"
+    },
+    {
+      "rule": "L09",
+      "severity": "error",
+      "line": 4,
+      "column": 12,
+      "message": "Frame bottom '┘' at col 22 does not align with top '┐' at col 12 (line 2)",
+      "suggestion": "Pad or trim the row so the closing │/┘ lands at column 12"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 4,
+      "column": 22,
+      "message": "Orphan closing '┘' at line 4, col 22 has no matching '┐' at same column",
+      "suggestion": "Add an opening ┐ at the same column position"
+    }
+  ],
+  "L08 fail — internal frame row too wide": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~28 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L08",
+      "severity": "error",
+      "line": 3,
+      "column": 1,
+      "message": "Frame row width 55 differs from frame header width 12 (line 2)",
+      "suggestion": "Make all frame rows the same display width"
+    },
+    {
+      "rule": "L09",
+      "severity": "error",
+      "line": 3,
+      "column": 12,
+      "message": "Frame inner row '│' at col 55 does not align with top '┐' at col 12 (line 2)",
+      "suggestion": "Pad or trim the row so the closing │/┘ lands at column 12"
+    }
+  ],
+  "L09 pass — single perfectly aligned frame": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 2 items; consider dot-leader list (saves ~38 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=16 > content=8); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    }
+  ],
+  "L09 pass — two stacked aligned frames in one diagram block": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 2 items; consider dot-leader list (saves ~36 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=14 > content=10); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    },
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame wraps homogeneous prose content; consider plain format (saves ~38 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    },
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 6,
+      "column": 1,
+      "message": "frame used for 2 items; consider dot-leader list (saves ~34 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 6,
+      "column": 1,
+      "message": "frame wraps homogeneous prose content; consider plain format (saves ~36 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    }
+  ],
+  "L09 pass — frame with decorative gap line (no │) between aligned rows": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 2 items; consider dot-leader list (saves ~38 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=16 > content=8); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    }
+  ],
+  "L09 fail — inner │ extends past anchor (PASS overflow defect)": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 2 items; consider dot-leader list (saves ~35 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame wraps homogeneous prose content; consider plain format (saves ~37 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    },
+    {
+      "rule": "L08",
+      "severity": "error",
+      "line": 4,
+      "column": 1,
+      "message": "Frame row width 18 differs from frame header width 12 (line 2)",
+      "suggestion": "Make all frame rows the same display width"
+    },
+    {
+      "rule": "L09",
+      "severity": "error",
+      "line": 4,
+      "column": 12,
+      "message": "Frame inner row '│' at col 18 does not align with top '┐' at col 12 (line 2)",
+      "suggestion": "Pad or trim the row so the closing │/┘ lands at column 12"
+    }
+  ],
+  "L09 fail — inner │ falls short of anchor": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~27 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=4 > content=2); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    },
+    {
+      "rule": "L08",
+      "severity": "error",
+      "line": 3,
+      "column": 1,
+      "message": "Frame row width 6 differs from frame header width 12 (line 2)",
+      "suggestion": "Make all frame rows the same display width"
+    },
+    {
+      "rule": "L09",
+      "severity": "error",
+      "line": 3,
+      "column": 12,
+      "message": "Frame inner row '│' at col 6 does not align with top '┐' at col 12 (line 2)",
+      "suggestion": "Pad or trim the row so the closing │/┘ lands at column 12"
+    }
+  ],
+  "L09 fail — bottom ┘ shifted past anchor": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~33 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=8 > content=4); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 2,
+      "column": 12,
+      "message": "Unclosed box: '┐' at line 2, col 12 has no matching '┘' at same column",
+      "suggestion": "Add a closing ┘ at the same column position"
+    },
+    {
+      "rule": "L08",
+      "severity": "error",
+      "line": 4,
+      "column": 1,
+      "message": "Frame close row width 14 differs from frame open width 12 (line 2)",
+      "suggestion": "Make all frame rows the same display width"
+    },
+    {
+      "rule": "L09",
+      "severity": "error",
+      "line": 4,
+      "column": 12,
+      "message": "Frame bottom '┘' at col 14 does not align with top '┐' at col 12 (line 2)",
+      "suggestion": "Pad or trim the row so the closing │/┘ lands at column 12"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 4,
+      "column": 14,
+      "message": "Orphan closing '┘' at line 4, col 14 has no matching '┐' at same column",
+      "suggestion": "Add an opening ┐ at the same column position"
+    }
+  ],
+  "L08 pass — combining accent (é = e+U+0301) counts as 1 visual char": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~19 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=6 > content=1); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    }
+  ],
+  "L08 pass — zero-width joiner (U+200D) inside row does not bloat width": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~18 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=5 > content=2); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    }
+  ],
+  "L08 pass — CJK wide chars (日本) count as 2 cols each": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~19 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    }
+  ],
+  "L08 pass — Unicode markers (▲▼✓✗) count as 1 col each": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 2 items; consider dot-leader list (saves ~27 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame wraps homogeneous prose content; consider plain format (saves ~29 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    }
+  ],
+  "L09 pass — combining accent aligned by visual width": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~19 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=6 > content=1); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    }
+  ],
+  "L09 pass — Unicode markers ✓ ✗ ◐ align by grapheme width": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 3 items; consider dot-leader list (saves ~30 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    }
+  ],
+  "L09 pass — CJK content aligned (width 2 per char)": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 2 items; consider dot-leader list (saves ~22 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame wraps homogeneous prose content; consider plain format (saves ~28 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    }
+  ],
+  "L09 fail — empty padding inside frame (line shorter than W)": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~28 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L08",
+      "severity": "error",
+      "line": 3,
+      "column": 1,
+      "message": "Frame row width 10 differs from frame header width 12 (line 2)",
+      "suggestion": "Make all frame rows the same display width"
+    },
+    {
+      "rule": "L09",
+      "severity": "error",
+      "line": 3,
+      "column": 12,
+      "message": "Frame inner row '│' at col 10 does not align with top '┐' at col 12 (line 2)",
+      "suggestion": "Pad or trim the row so the closing │/┘ lands at column 12"
+    }
+  ],
+  "L09 fail — top border ┌─ shorter than inner content": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~27 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 2,
+      "column": 4,
+      "message": "Unclosed box: '┐' at line 2, col 4 has no matching '┘' at same column",
+      "suggestion": "Add a closing ┘ at the same column position"
+    },
+    {
+      "rule": "L08",
+      "severity": "error",
+      "line": 3,
+      "column": 1,
+      "message": "Frame row width 20 differs from frame header width 4 (line 2)",
+      "suggestion": "Make all frame rows the same display width"
+    },
+    {
+      "rule": "L09",
+      "severity": "error",
+      "line": 3,
+      "column": 4,
+      "message": "Frame inner row '│' at col 20 does not align with top '┐' at col 4 (line 2)",
+      "suggestion": "Pad or trim the row so the closing │/┘ lands at column 4"
+    },
+    {
+      "rule": "L08",
+      "severity": "error",
+      "line": 4,
+      "column": 1,
+      "message": "Frame close row width 20 differs from frame open width 4 (line 2)",
+      "suggestion": "Make all frame rows the same display width"
+    },
+    {
+      "rule": "L09",
+      "severity": "error",
+      "line": 4,
+      "column": 4,
+      "message": "Frame bottom '┘' at col 20 does not align with top '┐' at col 4 (line 2)",
+      "suggestion": "Pad or trim the row so the closing │/┘ lands at column 4"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 4,
+      "column": 20,
+      "message": "Orphan closing '┘' at line 4, col 20 has no matching '┐' at same column",
+      "suggestion": "Add an opening ┐ at the same column position"
+    }
+  ],
+  "L08+L09 mixed fail — top wider than inner with shifted │": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~28 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=5 > content=1); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    },
+    {
+      "rule": "L08",
+      "severity": "error",
+      "line": 3,
+      "column": 1,
+      "message": "Frame row width 6 differs from frame header width 12 (line 2)",
+      "suggestion": "Make all frame rows the same display width"
+    },
+    {
+      "rule": "L09",
+      "severity": "error",
+      "line": 3,
+      "column": 12,
+      "message": "Frame inner row '│' at col 6 does not align with top '┐' at col 12 (line 2)",
+      "suggestion": "Pad or trim the row so the closing │/┘ lands at column 12"
+    }
+  ]
+}
