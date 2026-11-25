@@ -11,6 +11,7 @@ import {
   validateNativeWorkflow,
   validateWorkflowSchema,
 } from '../scripts/check-workflows.ts';
+import { shouldSkipActionlintDownload } from './helpers/offline.ts';
 
 const directory = path.resolve(import.meta.dirname, '..', '.github', 'workflows');
 const workflow = `on: push
@@ -67,13 +68,7 @@ it('accepts the queue diagnostic and rejects unknown runner labels even when the
   try {
     await actionlintBinary();
   } catch (error: unknown) {
-    if (
-      process.env['CI'] !== 'true' &&
-      error instanceof TypeError &&
-      error.cause instanceof Error &&
-      'code' in error.cause &&
-      ['ENOTFOUND', 'EAI_AGAIN', 'ENETUNREACH', 'EHOSTUNREACH'].includes(String(error.cause.code))
-    ) {
+    if (shouldSkipActionlintDownload(error, process.env)) {
       t.skip('Offline: the pinned actionlint release is unreachable');
       return;
     }
