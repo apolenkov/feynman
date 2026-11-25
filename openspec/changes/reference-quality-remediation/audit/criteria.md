@@ -36,7 +36,7 @@ Rows follow issue order. PASS applies only to the named audit deliverable or obs
 | F1 order | PASS | R00–R03 and R11–R17 correct or characterize failures. R04–R05 depend on the relevant corrections before extraction. R08 follows R04–R05. R09 integrates the results for review. |
 | F2 executable steps | PASS | Tasks specify findings, dependencies, locations, success tests, scope and rollback. |
 | F3 behavior vs contract change | PASS | R03 explicitly tightens docs exit behavior; moves retain public signatures and effects. |
-| F4 finding-to-task map | PASS | R01 records F01/F04/F05; R02 records F02/F03/F06 and owns F25/F26/F27; R03 F08; R04–05 F10 (R06 retired with the night factory in TASK-922); R07 F07/F09; R08 F11; R10 F12; R00 F13; R07 F14; R11 F15; R12 F16; R13 F17/F21; R14 F18/F23; R15 F19; R16 F20; R17 F22; R18 F24; R19 F28/F30/F31; R20 F29. |
+| F4 finding-to-task map | PASS | R01 records F01/F04/F05; R02 records F02/F03/F06 and owns F25/F26/F27; R03 F08; R04–05 F10 (R06 retired with the night factory in TASK-922); R07 F07/F09; R08 F11; R10 F12; R00 F13; R07 F14; R11 F15; R12 F16; R13 F17/F21; R14 F18/F23 (retired); R15 F19; R16 F20 (retired); R17 F22; R18 F24; R19 F28/F30/F31; R20 F29. |
 | F5 additional tracker issues | NOT APPLICABLE | #1 and the scanning change already own this work. This run authorizes no issue writes. |
 | F6 legacy baseline | PASS | Candidate identities and acceptance cases include deletion, stale permissions and a count-preserving substitution. No candidate is automatically approved. |
 | G1 self-check | PASS | Refer to the recorded inventory, path, range, gate and dependency checks. |

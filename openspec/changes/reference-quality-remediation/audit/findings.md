@@ -56,7 +56,7 @@ Rechecked at `2f72cee` following merge `631aa3d`. The [scanning change](../../co
 
 | Findings | Source disposition | Evidence on the integrated branch |
 |---|---|---|
-| F01, F04, F05 | Fixed in `f273f84` | `tests/atomic-write.test.ts:8` checks default creation and replacement modes. `tests/reproducibility.test.ts:121` covers missing, non-directory and link outcomes. `tests/factory-control.test.ts:15` checks exact limit and both excess conditions. |
+| F01, F04, F05 | Fixed in `f273f84` | `tests/atomic-write.test.ts:8` checks default creation and replacement modes. `tests/reproducibility.test.ts:121` covers missing, non-directory and link outcomes. `tests/factory-control.test.ts:15` checked the exact limit and both excess conditions at that revision. In `407cd8b` the factory test retired and those checks moved to `tests/bounded-file.test.ts` with the mutation-policy entry for `bin/adapters/fs.ts`. |
 | F02, F03 | Snapshot bracket searches and arrow alternation fixed in `f273f84`. | `lib/lint/rules.ts:383` and `:483` consume forward bracket scans. `lib/lint/arrows.ts:4` searches for complete literals. F25–F27 have independent sites and remain open. |
 | F06 | Expanded in `f273f84`, completed in `2f72cee`. | `tests/diagram-properties.test.ts:78` covers multiple token types, widths and offsets. The independent literal and label-pair oracles exercise first match, count and gap boundaries. All four reviewed L07 mutations failed the targeted cases. |
 | F07 | Fixed in `6ea3200`. | `README.md:19` and `:63` distinguish the terminal and UI steps and identify the new-session requirement. |
