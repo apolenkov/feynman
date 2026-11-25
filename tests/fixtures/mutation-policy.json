@@ -281,7 +281,7 @@
       "test": "tests/reproducibility.test.ts"
     },
     {
-      "file": "scripts/evaluate-ascii.ts",
+      "file": "scripts/ascii-app-server.ts",
       "owner": "appServerStdout",
       "mutationHash": "fcbfd49f2ed16037b5d5a1723fd1fa30d28276cd1ff5db0c90148600bccc5307",
       "count": 3,
@@ -297,7 +297,7 @@
       "test": "tests/ascii-evaluation-runner.test.ts"
     },
     {
-      "file": "scripts/evaluate-ascii.ts",
+      "file": "scripts/ascii-app-server.ts",
       "owner": "discoverInstalledSkills",
       "mutationHash": "c088ca77cb0c17724f559aecca756a65fc71b3f4bd358c68e3eda9231f716369",
       "count": 4,
@@ -305,7 +305,7 @@
       "test": "tests/ascii-evaluation-runner.test.ts"
     },
     {
-      "file": "scripts/evaluate-ascii.ts",
+      "file": "scripts/ascii-app-server.ts",
       "owner": "finish",
       "mutationHash": "8d32a5c046da2d54c455210b63e271e1598bd1f0b9deeaefc15586235d5bd557",
       "count": 2,
@@ -313,7 +313,7 @@
       "test": "tests/ascii-evaluation-runner.test.ts"
     },
     {
-      "file": "scripts/evaluate-ascii.ts",
+      "file": "scripts/ascii-app-server.ts",
       "owner": "handleTrustLine",
       "mutationHash": "5c36b1b3fcd9b53526ecde7d71440e3e3ff44cf36a9463c54d6fef0c4577cabc",
       "count": 2,
@@ -321,7 +321,7 @@
       "test": "tests/ascii-evaluation-runner.test.ts"
     },
     {
-      "file": "scripts/evaluate-ascii.ts",
+      "file": "scripts/ascii-app-server.ts",
       "owner": "pushChunk",
       "mutationHash": "6b496c4b8a5b114c8337f1c52cd618ba1e5b3ce5181667bcebefabb3e19a4cd6",
       "count": 6,
@@ -337,7 +337,7 @@
       "test": "tests/ascii-evaluation-runner.test.ts"
     },
     {
-      "file": "scripts/evaluate-ascii.ts",
+      "file": "scripts/ascii-app-server.ts",
       "owner": "sendSkillsRequest",
       "mutationHash": "499bc1a77c8382d9236e49e73392f6ef15bcbf3e4681cde627ba6be47e301c7d",
       "count": 1,
@@ -345,7 +345,7 @@
       "test": "tests/ascii-evaluation-runner.test.ts"
     },
     {
-      "file": "scripts/evaluate-ascii.ts",
+      "file": "scripts/ascii-app-server.ts",
       "owner": "trustInstalledHooks",
       "mutationHash": "d7b1855b6b0ff8f1c54e5f3663da6547453c3941a78d8892709e9fe63d44a414",
       "count": 5,
@@ -370,7 +370,7 @@
     },
     {
       "file": "scripts/evaluate.ts",
-      "owner": "runEvaluation",
+      "owner": "runAttempt",
       "mutationHash": "f03371a34769379b23325b6cc9043341033a72992709eba13bce6200cb210ce5",
       "count": 2,
       "reason": "The per-attempt catch slot preserves the original model-attempt failure when isolated-home cleanup also fails; raw attempt artifacts remain available.",
