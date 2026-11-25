@@ -16,7 +16,8 @@ The configuration file was already included in the historical percentage and
 remains included. Its explicit inventory entry preserves that denominator instead
 of dropping fully covered configuration lines to hide a mismatch. To list the
 current executable sources and compare them with the measured LCOV records, run
-`npm run coverage` followed by `npm run check:coverage`.
+`npm run coverage && npm run check:coverage`. The checker prints each expected
+path, the LCOV record count and any missing or unexpected paths.
 
 ## Historical baseline and expanded scope
 
