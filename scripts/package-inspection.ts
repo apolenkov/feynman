@@ -1,4 +1,24 @@
-import type { ReleaseCommandRunner } from './release-smoke.ts';
+export interface CommandResult {
+  readonly status: number | null;
+  readonly signal: NodeJS.Signals | null;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly error: Error | undefined;
+}
+
+export interface CommandOptions {
+  readonly cwd: string;
+  readonly env: NodeJS.ProcessEnv;
+  readonly shell?: boolean;
+  readonly input?: string;
+  readonly timeout?: number;
+}
+
+export type ReleaseCommandRunner = (
+  command: string,
+  args: readonly string[],
+  options: Readonly<CommandOptions>,
+) => CommandResult;
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

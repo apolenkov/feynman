@@ -2,35 +2,22 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { isRecord, verifyTarballManifest, verifyNativePlugin } from './package-inspection.ts';
+import {
+  isRecord,
+  verifyTarballManifest,
+  verifyNativePlugin,
+  type CommandOptions,
+  type CommandResult,
+  type ReleaseCommandRunner,
+} from './package-inspection.ts';
 import { spawnSync } from 'node:child_process';
 import { extractHookScriptPath } from '../bin/adapters/codex-config.ts';
 import { isDeepStrictEqual } from 'node:util';
 import { pathToFileURL } from 'node:url';
 
+export type { ReleaseCommandRunner } from './package-inspection.ts';
+
 const ROOT = path.resolve(import.meta.dirname, '..');
-
-interface CommandResult {
-  readonly status: number | null;
-  readonly signal: NodeJS.Signals | null;
-  readonly stdout: string;
-  readonly stderr: string;
-  readonly error: Error | undefined;
-}
-
-interface CommandOptions {
-  readonly cwd: string;
-  readonly env: NodeJS.ProcessEnv;
-  readonly shell?: boolean;
-  readonly input?: string;
-  readonly timeout?: number;
-}
-
-export type ReleaseCommandRunner = (
-  command: string,
-  args: readonly string[],
-  options: Readonly<CommandOptions>,
-) => CommandResult;
 
 export interface ReleaseSmokeOptions {
   readonly root?: string;
