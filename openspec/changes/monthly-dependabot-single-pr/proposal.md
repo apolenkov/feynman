@@ -10,8 +10,9 @@ Run Dependabot version updates monthly. Put the npm root, npm `/tools/codex` and
 
 Affects `.github/dependabot.yml` only. No dependency versions change in this change. Security updates keep their own Dependabot limits and are not scheduled.
 
+TASK-922 removed the nightly factory and its `/tools/ocr` tool, so the OCR scenario was dropped.
+
 ## Non-goals
 
-- Changing the pinned night-scan tool entry for `/tools/ocr`. It keeps its own monthly schedule and stays outside the group, because its bumps need policy and lock review together.
 - Changing CI workflows, dependency versions or the TypeScript ignore rule.
 - Merging any open Dependabot pull request as part of this change.

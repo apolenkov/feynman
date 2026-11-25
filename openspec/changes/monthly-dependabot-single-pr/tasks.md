@@ -1,4 +1,4 @@
 - [ ] Commit this change before the configuration. Touches `openspec/changes/monthly-dependabot-single-pr/`.
-- [ ] Update `.github/dependabot.yml`: monthly schedule, one multi-ecosystem group, per-ecosystem security-updates group, open-pull-requests-limit 2, pinned `/tools/ocr` kept outside the group. Touches `.github/dependabot.yml`.
+- [ ] Update `.github/dependabot.yml`: monthly schedule, one multi-ecosystem group, per-ecosystem security-updates group, open-pull-requests-limit 2. Touches `.github/dependabot.yml`.
 - [ ] Validate the file with a YAML parser and the Dependabot JSON schema. Touches no files.
-- [ ] After the merge, close the superseded Dependabot group pull request #16 without a comment. Pull request #15 (pinned tool) stays open. Touches no files.
+- [ ] After the merge, close the superseded Dependabot group pull request #16 without a comment. Touches no files.

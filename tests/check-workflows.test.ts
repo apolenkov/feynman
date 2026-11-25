@@ -5,11 +5,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { it } from 'node:test';
 import {
+  actionlintBinary,
   checkWorkflows,
   disposeActionlint,
   validateNativeWorkflow,
   validateWorkflowSchema,
 } from '../scripts/check-workflows.ts';
+import { shouldSkipActionlintDownload } from './helpers/offline.ts';
 
 const directory = path.resolve(import.meta.dirname, '..', '.github', 'workflows');
 const workflow = `on: push
@@ -63,6 +65,15 @@ it('accepts the queue diagnostic and rejects unknown runner labels even when the
   t.after(disposeActionlint);
   const name = 'queued.yml';
   const queued = workflow.replace('jobs:', 'concurrency:\n  group: test\n  queue: max\njobs:');
+  try {
+    await actionlintBinary();
+  } catch (error: unknown) {
+    if (shouldSkipActionlintDownload(error, process.env)) {
+      t.skip('Offline: the pinned actionlint release is unreachable');
+      return;
+    }
+    throw error;
+  }
   await validateNativeWorkflow(queued, name);
 
   for (const [label, diagnostic] of [
