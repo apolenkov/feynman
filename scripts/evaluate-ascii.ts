@@ -673,7 +673,18 @@ export async function runAsciiEvaluation(options: Readonly<AsciiEvaluationOption
     sourceTree,
     sourceStatus,
     sourceDiff,
-    runnerHash: sha256(fs.readFileSync(import.meta.filename)),
+    runnerHash: sha256(
+      [
+        'evaluate-ascii.ts',
+        'ascii-app-server.ts',
+        'ascii-call-plan.ts',
+        'ascii-delivery.ts',
+        'ascii-evidence.ts',
+        'evaluation-tasks.ts',
+      ]
+        .map((file) => sha256(fs.readFileSync(path.join(import.meta.dirname, file))))
+        .join(''),
+    ),
     asciiFixtureHash: sha256(asciiFixtureText),
     suppressionFixtureHash: sha256(suppressionFixtureText),
     protocolHash: sha256(fs.readFileSync(protocolPath)),

@@ -6,9 +6,23 @@ import path from 'node:path';
 
 export function assertManifestBytes(output: string, fixture: string, entry: string): void {
   const file = new URL(`../fixtures/${fixture}.txt`, import.meta.url);
-  const runner = fs.readFileSync(new URL(`../../scripts/${entry}.ts`, import.meta.url));
+  const sourceDigest = (name: string): string =>
+    createHash('sha256')
+      .update(fs.readFileSync(new URL(`../../scripts/${name}.ts`, import.meta.url)))
+      .digest('hex');
+  const asciiModules = [
+    'evaluate-ascii',
+    'ascii-app-server',
+    'ascii-call-plan',
+    'ascii-delivery',
+    'ascii-evidence',
+    'evaluation-tasks',
+  ];
   const fields = {
-    runnerHash: createHash('sha256').update(runner).digest('hex'),
+    runnerHash:
+      entry === 'evaluate-ascii'
+        ? createHash('sha256').update(asciiModules.map(sourceDigest).join('')).digest('hex')
+        : sourceDigest(entry),
     node: process.version,
     platform: process.platform,
     architecture: process.arch,
