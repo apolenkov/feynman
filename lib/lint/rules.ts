@@ -165,6 +165,15 @@ export function L10_mixed_script(textOrAst: string | ASTNode | null | undefined)
   );
 }
 
+// ---------------------------------------------------------------------------
+// L14 — Blank-line separation
+// Severity: warn. A fenced ASCII/diagram block should have a blank line before
+// and after it (monospace equivalent of vertical margin; improves scannability).
+// Only applies to fenced blocks (opening ``` is at startLine-1 in 1-based terms).
+// Conservative: only warn on a clear prose-line directly touching the fence.
+// Skips: indented/list-adjacent blocks, blocks at file boundaries.
+// ---------------------------------------------------------------------------
+
 export function L14_blank_line_separation(ast: ASTNode, fullText: string): Issue[] {
   if (ast.content.length === 0) return [];
 

@@ -198,16 +198,7 @@ export function L13_double_wrap(ast: ASTNode): Issue[] {
   });
 }
 
-// ---------------------------------------------------------------------------
-// L14 — Blank-line separation
-// Severity: warn. A fenced ASCII/diagram block should have a blank line before
-// and after it (monospace equivalent of vertical margin; improves scannability).
-// Only applies to fenced blocks (opening ``` is at startLine-1 in 1-based terms).
-// Conservative: only warn on a clear prose-line directly touching the fence.
-// Skips: indented/list-adjacent blocks, blocks at file boundaries.
-// ---------------------------------------------------------------------------
-
-// Regex: at least one box-drawing, arrow, or tree char in the content.
+// Matches the box-drawing characters used in diagram frames.
 export const DIAGRAM_CHAR_RE = /[┌┐└┘│─├┤┬┴┼]/;
 
 // ---------------------------------------------------------------------------
