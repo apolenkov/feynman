@@ -675,11 +675,15 @@ export async function runAsciiEvaluation(options: Readonly<AsciiEvaluationOption
     sourceDiff,
     runnerHash: sha256(
       [
-        'evaluate-ascii.ts',
+        '../lib/state/index.ts',
+        '../lib/state/model.ts',
+        '../lib/state/rules.ts',
         'ascii-app-server.ts',
         'ascii-call-plan.ts',
         'ascii-delivery.ts',
         'ascii-evidence.ts',
+        'evaluate-ascii.ts',
+        'evaluate.ts',
         'evaluation-tasks.ts',
       ]
         .map((file) => sha256(fs.readFileSync(path.join(import.meta.dirname, file))))
