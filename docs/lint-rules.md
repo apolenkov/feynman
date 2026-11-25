@@ -34,7 +34,7 @@ UTF-16 source offsets so editor integrations keep their existing coordinates.
 **Why:** An unclosed frame box is visually deceptive — it implies containment
 it doesn't deliver, and the unclosed edge is often invisible at a glance.
 
-**Source:** [`lib/lint/rules.ts#L66`](../lib/lint/rules.ts)
+**Source:** [`L01_box_closure`](../lib/lint/rules.ts)
 
 ### Valid
 
@@ -67,7 +67,7 @@ file:2:1: L01 Unclosed box: '┌' at line 2, col 1 has no matching '└' at same
 **Why:** `├──` means "more siblings follow"; `└──` means "last child." Using
 `├──` for the last item misleads the reader about the list's structure.
 
-**Source:** [`lib/lint/rules.ts#L156`](../lib/lint/rules.ts)
+**Source:** [`L02_tree_chars`](../lib/lint/flow-rules.ts)
 
 ### Valid
 
@@ -113,7 +113,7 @@ Recognized styles:
 **Why:** Mixed arrow styles force the reader to verify that the styles are
 equivalent rather than distinct, adding cognitive overhead without information.
 
-**Source:** [`lib/lint/rules.ts#L227`](../lib/lint/rules.ts)
+**Source:** [`L03_arrow_style`](../lib/lint/flow-rules.ts)
 
 ### Valid
 
@@ -142,7 +142,7 @@ The separator row (`|---|---|`) must match the header column count.
 **Why:** Mismatched column counts break the visual grid — the reader must
 count pipes instead of reading structure.
 
-**Source:** [`lib/lint/rules.ts#L272`](../lib/lint/rules.ts)
+**Source:** [`L04_column_widths`](../lib/lint/flow-rules.ts)
 
 ### Valid
 
@@ -178,7 +178,7 @@ consecutive pair.
 symbol somewhere in prose between them does not identify a relationship; the
 whole region must use a recognized connector.
 
-**Source:** [`lib/lint/rules.ts#L364`](../lib/lint/rules.ts)
+**Source:** [`L05_flow_integrity`](../lib/lint/flow-rules.ts)
 
 Recognized forms include bare arrows (`->`, `<-`, `-->`, `<--`, `<->`, `<-->`,
 `→`, `←`, `↔`, `─→`, `──>`, `->>`, `-->>`), bare undirected dash runs (`--` or
@@ -224,7 +224,7 @@ file:1:1: L05 2 boxes on same line with no connection between them: [Auth], [Han
 cannot determine whether the listed items are near the top or bottom of
 the full range.
 
-**Source:** [`lib/lint/rules.ts#L399`](../lib/lint/rules.ts)
+**Source:** [`L06_priority_scale`](../lib/lint/flow-rules.ts)
 
 ### Valid
 
@@ -261,7 +261,7 @@ diagram characters such as box corners, arrows, or tree branches.
 between visual vocabularies. It also signals that the response lacks a coherent
 visual strategy.
 
-**Source:** [`lib/lint/rules.ts#L441`](../lib/lint/rules.ts)
+**Source:** [`L07_no_mermaid_mix`](../lib/lint/flow-rules.ts)
 
 ### Valid
 
@@ -300,7 +300,7 @@ display width (measured in terminal columns).
 **Why:** Ragged right edges in a frame add visual noise without information.
 Consistent width makes the frame a clean visual container.
 
-**Source:** [`lib/lint/rules.ts#L476`](../lib/lint/rules.ts)
+**Source:** [`L08_frame_width`](../lib/lint/frame-geometry.ts)
 
 Display width counts each Unicode character as 1 column (box-drawing
 characters, Latin, and Cyrillic are single-width; CJK characters are
@@ -345,7 +345,7 @@ A common real-world example is `│  long row PASS │` whose right `│` extend
 past the top `┐`: L08 may flag the width difference, but L09 reports the
 column-precise drift on every offending row, including the bottom `┘`.
 
-**Source:** [`lib/lint/rules.ts#L563`](../lib/lint/rules.ts)
+**Source:** [`L09_right_edge_alignment`](../lib/lint/frame-geometry.ts)
 
 L09 uses visual-column indexing via the shared `lib/lint/width.ts` helper:
 ANSI escapes (`\x1b[...m`), combining marks (U+0300..U+036F), zero-width
@@ -402,7 +402,7 @@ is `warn` not `error` — single-language teams may legitimately use
 Russian-spelled English-like terms, so the linter surfaces these without
 failing CI exit codes.
 
-**Source:** [`lib/lint/rules.ts#L10_mixed_script`](../lib/lint/rules.ts)
+**Source:** [`L10_mixed_script`](../lib/lint/rules.ts)
 
 L10 operates on full text (not per-diagram AST), so it catches mixed
 tokens in prose, list items, and headings — anywhere words appear. Words
@@ -469,7 +469,7 @@ per session, this is the largest single token-economy lever feynman has.
 table columns (`│ key │ value │`) — those genuinely need the frame's
 grouping. L13 (double-wrap) handles the tree case separately.
 
-**Source:** [`lib/lint/rules.ts#L11_overdecoration`](../lib/lint/rules.ts)
+**Source:** [`L11_overdecoration`](../lib/lint/frame-economy.ts)
 
 ### Valid (same data as dot-leader)
 
@@ -523,7 +523,7 @@ the trimmed inner text.
 the frame to fit content, drop to a lighter visual, or accept the
 token tax explicitly.
 
-**Source:** [`lib/lint/rules.ts#L12_token_budget`](../lib/lint/rules.ts)
+**Source:** [`L12_token_budget`](../lib/lint/frame-economy.ts)
 
 ### Valid (content-dominated frame)
 
@@ -559,7 +559,7 @@ file:1: explain: equivalent dot-leader: ~120 chars
 file:1: explain: saving: -160 chars
 ```
 
-Cost data comes from `estimateFrameCost` in [`lib/lint/rules.ts`](../lib/lint/rules.ts)
+Cost data comes from `estimateFrameCost` in [`lib/lint/frame-economy.ts`](../lib/lint/frame-economy.ts)
 — the same source L12 uses for its threshold check.
 
 ---
@@ -574,7 +574,7 @@ at full border cost.
 double-encoding; the frame contributes nothing the indentation does not
 already deliver. Drop the frame, keep the tree.
 
-**Source:** [`lib/lint/rules.ts#L13_double_wrap`](../lib/lint/rules.ts)
+**Source:** [`L13_double_wrap`](../lib/lint/frame-economy.ts)
 
 ### Valid (bare tree, no frame)
 
@@ -626,7 +626,7 @@ paragraph, losing its monospace rendering and breaking copy-paste fidelity.
 **Whitelist:** the very first line of the file; code fences that follow
 another closing fence or another blank line; frames that start the file.
 
-**Source:** [`lib/lint/rules.ts#L14_blank_line_separation`](../lib/lint/rules.ts)
+**Source:** [`L14_blank_line_separation`](../lib/lint/rules.ts)
 
 ### Valid (blank line before the block)
 
@@ -674,7 +674,7 @@ too ambiguous to auto-convert.
 - All inner lines match state markers (`← готов`, `✓ done`, etc.) — status
   frame; L11 handles the conversion path for those.
 
-**Source:** [`lib/lint/rules.ts#L15_homogeneous_frame`](../lib/lint/rules.ts)
+**Source:** [`L15_homogeneous_frame`](../lib/lint/frame-economy.ts)
 
 ### Valid — heterogeneous content stays framed
 

@@ -57,7 +57,7 @@
       "test": "tests/lint-bounded-work.test.ts"
     },
     {
-      "file": "lib/lint/autofix.ts",
+      "file": "lib/lint/align-rows.ts",
       "owner": "buildSkipSet",
       "mutationHash": "5ca0854660ae4b3e45a645345dc216fc6a0ead8c6767412b89cfe45a8e17bb54",
       "count": 7,
@@ -65,7 +65,7 @@
       "test": "tests/autofix.test.ts"
     },
     {
-      "file": "lib/lint/autofix.ts",
+      "file": "lib/lint/align-rows.ts",
       "owner": "detectAndFixArrows",
       "mutationHash": "97332503a1b81b6ff2fd9527d593d80cf3660226b52b2d1deb096ea5fce852f6",
       "count": 9,
@@ -73,7 +73,7 @@
       "test": "tests/autofix.test.ts"
     },
     {
-      "file": "lib/lint/autofix.ts",
+      "file": "lib/lint/align-rows.ts",
       "owner": "detectAndFixJunctions",
       "mutationHash": "97332503a1b81b6ff2fd9527d593d80cf3660226b52b2d1deb096ea5fce852f6",
       "count": 9,
@@ -81,7 +81,7 @@
       "test": "tests/autofix.test.ts"
     },
     {
-      "file": "lib/lint/autofix.ts",
+      "file": "lib/lint/align-rows.ts",
       "owner": "detectAndFixSeparators",
       "mutationHash": "36d221ab20be69e1879baaf28c6d202f3b22e0af0095d8b1716db2917876f396",
       "count": 1,
@@ -121,7 +121,7 @@
       "test": "tests/lint-bounded-work.test.ts"
     },
     {
-      "file": "lib/lint/rules.ts",
+      "file": "lib/lint/flow-rules.ts",
       "owner": "hasAsciiFlow",
       "mutationHash": "1f74e5f5969d5a44c7dc17c1af5a5d3977a9380c3e17be653aa6c733f3ebfada",
       "count": 10,
@@ -169,7 +169,7 @@
       "test": "tests/lint-bounded-work.test.ts"
     },
     {
-      "file": "lib/lint/rules.ts",
+      "file": "lib/lint/flow-rules.ts",
       "owner": "L02_tree_chars",
       "mutationHash": "4af9576d2b80e86e24458ba61750aca5634db4ca89a1a2507375487fe7c8c5fc",
       "count": 5,
@@ -177,7 +177,7 @@
       "test": "tests/lint.test.ts"
     },
     {
-      "file": "lib/lint/rules.ts",
+      "file": "lib/lint/flow-rules.ts",
       "owner": "L03_arrow_style",
       "mutationHash": "8a83faff631aa46b6045d24a0a20a2e45a108e7765a8fa494a5b68a60d090339",
       "count": 1,
@@ -185,7 +185,7 @@
       "test": "tests/lint.test.ts"
     },
     {
-      "file": "lib/lint/rules.ts",
+      "file": "lib/lint/frame-geometry.ts",
       "owner": "L08_frame_width",
       "mutationHash": "889034942131954634e1610ccfad7de6845663d0535b5cce5678d6de96219f32",
       "count": 7,
@@ -193,7 +193,7 @@
       "test": "tests/lint.test.ts"
     },
     {
-      "file": "lib/lint/rules.ts",
+      "file": "lib/lint/frame-geometry.ts",
       "owner": "L09_right_edge_alignment",
       "mutationHash": "f877d2f7b487c0c81d2ba975524f29dd0bef12822ddf01316d8d3372f101902a",
       "count": 11,

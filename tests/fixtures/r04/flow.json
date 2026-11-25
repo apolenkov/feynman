@@ -1,0 +1,123 @@
+{
+  "L02 pass — correct tree with └── as last child": [],
+  "L02 fail — last child uses ├── instead of └──": [
+    {
+      "rule": "L02",
+      "severity": "error",
+      "line": 5,
+      "column": 1,
+      "message": "Last tree child uses '├──' but should use '└──'",
+      "suggestion": "Replace '├──' with '└──' for the last child in each group"
+    }
+  ],
+  "L02 pass — single child (only ├──, no siblings after)": [
+    {
+      "rule": "L02",
+      "severity": "error",
+      "line": 3,
+      "column": 1,
+      "message": "Last tree child uses '├──' but should use '└──'",
+      "suggestion": "Replace '├──' with '└──' for the last child in each group"
+    }
+  ],
+  "L02 pass — correctly structured multi-level tree": [],
+  "L03 pass — single arrow style (-->)": [],
+  "L03 pass — single arrow style (→)": [],
+  "L03 fail — mixed --> and →": [
+    {
+      "rule": "L03",
+      "severity": "error",
+      "line": 2,
+      "column": 1,
+      "message": "Mixed arrow styles: diagram uses '-->' and '→' — pick one style",
+      "suggestion": "Use a single arrow style throughout the diagram (e.g. '-->' only)"
+    }
+  ],
+  "L03 fail — mixed --> and ──>": [
+    {
+      "rule": "L03",
+      "severity": "error",
+      "line": 3,
+      "column": 1,
+      "message": "Mixed arrow styles: diagram uses '-->' and '──>' — pick one style",
+      "suggestion": "Use a single arrow style throughout the diagram (e.g. '-->' only)"
+    }
+  ],
+  "L04 pass — consistent table column count": [],
+  "L04 fail — row with wrong column count": [
+    {
+      "rule": "L04",
+      "severity": "error",
+      "line": 3,
+      "column": 1,
+      "message": "Table separator has 2 columns but header has 3 columns",
+      "suggestion": "Ensure all table rows and separators have 3 columns"
+    }
+  ],
+  "L05 pass — boxes connected with arrows": [],
+  "L05 fail — two boxes on same line no arrow": [
+    {
+      "rule": "L05",
+      "severity": "error",
+      "line": 2,
+      "column": 1,
+      "message": "2 boxes on same line with no connection between them: [Auth], [Handler]",
+      "suggestion": "Add a connection (for example --, -->, or →) between consecutive boxes"
+    }
+  ],
+  "L05 fail — three boxes no arrows": [
+    {
+      "rule": "L05",
+      "severity": "error",
+      "line": 2,
+      "column": 1,
+      "message": "3 boxes on same line with no connection between them: [Auth], [Handler], [Response]",
+      "suggestion": "Add a connection (for example --, -->, or →) between consecutive boxes"
+    }
+  ],
+  "L06 pass — both ▲ and ▼ present": [],
+  "L06 fail — ▲ without ▼": [
+    {
+      "rule": "L06",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "Priority scale has '▲' but missing '▼' — scales require both ends",
+      "suggestion": "Add a '▼' marker to indicate the low end of the priority scale"
+    }
+  ],
+  "L06 fail — ▼ without ▲": [
+    {
+      "rule": "L06",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "Priority scale has '▼' but missing '▲' — scales require both ends",
+      "suggestion": "Add a '▲' marker to indicate the high end of the priority scale"
+    }
+  ],
+  "L07 pass — ASCII only, no mermaid": [],
+  "L07 fail — mermaid block alongside ASCII diagram": [
+    {
+      "rule": "L07",
+      "severity": "warn",
+      "line": 9,
+      "column": 1,
+      "message": "Response mixes Mermaid (line 9) and ASCII diagrams — use one format only",
+      "suggestion": "Remove the ```mermaid block and use ASCII diagrams throughout"
+    }
+  ],
+  "L03 pass — sequence diagram uses both ->> and -->> (same seq-msg family)": [],
+  "L03 fail — mixing flow --> with seq ->> is mixed styles": [
+    {
+      "rule": "L03",
+      "severity": "error",
+      "line": 3,
+      "column": 1,
+      "message": "Mixed arrow styles: diagram uses '-->' and 'seq-msg' — pick one style",
+      "suggestion": "Use a single arrow style throughout the diagram (e.g. '-->' only)"
+    }
+  ],
+  "L05 pass — two boxes connected with ->> (seq arrow recognized)": [],
+  "L05 pass — two boxes connected with -->> (return arrow recognized)": []
+}

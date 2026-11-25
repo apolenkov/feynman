@@ -1,0 +1,19 @@
+Usage: feynman-lint <file.md>
+       feynman-lint -          (read from stdin)
+       feynman-lint --json <file>
+       feynman-lint --strict <file>
+       feynman-lint --fix <file>
+       feynman-lint --explain <file>
+       feynman-lint --help
+
+Options:
+  --json     Output issues as JSON object
+  --strict   Treat warnings as errors (exit 1 on any issue)
+  --fix      Repair misaligned ASCII frames in-place; exit 0 on success
+  --explain  Annotate each frame with token-cost breakdown (read-only)
+  --help     Show this help message
+
+Exit codes:
+  0   No errors (or no issues in default mode)
+  1   Lint failure (errors found, or warnings in --strict mode)
+  2   Usage error (bad arguments, file not found)

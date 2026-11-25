@@ -1,0 +1,341 @@
+{
+  "L11 pass — frame with 6 inner lines (boundary, not overdecorated)": [],
+  "L11 pass — frame containing 3-column embedded table (whitelist)": [],
+  "L11 pass — frame containing embedded table column (whitelist)": [
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame wraps homogeneous prose content; consider plain format (saves ~69 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    }
+  ],
+  "L11 fail — frame for 5 items should be dot-leader": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 5 items; consider dot-leader list (saves ~63 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    }
+  ],
+  "L11 fail — frame for 2 items is overdecoration": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 2 items; consider dot-leader list (saves ~36 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    }
+  ],
+  "L11 fail — frame for 5 status items with markers": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 5 items; consider dot-leader list (saves ~68 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    }
+  ],
+  "L11 autofix idempotent — already dot-leader, no change": [],
+  "L11 autofix — non-pattern prose lines emit bullets": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 3 items; consider dot-leader list (saves ~71 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame wraps homogeneous prose content; consider plain format (saves ~74 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    }
+  ],
+  "L12 pass — tight frame, content dominates padding": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 2 items; consider dot-leader list (saves ~112 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame wraps homogeneous prose content; consider plain format (saves ~114 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    }
+  ],
+  "L12 pass — dot-leader list, no frame to score": [],
+  "L12 pass — frame with substantial content per row": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 3 items; consider dot-leader list (saves ~81 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame wraps homogeneous prose content; consider plain format (saves ~84 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    }
+  ],
+  "L12 fail — wide frame, tiny labels (padding dominates)": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 3 items; consider dot-leader list (saves ~204 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=123 > content=3); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    }
+  ],
+  "L12 fail — frame with 2-char states padded to 30": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 3 items; consider dot-leader list (saves ~171 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=102 > content=6); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    },
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame wraps homogeneous prose content; consider plain format (saves ~174 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    }
+  ],
+  "L12 fail — frame with single-glyph status, padding dominates": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 3 items; consider dot-leader list (saves ~149 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=90 > content=3); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    }
+  ],
+  "L13 pass — bare tree, no frame": [],
+  "L13 pass — frame without tree chars": [
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=78 > content=6); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    }
+  ],
+  "L13 pass — tree sibling-adjacent to frame, not nested": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 8,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~31 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    }
+  ],
+  "L13 fail — tree fully nested inside frame": [
+    {
+      "rule": "L13",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "tree inside frame block — the tree already conveys hierarchy; drop the frame",
+      "suggestion": "Remove the surrounding ┌─...─┐ / └─...─┘ borders; tree indentation suffices"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 6,
+      "column": 3,
+      "message": "Orphan closing '└' at line 6, col 3 has no matching '┌' at same column",
+      "suggestion": "Add an opening ┌ at the same column position"
+    }
+  ],
+  "L13 fail — single-child tree inside frame": [
+    {
+      "rule": "L13",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "tree inside frame block — the tree already conveys hierarchy; drop the frame",
+      "suggestion": "Remove the surrounding ┌─...─┐ / └─...─┘ borders; tree indentation suffices"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 4,
+      "column": 3,
+      "message": "Orphan closing '└' at line 4, col 3 has no matching '┌' at same column",
+      "suggestion": "Add an opening ┌ at the same column position"
+    }
+  ],
+  "L13 fail — deeply nested tree inside frame": [
+    {
+      "rule": "L13",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "tree inside frame block — the tree already conveys hierarchy; drop the frame",
+      "suggestion": "Remove the surrounding ┌─...─┐ / └─...─┘ borders; tree indentation suffices"
+    },
+    {
+      "rule": "L08",
+      "severity": "error",
+      "line": 5,
+      "column": 1,
+      "message": "Frame row width 21 differs from frame header width 22 (line 2)",
+      "suggestion": "Make all frame rows the same display width"
+    },
+    {
+      "rule": "L09",
+      "severity": "error",
+      "line": 5,
+      "column": 22,
+      "message": "Frame inner row '│' at col 21 does not align with top '┐' at col 22 (line 2)",
+      "suggestion": "Pad or trim the row so the closing │/┘ lands at column 22"
+    },
+    {
+      "rule": "L08",
+      "severity": "error",
+      "line": 6,
+      "column": 1,
+      "message": "Frame row width 21 differs from frame header width 22 (line 2)",
+      "suggestion": "Make all frame rows the same display width"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 6,
+      "column": 7,
+      "message": "Orphan closing '└' at line 6, col 7 has no matching '┌' at same column",
+      "suggestion": "Add an opening ┌ at the same column position"
+    },
+    {
+      "rule": "L09",
+      "severity": "error",
+      "line": 6,
+      "column": 22,
+      "message": "Frame inner row '│' at col 21 does not align with top '┐' at col 22 (line 2)",
+      "suggestion": "Pad or trim the row so the closing │/┘ lands at column 22"
+    },
+    {
+      "rule": "L01",
+      "severity": "error",
+      "line": 7,
+      "column": 3,
+      "message": "Orphan closing '└' at line 7, col 3 has no matching '┌' at same column",
+      "suggestion": "Add an opening ┌ at the same column position"
+    }
+  ],
+  "L15 pass — frame with arrow inside (complex, not homogeneous)": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 2 items; consider dot-leader list (saves ~56 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    }
+  ],
+  "L15 pass — frame with only 1 inner line (below minimum threshold)": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 1 items; consider dot-leader list (saves ~42 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    }
+  ],
+  "L15 fail — frame wrapping homogeneous kv pairs": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 3 items; consider dot-leader list (saves ~59 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame wraps homogeneous kv content; consider plain format (saves ~62 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    }
+  ],
+  "L15 fail — frame wrapping homogeneous bullet list": [
+    {
+      "rule": "L11",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame used for 3 items; consider dot-leader list (saves ~67 chars)",
+      "suggestion": "Replace frame with dot-leader list — see docs/lint-rules.md#l11"
+    },
+    {
+      "rule": "L12",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame is padding-dominated (padding=34 > content=20); consider lighter visual",
+      "suggestion": "Use --explain for full cost breakdown; consider dot-leader or trimmed frame"
+    },
+    {
+      "rule": "L15",
+      "severity": "warn",
+      "line": 2,
+      "column": 1,
+      "message": "frame wraps homogeneous bullet content; consider plain format (saves ~70 chars)",
+      "suggestion": "Use feynman-lint --fix to convert to plain text — see docs/lint-rules.md#l15"
+    }
+  ]
+}
