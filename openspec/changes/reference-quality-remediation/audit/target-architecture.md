@@ -13,7 +13,8 @@ The existing architecture already puts Codex and filesystem I/O outside the pure
 | Lint | CLI file/stdin → parser/fence classification → rule registry → ordered diagnostics → GCC/JSON reporter | Keep rule IDs, diagnostic locations, mixed-script width, strict exit behavior and stdin vs write-back semantics. |
 | Autofix | Frame recognition → eligible content conversion → arrow, junction and separator passes | Preserve unclassified rows, fence policy, transformation order, idempotence and labels. |
 | Package | tsc build → stage compiled runtime and delivery files → npm pack → reproducibility comparison → install/smoke | Keep both bin names and compiled imports. Smoke must consume the exact retained tarball. |
-| Evaluation / factory | Fixture manifests → isolated runner → evidence files; separately GitHub event → role/controller → policy and receipt checks → decision | Preserve failure evidence and ordering. Offline tests may use fake transports. They cannot approve hosted effects or score a model answer. |
+| Evaluation | Fixture manifests → isolated runner → evidence files | Preserve failure evidence and ordering. Offline tests may use fake transports. They cannot score a model answer. |
+| Night factory (retired) | GitHub event → role/controller → policy and receipt checks → decision | Historical trace. TASK-922 removed the pipeline in `407cd8b` and retired its hosted-effect checks. |
 
 ## Concrete moves
 
